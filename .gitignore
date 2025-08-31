@@ -403,6 +403,6 @@ FodyWeavers.xsd
 log.txt
 *.log
 
-# Configuration files with sensitive data
-appsettings.json
-appsettings.Production.json
+# Configuration files with sensitive data (commented out for private repo)
+# appsettings.json
+# appsettings.Production.json
