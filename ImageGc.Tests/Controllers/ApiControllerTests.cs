@@ -19,7 +19,8 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
     {
         _factory = factory;
         _client = _factory.CreateClient();
-    }    [Fact]
+    }
+    [Fact]
     public async Task HealthController_Get_ShouldReturnOk()
     {
         // Act
@@ -27,10 +28,11 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
+
         var content = await response.Content.ReadAsStringAsync();
         Assert.NotEmpty(content);
-    }[Fact]
+    }
+    [Fact]
     public async Task HealthController_Detailed_ShouldReturnHealthStatus()
     {
         // Act
@@ -38,13 +40,14 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
+
         var content = await response.Content.ReadAsStringAsync();
         Assert.NotEmpty(content);
-        
+
         // Should contain JSON with health information
         Assert.Contains("status", content.ToLower());
-    }[Fact]
+    }
+    [Fact]
     public async Task ImageAnalysisController_AnalyzeImage_WithValidImage_ShouldReturnResult()
     {
         // Arrange
@@ -79,7 +82,8 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
 
             Assert.NotNull(result);
         }
-    }    [Fact]
+    }
+    [Fact]
     public async Task ImageAnalysisController_AnalyzeImage_WithNullData_ShouldReturnBadRequest()
     {
         // Arrange
@@ -105,14 +109,15 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task ImageAnalysisController_AnalyzeImage_WithInvalidJson_ShouldReturnBadRequest()
     {
         // Arrange
-        var invalidJson = "{ invalid json }";        var content = new StringContent(invalidJson, Encoding.UTF8, "application/json");
+        var invalidJson = "{ invalid json }"; var content = new StringContent(invalidJson, Encoding.UTF8, "application/json");
 
         // Act
         var response = await _client.PostAsync("/api/imageanalysis/analyze", content);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }    [Theory]
+    }
+    [Theory]
     [InlineData("/api/health")]
     [InlineData("/api/health/azure")]
     public async Task HealthEndpoints_ShouldReturnSuccessStatusCodes(string endpoint)
@@ -121,9 +126,10 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
         var response = await _client.GetAsync(endpoint);
 
         // Assert
-        Assert.True(response.IsSuccessStatusCode, 
+        Assert.True(response.IsSuccessStatusCode,
             $"Expected success status code for {endpoint}, but got {response.StatusCode}");
-    }    [Fact]
+    }
+    [Fact]
     public async Task ApiEndpoints_ShouldReturnJsonContentType()
     {
         // Act

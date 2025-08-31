@@ -4,15 +4,11 @@
 @using System.Text.Json
 @using ImageGc.Shared.Models
 @using Client.Services
-@using Microsoft.AspNetCore.Authorization
-@using System.Security.Claims
-@using Microsoft.AspNetCore.Components.Authorization
 @inject ApiService Api
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 @inject ILogger<Home> Logger
 @inject NavigationManager NavigationManager
-@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Image Translation & Regeneration</PageTitle>
 
@@ -191,12 +187,11 @@
     private int descriptionLength = 350; // Default to 350 words for better image generation results
     private const int MaxFileSize = 20 * 1024 * 1024; // 20MB
     private ImageAnalysisResult? analysisResult;
-    private string? userId;
+    private string? userId = "anonymous";
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+        // Initialization logic if needed
     }
     
     private async Task LoadFile(InputFileChangeEventArgs e)

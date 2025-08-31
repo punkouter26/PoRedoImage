@@ -36,7 +36,7 @@ public abstract class TestBase : IDisposable
     {
         services.AddSingleton(Configuration);
         services.AddLogging(builder => builder.AddConsole());
-        
+
         // Mock IWebHostEnvironment for services that might depend on it
         var hostingEnvironmentMock = new Mock<IWebHostEnvironment>();
         hostingEnvironmentMock.Setup(e => e.ApplicationName).Returns("ImageGc.Tests");
@@ -57,14 +57,14 @@ public abstract class TestBase : IDisposable
         // Generate a simple 100x100 pixel PNG image with a red background
         using var bitmap = new System.Drawing.Bitmap(100, 100);
         using var graphics = System.Drawing.Graphics.FromImage(bitmap);
-        
+
         // Fill with red background
         graphics.Clear(System.Drawing.Color.Red);
-        
+
         // Add a simple blue circle in the center
         using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Blue);
         graphics.FillEllipse(brush, 25, 25, 50, 50);
-        
+
         // Convert to PNG bytes
         using var stream = new MemoryStream();
         bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
@@ -79,11 +79,12 @@ public abstract class TestBase : IDisposable
         var computerVisionKey = Configuration["ComputerVision:ApiKey"];
         var openAiKey = Configuration["OpenAI:ApiKey"];
 
-        return !string.IsNullOrEmpty(computerVisionKey) && 
+        return !string.IsNullOrEmpty(computerVisionKey) &&
                !computerVisionKey.Contains("placeholder") &&
-               !string.IsNullOrEmpty(openAiKey) && 
+               !string.IsNullOrEmpty(openAiKey) &&
                !openAiKey.Contains("placeholder");
-    }    public virtual void Dispose()
+    }
+    public virtual void Dispose()
     {
         if (ServiceProvider is IDisposable disposableServiceProvider)
         {

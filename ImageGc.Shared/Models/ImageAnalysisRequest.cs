@@ -12,18 +12,18 @@ public class ImageAnalysisRequest
     /// </summary>
     [Required]
     public string ImageData { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the MIME type of the image (e.g., image/jpeg, image/png)
     /// </summary>
     [Required]
     public string ContentType { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the original filename
     /// </summary>
     public string FileName { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the desired length of the generated description in words
     /// </summary>

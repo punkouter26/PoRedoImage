@@ -28,6 +28,61 @@
                 "${workspaceFolder}/Server"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "start-playwright-mcp",
+            "type": "shell",
+            "command": "npx",
+            "args": [
+                "@playwright/mcp",
+                "--config",
+                "./playwright-mcp.config.json"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "start-playwright-mcp-headless",
+            "type": "shell",
+            "command": "npx",
+            "args": [
+                "@playwright/mcp",
+                "--config",
+                "./playwright-mcp.config.json",
+                "--headless"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "test-playwright-mcp",
+            "type": "shell",
+            "command": "node",
+            "args": [
+                "test-playwright-mcp.js"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new"
+            },
+            "problemMatcher": []
         }
     ]
 }

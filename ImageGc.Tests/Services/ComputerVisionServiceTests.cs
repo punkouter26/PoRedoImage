@@ -22,7 +22,7 @@ public class ComputerVisionServiceTests : TestBase
     protected override void ConfigureServices(IServiceCollection services)
     {
         base.ConfigureServices(services);
-        
+
         services.AddScoped<IComputerVisionService, ComputerVisionService>();
         services.AddScoped<ILogger<ComputerVisionService>>(provider =>
             provider.GetRequiredService<ILoggerFactory>().CreateLogger<ComputerVisionService>());
@@ -87,7 +87,7 @@ public class ComputerVisionServiceTests : TestBase
         Assert.NotNull(endpoint);
         Assert.NotEmpty(endpoint);
         Assert.True(Uri.IsWellFormedUriString(endpoint, UriKind.Absolute));
-        
+
         Assert.NotNull(apiKey);
         Assert.NotEmpty(apiKey);
     }
@@ -107,13 +107,13 @@ public class ComputerVisionServiceTests : TestBase
         // Arrange
         var endpoint = Configuration["ComputerVision:Endpoint"];
         var apiKey = Configuration["ComputerVision:ApiKey"];
-        
+
         // Act & Assert
         try
         {
             var client = new ImageAnalysisClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
             var imageData = GetTestImageData();
-            
+
             // Simple connection test - just try to analyze a small image
             using var stream = new MemoryStream(imageData);
             var result = await client.AnalyzeAsync(
@@ -152,7 +152,7 @@ public class ComputerVisionServiceTests : TestBase
 
         // Act
         var startTime = DateTime.UtcNow;
-        
+
         try
         {
             using var cts = new CancellationTokenSource(timeout);

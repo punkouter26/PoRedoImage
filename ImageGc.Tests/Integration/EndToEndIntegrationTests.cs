@@ -23,7 +23,7 @@ public class EndToEndIntegrationTests : TestBase
     protected override void ConfigureServices(IServiceCollection services)
     {
         base.ConfigureServices(services);
-        
+
         services.AddScoped<IComputerVisionService, ComputerVisionService>();
         services.AddScoped<IOpenAIService, OpenAIService>();
         services.AddScoped<ILogger<ComputerVisionService>>(provider =>
@@ -53,7 +53,7 @@ public class EndToEndIntegrationTests : TestBase
             // Act - Step 1: Analyze the image
             _logger.LogInformation("Step 1: Analyzing image with Computer Vision");
             var analysisResult = await computerVisionService.AnalyzeImageAsync(imageData);
-            
+
             Assert.NotNull(analysisResult.Description);
             Assert.NotEmpty(analysisResult.Description);
             Assert.True(analysisResult.ProcessingTimeMs > 0);
@@ -62,10 +62,10 @@ public class EndToEndIntegrationTests : TestBase
             // Act - Step 2: Enhance the description
             _logger.LogInformation("Step 2: Enhancing description with OpenAI");
             var enhancedResult = await openAIService.EnhanceDescriptionAsync(
-                analysisResult.Description, 
-                analysisResult.Tags, 
+                analysisResult.Description,
+                analysisResult.Tags,
                 300);
-            
+
             Assert.NotNull(enhancedResult.EnhancedDescription);
             Assert.NotEmpty(enhancedResult.EnhancedDescription);
             Assert.True(enhancedResult.TokensUsed > 0);
@@ -75,7 +75,7 @@ public class EndToEndIntegrationTests : TestBase
             // Act - Step 3: Generate new image
             _logger.LogInformation("Step 3: Generating new image with DALL-E");
             var generationResult = await openAIService.GenerateImageAsync(enhancedResult.EnhancedDescription);
-            
+
             Assert.NotNull(generationResult.ImageData);
             Assert.True(generationResult.ImageData.Length > 0);
             Assert.NotNull(generationResult.ContentType);
@@ -84,10 +84,10 @@ public class EndToEndIntegrationTests : TestBase
             _logger.LogInformation($"Image generation completed in {generationResult.ProcessingTimeMs}ms, used {generationResult.TokensUsed} tokens");
 
             // Assert - Verify overall workflow
-            var totalProcessingTime = analysisResult.ProcessingTimeMs + 
-                                    enhancedResult.ProcessingTimeMs + 
+            var totalProcessingTime = analysisResult.ProcessingTimeMs +
+                                    enhancedResult.ProcessingTimeMs +
                                     generationResult.ProcessingTimeMs;
-            
+
             _logger.LogInformation($"Complete workflow finished in {totalProcessingTime}ms total");
             Assert.True(totalProcessingTime > 0);
             Assert.True(totalProcessingTime < 120000, "Complete workflow should finish within 2 minutes");
@@ -121,7 +121,7 @@ public class EndToEndIntegrationTests : TestBase
 
         // Act
         var tasks = new List<Task<(string Description, List<string> Tags, double ConfidenceScore, long ProcessingTimeMs)>>();
-        
+
         for (int i = 0; i < numberOfRequests; i++)
         {
             tasks.Add(computerVisionService.AnalyzeImageAsync(imageData));
@@ -151,7 +151,8 @@ public class EndToEndIntegrationTests : TestBase
     }
 
     [Fact]
-    public async Task ErrorHandling_WithInvalidApiKeys_ShouldFailGracefully()    {
+    public async Task ErrorHandling_WithInvalidApiKeys_ShouldFailGracefully()
+    {
         // Arrange
         var invalidConfig = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -196,7 +197,7 @@ public class EndToEndIntegrationTests : TestBase
                 ["ComputerVision:ApiKey"] = "test-key-12345",
                 ["ApplicationInsights:InstrumentationKey"] = "test-key"
             })
-            .Build();        var services = new ServiceCollection();
+            .Build(); var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(invalidConfig);
         services.AddLogging(builder => builder.AddConsole());
         // Configure a real TelemetryClient for testing, but disable sending telemetry
@@ -213,7 +214,7 @@ public class EndToEndIntegrationTests : TestBase
 
         // Act & Assert
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        
+
         await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
             await computerVisionService.AnalyzeImageAsync(imageData);

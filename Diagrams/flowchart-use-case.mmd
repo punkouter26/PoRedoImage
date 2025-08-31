@@ -1,0 +1,70 @@
+flowchart TD
+    %% Flowchart for Image Analysis Use Case
+    %% Outlines the logical flow and decision points for image analysis feature
+    
+    Start([User Visits Application]) --> SelectImage[User Selects Image File]
+    
+    SelectImage --> ValidateFile{Validate File}
+    ValidateFile -->|Invalid Type| ShowFileError[Show File Type Error]
+    ValidateFile -->|Too Large| ShowSizeError[Show File Size Error]
+    ValidateFile -->|Valid| ConvertBase64[Convert Image to Base64]
+    
+    ShowFileError --> SelectImage
+    ShowSizeError --> SelectImage
+    
+    ConvertBase64 --> SetLength[User Sets Description Length]
+    SetLength --> SubmitRequest[Submit Analysis Request]
+    
+    SubmitRequest --> ShowLoading[Show Loading Spinner]
+    ShowLoading --> CallAPI[Call Image Analysis API]
+    
+    CallAPI --> APIResponse{API Response}
+    APIResponse -->|Success| ProcessResults[Process Analysis Results]
+    APIResponse -->|Error| CheckError{Error Type}
+    
+    CheckError -->|Network Error| ShowNetworkError[Show Network Error]
+    CheckError -->|Server Error| ShowServerError[Show Server Error]
+    CheckError -->|Validation Error| ShowValidationError[Show Validation Error]
+    
+    ShowNetworkError --> RetryOption{User Wants to Retry?}
+    ShowServerError --> RetryOption
+    ShowValidationError --> SelectImage
+    
+    RetryOption -->|Yes| CallAPI
+    RetryOption -->|No| End([End])
+    
+    ProcessResults --> DisplayDescription[Display Enhanced Description]
+    DisplayDescription --> DisplayTags[Display Identified Tags]
+    DisplayTags --> DisplayMetrics[Display Processing Metrics]
+    
+    DisplayMetrics --> CheckImage{Generated Image Available?}
+    CheckImage -->|Yes| DisplayImage[Display Generated Image]
+    CheckImage -->|No| ShowImageError[Show Image Generation Error]
+    
+    DisplayImage --> OfferActions[Offer User Actions]
+    ShowImageError --> OfferActions
+    
+    OfferActions --> UserAction{User Choice}
+    UserAction -->|Analyze Another| SelectImage
+    UserAction -->|Download Results| DownloadResults[Download Analysis Results]
+    UserAction -->|Share Results| ShareResults[Share Analysis Results]
+    UserAction -->|View Diagnostics| ViewDiag[Navigate to Diagnostics Page]
+    UserAction -->|Done| End
+    
+    DownloadResults --> End
+    ShareResults --> End
+    ViewDiag --> DiagnosticChecks[Run Diagnostic Checks]
+    DiagnosticChecks --> ShowDiagResults[Display System Status]
+    ShowDiagResults --> End
+    
+    %% Styling
+    classDef startEnd fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    classDef process fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef success fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
+    
+    class Start,End startEnd
+    class SelectImage,ConvertBase64,SetLength,SubmitRequest,ShowLoading,CallAPI,ProcessResults,DisplayDescription,DisplayTags,DisplayMetrics,DisplayImage,OfferActions,DownloadResults,ShareResults,ViewDiag,DiagnosticChecks,ShowDiagResults process
+    class ValidateFile,APIResponse,CheckError,RetryOption,CheckImage,UserAction decision
+    class ShowFileError,ShowSizeError,ShowNetworkError,ShowServerError,ShowValidationError,ShowImageError error

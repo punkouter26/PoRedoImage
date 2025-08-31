@@ -1,0 +1,65 @@
+sequenceDiagram
+    %% Sequence Diagram for API Calls
+    %% Traces request flow for image analysis feature
+    
+    participant User
+    participant BlazorClient as Blazor Client
+    participant ApiService as API Service
+    participant Controller as Image Controller
+    participant CVService as Computer Vision Service
+    participant OpenAIService as OpenAI Service
+    participant AzureCV as Azure Computer Vision
+    participant AzureOAI as Azure OpenAI
+    participant AppInsights as Application Insights
+    
+    User->>BlazorClient: Upload Image
+    BlazorClient->>BlazorClient: Validate File (size, type)
+    BlazorClient->>BlazorClient: Convert to Base64
+    
+    BlazorClient->>ApiService: analyzeImageAsync(request)
+    ApiService->>Controller: POST /api/imageanalysis/analyze
+    
+    Controller->>Controller: Validate Request
+    Controller->>AppInsights: Log Request Start
+    
+    Note over Controller: Start Performance Tracking
+    Controller->>CVService: analyzeImageAsync(imageData)
+    CVService->>AzureCV: Analyze Image
+    AzureCV-->>CVService: Vision Analysis Result
+    CVService->>Controller: Tags + Confidence
+    
+    Controller->>OpenAIService: enhanceDescriptionAsync(analysis, tags)
+    OpenAIService->>AzureOAI: GPT-4 Enhancement Request
+    AzureOAI-->>OpenAIService: Enhanced Description
+    OpenAIService->>Controller: Enhanced Description + Token Count
+    
+    Controller->>OpenAIService: generateImageAsync(description)
+    OpenAIService->>AzureOAI: DALL-E Generation Request
+    AzureOAI-->>OpenAIService: Generated Image
+    OpenAIService->>Controller: Image Data + Token Count
+    
+    Controller->>Controller: Build Processing Metrics
+    Controller->>AppInsights: Log Performance Metrics
+    Controller->>AppInsights: Log Success/Failure
+    
+    Controller-->>ApiService: ImageAnalysisResult
+    ApiService-->>BlazorClient: Analysis Result
+    BlazorClient->>BlazorClient: Display Results
+    BlazorClient->>User: Show Analysis + Generated Image
+    
+    %% Error Handling Path
+    Note over Controller,AzureOAI: Error Handling
+    alt Azure Service Error
+        AzureCV-->>CVService: API Error
+        CVService->>Controller: Throw ServiceException
+        Controller->>AppInsights: Log Error
+        Controller-->>ApiService: Error Response (500)
+        ApiService-->>BlazorClient: Display Error Message
+    end
+    
+    %% Performance Monitoring
+    Note over Controller,AppInsights: Performance Tracking
+    Controller->>AppInsights: Track Dependency (Computer Vision)
+    Controller->>AppInsights: Track Dependency (OpenAI)
+    Controller->>AppInsights: Track Request Duration
+    Controller->>AppInsights: Track Token Usage

@@ -1,0 +1,76 @@
+graph TD
+    %% Project Dependency Diagram
+    %% Shows how .NET projects, APIs, and databases are interconnected
+    
+    subgraph "Solution: ImageGc"
+        Client["`**Client**
+        *Blazor WebAssembly*
+        ImageGc.Client.csproj`"]
+        
+        Server["`**Server**
+        *ASP.NET Core API*
+        ImageGc.Server.csproj`"]
+        
+        Shared["`**Shared**
+        *Class Library*
+        ImageGc.Shared.csproj`"]
+        
+        Tests["`**Tests**
+        *XUnit Test Project*
+        ImageGc.Tests.csproj`"]
+    end
+    
+    subgraph "Azure Services"
+        CV["`**Computer Vision**
+        *Azure AI Service*
+        Image Analysis`"]
+        
+        OpenAI["`**Azure OpenAI**
+        *GPT-4 & DALL-E*
+        Description & Generation`"]
+        
+        AppInsights["`**Application Insights**
+        *Telemetry & Monitoring*
+        Performance Tracking`"]
+        
+        AppService["`**App Service**
+        *Web Hosting*
+        Production Environment`"]
+    end
+    
+    subgraph "Local Development"
+        Azurite["`**Azurite**
+        *Local Storage Emulator*
+        Development Storage`"]
+    end
+    
+    %% Project Dependencies
+    Client --> Shared
+    Server --> Shared
+    Tests --> Client
+    Tests --> Server
+    Tests --> Shared
+    
+    %% API Dependencies
+    Server --> CV
+    Server --> OpenAI
+    Server --> AppInsights
+    
+    %% Deployment Dependencies
+    Server --> AppService
+    Client --> AppService
+    
+    %% Development Dependencies
+    Server -.-> Azurite
+    Tests -.-> Azurite
+    
+    %% Client API Calls
+    Client --> Server
+    
+    classDef projectBox fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef azureBox fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef localBox fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    
+    class Client,Server,Shared,Tests projectBox
+    class CV,OpenAI,AppInsights,AppService azureBox
+    class Azurite localBox

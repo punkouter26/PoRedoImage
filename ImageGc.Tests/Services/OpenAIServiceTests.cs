@@ -22,7 +22,7 @@ public class OpenAIServiceTests : TestBase
     protected override void ConfigureServices(IServiceCollection services)
     {
         base.ConfigureServices(services);
-        
+
         services.AddScoped<IOpenAIService, OpenAIService>();
         services.AddScoped<ILogger<OpenAIService>>(provider =>
             provider.GetRequiredService<ILoggerFactory>().CreateLogger<OpenAIService>());
@@ -107,13 +107,13 @@ public class OpenAIServiceTests : TestBase
         Assert.NotNull(endpoint);
         Assert.NotEmpty(endpoint);
         Assert.True(Uri.IsWellFormedUriString(endpoint, UriKind.Absolute));
-        
+
         Assert.NotNull(apiKey);
         Assert.NotEmpty(apiKey);
-        
+
         Assert.NotNull(chatModel);
         Assert.NotEmpty(chatModel);
-        
+
         Assert.NotNull(imageModel);
         Assert.NotEmpty(imageModel);
     }
@@ -133,16 +133,16 @@ public class OpenAIServiceTests : TestBase
         // Arrange
         var endpoint = Configuration["OpenAI:Endpoint"];
         var apiKey = Configuration["OpenAI:ApiKey"];
-        
+
         // Act & Assert
         try
         {
             var client = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
-            
+
             // Simple connection test - try to get chat completions client
             var chatClient = client.GetChatClient(Configuration["OpenAI:ChatModel"]!);
             Assert.NotNull(chatClient);
-              // Test with a simple completion request
+            // Test with a simple completion request
             var chatMessages = new OpenAI.Chat.ChatMessage[]
             {
                 OpenAI.Chat.ChatMessage.CreateSystemMessage("You are a helpful assistant."),
@@ -183,7 +183,7 @@ public class OpenAIServiceTests : TestBase
 
         // Act
         var startTime = DateTime.UtcNow;
-        
+
         try
         {
             using var cts = new CancellationTokenSource(timeout);
@@ -214,7 +214,7 @@ public class OpenAIServiceTests : TestBase
 
         // Act
         var startTime = DateTime.UtcNow;
-        
+
         try
         {
             using var cts = new CancellationTokenSource(timeout);
@@ -251,15 +251,15 @@ public class OpenAIServiceTests : TestBase
 
         // Assert
         Assert.NotNull(result.EnhancedDescription);
-        
+
         // Count words in the result (approximate check)
         var wordCount = result.EnhancedDescription.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
-        
+
         // Allow some variance in word count (±30%)
         var minWords = (int)(targetLength * 0.7);
         var maxWords = (int)(targetLength * 1.3);
-        
-        Assert.True(wordCount >= minWords && wordCount <= maxWords, 
+
+        Assert.True(wordCount >= minWords && wordCount <= maxWords,
             $"Word count {wordCount} should be between {minWords} and {maxWords} for target {targetLength}");
     }
 }

@@ -402,3 +402,7 @@ FodyWeavers.xsd
 # Application-specific log files
 log.txt
 *.log
+
+# Configuration files with sensitive data
+appsettings.json
+appsettings.Production.json
