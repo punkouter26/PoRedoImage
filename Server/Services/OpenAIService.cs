@@ -67,8 +67,8 @@ public class OpenAIService : IOpenAIService
 
         _endpoint = configuration["OpenAI:Endpoint"] ??
             throw new ArgumentNullException("OpenAI:Endpoint is not configured");
-        _apiKey = configuration["OpenAI:ApiKey"] ??
-            throw new ArgumentNullException("OpenAI:ApiKey is not configured");
+        _apiKey = configuration["OpenAI:Key"] ??
+            throw new ArgumentNullException("OpenAI:Key is not configured");
         _chatModel = configuration["OpenAI:ChatModel"] ?? "gpt-4o";
         _imageModel = configuration["OpenAI:ImageModel"] ?? "dall-e-3";
         _fallbackChatModel = configuration["OpenAI:FallbackChatModel"] ?? "gpt-4o";

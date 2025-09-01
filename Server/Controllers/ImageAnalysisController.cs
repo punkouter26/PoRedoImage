@@ -13,17 +13,14 @@ namespace Server.Controllers;
 public class ImageAnalysisController : ControllerBase
 {
     private readonly ILogger<ImageAnalysisController> _logger;
-    private readonly IComputerVisionService _computerVisionService;
-    private readonly IOpenAIService _openAIService;
+    private readonly IServiceProvider _serviceProvider;
 
     public ImageAnalysisController(
         ILogger<ImageAnalysisController> logger,
-        IComputerVisionService computerVisionService,
-        IOpenAIService openAIService)
+        IServiceProvider serviceProvider)
     {
         _logger = logger;
-        _computerVisionService = computerVisionService;
-        _openAIService = openAIService;
+        _serviceProvider = serviceProvider;
     }
     [HttpPost("analyze")]
     [AllowAnonymous] // Allow anonymous access for debugging
@@ -31,6 +28,17 @@ public class ImageAnalysisController : ControllerBase
     {
         try
         {
+            // Try to get services from DI container
+            var computerVisionService = _serviceProvider.GetService<IComputerVisionService>();
+            var openAIService = _serviceProvider.GetService<IOpenAIService>();
+            
+            if (computerVisionService == null || openAIService == null)
+            {
+                _logger.LogError("Required services not available. ComputerVision: {CV}, OpenAI: {AI}", 
+                    computerVisionService != null, openAIService != null);
+                return StatusCode(503, new { error = "Required AI services are not available" });
+            }
+
             // Get the authenticated user (allow anonymous for now)
             var userId = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
             var userName = User?.FindFirst(ClaimTypes.Name)?.Value ?? "anonymous";
@@ -88,7 +96,7 @@ public class ImageAnalysisController : ControllerBase
             try
             {
                 var (description, imageTags, confidence, processingTime) =
-                    await _computerVisionService.AnalyzeImageAsync(imageBytes);
+                    await computerVisionService.AnalyzeImageAsync(imageBytes);
 
                 // We'll only use tags and confidence, not the basic description
                 tags = imageTags;
@@ -111,7 +119,7 @@ public class ImageAnalysisController : ControllerBase
             try
             {
                 var (description, tokensUsed, processingTime) =
-                    await _openAIService.GenerateDetailedDescriptionAsync(tags, request.DescriptionLength, confidenceScore);
+                    await openAIService.GenerateDetailedDescriptionAsync(tags, request.DescriptionLength, confidenceScore);
 
                 detailedDescription = description;
                 result.Metrics.DescriptionGenerationTimeMs = processingTime;
@@ -133,7 +141,7 @@ public class ImageAnalysisController : ControllerBase
             try
             {
                 var (imageData, contentType, tokensUsed, processingTime) =
-                    await _openAIService.GenerateImageAsync(detailedDescription);
+                    await openAIService.GenerateImageAsync(detailedDescription);
 
                 result.RegeneratedImageData = Convert.ToBase64String(imageData);
                 result.RegeneratedImageContentType = contentType;

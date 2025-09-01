@@ -22,8 +22,15 @@ builder.Host.UseSerilog();
 // Add services to the container.
 builder.Services.AddApplicationInsightsTelemetry();
 
+// Ensure TelemetryClient is properly registered
+builder.Services.AddSingleton<Microsoft.ApplicationInsights.TelemetryClient>();
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+
+// Add Swagger/OpenAPI
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 // Add health checks
 builder.Services.AddHealthChecks();
@@ -57,6 +64,14 @@ else
     app.UseHsts();
 }
 
+// Enable Swagger in all environments (including production)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ImageGc API V1");
+    c.RoutePrefix = "swagger"; // Available at /swagger
+});
+
 // Enable CORS for all environments (required for Azure hosting)
 app.UseCors("AllowAll");
 
@@ -65,8 +80,10 @@ app.UseBlazorFrameworkFiles(); // Serve Blazor WebAssembly static files
 app.UseStaticFiles();
 
 app.UseRouting();
+
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/api/health");
+
 app.MapFallbackToFile("index.html");
 
 try

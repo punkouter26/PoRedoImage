@@ -1,0 +1,285 @@
+@page "/diag"
+@inject HttpClient Http
+@inject ILogger<Diag> Logger
+@using System.Net.Http.Json
+
+<PageTitle>System Diagnostics - ImageGc</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">
+                <i class="bi bi-heart-pulse text-info me-2"></i>
+                System Diagnostics
+            </h1>
+            
+            <div class="row g-3">
+                <!-- API Health Check -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex align-items-center">
+                            <i class="@GetStatusIcon(apiHealthStatus) me-2"></i>
+                            <span class="fw-semibold">API Health</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <span class="badge @GetStatusBadge(apiHealthStatus)">
+                                    @GetStatusText(apiHealthStatus)
+                                </span>
+                            </div>
+                            <small class="text-muted">
+                                Endpoint: /api/health<br/>
+                                Last checked: @lastChecked?.ToString("HH:mm:ss")
+                            </small>
+                            @if (!string.IsNullOrEmpty(apiHealthMessage))
+                            {
+                                <div class="mt-2">
+                                    <small class="text-muted">@apiHealthMessage</small>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Internet Connectivity -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex align-items-center">
+                            <i class="@GetStatusIcon(internetStatus) me-2"></i>
+                            <span class="fw-semibold">Internet Connectivity</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <span class="badge @GetStatusBadge(internetStatus)">
+                                    @GetStatusText(internetStatus)
+                                </span>
+                            </div>
+                            <small class="text-muted">
+                                Test URL: httpbin.org<br/>
+                                Last checked: @lastChecked?.ToString("HH:mm:ss")
+                            </small>
+                            @if (!string.IsNullOrEmpty(internetMessage))
+                            {
+                                <div class="mt-2">
+                                    <small class="text-muted">@internetMessage</small>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Client Status -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex align-items-center">
+                            <i class="bi bi-pc-display-horizontal text-success me-2"></i>
+                            <span class="fw-semibold">Client Status</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <span class="badge bg-success">Online</span>
+                            </div>
+                            <small class="text-muted">
+                                Blazor WebAssembly client running<br/>
+                                Browser: @GetBrowserInfo()
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="RunDiagnostics" disabled="@isRunning">
+                    @if (isRunning)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        <span>Running...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-arrow-clockwise me-2"></i>
+                        <span>Refresh All Checks</span>
+                    }
+                </button>
+                
+                <button class="btn btn-outline-secondary" @onclick="ClearLogs">
+                    <i class="bi bi-trash me-2"></i>
+                    Clear Logs
+                </button>
+            </div>
+
+            @if (diagnosticLogs.Any())
+            {
+                <div class="mt-4">
+                    <h5>Diagnostic Logs</h5>
+                    <div class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto;">
+                        @foreach (var log in diagnosticLogs.TakeLast(50))
+                        {
+                            <div class="font-monospace small">@log</div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private enum DiagnosticStatus { Unknown, Checking, Healthy, Error }
+    
+    private DiagnosticStatus apiHealthStatus = DiagnosticStatus.Unknown;
+    private DiagnosticStatus internetStatus = DiagnosticStatus.Unknown;
+    private DateTime? lastChecked;
+    private bool isRunning = false;
+    private string? apiHealthMessage;
+    private string? internetMessage;
+    private List<string> diagnosticLogs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunDiagnostics();
+    }
+
+    private async Task RunDiagnostics()
+    {
+        if (isRunning) return;
+        
+        isRunning = true;
+        StateHasChanged();
+        
+        try
+        {
+            AddLog("=== Starting diagnostic checks ===");
+            
+            // Check API Health
+            await CheckApiHealth();
+            
+            // Check Internet Connectivity
+            await CheckInternetConnectivity();
+            
+            lastChecked = DateTime.Now;
+            AddLog("=== Diagnostic checks completed ===");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during diagnostics");
+            AddLog($"ERROR: {ex.Message}");
+        }
+        finally
+        {
+            isRunning = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CheckApiHealth()
+    {
+        apiHealthStatus = DiagnosticStatus.Checking;
+        StateHasChanged();
+        
+        try
+        {
+            AddLog("Checking API health...");
+            var response = await Http.GetAsync("/api/health");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                apiHealthStatus = DiagnosticStatus.Healthy;
+                apiHealthMessage = $"Status: {response.StatusCode}";
+                AddLog($"API Health: OK ({response.StatusCode})");
+            }
+            else
+            {
+                apiHealthStatus = DiagnosticStatus.Error;
+                apiHealthMessage = $"HTTP {response.StatusCode}: {response.ReasonPhrase}";
+                AddLog($"API Health: ERROR - {response.StatusCode} {response.ReasonPhrase}");
+            }
+        }
+        catch (Exception ex)
+        {
+            apiHealthStatus = DiagnosticStatus.Error;
+            apiHealthMessage = ex.Message;
+            AddLog($"API Health: ERROR - {ex.Message}");
+            Logger.LogError(ex, "API health check failed");
+        }
+    }
+
+    private async Task CheckInternetConnectivity()
+    {
+        internetStatus = DiagnosticStatus.Checking;
+        StateHasChanged();
+        
+        try
+        {
+            AddLog("Checking internet connectivity...");
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+            
+            var response = await httpClient.GetAsync("https://httpbin.org/status/200");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                internetStatus = DiagnosticStatus.Healthy;
+                internetMessage = "Connected";
+                AddLog("Internet: Connected");
+            }
+            else
+            {
+                internetStatus = DiagnosticStatus.Error;
+                internetMessage = $"HTTP {response.StatusCode}";
+                AddLog($"Internet: ERROR - {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            internetStatus = DiagnosticStatus.Error;
+            internetMessage = "Connection failed";
+            AddLog($"Internet: ERROR - {ex.Message}");
+            Logger.LogError(ex, "Internet connectivity check failed");
+        }
+    }
+
+    private void AddLog(string message)
+    {
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        diagnosticLogs.Add($"[{timestamp}] {message}");
+        StateHasChanged();
+    }
+
+    private void ClearLogs()
+    {
+        diagnosticLogs.Clear();
+        StateHasChanged();
+    }
+
+    private string GetStatusIcon(DiagnosticStatus status) => status switch
+    {
+        DiagnosticStatus.Healthy => "bi bi-check-circle text-success",
+        DiagnosticStatus.Error => "bi bi-x-circle text-danger",
+        DiagnosticStatus.Checking => "bi bi-arrow-clockwise text-warning",
+        _ => "bi bi-question-circle text-muted"
+    };
+
+    private string GetStatusBadge(DiagnosticStatus status) => status switch
+    {
+        DiagnosticStatus.Healthy => "bg-success",
+        DiagnosticStatus.Error => "bg-danger",
+        DiagnosticStatus.Checking => "bg-warning",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusText(DiagnosticStatus status) => status switch
+    {
+        DiagnosticStatus.Healthy => "Healthy",
+        DiagnosticStatus.Error => "Error",
+        DiagnosticStatus.Checking => "Checking...",
+        _ => "Unknown"
+    };
+
+    private string GetBrowserInfo()
+    {
+        // This is a simplified browser detection for Blazor WebAssembly
+        return "Blazor WebAssembly";
+    }
+}
