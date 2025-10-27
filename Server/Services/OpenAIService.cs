@@ -51,6 +51,8 @@ public class OpenAIService : IOpenAIService
     private readonly TelemetryClient _telemetryClient;
     private readonly string _endpoint;
     private readonly string _apiKey;
+    private readonly string _imageEndpoint;
+    private readonly string _imageApiKey;
     private readonly string _chatModel;
     private readonly string _imageModel;
     private readonly string _fallbackChatModel;
@@ -69,6 +71,11 @@ public class OpenAIService : IOpenAIService
             throw new ArgumentNullException("OpenAI:Endpoint is not configured");
         _apiKey = configuration["OpenAI:Key"] ??
             throw new ArgumentNullException("OpenAI:Key is not configured");
+        
+        // Allow separate endpoint/key for image generation (fallback to main endpoint if not specified)
+        _imageEndpoint = configuration["OpenAI:ImageEndpoint"] ?? _endpoint;
+        _imageApiKey = configuration["OpenAI:ImageKey"] ?? _apiKey;
+        
         _chatModel = configuration["OpenAI:ChatModel"] ?? "gpt-4o";
         _imageModel = configuration["OpenAI:ImageModel"] ?? "dall-e-3";
         _fallbackChatModel = configuration["OpenAI:FallbackChatModel"] ?? "gpt-4o";
@@ -79,6 +86,8 @@ public class OpenAIService : IOpenAIService
             _chatModel, _imageModel, _fallbackChatModel);
         _logger.LogInformation("Using deployments - Chat: {ChatDeployment}, Image: {ImageDeployment}",
             _chatDeployment, _imageDeployment);
+        _logger.LogInformation("Using endpoints - Chat: {ChatEndpoint}, Image: {ImageEndpoint}",
+            _endpoint, _imageEndpoint);
     }
 
     /// <summary>
@@ -326,8 +335,8 @@ Enhanced description:";
         _logger.LogInformation("Generating image with DALL-E based on description");
         var startTime = DateTime.UtcNow;
         try
-        {            // Create the Azure OpenAI client
-            var client = new AzureOpenAIClient(new Uri(_endpoint), new Azure.AzureKeyCredential(_apiKey));
+        {            // Create the Azure OpenAI client using the image-specific endpoint
+            var client = new AzureOpenAIClient(new Uri(_imageEndpoint), new Azure.AzureKeyCredential(_imageApiKey));
             var imageClient = client.GetImageClient(_imageDeployment);
 
             // Configure the image generation options
