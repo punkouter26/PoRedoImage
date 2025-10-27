@@ -9,8 +9,8 @@ param environmentName string = 'PoRedoImage'
 @description('Primary location for all resources')
 param location string = 'eastus2'
 
-// The application is created within a new resource group called 'poredoimage'
-param resourceGroupName string = 'poredoimage'
+// The application is created within a new resource group called 'PoRedoImage'
+param resourceGroupName string = 'PoRedoImage'
 
 // Option 1: Use existing shared App Service Plan from PoShared resource group
 param useSharedAppServicePlan bool = true
@@ -75,7 +75,7 @@ module web './app/web.bicep' = {
   name: 'web'
   scope: rg
   params: {
-    name: '${abbrs.webSitesAppService}PoRedoImage-${resourceToken}'
+    name: 'PoRedoImage'
     location: location
     tags: tags
     appServicePlanId: useSharedAppServicePlan ? existingAppServicePlan.id : appServicePlan!.outputs.id

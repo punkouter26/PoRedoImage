@@ -9,7 +9,7 @@
       "value": "uksouth"
     },
     "resourceGroupName": {
-      "value": "poredoimage-uksouth"
+      "value": "PoRedoImage"
     },
     "useSharedAppServicePlan": {
       "value": true
