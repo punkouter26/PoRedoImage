@@ -1,10 +1,19 @@
-# ImageGc - Image Analysis with Azure AI
+# PoRedoImage - Image Analysis with Azure AI
 
 An intelligent image analysis application that uses Azure AI services to analyze images and generate enhanced descriptions. The project uses Azure Computer Vision to analyze images and Azure OpenAI to enhance descriptions and generate images based on analysis.
 
-## 🎯 Application Overview
+## � Live Application
 
-ImageGc is a modern web application that demonstrates the power of AI-driven image analysis and generation. Users can upload images to receive detailed AI-generated descriptions and see new images created based on those descriptions, showcasing the fascinating capabilities of computer vision and generative AI working together.
+**Production URL**: [https://app-poredoimage-cqevadpy77pvi.azurewebsites.net](https://app-poredoimage-cqevadpy77pvi.azurewebsites.net)
+
+- **Resource Group**: poredoimage-uksouth
+- **Region**: UK South
+- **App Service Plan**: PoShared5 (F1 Free tier)
+- **Platform**: Azure App Service (.NET 9.0)
+
+## �🎯 Application Overview
+
+PoRedoImage is a modern web application that demonstrates the power of AI-driven image analysis and generation. Users can upload images to receive detailed AI-generated descriptions and see new images created based on those descriptions, showcasing the fascinating capabilities of computer vision and generative AI working together.
 
 ### Key Capabilities
 - **🔍 Image Analysis**: Advanced computer vision analysis of uploaded images
@@ -175,32 +184,74 @@ docker run -p 5000:80 -e ComputerVision__ApiKey=your-key imagegc:latest
 
 ### ☁️ Azure Deployment
 
-For automated Azure deployment using GitHub Actions:
+The application is deployed using Azure Developer CLI (azd) with infrastructure as code (Bicep).
 
-1. **Set up Azure Resources**
+#### Prerequisites
+- Azure CLI installed
+- Azure Developer CLI (azd) installed
+- Azure subscription with appropriate permissions
+
+#### Deployment Steps
+
+1. **Login to Azure**
    ```bash
-   # Use the provided workflow
-   gh workflow run azure-environment-setup.yml
+   az login
+   azd auth login
    ```
 
-2. **Configure GitHub Secrets**
+2. **Initialize Environment**
    ```bash
-   # Run the setup script
-   .\setup-github-secrets.ps1
+   azd env new <environment-name>
    ```
 
-3. **Deploy**
+3. **Configure Location and Resources**
    ```bash
-   # Push to main branch triggers automatic deployment
-   git push origin main
+   # Set your preferred Azure region
+   azd env set AZURE_LOCATION uksouth
    ```
 
-*For detailed deployment instructions, see the [GitHub Actions Deployment Guide](./docs/github-actions-deployment-guide.md).*
+4. **Deploy Infrastructure and Application**
+   ```bash
+   # Deploy everything with a single command
+   azd up
+   ```
+
+5. **Configure API Keys**
+   After deployment, add the following application settings in the Azure Portal:
+   - `ComputerVision__Endpoint`
+   - `ComputerVision__Key`
+   - `OpenAI__Endpoint`
+   - `OpenAI__Key`
+   - `OpenAI__ChatCompletionsDeployment`
+   - `ConnectionStrings__AzureTableStorage`
+
+6. **Set Up GitHub CI/CD**
+   ```bash
+   # Get publish profile
+   az webapp deployment list-publishing-profiles \
+     --resource-group <resource-group> \
+     --name <app-name> \
+     --xml > publish-profile.xml
+   
+   # Add as GitHub secret named AZURE_WEBAPP_PUBLISH_PROFILE
+   ```
+
+#### Infrastructure Details
+
+The Bicep templates create:
+- Resource Group (e.g., poredoimage-uksouth)
+- App Service (using shared App Service Plan from PoShared RG)
+- Application Insights for telemetry
+- Log Analytics Workspace
+- Storage Account for Azure Table Storage
+
+*For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).*
 
 ## 🧪 Testing
 
+### Unit and Integration Tests (.NET)
 ```bash
-# Run all tests
+# Run all .NET tests
 dotnet test
 
 # Run with coverage
@@ -209,6 +260,34 @@ dotnet test --collect:"XPlat Code Coverage"
 # Run specific test categories
 dotnet test --filter Category=Integration
 ```
+
+### End-to-End Tests (Playwright)
+```bash
+# Run Playwright tests
+npm test
+
+# Run with UI mode
+npm run test:ui
+
+# Run in headed mode (see browser)
+npm run test:headed
+
+# Debug tests
+npm run test:debug
+
+# View test report
+npm run test:report
+```
+
+The Playwright test suite includes:
+- ✅ Health endpoint verification
+- ✅ Page load and navigation tests
+- ✅ Upload functionality verification
+- ✅ API endpoint testing
+- ✅ HTTPS configuration validation
+- ✅ Diagnostics page testing
+- ✅ Performance benchmarking
+- ✅ CORS and security headers
 
 ## 📊 Monitoring & Diagnostics
 

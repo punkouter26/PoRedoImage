@@ -187,11 +187,11 @@
     private int descriptionLength = 350; // Default to 350 words for better image generation results
     private const int MaxFileSize = 20 * 1024 * 1024; // 20MB
     private ImageAnalysisResult? analysisResult;
-    private string? userId = "anonymous";
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         // Initialization logic if needed
+        return Task.CompletedTask;
     }
     
     private async Task LoadFile(InputFileChangeEventArgs e)

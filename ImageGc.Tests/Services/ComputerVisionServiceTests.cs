@@ -34,23 +34,14 @@ public class ComputerVisionServiceTests : TestBase
         // Arrange
         var imageData = GetTestImageData();
 
-        // Act & Assert
-        if (HasRealApiKeys())
-        {
-            // Integration test with real API
-            var result = await _computerVisionService.AnalyzeImageAsync(imageData);
+        // Act
+        var result = await _computerVisionService.AnalyzeImageAsync(imageData);
 
-            Assert.NotNull(result.Description);
-            Assert.NotEmpty(result.Description);
-            Assert.True(result.ProcessingTimeMs > 0);
-            Assert.True(result.ConfidenceScore >= 0 && result.ConfidenceScore <= 1);
-        }
-        else
-        {
-            // Skip test if no real API keys are configured
-            await Assert.ThrowsAsync<RequestFailedException>(
-                () => _computerVisionService.AnalyzeImageAsync(imageData));
-        }
+        // Assert
+        Assert.NotNull(result.Description);
+        Assert.NotEmpty(result.Description);
+        Assert.True(result.ProcessingTimeMs > 0);
+        Assert.True(result.ConfidenceScore >= 0 && result.ConfidenceScore <= 1);
     }
 
     [Fact]

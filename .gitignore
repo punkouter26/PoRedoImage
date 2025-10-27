@@ -403,6 +403,17 @@ FodyWeavers.xsd
 log.txt
 *.log
 
+# Azurite local storage data
+AzuriteData/*
+!AzuriteData/README.md
+
 # Configuration files with sensitive data (commented out for private repo)
 # appsettings.json
 # appsettings.Production.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

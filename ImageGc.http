@@ -1,0 +1,188 @@
+### ImageGc API Testing - REST Client File
+### Use the REST Client extension in VS Code to run these requests
+### https://marketplace.visualstudio.com/items?itemName=humao.rest-client
+
+# Local Development
+@baseUrl = http://localhost:5000
+@httpsUrl = https://localhost:5001
+
+# Azure Production
+@azureUrl = https://app-poredoimage-cqevadpy77pvi.azurewebsites.net
+
+### ===== Health Check Endpoints =====
+
+### Local Health Check
+GET {{baseUrl}}/api/health HTTP/1.1
+
+### Production Health Check
+GET {{azureUrl}}/api/health HTTP/1.1
+
+### Detailed Health Check (with individual service status)
+GET {{baseUrl}}/api/health HTTP/1.1
+Accept: application/json
+
+### ===== Test Endpoints =====
+
+### Test Controller - Get
+GET {{baseUrl}}/api/test HTTP/1.1
+
+### Test Controller - Simple
+GET {{baseUrl}}/api/test/simple HTTP/1.1
+
+### ===== Client Logging Endpoints =====
+
+### Client Log - Information Level
+POST {{baseUrl}}/api/log/client HTTP/1.1
+Content-Type: application/json
+
+{
+  "message": "User clicked the upload button",
+  "level": "Information",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "url": "/",
+  "sessionId": "test-session-123",
+  "properties": {
+    "action": "button_click",
+    "component": "FileUploader"
+  }
+}
+
+### Client Log - Error Level
+POST {{baseUrl}}/api/log/client HTTP/1.1
+Content-Type: application/json
+
+{
+  "message": "Failed to upload image",
+  "level": "Error",
+  "timestamp": "2024-01-15T10:31:00Z",
+  "url": "/",
+  "sessionId": "test-session-123",
+  "errorDetails": "Network request failed: timeout after 30s",
+  "properties": {
+    "fileName": "test.jpg",
+    "fileSize": "2048576"
+  }
+}
+
+### Client Log - Warning Level
+POST {{baseUrl}}/api/log/client HTTP/1.1
+Content-Type: application/json
+
+{
+  "message": "Image file size is large, processing may take longer",
+  "level": "Warning",
+  "timestamp": "2024-01-15T10:32:00Z",
+  "url": "/",
+  "sessionId": "test-session-123",
+  "properties": {
+    "fileName": "large-image.png",
+    "fileSizeMB": "15"
+  }
+}
+
+### Client Log - Invalid (Missing Message)
+POST {{baseUrl}}/api/log/client HTTP/1.1
+Content-Type: application/json
+
+{
+  "level": "Information",
+  "timestamp": "2024-01-15T10:33:00Z"
+}
+
+### ===== Image Analysis Endpoints =====
+
+### Test Connection
+GET {{baseUrl}}/api/imageanalysis/test HTTP/1.1
+
+### Debug Info
+GET {{baseUrl}}/api/imageanalysis/debug HTTP/1.1
+
+### Analyze Image - Valid Request (Base64 test image)
+POST {{baseUrl}}/api/imageanalysis/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC",
+  "contentType": "image/png",
+  "fileName": "test.png",
+  "descriptionLength": 200
+}
+
+### Analyze Image - Invalid (Null ImageData)
+POST {{baseUrl}}/api/imageanalysis/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": null,
+  "contentType": "image/png",
+  "fileName": "test.png",
+  "descriptionLength": 200
+}
+
+### Analyze Image - Invalid (Bad Base64)
+POST {{baseUrl}}/api/imageanalysis/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": "not-valid-base64-data",
+  "contentType": "image/png",
+  "fileName": "test.png",
+  "descriptionLength": 200
+}
+
+### Analyze Image - Invalid (Unsupported Content Type)
+POST {{baseUrl}}/api/imageanalysis/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC",
+  "contentType": "image/gif",
+  "fileName": "test.gif",
+  "descriptionLength": 200
+}
+
+### Analyze Image - Different Description Lengths
+POST {{baseUrl}}/api/imageanalysis/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC",
+  "contentType": "image/png",
+  "fileName": "test.png",
+  "descriptionLength": 500
+}
+
+### ===== HTTPS Endpoints (if using HTTPS) =====
+
+### HTTPS Health Check
+GET {{httpsUrl}}/api/health HTTP/1.1
+
+### HTTPS Image Analysis Test
+GET {{httpsUrl}}/api/imageanalysis/test HTTP/1.1
+
+### ===== Concurrent Request Test =====
+### NOTE: Run these sequentially to avoid overwhelming the local server
+
+### Request 1
+GET {{baseUrl}}/api/health HTTP/1.1
+
+###
+
+### Request 2
+GET {{baseUrl}}/api/health HTTP/1.1
+
+###
+
+### Request 3
+GET {{baseUrl}}/api/health HTTP/1.1
+
+### ===== Swagger Documentation =====
+### Note: Open in browser
+# {{baseUrl}}/swagger
+
+### ===== Notes =====
+# 1. Make sure the server is running (dotnet run in Server directory)
+# 2. For HTTPS, you may need to trust the development certificate
+# 3. The test base64 image is a tiny 10x10 transparent PNG
+# 4. Replace with real image data for actual testing
+# 5. API keys must be configured in appsettings.Development.json

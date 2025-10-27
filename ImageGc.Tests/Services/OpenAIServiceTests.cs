@@ -99,7 +99,7 @@ public class OpenAIServiceTests : TestBase
     {
         // Arrange & Act
         var endpoint = Configuration["OpenAI:Endpoint"];
-        var apiKey = Configuration["OpenAI:ApiKey"];
+        var apiKey = Configuration["OpenAI:Key"]; // Fixed: Changed from ApiKey to Key
         var chatModel = Configuration["OpenAI:ChatModel"];
         var imageModel = Configuration["OpenAI:ImageModel"];
 

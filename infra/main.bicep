@@ -3,14 +3,23 @@ targetScope = 'subscription'
 @minLength(1)
 @maxLength(64)
 @description('Name of the environment that can be used as part of naming resource convention')
-param environmentName string
+param environmentName string = 'PoRedoImage'
 
 @minLength(1)
 @description('Primary location for all resources')
-param location string
+param location string = 'eastus2'
 
-// The application database is created within a new resource group
-param resourceGroupName string = ''
+// The application is created within a new resource group called 'poredoimage'
+param resourceGroupName string = 'poredoimage'
+
+// Option 1: Use existing shared App Service Plan from PoShared resource group
+param useSharedAppServicePlan bool = true
+param sharedAppServicePlanName string = 'asp-poshared-eastus2-001'
+param sharedAppServicePlanResourceGroup string = 'PoShared'
+
+// Option 2: Create new App Service Plan in poredoimage resource group (if useSharedAppServicePlan = false)
+param appServicePlanName string = 'asp-poredoimage-eastus2'
+param appServicePlanSku string = 'B1' // Basic tier
 
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, location, environmentName))
@@ -18,9 +27,36 @@ var tags = { 'azd-env-name': environmentName }
 
 // Organize resources in a resource group
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: !empty(resourceGroupName) ? resourceGroupName : '${abbrs.resourcesResourceGroups}${environmentName}'
+  name: resourceGroupName
   location: location
   tags: tags
+}
+
+// Reference to PoShared resource group (for existing App Service Plan)
+resource sharedRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = if (useSharedAppServicePlan) {
+  name: sharedAppServicePlanResourceGroup
+  scope: subscription()
+}
+
+// Reference existing App Service Plan from PoShared
+resource existingAppServicePlan 'Microsoft.Web/serverfarms@2022-09-01' existing = if (useSharedAppServicePlan) {
+  name: sharedAppServicePlanName
+  scope: sharedRg
+}
+
+// Create new App Service Plan in poredoimage resource group (only if not using shared plan)
+module appServicePlan './core/host/appserviceplan.bicep' = if (!useSharedAppServicePlan) {
+  name: 'appserviceplan'
+  scope: rg
+  params: {
+    name: appServicePlanName
+    location: location
+    tags: tags
+    sku: {
+      name: appServicePlanSku
+      tier: 'Basic'
+    }
+  }
 }
 
 // Create managed identity for the app service
@@ -39,10 +75,10 @@ module web './app/web.bicep' = {
   name: 'web'
   scope: rg
   params: {
-    name: '${abbrs.webSitesAppService}web-${resourceToken}'
+    name: '${abbrs.webSitesAppService}PoRedoImage-${resourceToken}'
     location: location
     tags: tags
-    appServicePlanId: appServicePlan.outputs.id
+    appServicePlanId: useSharedAppServicePlan ? existingAppServicePlan.id : appServicePlan!.outputs.id
     managedIdentityId: managedIdentity.outputs.id
     managedIdentityPrincipalId: managedIdentity.outputs.principalId
     appSettings: {
@@ -52,29 +88,15 @@ module web './app/web.bicep' = {
   }
 }
 
-// Shared App Service Plan
-module appServicePlan './core/host/appserviceplan.bicep' = {
-  name: 'appserviceplan'
-  scope: rg
-  params: {
-    name: '${abbrs.webServerFarms}${resourceToken}'
-    location: location
-    tags: tags
-    sku: {
-      name: 'F1'
-      tier: 'Free'
-    }
-  }
-}
-
-// Monitoring
+// Monitoring - Log Analytics and Application Insights in the same resource group
 module monitoring './core/monitor/monitoring.bicep' = {
   name: 'monitoring'
   scope: rg
   params: {
     location: location
     tags: tags
-    applicationInsightsName: '${abbrs.insightsComponents}${resourceToken}'
+    applicationInsightsName: '${abbrs.insightsComponents}PoRedoImage-${resourceToken}'
+    logAnalyticsName: '${abbrs.operationalInsightsWorkspaces}PoRedoImage-${resourceToken}'
   }
 }
 

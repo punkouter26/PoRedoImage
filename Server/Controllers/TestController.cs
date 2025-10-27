@@ -9,8 +9,9 @@ public class TestController : ControllerBase
     [HttpGet]
     public IActionResult Get()
     {
-        return Ok(new { 
-            message = "Test endpoint working", 
+        return Ok(new
+        {
+            message = "Test endpoint working",
             timestamp = DateTime.UtcNow,
             server = "Azure App Service"
         });

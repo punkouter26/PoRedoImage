@@ -36,7 +36,7 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task HealthController_Detailed_ShouldReturnHealthStatus()
     {
         // Act
-        var response = await _client.GetAsync("/api/health/azure");
+        var response = await _client.GetAsync("/api/health"); // Fixed: Changed from /api/health/azure to /api/health
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -119,7 +119,6 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
     }
     [Theory]
     [InlineData("/api/health")]
-    [InlineData("/api/health/azure")]
     public async Task HealthEndpoints_ShouldReturnSuccessStatusCodes(string endpoint)
     {
         // Act
@@ -133,7 +132,7 @@ public class ApiControllerTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task ApiEndpoints_ShouldReturnJsonContentType()
     {
         // Act
-        var response = await _client.GetAsync("/api/health/azure");
+        var response = await _client.GetAsync("/api/health");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

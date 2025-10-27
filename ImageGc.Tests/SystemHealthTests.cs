@@ -40,7 +40,7 @@ public class SystemHealthTests : TestBase
             "ComputerVision:Endpoint",
             "ComputerVision:ApiKey",
             "OpenAI:Endpoint",
-            "OpenAI:ApiKey"
+            "OpenAI:Key" // Fixed: Changed from ApiKey to Key
         };
 
         // Assert
@@ -49,7 +49,7 @@ public class SystemHealthTests : TestBase
             var value = Configuration[setting];
             Assert.NotNull(value);
             Assert.NotEmpty(value);
-            Assert.False(string.IsNullOrWhiteSpace(value), 
+            Assert.False(string.IsNullOrWhiteSpace(value),
                 $"Configuration setting '{setting}' should not be empty or whitespace");
         }
     }

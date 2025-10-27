@@ -2,19 +2,35 @@ using Microsoft.ApplicationInsights.Extensibility;
 using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
+using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 using Server.Services;
+using Server.Services.HealthChecks;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Serilog - simplified
+// Get Application Insights connection string for Serilog
+var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+
+// Configure Serilog with structured logging and Application Insights sink
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .MinimumLevel.Override("System", LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.File("log.txt", shared: true)
+    .Enrich.WithProperty("Application", "ImageGc")
+    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
+    .Enrich.WithMachineName()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.File(
+        path: "log.txt",
+        shared: true,
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.ApplicationInsights(
+        connectionString: appInsightsConnectionString,
+        telemetryConverter: TelemetryConverter.Traces)
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -32,8 +48,11 @@ builder.Services.AddRazorPages();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add health checks
-builder.Services.AddHealthChecks();
+// Add health checks with custom health check classes for external dependencies
+builder.Services.AddHealthChecks()
+    .AddCheck<AzureTableStorageHealthCheck>("AzureTableStorage")
+    .AddCheck<ComputerVisionHealthCheck>("ComputerVision")
+    .AddCheck<OpenAIHealthCheck>("OpenAI");
 
 // Add CORS policy for development
 builder.Services.AddCors(options =>

@@ -11,7 +11,8 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // Configure HttpClient for API access
 var baseAddress = builder.HostEnvironment.BaseAddress;
-builder.Services.AddScoped(sp => new HttpClient { 
+builder.Services.AddScoped(sp => new HttpClient
+{
     BaseAddress = new Uri(baseAddress),
     Timeout = TimeSpan.FromMinutes(3) // Extended timeout for image processing
 });

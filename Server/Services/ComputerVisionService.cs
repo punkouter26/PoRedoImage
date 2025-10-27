@@ -70,10 +70,10 @@ public class ComputerVisionService : IComputerVisionService
             throw new ArgumentException("Image data cannot be empty", nameof(imageData));
 
         _logger.LogInformation("Starting image analysis with Azure Computer Vision");
-        
+
         Log.Information("=== STATE CHANGE: Computer Vision Analysis Started ===");
         Log.Information("Image size: {Size} bytes", imageData.Length);
-        
+
         var startTime = DateTime.UtcNow;
 
         try
@@ -127,10 +127,10 @@ public class ComputerVisionService : IComputerVisionService
         catch (Exception ex)
         {
             var processingTime = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
-            
+
             Log.Error(ex, "=== ERROR: Computer Vision Analysis Failed ===");
             Log.Information("Processing time before error: {ProcessingTime}ms", processingTime);
-            
+
             _logger.LogError(ex, "Error analyzing image with Azure Computer Vision after {ProcessingTime}ms", processingTime);
             _telemetryClient.TrackException(ex, new Dictionary<string, string>
             {

@@ -52,6 +52,7 @@ public abstract class TestBase : IDisposable
     /// <summary>
     /// Gets a test image as byte array (generated programmatically)
     /// </summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows6.1")]
     public static byte[] GetTestImageData()
     {
         // Generate a simple 100x100 pixel PNG image with a red background

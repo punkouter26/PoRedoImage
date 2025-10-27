@@ -191,8 +191,6 @@ class DebugLogger {
         if (this.logs.length === 0 && this.networkLogs.length === 0) return;
         
         const debugData = {
-            timestamp: new Date().toISOString(),
-            session: this.getSessionId(),
             consoleLogs: [...this.logs],
             networkLogs: [...this.networkLogs],
             performance: this.getPerformanceData(),
@@ -200,13 +198,22 @@ class DebugLogger {
         };
         
         try {
-            // Send to server endpoint for file writing
-            await fetch('/api/debug/log', {
+            // Send to server endpoint - format matches ClientLogEntry model
+            await fetch('/api/log/client', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(debugData)
+                body: JSON.stringify({
+                    message: `Debug log flush: ${this.logs.length} console logs, ${this.networkLogs.length} network logs`,
+                    level: 'Information',
+                    timestamp: new Date().toISOString(),
+                    url: window.location.href,
+                    sessionId: this.getSessionId(),
+                    properties: {
+                        debugData: JSON.stringify(debugData)
+                    }
+                })
             });
             
             // Clear logs after successful flush
@@ -214,7 +221,8 @@ class DebugLogger {
             this.networkLogs = [];
             
         } catch (error) {
-            console.error('Failed to flush debug logs:', error);
+            // Don't log to console as it would create infinite loop
+            // Just silently fail - debug logging is non-critical
         }
     }
 

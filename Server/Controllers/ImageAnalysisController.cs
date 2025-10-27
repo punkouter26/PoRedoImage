@@ -5,43 +5,70 @@ using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Serilog;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.DataContracts;
 
 namespace Server.Controllers;
 
+/// <summary>
+/// Controller for image analysis workflow.
+/// Uses Application Insights to track custom events and metrics for the complete pipeline.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ImageAnalysisController : ControllerBase
 {
     private readonly ILogger<ImageAnalysisController> _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly TelemetryClient _telemetryClient;
 
     public ImageAnalysisController(
         ILogger<ImageAnalysisController> logger,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        TelemetryClient telemetryClient)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _telemetryClient = telemetryClient;
     }
     [HttpPost("analyze")]
     [AllowAnonymous] // Allow anonymous access for debugging
     public async Task<ActionResult<ImageAnalysisResult>> AnalyzeImage([FromBody] ImageAnalysisRequest request)
     {
+        // Start tracking this operation with Application Insights
+        var operation = _telemetryClient.StartOperation<RequestTelemetry>("ImageAnalysisWorkflow");
+        operation.Telemetry.Properties["FileName"] = request.FileName;
+        operation.Telemetry.Properties["ContentType"] = request.ContentType;
+        operation.Telemetry.Properties["DescriptionLength"] = request.DescriptionLength.ToString();
+
         try
         {
             // Try to get services from DI container
             var computerVisionService = _serviceProvider.GetService<IComputerVisionService>();
             var openAIService = _serviceProvider.GetService<IOpenAIService>();
-            
+
             if (computerVisionService == null || openAIService == null)
             {
-                _logger.LogError("Required services not available. ComputerVision: {CV}, OpenAI: {AI}", 
+                _logger.LogError("Required services not available. ComputerVision: {CV}, OpenAI: {AI}",
                     computerVisionService != null, openAIService != null);
+                
+                // Track service unavailability event
+                _telemetryClient.TrackEvent("ServiceUnavailable", new Dictionary<string, string>
+                {
+                    { "ComputerVisionAvailable", (computerVisionService != null).ToString() },
+                    { "OpenAIAvailable", (openAIService != null).ToString() }
+                });
+
+                operation.Telemetry.Success = false;
                 return StatusCode(503, new { error = "Required AI services are not available" });
             }
 
             // Get the authenticated user (allow anonymous for now)
             var userId = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
             var userName = User?.FindFirst(ClaimTypes.Name)?.Value ?? "anonymous";
+
+            operation.Telemetry.Properties["UserId"] = userId;
+            operation.Telemetry.Properties["UserName"] = userName;
 
             Log.Information("=== USER ACTION: Image Analysis Started ===");
             Log.Information("User: {UserId} ({UserName})", userId, userName);
@@ -50,6 +77,16 @@ public class ImageAnalysisController : ControllerBase
 
             _logger.LogInformation("Image analysis request received from user {UserId} ({UserName}). File: {FileName}, Description Length: {Length} words",
                 userId, userName, request.FileName, request.DescriptionLength);
+
+            // Track custom event: Image analysis started
+            _telemetryClient.TrackEvent("ImageAnalysisStarted", new Dictionary<string, string>
+            {
+                { "UserId", userId },
+                { "UserName", userName },
+                { "FileName", request.FileName },
+                { "ContentType", request.ContentType },
+                { "DescriptionLength", request.DescriptionLength.ToString() }
+            });
 
             // Prepare the result object
             var result = new ImageAnalysisResult();
@@ -68,10 +105,23 @@ public class ImageAnalysisController : ControllerBase
 
                 imageBytes = Convert.FromBase64String(base64Data);
                 _logger.LogInformation("Successfully converted image data: {Size} bytes", imageBytes.Length);
+                
+                // Track image size metric
+                _telemetryClient.TrackMetric("ImageSizeBytes", imageBytes.Length);
+                operation.Telemetry.Properties["ImageSizeBytes"] = imageBytes.Length.ToString();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to decode base64 image data");
+                
+                // Track decode failure
+                _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                {
+                    { "ErrorType", "Base64DecodeFailed" },
+                    { "UserId", userId }
+                });
+
+                operation.Telemetry.Success = false;
                 return BadRequest(new { error = "Invalid image data format" });
             }
 
@@ -80,12 +130,31 @@ public class ImageAnalysisController : ControllerBase
             if (imageBytes.Length > MaxFileSize)
             {
                 _logger.LogWarning("Received image exceeds maximum size limit. Size: {Size} bytes", imageBytes.Length);
+                
+                // Track validation failure
+                _telemetryClient.TrackEvent("ValidationFailed", new Dictionary<string, string>
+                {
+                    { "Reason", "FileSizeTooLarge" },
+                    { "SizeBytes", imageBytes.Length.ToString() },
+                    { "MaxSizeBytes", MaxFileSize.ToString() }
+                });
+
+                operation.Telemetry.Success = false;
                 return BadRequest(new { error = $"File size exceeds the maximum allowed ({MaxFileSize / 1024 / 1024}MB)." });
             }
 
             if (request.ContentType != "image/jpeg" && request.ContentType != "image/png")
             {
                 _logger.LogWarning("Received image with unsupported content type: {ContentType}", request.ContentType);
+                
+                // Track validation failure
+                _telemetryClient.TrackEvent("ValidationFailed", new Dictionary<string, string>
+                {
+                    { "Reason", "UnsupportedContentType" },
+                    { "ContentType", request.ContentType }
+                });
+
+                operation.Telemetry.Success = false;
                 return BadRequest(new { error = "Only JPG and PNG files are supported." });
             }
 
@@ -95,6 +164,7 @@ public class ImageAnalysisController : ControllerBase
             double confidenceScore;
             try
             {
+                var cvStopwatch = Stopwatch.StartNew();
                 var (description, imageTags, confidence, processingTime) =
                     await computerVisionService.AnalyzeImageAsync(imageBytes);
 
@@ -105,11 +175,28 @@ public class ImageAnalysisController : ControllerBase
 
                 _logger.LogInformation("Computer Vision analysis completed. Tags: {TagCount}, Confidence: {Confidence}",
                     tags.Count, confidenceScore);
+
+                // Track Computer Vision metrics
+                _telemetryClient.TrackMetric("ComputerVisionProcessingTimeMs", processingTime);
+                _telemetryClient.TrackMetric("ComputerVisionConfidence", confidenceScore);
+                _telemetryClient.TrackMetric("ComputerVisionTagCount", tags.Count);
+                
+                operation.Telemetry.Properties["TagCount"] = tags.Count.ToString();
+                operation.Telemetry.Properties["ConfidenceScore"] = confidenceScore.ToString("F2");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during Computer Vision analysis");
                 result.Metrics.ErrorInfo = $"Computer Vision analysis failed: {ex.Message}";
+                
+                // Track Computer Vision failure
+                _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                {
+                    { "ErrorType", "ComputerVisionAnalysisFailed" },
+                    { "UserId", userId }
+                });
+
+                operation.Telemetry.Success = false;
                 return StatusCode(500, result);
             }
 
@@ -127,6 +214,13 @@ public class ImageAnalysisController : ControllerBase
 
                 _logger.LogInformation("Detailed description generation completed. Length: {Length} characters, Tokens: {Tokens}",
                     detailedDescription.Length, tokensUsed);
+
+                // Track OpenAI text generation metrics
+                _telemetryClient.TrackMetric("OpenAIDescriptionProcessingTimeMs", processingTime);
+                _telemetryClient.TrackMetric("OpenAIDescriptionTokensUsed", tokensUsed);
+                _telemetryClient.TrackMetric("DescriptionLength", detailedDescription.Length);
+                
+                operation.Telemetry.Properties["DescriptionTokensUsed"] = tokensUsed.ToString();
             }
             catch (Exception ex)
             {
@@ -134,6 +228,13 @@ public class ImageAnalysisController : ControllerBase
                 // Fall back to a basic description from tags
                 detailedDescription = $"Image contains: {string.Join(", ", tags)}";
                 result.Metrics.ErrorInfo = $"Detailed description generation failed: {ex.Message}";
+                
+                // Track description generation failure
+                _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                {
+                    { "ErrorType", "DescriptionGenerationFailed" },
+                    { "UserId", userId }
+                });
             }
 
             // Step 3: Generate new image with DALL-E
@@ -150,11 +251,28 @@ public class ImageAnalysisController : ControllerBase
 
                 _logger.LogInformation("Image generation completed. Size: {Size} bytes, Tokens: {Tokens}",
                     imageData.Length, tokensUsed);
+
+                // Track DALL-E image generation metrics
+                _telemetryClient.TrackMetric("DALLEProcessingTimeMs", processingTime);
+                _telemetryClient.TrackMetric("DALLETokensUsed", tokensUsed);
+                _telemetryClient.TrackMetric("RegeneratedImageSizeBytes", imageData.Length);
+                
+                operation.Telemetry.Properties["RegenerationTokensUsed"] = tokensUsed.ToString();
+                operation.Telemetry.Properties["RegeneratedImageSizeBytes"] = imageData.Length.ToString();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during image generation");
                 result.Metrics.ErrorInfo = $"Image generation failed: {ex.Message}";
+                
+                // Track image generation failure
+                _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                {
+                    { "ErrorType", "ImageGenerationFailed" },
+                    { "UserId", userId },
+                    { "Description", detailedDescription }
+                });
+                
                 // We'll return what we have so far
             }
 
@@ -165,13 +283,28 @@ public class ImageAnalysisController : ControllerBase
 
             stopwatch.Stop();
             var totalTime = stopwatch.ElapsedMilliseconds;
-            
+
             Log.Information("=== USER ACTION: Image Analysis Completed ===");
             Log.Information("Total processing time: {TotalTime}ms", totalTime);
             Log.Information("Description length: {DescriptionLength} characters", detailedDescription.Length);
             Log.Information("Tags found: {TagCount}", tags.Count);
-            
+
             _logger.LogInformation("Image analysis completed in {TotalTime}ms for user {UserName}", totalTime, userName);
+
+            // Track overall success and timing
+            _telemetryClient.TrackMetric("ImageAnalysisTotalTimeMs", totalTime);
+            _telemetryClient.TrackEvent("ImageAnalysisCompleted", new Dictionary<string, string>
+            {
+                { "UserId", userId },
+                { "UserName", userName },
+                { "TotalTimeMs", totalTime.ToString() },
+                { "TagCount", tags.Count.ToString() },
+                { "DescriptionLength", detailedDescription.Length.ToString() },
+                { "Success", "true" }
+            });
+
+            operation.Telemetry.Properties["TotalTimeMs"] = totalTime.ToString();
+            operation.Telemetry.Success = true;
 
             return Ok(result);
         }
@@ -180,6 +313,14 @@ public class ImageAnalysisController : ControllerBase
             Log.Error(ex, "=== ERROR: Image Analysis Failed ===");
             _logger.LogError(ex, "Unhandled error processing image analysis request");
 
+            // Track unhandled exception
+            _telemetryClient.TrackException(ex, new Dictionary<string, string>
+            {
+                { "ErrorType", "UnhandledImageAnalysisError" }
+            });
+
+            operation.Telemetry.Success = false;
+
             return StatusCode(500, new ImageAnalysisResult
             {
                 Metrics = new ProcessingMetrics
@@ -187,6 +328,11 @@ public class ImageAnalysisController : ControllerBase
                     ErrorInfo = $"Error: {ex.Message}"
                 }
             });
+        }
+        finally
+        {
+            // Stop the operation tracking
+            _telemetryClient.StopOperation(operation);
         }
     }
 

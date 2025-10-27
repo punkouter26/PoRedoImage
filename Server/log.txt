@@ -805,3 +805,4 @@ The API deployment for this resource does not exist. If you created the deployme
 2025-08-31 16:05:07.692 -04:00 [INF] Description length: 2091 characters
 2025-08-31 16:05:07.693 -04:00 [INF] Tags found: 10
 2025-08-31 16:05:07.694 -04:00 [INF] Image analysis completed in 14802ms for user anonymous
+2025-10-26 11:56:41.383 -04:00 [INF] Starting web host

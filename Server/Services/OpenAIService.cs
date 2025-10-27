@@ -96,12 +96,12 @@ public class OpenAIService : IOpenAIService
             throw new ArgumentException("Target length must be greater than 0", nameof(targetLength));
 
         _logger.LogInformation("Enhancing description with OpenAI. Target length: {TargetLength} words", targetLength);
-        
+
         Log.Information("=== STATE CHANGE: OpenAI Description Enhancement Started ===");
         Log.Information("Input description length: {Length} characters", basicDescription.Length);
         Log.Information("Target length: {TargetLength} words", targetLength);
         Log.Information("Tags count: {TagCount}", tags.Count);
-        
+
         var startTime = DateTime.UtcNow;
         var attemptedModels = new List<string>();
         try

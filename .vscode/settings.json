@@ -1,7 +1,7 @@
 {
     "appService.defaultWebAppToDeploy": "/subscriptions/f0504e26-451a-4249-8fb3-46270defdd5b/resourceGroups/PoRedoImage/providers/Microsoft.Web/sites/PoRedoImage",
     "appService.deploySubpath": ".",
-    "chat.mcp.autostart": "never",
+    "chat.mcp.autostart": "newAndOutdated",
     "chat.mcp.serverSampling": {},
     "mcp.servers": {
         "playwright": {
