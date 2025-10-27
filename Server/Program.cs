@@ -54,17 +54,6 @@ builder.Services.AddHealthChecks()
     .AddCheck<ComputerVisionHealthCheck>("ComputerVision")
     .AddCheck<OpenAIHealthCheck>("OpenAI");
 
-// Add CORS policy for development
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
-
 // Register Azure services
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IComputerVisionService, ComputerVisionService>();
@@ -90,9 +79,6 @@ app.UseSwaggerUI(c =>
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "ImageGc API V1");
     c.RoutePrefix = "swagger"; // Available at /swagger
 });
-
-// Enable CORS for all environments (required for Azure hosting)
-app.UseCors("AllowAll");
 
 app.UseHttpsRedirection(); // Enabled for proper HTTPS handling
 app.UseBlazorFrameworkFiles(); // Serve Blazor WebAssembly static files
