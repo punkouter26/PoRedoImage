@@ -40,6 +40,15 @@ public interface IOpenAIService
     /// <returns>Generated image data, content type, and token usage</returns>
     Task<(byte[] ImageData, string ContentType, int TokensUsed, long ProcessingTimeMs)> GenerateImageAsync(
         string description);
+
+    /// <summary>
+    /// Generates a funny meme caption based on image tags and context
+    /// </summary>
+    /// <param name="tags">Tags from Computer Vision analysis</param>
+    /// <param name="confidenceScore">Confidence score from Computer Vision</param>
+    /// <returns>Top text, bottom text, tokens used, and processing time</returns>
+    Task<(string TopText, string BottomText, int TokensUsed, long ProcessingTimeMs)> GenerateMemeCaptionAsync(
+        List<string> tags, double confidenceScore);
 }
 
 /// <summary>
@@ -388,6 +397,155 @@ Enhanced description:";
             });
 
             throw new InvalidOperationException("The image generation service is temporarily unavailable. Please try again later.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Generates a funny meme caption based on image tags and context
+    /// </summary>
+    public async Task<(string TopText, string BottomText, int TokensUsed, long ProcessingTimeMs)> GenerateMemeCaptionAsync(
+        List<string> tags, double confidenceScore)
+    {
+        // Validate inputs
+        if (tags == null || tags.Count == 0)
+            throw new ArgumentException("Tags list cannot be null or empty", nameof(tags));
+
+        _logger.LogInformation("Generating meme caption based on {TagCount} tags", tags.Count);
+
+        Log.Information("=== STATE CHANGE: OpenAI Meme Caption Generation Started ===");
+        Log.Information("Tags count: {TagCount}", tags.Count);
+        Log.Information("Confidence: {Confidence}", confidenceScore);
+
+        var startTime = DateTime.UtcNow;
+        var attemptedModels = new List<string>();
+        
+        try
+        {
+            // Create the Azure OpenAI client
+            var client = new AzureOpenAIClient(new Uri(_endpoint), new Azure.AzureKeyCredential(_apiKey));
+            var chatClient = client.GetChatClient(_chatDeployment);
+
+            // Build the prompt for meme caption generation
+            var prompt = $@"You are a hilarious meme creator. Based on the following image analysis, create a funny meme caption.
+
+Image Analysis:
+- Detected elements: {string.Join(", ", tags)}
+- Analysis confidence: {confidenceScore:F2}
+
+Create a classic two-line meme caption that is clever, witty, and funny. The caption should:
+1. Be related to the detected elements in a humorous way
+2. Follow internet meme culture and humor style
+3. Be concise and punchy (each line should be 2-8 words)
+4. Use classic meme formats when appropriate (surprised, fail, success, etc.)
+5. Be appropriate but edgy humor
+
+Return ONLY two lines in this exact format:
+TOP: [your top text here]
+BOTTOM: [your bottom text here]
+
+Example format:
+TOP: WHEN YOU SEE YOUR CRUSH
+BOTTOM: BUT FORGET HOW TO SPEAK
+
+Your meme caption:";
+
+            // Configure chat completion with lower temperature for consistent humor
+            var messages = new List<ChatMessage>
+            {
+                new SystemChatMessage(@"You are an expert meme creator who understands internet humor, pop culture, and classic meme formats. Create funny, clever captions that would go viral. Keep it witty but appropriate."),
+                new UserChatMessage(prompt)
+            };
+
+            var chatOptions = new ChatCompletionOptions
+            {
+                MaxOutputTokenCount = 100,
+                Temperature = 0.5f, // Lower temperature for more consistent, focused humor
+                TopP = 0.9f
+            };
+
+            attemptedModels.Add(_chatDeployment);
+            ChatCompletion response;
+
+            try
+            {
+                // Try with primary model
+                response = await chatClient.CompleteChatAsync(messages, chatOptions);
+            }
+            catch (Exception ex) when (ex.Message.Contains("unavailable") && _chatDeployment != _fallbackChatModel)
+            {
+                _logger.LogWarning("Primary deployment {PrimaryDeployment} unavailable. Trying fallback model {FallbackModel}",
+                    _chatDeployment, _fallbackChatModel);
+
+                var fallbackChatClient = client.GetChatClient(_chatDeployment);
+                attemptedModels.Add(_fallbackChatModel);
+
+                response = await fallbackChatClient.CompleteChatAsync(messages, chatOptions);
+
+                _logger.LogInformation("Successfully used fallback model {FallbackModel}", _fallbackChatModel);
+            }
+
+            var captionText = response.Content[0].Text.Trim();
+            var tokensUsed = response.Usage.TotalTokenCount;
+            var processingTime = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
+
+            // Parse the response to extract top and bottom text
+            string topText = "";
+            string bottomText = "";
+
+            var lines = captionText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                if (line.StartsWith("TOP:", StringComparison.OrdinalIgnoreCase))
+                {
+                    topText = line.Substring(4).Trim();
+                }
+                else if (line.StartsWith("BOTTOM:", StringComparison.OrdinalIgnoreCase))
+                {
+                    bottomText = line.Substring(7).Trim();
+                }
+            }
+
+            // Fallback if parsing failed
+            if (string.IsNullOrWhiteSpace(topText) && string.IsNullOrWhiteSpace(bottomText))
+            {
+                _logger.LogWarning("Failed to parse meme caption format. Using raw response.");
+                var parts = captionText.Split('\n', 2, StringSplitOptions.RemoveEmptyEntries);
+                topText = parts.Length > 0 ? parts[0] : "MEME";
+                bottomText = parts.Length > 1 ? parts[1] : "GENERATION";
+            }
+
+            Log.Information("=== STATE CHANGE: OpenAI Meme Caption Generation Completed ===");
+            Log.Information("Processing time: {ProcessingTime}ms", processingTime);
+            Log.Information("Tokens used: {TokensUsed}", tokensUsed);
+            Log.Information("Top text: {TopText}", topText);
+            Log.Information("Bottom text: {BottomText}", bottomText);
+
+            // Track metrics in Application Insights
+            _telemetryClient.TrackMetric("OpenAIMemeCaptionTime", processingTime);
+            _telemetryClient.TrackMetric("OpenAIMemeCaptionTokens", tokensUsed);
+
+            var memeTelemetry = new Microsoft.ApplicationInsights.DataContracts.TraceTelemetry("OpenAI Meme Caption Generation Completed");
+            memeTelemetry.Properties["Model"] = _chatModel;
+            memeTelemetry.Properties["TopText"] = topText;
+            memeTelemetry.Properties["BottomText"] = bottomText;
+            _telemetryClient.TrackTrace(memeTelemetry);
+
+            return (topText, bottomText, tokensUsed, processingTime);
+        }
+        catch (Exception ex)
+        {
+            var processingTime = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            _logger.LogError(ex, "Error generating meme caption with OpenAI after {ProcessingTime}ms. Attempted models: {Models}",
+                processingTime, string.Join(", ", attemptedModels));
+
+            _telemetryClient.TrackException(ex, new Dictionary<string, string>
+            {
+                { "Service", "OpenAIMemeCaption" },
+                { "ProcessingTime", processingTime.ToString() },
+                { "AttemptedModels", string.Join(", ", attemptedModels) }
+            });
+
+            throw;
         }
     }
 }

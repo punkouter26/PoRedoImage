@@ -29,4 +29,9 @@ public class ImageAnalysisRequest
     /// </summary>
     [Range(200, 500)]
     public int DescriptionLength { get; set; } = 200;
+
+    /// <summary>
+    /// Gets or sets the processing mode (ImageRegeneration or MemeGeneration)
+    /// </summary>
+    public ProcessingMode Mode { get; set; } = ProcessingMode.ImageRegeneration;
 }

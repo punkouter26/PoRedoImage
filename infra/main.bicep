@@ -70,6 +70,19 @@ module managedIdentity './core/security/managed-identity.bicep' = {
   }
 }
 
+// Create Key Vault for secure secret storage
+module keyVault './core/security/keyvault.bicep' = {
+  name: 'keyvault'
+  scope: rg
+  params: {
+    name: 'kv-${resourceToken}'
+    location: location
+    tags: tags
+    tenantId: tenant().tenantId
+    principalId: managedIdentity.outputs.principalId
+  }
+}
+
 // The application frontend
 module web './app/web.bicep' = {
   name: 'web'
@@ -84,6 +97,7 @@ module web './app/web.bicep' = {
     appSettings: {
       // Only essential Azure-specific settings
       APPLICATIONINSIGHTS_CONNECTION_STRING: monitoring.outputs.applicationInsightsConnectionString
+      AZURE_KEY_VAULT_ENDPOINT: keyVault.outputs.vaultUri
     }
   }
 }
@@ -111,8 +125,23 @@ module tableStorage './core/storage/storage-table.bicep' = {
   }
 }
 
+// Cost Management Budget
+module budget './core/consumption/budget.bicep' = {
+  name: 'budget'
+  scope: rg
+  params: {
+    budgetName: 'budget-poredoimage-monthly'
+    amount: 5
+    resourceGroupId: rg.id
+    contactEmail: 'punkouter26@gmail.com'
+    thresholdPercentage: 80
+    startDate: '2025-11-01'
+  }
+}
+
 // App outputs
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.applicationInsightsConnectionString
+output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.vaultUri
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
 output RESOURCE_GROUP_ID string = rg.id

@@ -6,8 +6,38 @@ using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 using Server.Services;
 using Server.Services.HealthChecks;
 using System.Net;
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Azure Key Vault for Production environment only
+// In Development, use dotnet user-secrets: dotnet user-secrets set "Key:Name" "value"
+if (builder.Environment.IsProduction())
+{
+    var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
+    
+    if (!string.IsNullOrEmpty(keyVaultEndpoint))
+    {
+        // Use Managed Identity in Azure (DefaultAzureCredential falls back to local dev credentials)
+        var credential = new DefaultAzureCredential();
+        builder.Configuration.AddAzureKeyVault(new Uri(keyVaultEndpoint), credential);
+        
+        Log.Information("Key Vault configured: {KeyVaultEndpoint}", keyVaultEndpoint);
+    }
+    else
+    {
+        Log.Warning("AZURE_KEY_VAULT_ENDPOINT not configured. Secrets will be read from appsettings.json");
+    }
+}
+else
+{
+    Log.Information("Development environment detected. Using user-secrets and appsettings.Development.json");
+}
 
 // Get Application Insights connection string for Serilog
 var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
@@ -35,6 +65,27 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
+// Configure OpenTelemetry for modern telemetry and metrics
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService("PoRedoImage")
+        .AddAttributes(new Dictionary<string, object>
+        {
+            ["deployment.environment"] = builder.Environment.EnvironmentName,
+            ["service.version"] = "1.0.0"
+        }))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddMeter("PoRedoImage.Api") // Custom metrics meter
+        .AddConsoleExporter()
+        .AddOtlpExporter())
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddConsoleExporter()
+        .AddOtlpExporter());
+
 // Add services to the container.
 builder.Services.AddApplicationInsightsTelemetry();
 
@@ -44,9 +95,8 @@ builder.Services.AddSingleton<Microsoft.ApplicationInsights.TelemetryClient>();
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
-// Add Swagger/OpenAPI
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Add OpenAPI with Scalar documentation
+builder.Services.AddOpenApi();
 
 // Add health checks with custom health check classes for external dependencies
 builder.Services.AddHealthChecks()
@@ -58,6 +108,7 @@ builder.Services.AddHealthChecks()
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IComputerVisionService, ComputerVisionService>();
 builder.Services.AddScoped<IOpenAIService, OpenAIService>();
+builder.Services.AddScoped<IMemeGeneratorService, MemeGeneratorService>();
 
 var app = builder.Build();
 
@@ -72,13 +123,9 @@ else
     app.UseHsts();
 }
 
-// Enable Swagger in all environments (including production)
-app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ImageGc API V1");
-    c.RoutePrefix = "swagger"; // Available at /swagger
-});
+// Map OpenAPI endpoint and enable Scalar UI
+app.MapOpenApi();
+app.MapScalarApiReference();
 
 app.UseHttpsRedirection(); // Enabled for proper HTTPS handling
 app.UseBlazorFrameworkFiles(); // Serve Blazor WebAssembly static files

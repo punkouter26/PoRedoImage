@@ -1,15 +1,16 @@
-# PoRedoImage - Image Analysis with Azure AI
+# PoRedoImage - AI-Powered Image Analysis Platform
 
-An intelligent image analysis application that uses Azure AI services to analyze images and generate enhanced descriptions. The project uses Azure Computer Vision to analyze images and Azure OpenAI to enhance descriptions and generate images based on analysis.
+An intelligent image analysis application leveraging Azure AI services to analyze images, generate enhanced descriptions, and create new images. Built with modern .NET architecture, secure secret management, and comprehensive observability.
 
-## � Live Application
+## 🌐 Live Application
 
 **Production URL**: [https://app-poredoimage-cqevadpy77pvi.azurewebsites.net](https://app-poredoimage-cqevadpy77pvi.azurewebsites.net)
 
 - **Resource Group**: poredoimage-uksouth
-- **Region**: UK South
+- **Region**: UK South  
 - **App Service Plan**: PoShared5 (F1 Free tier)
-- **Platform**: Azure App Service (.NET 9.0)
+- **Platform**: Azure App Service (.NET 10.0)
+- **Security**: Azure Key Vault, Managed Identity
 
 ## �🎯 Application Overview
 
@@ -90,20 +91,36 @@ Visual representations of the system architecture are available in the [`/Diagra
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: Blazor WebAssembly, Bootstrap, JavaScript
-- **Backend**: ASP.NET Core 9.0, C#, Dependency Injection
-- **AI Services**: Azure Computer Vision, Azure OpenAI (GPT-4, DALL-E)
-- **Cloud**: Azure App Service, Application Insights
-- **Testing**: xUnit, Moq, Integration Tests
-- **DevOps**: GitHub Actions, Docker, Azure CLI
-- **Monitoring**: Serilog, Application Insights, Custom Metrics
+### Core Framework
+- **.NET 10.0** - Latest .NET with improved performance and modern C# features
+- **Blazor WebAssembly** - Client-side web UI with C#
+- **ASP.NET Core** - High-performance backend API
+- **Centralized Package Management** - Single source of truth for dependencies
 
-## Azure Services Used
+### Azure Services
+- **Azure Key Vault** - Secure secret management with RBAC
+- **Azure Computer Vision** - Advanced image analysis
+- **Azure OpenAI Service** - GPT-4 descriptions, DALL-E image generation
+- **Azure App Service** - PaaS hosting with Managed Identity
+- **Application Insights** - Telemetry and monitoring
 
-- Azure Computer Vision
-- Azure OpenAI Service
-- Azure App Service
-- Azure Application Insights
+### Observability & Logging
+- **OpenTelemetry** - Modern, vendor-neutral metrics and tracing
+- **Serilog** - Structured logging to Console, File, and Application Insights
+- **Custom Metrics** - Business-specific telemetry (processing time, token usage)
+
+### DevOps & Infrastructure
+- **GitHub Actions** - CI/CD with OIDC federation
+- **Azure Developer CLI (azd)** - Infrastructure deployment
+- **Bicep** - Infrastructure as Code
+- **Docker** - Containerization support
+
+### Testing
+- **xUnit** - Unit and integration testing
+- **bUnit** - Blazor component testing
+- **Moq** - Mocking framework
+- **Playwright** - End-to-end browser testing
+- **dotnet-coverage** - Code coverage analysis
 
 ## CI/CD Pipeline
 
@@ -119,58 +136,73 @@ To deploy the application to your Azure resources, see the [GitHub Actions Deplo
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **.NET 9.0 SDK** or later
-- **Node.js** and **npm** (for client-side packages)
-- **Azure Subscription** with the following services:
+- **.NET 10.0 SDK** (10.0.100 or later)
+- **Node.js 18+** and **npm** (for E2E tests)
+- **Azure Subscription** with:
   - Azure Computer Vision
   - Azure OpenAI Service
+  - Azure Key Vault (auto-created by deployment)
+- **Azure CLI** and **Azure Developer CLI (azd)**
 - **Git** for version control
 
-### 🏃‍♂️ Quick Start (Local Development)
+### 🏃‍♂️ Local Development Setup
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/punkouter25/PoRedoImage.git
-   cd PoRedoImage
-   ```
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/punkouter26/PoRedoImage.git
+cd PoRedoImage
+```
 
-2. **Install Dependencies**
-   ```bash
-   dotnet restore
-   ```
+#### 2. Restore Dependencies
+```bash
+dotnet restore
+```
 
-3. **Configure Azure Services**
-   - Copy `appsettings.Example.json` to `appsettings.json`
-   - Update with your Azure service credentials:
-     ```json
-     {
-       "ComputerVision": {
-         "Endpoint": "https://your-cv-service.cognitiveservices.azure.com/",
-         "ApiKey": "your-computer-vision-key",
-         "ApiVersion": "2024-02-01"
-       },
-       "OpenAI": {
-         "Endpoint": "https://your-openai-service.openai.azure.com/",
-         "ApiKey": "your-openai-key",
-         "ChatCompletionsDeployment": "gpt-4",
-         "ImageGenerationDeployment": "dall-e-3"
-       }
-     }
-     ```
+#### 3. Configure Secrets (Development)
 
-4. **Build and Run**
-   ```bash
-   # Build the solution
-   dotnet build
-   
-   # Run the server (starts both API and serves the client)
-   cd Server
-   dotnet run
-   ```
+**Option A: Use PowerShell Script (Recommended)**
+```powershell
+.\scripts\Configure-UserSecrets.ps1
+```
 
-5. **Access the Application**
-   - Open your browser to `https://localhost:5001`
-   - Upload an image and experience the AI analysis!
+**Option B: Manual Configuration**
+```bash
+cd Server
+
+# Initialize user secrets
+dotnet user-secrets init
+
+# Add secrets
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=..."
+dotnet user-secrets set "ConnectionStrings:AzureTableStorage" "UseDevelopmentStorage=true"
+dotnet user-secrets set "ComputerVision:Endpoint" "https://..."
+dotnet user-secrets set "ComputerVision:ApiKey" "your-key"
+dotnet user-secrets set "OpenAI:Endpoint" "https://..."
+dotnet user-secrets set "OpenAI:Key" "your-key"
+```
+
+See [docs/SECRETS.md](docs/SECRETS.md) for comprehensive secret management guide.
+
+#### 4. Start Azurite (Local Storage Emulator)
+```bash
+azurite --location ./AzuriteData
+```
+
+#### 5. Build and Run
+```bash
+# Build the solution
+dotnet build
+
+# Run the server (F5 in VS Code also works)
+cd Server
+dotnet run
+```
+
+#### 6. Access the Application
+- **App**: `https://localhost:5001`
+- **Swagger**: `https://localhost:5001/swagger`
+- **Health Check**: `https://localhost:5001/api/health`
+- **Diagnostics**: `https://localhost:5001/diag`
 
 ### 🐳 Docker Deployment
 
@@ -184,68 +216,51 @@ docker run -p 5000:80 -e ComputerVision__ApiKey=your-key imagegc:latest
 
 ### ☁️ Azure Deployment
 
-The application is deployed using Azure Developer CLI (azd) with infrastructure as code (Bicep).
+Deploy using Azure Developer CLI with automated infrastructure provisioning.
 
-#### Prerequisites
-- Azure CLI installed
-- Azure Developer CLI (azd) installed
-- Azure subscription with appropriate permissions
+#### 1. Login to Azure
+```bash
+az login
+azd auth login
+```
 
-#### Deployment Steps
+#### 2. Deploy Infrastructure and Application
+```bash
+# One command to deploy everything
+azd up
 
-1. **Login to Azure**
-   ```bash
-   az login
-   azd auth login
-   ```
+# Or step by step:
+azd provision  # Create Azure resources
+azd deploy     # Deploy application code
+```
 
-2. **Initialize Environment**
-   ```bash
-   azd env new <environment-name>
-   ```
+This creates:
+- ✅ Resource Group (poredoimage-{location})
+- ✅ Azure Key Vault with RBAC
+- ✅ App Service with Managed Identity
+- ✅ Application Insights & Log Analytics
+- ✅ Storage Account (Azure Tables)
+- ✅ Cost Budget ($5/month with 80% alert)
 
-3. **Configure Location and Resources**
-   ```bash
-   # Set your preferred Azure region
-   azd env set AZURE_LOCATION uksouth
-   ```
+#### 3. Configure Secrets in Key Vault
+```powershell
+# Get Key Vault name from deployment output
+$keyVaultName = azd env get-values | Select-String "AZURE_KEY_VAULT_NAME" | ...
 
-4. **Deploy Infrastructure and Application**
-   ```bash
-   # Deploy everything with a single command
-   azd up
-   ```
+# Run the script to add secrets
+.\scripts\Add-SecretsToKeyVault.ps1 -KeyVaultName $keyVaultName
+```
 
-5. **Configure API Keys**
-   After deployment, add the following application settings in the Azure Portal:
-   - `ComputerVision__Endpoint`
-   - `ComputerVision__Key`
-   - `OpenAI__Endpoint`
-   - `OpenAI__Key`
-   - `OpenAI__ChatCompletionsDeployment`
-   - `ConnectionStrings__AzureTableStorage`
+#### 4. Verify Deployment
+```bash
+# Check deployment status
+azd monitor
 
-6. **Set Up GitHub CI/CD**
-   ```bash
-   # Get publish profile
-   az webapp deployment list-publishing-profiles \
-     --resource-group <resource-group> \
-     --name <app-name> \
-     --xml > publish-profile.xml
-   
-   # Add as GitHub secret named AZURE_WEBAPP_PUBLISH_PROFILE
-   ```
+# View application logs
+azd logs
+```
 
-#### Infrastructure Details
-
-The Bicep templates create:
-- Resource Group (e.g., poredoimage-uksouth)
-- App Service (using shared App Service Plan from PoShared RG)
-- Application Insights for telemetry
-- Log Analytics Workspace
-- Storage Account for Azure Table Storage
-
-*For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).*
+See [docs/SECRETS.md](docs/SECRETS.md) for detailed secret management and [AGENTS.md](AGENTS.md) for deployment chronicles.
 
 ## 🧪 Testing
 
@@ -289,13 +304,40 @@ The Playwright test suite includes:
 - ✅ Performance benchmarking
 - ✅ CORS and security headers
 
-## 📊 Monitoring & Diagnostics
+## 📊 Monitoring & Observability
 
-- **Application Insights**: Performance monitoring and telemetry
-- **Health Checks**: Built-in endpoints for service monitoring  
-- **Structured Logging**: Serilog with Azure integration
-- **Custom Metrics**: Processing times, token usage, error rates
-- **Diagnostics Page**: Real-time system status and connectivity tests
+### Telemetry Stack
+- **OpenTelemetry**: Modern metrics and distributed tracing
+- **Application Insights**: Azure-native telemetry backend
+- **Serilog**: Structured logging to multiple sinks
+- **Health Checks**: `/api/health` endpoint for liveness/readiness
+
+### Key Metrics
+- `poredoimage.processing.duration` - Image processing time (histogram)
+- `poredoimage.openai.tokens.total` - Token consumption tracking (counter)
+- `poredoimage.vision.api.calls` - Computer Vision usage (counter)
+- `poredoimage.processing.failures` - Error rate monitoring (counter)
+
+### Monitoring Queries
+Essential KQL queries are available in:
+- [Server/KqlQueries.cs](Server/KqlQueries.cs) - Embedded queries for Application Insights
+- [MONITORING.md](MONITORING.md) - Comprehensive monitoring guide
+
+### Diagnostics
+Visit `/diag` for real-time system diagnostics:
+- Azure service connectivity tests
+- Configuration validation
+- Performance metrics dashboard
+- Recent logs and errors
+
+## 📚 Documentation
+
+- **[docs/SECRETS.md](docs/SECRETS.md)** - Complete secret management guide
+- **[docs/adr/](docs/adr/)** - Architecture Decision Records
+- **[AGENTS.md](AGENTS.md)** - AI-assisted development chronicle
+- **[MONITORING.md](MONITORING.md)** - Observability and monitoring
+- **[PRD.md](PRD.md)** - Product Requirements Document
+- **[Diagrams/](Diagrams/)** - Architecture diagrams (Mermaid)
 
 ## 🤝 Contributing
 

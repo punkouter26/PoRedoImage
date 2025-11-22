@@ -34,4 +34,14 @@ public class ImageAnalysisResult
     /// Gets or sets the processing metrics for telemetry and diagnostics
     /// </summary>
     public ProcessingMetrics Metrics { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the base64-encoded meme image data (when Mode = MemeGeneration)
+    /// </summary>
+    public string? MemeImageData { get; set; }
+
+    /// <summary>
+    /// Gets or sets the AI-generated meme caption text (when Mode = MemeGeneration)
+    /// </summary>
+    public string? MemeCaption { get; set; }
 }

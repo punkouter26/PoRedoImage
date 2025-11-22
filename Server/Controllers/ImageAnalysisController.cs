@@ -46,6 +46,7 @@ public class ImageAnalysisController : ControllerBase
             // Try to get services from DI container
             var computerVisionService = _serviceProvider.GetService<IComputerVisionService>();
             var openAIService = _serviceProvider.GetService<IOpenAIService>();
+            var memeGeneratorService = _serviceProvider.GetService<IMemeGeneratorService>();
 
             if (computerVisionService == null || openAIService == null)
             {
@@ -56,7 +57,8 @@ public class ImageAnalysisController : ControllerBase
                 _telemetryClient.TrackEvent("ServiceUnavailable", new Dictionary<string, string>
                 {
                     { "ComputerVisionAvailable", (computerVisionService != null).ToString() },
-                    { "OpenAIAvailable", (openAIService != null).ToString() }
+                    { "OpenAIAvailable", (openAIService != null).ToString() },
+                    { "MemeGeneratorAvailable", (memeGeneratorService != null).ToString() }
                 });
 
                 operation.Telemetry.Success = false;
@@ -72,11 +74,11 @@ public class ImageAnalysisController : ControllerBase
 
             Log.Information("=== USER ACTION: Image Analysis Started ===");
             Log.Information("User: {UserId} ({UserName})", userId, userName);
-            Log.Information("File: {FileName}, Content Type: {ContentType}, Description Length: {Length} words",
-                request.FileName, request.ContentType, request.DescriptionLength);
+            Log.Information("File: {FileName}, Content Type: {ContentType}, Description Length: {Length} words, Mode: {Mode}",
+                request.FileName, request.ContentType, request.DescriptionLength, request.Mode);
 
-            _logger.LogInformation("Image analysis request received from user {UserId} ({UserName}). File: {FileName}, Description Length: {Length} words",
-                userId, userName, request.FileName, request.DescriptionLength);
+            _logger.LogInformation("Image analysis request received from user {UserId} ({UserName}). File: {FileName}, Mode: {Mode}",
+                userId, userName, request.FileName, request.Mode);
 
             // Track custom event: Image analysis started
             _telemetryClient.TrackEvent("ImageAnalysisStarted", new Dictionary<string, string>
@@ -85,7 +87,8 @@ public class ImageAnalysisController : ControllerBase
                 { "UserName", userName },
                 { "FileName", request.FileName },
                 { "ContentType", request.ContentType },
-                { "DescriptionLength", request.DescriptionLength.ToString() }
+                { "DescriptionLength", request.DescriptionLength.ToString() },
+                { "Mode", request.Mode.ToString() }
             });
 
             // Prepare the result object
@@ -200,84 +203,182 @@ public class ImageAnalysisController : ControllerBase
                 return StatusCode(500, result);
             }
 
-            // Step 2: Generate detailed description directly from tags with OpenAI
-            _logger.LogInformation("Step 2: Generating detailed description with OpenAI");
-            string detailedDescription;
-            try
+            // Branch based on processing mode
+            if (request.Mode == ProcessingMode.MemeGeneration)
             {
-                var (description, tokensUsed, processingTime) =
-                    await openAIService.GenerateDetailedDescriptionAsync(tags, request.DescriptionLength, confidenceScore);
+                // MEME GENERATION MODE
+                _logger.LogInformation("Processing in MEME GENERATION mode");
 
-                detailedDescription = description;
-                result.Metrics.DescriptionGenerationTimeMs = processingTime;
-                result.Metrics.DescriptionTokensUsed = tokensUsed;
-
-                _logger.LogInformation("Detailed description generation completed. Length: {Length} characters, Tokens: {Tokens}",
-                    detailedDescription.Length, tokensUsed);
-
-                // Track OpenAI text generation metrics
-                _telemetryClient.TrackMetric("OpenAIDescriptionProcessingTimeMs", processingTime);
-                _telemetryClient.TrackMetric("OpenAIDescriptionTokensUsed", tokensUsed);
-                _telemetryClient.TrackMetric("DescriptionLength", detailedDescription.Length);
-                
-                operation.Telemetry.Properties["DescriptionTokensUsed"] = tokensUsed.ToString();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during detailed description generation");
-                // Fall back to a basic description from tags
-                detailedDescription = $"Image contains: {string.Join(", ", tags)}";
-                result.Metrics.ErrorInfo = $"Detailed description generation failed: {ex.Message}";
-                
-                // Track description generation failure
-                _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                // Step 2: Generate funny meme caption with OpenAI
+                _logger.LogInformation("Step 2 (Meme): Generating funny meme caption with OpenAI");
+                string topText = "";
+                string bottomText = "";
+                try
                 {
-                    { "ErrorType", "DescriptionGenerationFailed" },
-                    { "UserId", userId }
-                });
-            }
+                    var (top, bottom, tokensUsed, processingTime) =
+                        await openAIService.GenerateMemeCaptionAsync(tags, confidenceScore);
 
-            // Step 3: Generate new image with DALL-E
-            _logger.LogInformation("Step 3: Generating image with DALL-E");
-            try
-            {
-                var (imageData, contentType, tokensUsed, processingTime) =
-                    await openAIService.GenerateImageAsync(detailedDescription);
+                    topText = top;
+                    bottomText = bottom;
+                    result.MemeCaption = $"{topText}\n{bottomText}";
+                    result.Metrics.DescriptionGenerationTimeMs = processingTime;
+                    result.Metrics.DescriptionTokensUsed = tokensUsed;
 
-                result.RegeneratedImageData = Convert.ToBase64String(imageData);
-                result.RegeneratedImageContentType = contentType;
-                result.Metrics.ImageRegenerationTimeMs = processingTime;
-                result.Metrics.RegenerationTokensUsed = tokensUsed;
+                    _logger.LogInformation("Meme caption generation completed. Top: '{Top}', Bottom: '{Bottom}', Tokens: {Tokens}",
+                        topText, bottomText, tokensUsed);
 
-                _logger.LogInformation("Image generation completed. Size: {Size} bytes, Tokens: {Tokens}",
-                    imageData.Length, tokensUsed);
-
-                // Track DALL-E image generation metrics
-                _telemetryClient.TrackMetric("DALLEProcessingTimeMs", processingTime);
-                _telemetryClient.TrackMetric("DALLETokensUsed", tokensUsed);
-                _telemetryClient.TrackMetric("RegeneratedImageSizeBytes", imageData.Length);
-                
-                operation.Telemetry.Properties["RegenerationTokensUsed"] = tokensUsed.ToString();
-                operation.Telemetry.Properties["RegeneratedImageSizeBytes"] = imageData.Length.ToString();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during image generation");
-                result.Metrics.ErrorInfo = $"Image generation failed: {ex.Message}";
-                
-                // Track image generation failure
-                _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                    // Track meme caption metrics
+                    _telemetryClient.TrackMetric("OpenAIMemeCaptionProcessingTimeMs", processingTime);
+                    _telemetryClient.TrackMetric("OpenAIMemeCaptionTokensUsed", tokensUsed);
+                    
+                    operation.Telemetry.Properties["MemeCaptionTokensUsed"] = tokensUsed.ToString();
+                }
+                catch (Exception ex)
                 {
-                    { "ErrorType", "ImageGenerationFailed" },
-                    { "UserId", userId },
-                    { "Description", detailedDescription }
-                });
-                
-                // We'll return what we have so far
+                    _logger.LogError(ex, "Error during meme caption generation");
+                    result.Metrics.ErrorInfo = $"Meme caption generation failed: {ex.Message}";
+                    
+                    // Track caption generation failure
+                    _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                    {
+                        { "ErrorType", "MemeCaptionGenerationFailed" },
+                        { "UserId", userId }
+                    });
+
+                    // Use fallback captions
+                    topText = "WHEN YOU UPLOAD";
+                    bottomText = "AN AWESOME IMAGE";
+                    result.MemeCaption = $"{topText}\n{bottomText}";
+                }
+
+                // Step 3: Overlay caption on original image
+                _logger.LogInformation("Step 3 (Meme): Overlaying caption on image");
+                try
+                {
+                    if (memeGeneratorService == null)
+                    {
+                        throw new InvalidOperationException("Meme generator service not available");
+                    }
+
+                    var memeStopwatch = Stopwatch.StartNew();
+                    var memeImageBytes = memeGeneratorService.AddCaptionToImage(imageBytes, topText, bottomText);
+                    memeStopwatch.Stop();
+
+                    result.MemeImageData = Convert.ToBase64String(memeImageBytes);
+                    result.RegeneratedImageContentType = "image/png";
+                    result.Metrics.ImageRegenerationTimeMs = memeStopwatch.ElapsedMilliseconds;
+
+                    _logger.LogInformation("Meme overlay completed. Size: {Size} bytes, Time: {Time}ms",
+                        memeImageBytes.Length, memeStopwatch.ElapsedMilliseconds);
+
+                    // Track meme generation metrics
+                    _telemetryClient.TrackMetric("MemeOverlayProcessingTimeMs", memeStopwatch.ElapsedMilliseconds);
+                    _telemetryClient.TrackMetric("MemeImageSizeBytes", memeImageBytes.Length);
+                    
+                    operation.Telemetry.Properties["MemeImageSizeBytes"] = memeImageBytes.Length.ToString();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during meme image generation");
+                    result.Metrics.ErrorInfo = $"Meme image generation failed: {ex.Message}";
+                    
+                    // Track meme generation failure
+                    _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                    {
+                        { "ErrorType", "MemeImageGenerationFailed" },
+                        { "UserId", userId }
+                    });
+                }
+
+                // Set description to simple tag list for meme mode
+                result.Description = $"Image contains: {string.Join(", ", tags)}";
+            }
+            else
+            {
+                // ORIGINAL IMAGE REGENERATION MODE
+                _logger.LogInformation("Processing in IMAGE REGENERATION mode");
+
+                // Step 2: Generate detailed description directly from tags with OpenAI
+                _logger.LogInformation("Step 2: Generating detailed description with OpenAI");
+                string detailedDescription;
+                try
+                {
+                    var (description, tokensUsed, processingTime) =
+                        await openAIService.GenerateDetailedDescriptionAsync(tags, request.DescriptionLength, confidenceScore);
+
+                    detailedDescription = description;
+                    result.Metrics.DescriptionGenerationTimeMs = processingTime;
+                    result.Metrics.DescriptionTokensUsed = tokensUsed;
+
+                    _logger.LogInformation("Detailed description generation completed. Length: {Length} characters, Tokens: {Tokens}",
+                        detailedDescription.Length, tokensUsed);
+
+                    // Track OpenAI text generation metrics
+                    _telemetryClient.TrackMetric("OpenAIDescriptionProcessingTimeMs", processingTime);
+                    _telemetryClient.TrackMetric("OpenAIDescriptionTokensUsed", tokensUsed);
+                    _telemetryClient.TrackMetric("DescriptionLength", detailedDescription.Length);
+                    
+                    operation.Telemetry.Properties["DescriptionTokensUsed"] = tokensUsed.ToString();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during detailed description generation");
+                    // Fall back to a basic description from tags
+                    detailedDescription = $"Image contains: {string.Join(", ", tags)}";
+                    result.Metrics.ErrorInfo = $"Detailed description generation failed: {ex.Message}";
+                    
+                    // Track description generation failure
+                    _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                    {
+                        { "ErrorType", "DescriptionGenerationFailed" },
+                        { "UserId", userId }
+                    });
+                }
+
+                // Step 3: Generate new image with DALL-E
+                _logger.LogInformation("Step 3: Generating image with DALL-E");
+                try
+                {
+                    var (imageData, contentType, tokensUsed, processingTime) =
+                        await openAIService.GenerateImageAsync(detailedDescription);
+
+                    result.RegeneratedImageData = Convert.ToBase64String(imageData);
+                    result.RegeneratedImageContentType = contentType;
+                    result.Metrics.ImageRegenerationTimeMs = processingTime;
+                    result.Metrics.RegenerationTokensUsed = tokensUsed;
+
+                    _logger.LogInformation("Image generation completed. Size: {Size} bytes, Tokens: {Tokens}",
+                        imageData.Length, tokensUsed);
+
+                    // Track DALL-E image generation metrics
+                    _telemetryClient.TrackMetric("DALLEProcessingTimeMs", processingTime);
+                    _telemetryClient.TrackMetric("DALLETokensUsed", tokensUsed);
+                    _telemetryClient.TrackMetric("RegeneratedImageSizeBytes", imageData.Length);
+                    
+                    operation.Telemetry.Properties["RegenerationTokensUsed"] = tokensUsed.ToString();
+                    operation.Telemetry.Properties["RegeneratedImageSizeBytes"] = imageData.Length.ToString();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during image generation");
+                    result.Metrics.ErrorInfo = $"Image generation failed: {ex.Message}";
+                    
+                    // Track image generation failure
+                    _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                    {
+                        { "ErrorType", "ImageGenerationFailed" },
+                        { "UserId", userId },
+                        { "Description", detailedDescription }
+                    });
+                    
+                    // We'll return what we have so far
+                }
+
+                // Complete the result
+                result.Description = detailedDescription;
             }
 
-            // Complete the result
-            result.Description = detailedDescription;
+            // Common result completion
             result.Tags = tags;
             result.ConfidenceScore = confidenceScore;
 
@@ -286,10 +387,19 @@ public class ImageAnalysisController : ControllerBase
 
             Log.Information("=== USER ACTION: Image Analysis Completed ===");
             Log.Information("Total processing time: {TotalTime}ms", totalTime);
-            Log.Information("Description length: {DescriptionLength} characters", detailedDescription.Length);
+            Log.Information("Mode: {Mode}", request.Mode);
+            if (request.Mode == ProcessingMode.MemeGeneration)
+            {
+                Log.Information("Meme caption: {Caption}", result.MemeCaption);
+            }
+            else
+            {
+                Log.Information("Description length: {DescriptionLength} characters", result.Description.Length);
+            }
             Log.Information("Tags found: {TagCount}", tags.Count);
 
-            _logger.LogInformation("Image analysis completed in {TotalTime}ms for user {UserName}", totalTime, userName);
+            _logger.LogInformation("Image analysis completed in {TotalTime}ms for user {UserName} (Mode: {Mode})", 
+                totalTime, userName, request.Mode);
 
             // Track overall success and timing
             _telemetryClient.TrackMetric("ImageAnalysisTotalTimeMs", totalTime);
@@ -299,7 +409,7 @@ public class ImageAnalysisController : ControllerBase
                 { "UserName", userName },
                 { "TotalTimeMs", totalTime.ToString() },
                 { "TagCount", tags.Count.ToString() },
-                { "DescriptionLength", detailedDescription.Length.ToString() },
+                { "Mode", request.Mode.ToString() },
                 { "Success", "true" }
             });
 
