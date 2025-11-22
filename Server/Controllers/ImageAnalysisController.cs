@@ -4,6 +4,7 @@ using Server.Services;
 using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Serilog;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.DataContracts;
@@ -236,7 +237,6 @@ public class ImageAnalysisController : ControllerBase
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error during meme caption generation");
-                    result.Metrics.ErrorInfo = $"Meme caption generation failed: {ex.Message}";
                     
                     // Track caption generation failure
                     _telemetryClient.TrackException(ex, new Dictionary<string, string>
@@ -245,10 +245,11 @@ public class ImageAnalysisController : ControllerBase
                         { "UserId", userId }
                     });
 
-                    // Use fallback captions
-                    topText = "WHEN YOU UPLOAD";
-                    bottomText = "AN AWESOME IMAGE";
-                    result.MemeCaption = $"{topText}\n{bottomText}";
+                    operation.Telemetry.Success = false;
+                    return Problem(
+                        title: "Meme caption generation failed",
+                        detail: ex.Message,
+                        statusCode: StatusCodes.Status500InternalServerError);
                 }
 
                 // Step 3: Overlay caption on original image
@@ -290,8 +291,38 @@ public class ImageAnalysisController : ControllerBase
                     });
                 }
 
-                // Set description to simple tag list for meme mode
-                result.Description = $"Image contains: {string.Join(", ", tags)}";
+                // Provide a descriptive summary even in meme mode using OpenAI
+                try
+                {
+                    var (description, tokensUsed, processingTime) =
+                        await openAIService.GenerateDetailedDescriptionAsync(tags, request.DescriptionLength, confidenceScore);
+
+                    result.Description = description;
+                    result.Metrics.DescriptionGenerationTimeMs = processingTime;
+                    result.Metrics.DescriptionTokensUsed = tokensUsed;
+
+                    _telemetryClient.TrackMetric("OpenAIDescriptionProcessingTimeMs", processingTime);
+                    _telemetryClient.TrackMetric("OpenAIDescriptionTokensUsed", tokensUsed);
+                    _telemetryClient.TrackMetric("DescriptionLength", description.Length);
+                    
+                    operation.Telemetry.Properties["DescriptionTokensUsed"] = tokensUsed.ToString();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error generating detailed description for meme mode");
+                    
+                    _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                    {
+                        { "ErrorType", "DescriptionGenerationFailed" },
+                        { "UserId", userId }
+                    });
+
+                    operation.Telemetry.Success = false;
+                    return Problem(
+                        title: "Detailed description generation failed",
+                        detail: ex.Message,
+                        statusCode: StatusCodes.Status500InternalServerError);
+                }
             }
             else
             {
@@ -323,16 +354,18 @@ public class ImageAnalysisController : ControllerBase
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error during detailed description generation");
-                    // Fall back to a basic description from tags
-                    detailedDescription = $"Image contains: {string.Join(", ", tags)}";
-                    result.Metrics.ErrorInfo = $"Detailed description generation failed: {ex.Message}";
                     
-                    // Track description generation failure
                     _telemetryClient.TrackException(ex, new Dictionary<string, string>
                     {
                         { "ErrorType", "DescriptionGenerationFailed" },
                         { "UserId", userId }
                     });
+
+                    operation.Telemetry.Success = false;
+                    return Problem(
+                        title: "Detailed description generation failed",
+                        detail: ex.Message,
+                        statusCode: StatusCodes.Status500InternalServerError);
                 }
 
                 // Step 3: Generate new image with DALL-E

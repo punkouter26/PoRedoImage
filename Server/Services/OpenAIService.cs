@@ -239,32 +239,46 @@ Enhanced description:";
             var chatClient = client.GetChatClient(_chatDeployment);
 
             // Build the prompt for detailed description generation
-            var prompt = $@"You are an expert image analyst. Based on the following image analysis data, create a comprehensive and vivid image description.
+            var prompt = $@"Create a detailed visual description of an image based on the detected elements.
 
-Image Analysis Data:
-- Detected elements: {string.Join(", ", tags)}
-- Analysis confidence: {confidenceScore:F2}
+**DETECTED ELEMENTS**: {string.Join(", ", tags)}
 
-Create a detailed, engaging description that is approximately {targetLength} words long. The description should:
-1. Paint a vivid picture of what the image contains
-2. Describe the composition, lighting, colors, and atmosphere
-3. Include details about the setting, objects, people, and their interactions
-4. Be written in a flowing, descriptive style suitable for image generation
-5. Focus on visual elements and spatial relationships
-6. Maintain accuracy based on the detected elements
+**WORD COUNT REQUIREMENT**: You MUST write EXACTLY {targetLength} words. Count carefully. This is mandatory.
 
-Enhanced description:";
+**STRUCTURE YOUR DESCRIPTION**:
+- Main subjects: Who/what is in the image? Describe appearance, poses, expressions, clothing
+- Setting & background: Where is this? Describe the environment, location, surroundings
+- Colors & lighting: What colors dominate? How is the lighting? Time of day? Mood?
+- Composition: How are elements arranged? Foreground/background relationship?
+- Textures & details: Materials, surfaces, patterns, fine details visible
+- Atmosphere: Overall feeling, mood, aesthetic quality
+
+Write a SINGLE flowing paragraph. Be descriptive and specific. Use vivid language. The description will be used for DALL-E image generation.
+
+REMINDER: Your response must be EXACTLY {targetLength} words long. Count before submitting.
+
+Description:";
 
             // Configure the chat completion options
             var messages = new List<ChatMessage>
             {
-                new SystemChatMessage(@"You are an expert visual description writer. Create detailed, vivid descriptions that capture the essence of images based on analysis data. Focus on visual elements, composition, lighting, and atmosphere. Write in a descriptive, engaging style."),
+                new SystemChatMessage(@"You are a professional visual description writer. Your task is to create detailed image descriptions with EXACT word counts.
+
+CRITICAL RULES:
+1. You MUST match the exact word count specified in the user request
+2. Count every word before responding - accuracy is mandatory
+3. Write one flowing paragraph in descriptive narrative style
+4. Include visual details: subjects, setting, colors, lighting, composition, textures, atmosphere
+5. Be specific and vivid - this description will be used for AI image generation
+6. Use sensory language that paints a complete picture
+
+The word count requirement is NON-NEGOTIABLE. If asked for 350 words, you must write exactly 350 words."),
                 new UserChatMessage(prompt)
             };
 
             var chatOptions = new ChatCompletionOptions
             {
-                MaxOutputTokenCount = Math.Max(800, targetLength * 2), // Allow more tokens for longer descriptions
+                MaxOutputTokenCount = Math.Max(1500, (int)(targetLength * 2.5)), // Allow enough tokens for target word count
                 Temperature = 0.7f,
                 TopP = 0.95f
             };

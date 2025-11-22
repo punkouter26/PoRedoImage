@@ -15,28 +15,31 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Azure Key Vault for Production environment only
-// In Development, use dotnet user-secrets: dotnet user-secrets set "Key:Name" "value"
-if (builder.Environment.IsProduction())
+// Configure Azure Key Vault for all environments
+// Local development uses DefaultAzureCredential which falls back to Azure CLI/Visual Studio credentials
+// Production uses Managed Identity
+var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"] 
+    ?? "https://kv-poredoimage.vault.azure.net/";
+
+if (!string.IsNullOrEmpty(keyVaultEndpoint))
 {
-    var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
-    
-    if (!string.IsNullOrEmpty(keyVaultEndpoint))
+    try
     {
-        // Use Managed Identity in Azure (DefaultAzureCredential falls back to local dev credentials)
+        // Use Managed Identity in Azure, Azure CLI credentials locally
         var credential = new DefaultAzureCredential();
         builder.Configuration.AddAzureKeyVault(new Uri(keyVaultEndpoint), credential);
         
-        Log.Information("Key Vault configured: {KeyVaultEndpoint}", keyVaultEndpoint);
+        Log.Information("Key Vault configured: {KeyVaultEndpoint} (Environment: {Environment})", 
+            keyVaultEndpoint, builder.Environment.EnvironmentName);
     }
-    else
+    catch (Exception ex)
     {
-        Log.Warning("AZURE_KEY_VAULT_ENDPOINT not configured. Secrets will be read from appsettings.json");
+        Log.Warning(ex, "Failed to configure Key Vault. Falling back to appsettings.json");
     }
 }
 else
 {
-    Log.Information("Development environment detected. Using user-secrets and appsettings.Development.json");
+    Log.Warning("AZURE_KEY_VAULT_ENDPOINT not configured. Secrets will be read from appsettings.json");
 }
 
 // Get Application Insights connection string for Serilog
@@ -78,12 +81,10 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddMeter("PoRedoImage.Api") // Custom metrics meter
-        .AddConsoleExporter()
         .AddOtlpExporter())
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
-        .AddConsoleExporter()
         .AddOtlpExporter());
 
 // Add services to the container.

@@ -1,3 +1,4 @@
+
 using Azure;
 using Azure.AI.Vision.ImageAnalysis;
 using Microsoft.ApplicationInsights;
@@ -29,6 +30,7 @@ public class ComputerVisionService : IComputerVisionService
     private readonly string _endpoint;
     private readonly string _key;
     private readonly string _apiVersion;
+    private readonly float _minTagConfidence;
 
     public ComputerVisionService(
         IConfiguration configuration,
@@ -52,9 +54,10 @@ public class ComputerVisionService : IComputerVisionService
         _key = configuration["ComputerVision:ApiKey"] ?? configuration["ComputerVision:Key"] ??
             throw new ArgumentNullException("ComputerVision:ApiKey or ComputerVision:Key is not configured");
         _apiVersion = configuration["ComputerVision:ApiVersion"] ?? "2023-10-01";
+        _minTagConfidence = configuration.GetValue<float>("ComputerVision:MinTagConfidence", 0.6f);
 
-        _logger.LogInformation("Computer Vision Service initialized with endpoint: {Endpoint}, API version: {ApiVersion}",
-            _endpoint, _apiVersion);
+        _logger.LogInformation("Computer Vision Service initialized with endpoint: {Endpoint}, API version: {ApiVersion}, MinTagConfidence: {MinTagConfidence}",
+            _endpoint, _apiVersion, _minTagConfidence);
     }
 
     /// <summary>
@@ -103,7 +106,14 @@ public class ComputerVisionService : IComputerVisionService
                 // Access the Tags collection through its Values property
                 foreach (var tag in response.Value.Tags.Values)
                 {
-                    tags.Add(tag.Name);
+                    if (tag.Confidence >= _minTagConfidence)
+                    {
+                        tags.Add(tag.Name);
+                    }
+                    else
+                    {
+                        Log.Information("Filtered out low confidence tag: {Tag} ({Confidence:F2})", tag.Name, tag.Confidence);
+                    }
                 }
             }
 

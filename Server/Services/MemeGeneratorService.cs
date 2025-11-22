@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
+using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 
 namespace Server.Services;
@@ -9,6 +10,7 @@ namespace Server.Services;
 /// <summary>
 /// Service for generating meme images with caption overlays
 /// </summary>
+[SupportedOSPlatform("windows")]
 public class MemeGeneratorService : IMemeGeneratorService
 {
     private readonly ILogger<MemeGeneratorService> _logger;
@@ -21,6 +23,7 @@ public class MemeGeneratorService : IMemeGeneratorService
     /// <summary>
     /// Adds meme-style caption overlay to an image (white Impact font with black outline)
     /// </summary>
+    [SupportedOSPlatform("windows")]
     public byte[] AddCaptionToImage(byte[] imageData, string? topText, string? bottomText)
     {
         if (imageData == null || imageData.Length == 0)
@@ -44,36 +47,19 @@ public class MemeGeneratorService : IMemeGeneratorService
             // Draw the original image
             graphics.DrawImage(originalImage, 0, 0, originalImage.Width, originalImage.Height);
 
-            // Calculate font size based on image dimensions (approximately 1/10th of image height)
-            float fontSize = Math.Max(20, originalImage.Height / 10f);
-            
-            // Try to use Impact font, fallback to Arial Bold if not available
-            Font font;
-            try
+            // Draw the original image
+            graphics.DrawImage(originalImage, 0, 0, originalImage.Width, originalImage.Height);
+
+            // Add top text if provided
+            if (!string.IsNullOrWhiteSpace(topText))
             {
-                font = new Font("Impact", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
-            }
-            catch
-            {
-                _logger.LogWarning("Impact font not available, falling back to Arial Bold");
-                font = new Font("Arial", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
+                DrawMemeText(graphics, topText.ToUpperInvariant(), originalImage.Width, originalImage.Height, isTop: true);
             }
 
-            using (font)
+            // Add bottom text if provided
+            if (!string.IsNullOrWhiteSpace(bottomText))
             {
-                // Add top text if provided
-                if (!string.IsNullOrWhiteSpace(topText))
-                {
-                    DrawMemeText(graphics, topText.ToUpperInvariant(), font, 
-                        originalImage.Width, originalImage.Height, isTop: true);
-                }
-
-                // Add bottom text if provided
-                if (!string.IsNullOrWhiteSpace(bottomText))
-                {
-                    DrawMemeText(graphics, bottomText.ToUpperInvariant(), font, 
-                        originalImage.Width, originalImage.Height, isTop: false);
-                }
+                DrawMemeText(graphics, bottomText.ToUpperInvariant(), originalImage.Width, originalImage.Height, isTop: false);
             }
 
             // Save to output stream
@@ -94,48 +80,110 @@ public class MemeGeneratorService : IMemeGeneratorService
     /// <summary>
     /// Draws text with white fill and black outline (classic meme style)
     /// </summary>
-    private void DrawMemeText(Graphics graphics, string text, Font font, 
-        int imageWidth, int imageHeight, bool isTop)
+    private void DrawMemeText(Graphics graphics, string text, int imageWidth, int imageHeight, bool isTop)
     {
-        // Configure text format
-        var format = new StringFormat
-        {
-            Alignment = StringAlignment.Center,
-            LineAlignment = isTop ? StringAlignment.Near : StringAlignment.Far
-        };
+        // Calculate max dimensions
+        float padding = imageWidth * 0.04f;
+        float maxWidth = imageWidth - (padding * 2);
+        float maxFontSize = imageHeight / 8f;
+        float minFontSize = Math.Max(12f, imageHeight / 40f);
+        float currentFontSize = maxFontSize;
 
-        // Create brushes and pens
-        using var whiteBrush = new SolidBrush(Color.White);
-        using var blackPen = new Pen(Color.Black, Math.Max(2, font.Size / 20f))
-        {
-            LineJoin = LineJoin.Round
-        };
-
-        // Calculate text position
-        var textRect = new RectangleF(
-            0, 
-            isTop ? imageHeight * 0.05f : imageHeight * 0.75f,
-            imageWidth, 
-            imageHeight * 0.2f
-        );
-
-        // Create path for the text to enable outlining
-        using var path = new GraphicsPath();
-        path.AddString(
-            text,
-            font.FontFamily,
-            (int)font.Style,
-            graphics.DpiY * font.Size / 72,
-            textRect,
-            format
-        );
-
-        // Draw black outline
-        graphics.DrawPath(blackPen, path);
+        Font font = null;
         
-        // Fill with white
-        graphics.FillPath(whiteBrush, path);
+        // Try to find the best font size that fits
+        // We prefer the text to fit on one line, but if it's too long, we'll let it wrap
+        // by using a rectangle layout. However, we first try to scale it down to fit width
+        // if it's reasonably close.
+        
+        while (currentFontSize >= minFontSize)
+        {
+            try 
+            { 
+                font?.Dispose();
+                font = new Font("Impact", currentFontSize, FontStyle.Bold, GraphicsUnit.Pixel); 
+            }
+            catch 
+            { 
+                font?.Dispose();
+                font = new Font("Arial", currentFontSize, FontStyle.Bold, GraphicsUnit.Pixel); 
+            }
 
-        _logger.LogDebug("Drew meme text: '{Text}' at {Position}", text, isTop ? "top" : "bottom");
+            var size = graphics.MeasureString(text, font);
+            if (size.Width <= maxWidth)
+            {
+                break; // It fits!
+            }
+            
+            currentFontSize -= 2f;
+        }
+
+        // If we hit minFontSize and it still doesn't fit, we'll rely on wrapping in the rectangle
+        if (font == null) // Should not happen unless loop doesn't run
+        {
+             try { font = new Font("Impact", minFontSize, FontStyle.Bold, GraphicsUnit.Pixel); }
+             catch { font = new Font("Arial", minFontSize, FontStyle.Bold, GraphicsUnit.Pixel); }
+        }
+
+        using (font)
+        {
+            // Configure text format
+            var format = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = isTop ? StringAlignment.Near : StringAlignment.Far
+            };
+
+            // Create brushes and pens
+            using var whiteBrush = new SolidBrush(Color.White);
+            using var blackPen = new Pen(Color.Black, Math.Max(3, font.Size / 15f))
+            {
+                LineJoin = LineJoin.Round
+            };
+
+            // Calculate text position
+            // We give it more vertical space to allow for wrapping if needed
+            float yPos = isTop ? imageHeight * 0.02f : imageHeight * 0.75f;
+            float height = isTop ? imageHeight * 0.4f : imageHeight * 0.23f; // More space for top, bottom is usually constrained
+            
+            // Adjust bottom yPos if we need more height for wrapping
+            if (!isTop)
+            {
+                // Measure height with wrapping
+                var size = graphics.MeasureString(text, font, (int)maxWidth);
+                if (size.Height > height)
+                {
+                    // Move up to accommodate
+                    yPos = imageHeight - size.Height - (imageHeight * 0.02f);
+                    height = size.Height + (imageHeight * 0.02f);
+                }
+            }
+
+            var textRect = new RectangleF(
+                padding, 
+                yPos,
+                maxWidth, 
+                height
+            );
+
+            // Create path for the text to enable outlining
+            using var path = new GraphicsPath();
+            path.AddString(
+                text,
+                font.FontFamily,
+                (int)font.Style,
+                font.Size, // Use pixel size directly
+                textRect,
+                format
+            );
+
+            // Draw black outline
+            graphics.DrawPath(blackPen, path);
+            
+            // Fill with white
+            graphics.FillPath(whiteBrush, path);
+
+            _logger.LogDebug("Drew meme text: '{Text}' at {Position} with size {Size}", text, isTop ? "top" : "bottom", font.Size);
+        }
     }
 }
