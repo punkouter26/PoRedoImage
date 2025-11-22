@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Configuration
-const BASE_URL = process.env.BASE_URL || 'https://app-poredoimage-cqevadpy77pvi.azurewebsites.net';
+const BASE_URL = process.env.BASE_URL || 'https://poredoimage.azurewebsites.net';
 const API_BASE_URL = `${BASE_URL}/api`;
 
 test.describe('PoRedoImage Application Tests', () => {
