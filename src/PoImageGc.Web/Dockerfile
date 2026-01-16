@@ -8,7 +8,6 @@ COPY PoImageGc.slnx ./
 
 # Copy project files
 COPY src/PoImageGc.Web/PoImageGc.Web.csproj src/PoImageGc.Web/
-COPY src/PoImageGc.Web.Client/PoImageGc.Web.Client.csproj src/PoImageGc.Web.Client/
 COPY src/PoImageGc.Shared/PoImageGc.Shared.csproj src/PoImageGc.Shared/
 COPY src/PoImageGc.ServiceDefaults/PoImageGc.ServiceDefaults.csproj src/PoImageGc.ServiceDefaults/
 

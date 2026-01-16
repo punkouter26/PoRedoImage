@@ -6,14 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PoImageGc.Web.Client\PoImageGc.Web.Client.csproj" />
     <ProjectReference Include="..\PoImageGc.Shared\PoImageGc.Shared.csproj" />
     <ProjectReference Include="..\PoImageGc.ServiceDefaults\PoImageGc.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Blazor -->
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
     
     <!-- Azure -->
     <PackageReference Include="Azure.AI.OpenAI" />
