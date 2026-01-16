@@ -2,9 +2,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
 
-# Copy Directory.Packages.props and solution files
+# Copy Directory.Build.props for shared settings
+COPY Directory.Build.props ./
 COPY Directory.Packages.props ./
-COPY PoImageGc.slnx ./
 
 # Copy project files
 COPY src/PoImageGc.Web/PoImageGc.Web.csproj src/PoImageGc.Web/
