@@ -1,0 +1,77 @@
+### PoImageGc API Testing - REST Client File
+### Use the REST Client extension in VS Code to run these requests
+### https://marketplace.visualstudio.com/items?itemName=humao.rest-client
+
+# Local Development
+@baseUrl = http://localhost:5000
+
+# Azure Production (update with actual URL after deployment)
+# @azureUrl = https://poimagegc.azurewebsites.net
+
+### ===== Health Check Endpoints (Aspire Defaults) =====
+
+### Health Check (all checks)
+GET {{baseUrl}}/health HTTP/1.1
+
+### Alive Check (liveness probe)
+GET {{baseUrl}}/alive HTTP/1.1
+
+### ===== OpenAPI Documentation =====
+
+### Get OpenAPI specification
+GET {{baseUrl}}/openapi/v1.json HTTP/1.1
+
+### Scalar API Reference (open in browser)
+# {{baseUrl}}/scalar/v1
+
+### ===== Image Analysis Endpoints (Minimal API) =====
+
+### Get Image Analysis Status
+GET {{baseUrl}}/api/images/status HTTP/1.1
+
+### Analyze Image - Image Regeneration Mode
+POST {{baseUrl}}/api/images/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC",
+  "contentType": "image/png",
+  "fileName": "test.png",
+  "descriptionLength": 200,
+  "mode": 0
+}
+
+### Analyze Image - Meme Mode
+POST {{baseUrl}}/api/images/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC",
+  "contentType": "image/png",
+  "fileName": "meme.png",
+  "descriptionLength": 150,
+  "mode": 1
+}
+
+### Analyze Image - Extended Description
+POST {{baseUrl}}/api/images/analyze HTTP/1.1
+Content-Type: application/json
+
+{
+  "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC",
+  "contentType": "image/png",
+  "fileName": "detailed.png",
+  "descriptionLength": 500,
+  "mode": 0
+}
+
+### ===== Notes =====
+# 1. Start the app with F5 (Launch Web or Launch AppHost)
+# 2. The test base64 image is a tiny 10x10 transparent PNG
+# 3. Replace with real image data for actual testing
+# 4. API keys must be configured in appsettings.Development.json:
+#    - AzureOpenAI:ApiKey
+#    - ComputerVision:Key
+# 5. Processing modes:
+#    - 0 = ImageRegeneration (uses DALL-E to recreate image)
+#    - 1 = Meme (generates meme caption and overlays on image)

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PoImageGc.AppHost/PoImageGc.AppHost.csproj" />
+    <Project Path="src/PoImageGc.ServiceDefaults/PoImageGc.ServiceDefaults.csproj" />
+    <Project Path="src/PoImageGc.Shared/PoImageGc.Shared.csproj" />
+    <Project Path="src/PoImageGc.Web.Client/PoImageGc.Web.Client.csproj" />
+    <Project Path="src/PoImageGc.Web/PoImageGc.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PoImageGc.Tests.Integration/PoImageGc.Tests.Integration.csproj" />
+    <Project Path="tests/PoImageGc.Tests.Unit/PoImageGc.Tests.Unit.csproj" />
+  </Folder>
+</Solution>

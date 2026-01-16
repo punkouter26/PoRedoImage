@@ -2,76 +2,80 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Server (Chrome - HTTPS)",
-            "type": "blazorwasm",
-            "request": "launch",
-            "cwd": "${workspaceFolder}/Server",
-            "browser": "chrome",
-            "url": "https://localhost:5001",
-            "webRoot": "${workspaceFolder}/Client/wwwroot",
-            "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
-            "hosted": true,
-            "program": "${workspaceFolder}/Server/bin/Debug/net9.0/Server.dll",
-            "args": [],
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            },
-            "preLaunchTask": "build",
-            "timeout": 120000
-        },
-        {
-            "name": "Launch Server (Chrome - HTTP)",
-            "type": "blazorwasm",
-            "request": "launch",
-            "cwd": "${workspaceFolder}/Server",
-            "browser": "chrome",
-            "url": "http://localhost:5000",
-            "webRoot": "${workspaceFolder}/Client/wwwroot",
-            "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
-            "hosted": true,
-            "program": "${workspaceFolder}/Server/bin/Debug/net9.0/Server.dll",
-            "args": [],
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            },
-            "preLaunchTask": "build",
-            "timeout": 120000
-        },
-        {
-            "name": "Launch Server Only",
+            "name": "Launch AppHost (Aspire)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/Server/bin/Debug/net9.0/Server.dll",
+            "program": "${workspaceFolder}/src/PoImageGc.AppHost/bin/Debug/net10.0/PoImageGc.AppHost.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/Server",
-            "console": "internalConsole",
+            "cwd": "${workspaceFolder}/src/PoImageGc.AppHost",
             "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+            },
             "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            }
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "DOTNET_ENVIRONMENT": "Development"
+            },
+            "console": "integratedTerminal"
         },
         {
-            "name": "Launch Server (No Browser)",
+            "name": "Launch Web (Direct)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/Server/bin/Debug/net9.0/Server.dll",
+            "program": "${workspaceFolder}/src/PoImageGc.Web/bin/Debug/net10.0/PoImageGc.Web.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/Server",
-            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src/PoImageGc.Web",
             "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+            },
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development"
             },
-            "launchBrowser": {
-                "enabled": false
-            }
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Run Unit Tests",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "dotnet",
+            "args": [
+                "test",
+                "${workspaceFolder}/tests/PoImageGc.Tests.Unit/PoImageGc.Tests.Unit.csproj",
+                "--no-build"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Run Integration Tests",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "dotnet",
+            "args": [
+                "test",
+                "${workspaceFolder}/tests/PoImageGc.Tests.Integration/PoImageGc.Tests.Integration.csproj",
+                "--no-build"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
         },
         {
             "name": "Attach to .NET Core",
             "type": "coreclr",
             "request": "attach"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Debug Full Stack (Aspire)",
+            "configurations": ["Launch AppHost (Aspire)"]
         }
     ]
 }

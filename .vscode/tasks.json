@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/ImageGc.sln",
+                "${workspaceFolder}/PoImageGc.slnx",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -18,6 +18,17 @@
             }
         },
         {
+            "label": "test",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/PoImageGc.slnx"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "test"
+        },
+        {
             "label": "watch",
             "command": "dotnet",
             "type": "process",
@@ -25,7 +36,28 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/Server"
+                "${workspaceFolder}/src/PoImageGc.AppHost"
+            ],
+            "problemMatcher": "$msCompile",
+            "isBackground": true
+        },
+        {
+            "label": "clean",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "clean",
+                "${workspaceFolder}/PoImageGc.slnx"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "restore",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "restore",
+                "${workspaceFolder}/PoImageGc.slnx"
             ],
             "problemMatcher": "$msCompile"
         },
