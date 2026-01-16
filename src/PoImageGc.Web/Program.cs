@@ -1,4 +1,6 @@
 using Azure.Identity;
+using Azure.Extensions.AspNetCore.Configuration.Secrets;
+using Azure.Security.KeyVault.Secrets;
 using Microsoft.ApplicationInsights.Extensibility;
 using PoImageGc.Web.Client.Pages;
 using PoImageGc.Web.Components;
@@ -13,12 +15,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults (OpenTelemetry, health checks, resilience)
 builder.AddServiceDefaults();
 
-// Configure Azure Key Vault for production
+// Configure Azure Key Vault for production with secret name mapping
 var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
 if (!string.IsNullOrEmpty(keyVaultEndpoint) && builder.Environment.IsProduction())
 {
     var credential = new DefaultAzureCredential();
-    builder.Configuration.AddAzureKeyVault(new Uri(keyVaultEndpoint), credential);
+    var secretClient = new SecretClient(new Uri(keyVaultEndpoint), credential);
+    builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretNameMapping());
 }
 
 // Get Application Insights connection string for Serilog
@@ -106,3 +109,35 @@ app.Run();
 
 // Make Program class accessible to integration tests
 public partial class Program { }
+
+/// <summary>
+/// Maps Key Vault secret names to configuration keys for this application.
+/// Key Vault secrets use format: "PoRedoImage-SecretName" or "AzureOpenAI-SecretName"
+/// </summary>
+public class KeyVaultSecretNameMapping : KeyVaultSecretManager
+{
+    private static readonly Dictionary<string, string> SecretMappings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["ComputerVision-ApiKey"] = "ComputerVision:ApiKey",
+        ["ComputerVision-Endpoint"] = "ComputerVision:Endpoint",
+        ["AzureOpenAI-ApiKey"] = "OpenAI:Key",
+        ["AzureOpenAI-Endpoint"] = "OpenAI:Endpoint",
+        ["AzureOpenAI-DeploymentName"] = "OpenAI:ChatCompletionsDeployment",
+        ["ApplicationInsights-ConnectionString"] = "ApplicationInsights:ConnectionString",
+        ["PoRedoImage-StorageConnectionString"] = "Storage:ConnectionString"
+    };
+
+    public override bool Load(SecretProperties secret)
+    {
+        // Only load secrets that are relevant to this application
+        return SecretMappings.ContainsKey(secret.Name);
+    }
+
+    public override string GetKey(KeyVaultSecret secret)
+    {
+        // Map Key Vault secret name to configuration key
+        return SecretMappings.TryGetValue(secret.Name, out var configKey) 
+            ? configKey 
+            : secret.Name.Replace("--", ":");
+    }
+}
