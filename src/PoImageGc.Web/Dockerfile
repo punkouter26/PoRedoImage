@@ -2,14 +2,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
 
-# Copy Directory.Build.props for shared settings
+# Copy all build configuration files
 COPY Directory.Build.props ./
 COPY Directory.Packages.props ./
+COPY global.json ./
 
-# Copy project files
-COPY src/PoImageGc.Web/PoImageGc.Web.csproj src/PoImageGc.Web/
+# Copy all project files first for restore caching
 COPY src/PoImageGc.Shared/PoImageGc.Shared.csproj src/PoImageGc.Shared/
 COPY src/PoImageGc.ServiceDefaults/PoImageGc.ServiceDefaults.csproj src/PoImageGc.ServiceDefaults/
+COPY src/PoImageGc.Web/PoImageGc.Web.csproj src/PoImageGc.Web/
 
 # Restore packages
 RUN dotnet restore src/PoImageGc.Web/PoImageGc.Web.csproj
@@ -17,8 +18,8 @@ RUN dotnet restore src/PoImageGc.Web/PoImageGc.Web.csproj
 # Copy all source code
 COPY src/ src/
 
-# Build and publish
-RUN dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj -c Release -o /app/publish --no-restore
+# Build and publish (with restore to ensure all packages available)
+RUN dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
