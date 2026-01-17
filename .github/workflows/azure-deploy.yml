@@ -7,9 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_CONTAINER_APP_NAME: 'poredoimage-app'
   AZURE_RESOURCE_GROUP: 'PoRedoImage'
-  AZURE_ACR_NAME: 'acrposhared'
+  AZURE_LOCATION: 'eastus'
   DOTNET_VERSION: '10.0.x'
 
 jobs:
@@ -28,6 +27,12 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Install Aspire workload
+      run: dotnet workload install aspire
+        
+    - name: Install Aspire CLI
+      run: dotnet tool install -g aspire.cli
         
     - name: Restore dependencies
       run: dotnet restore PoImageGc.slnx
@@ -38,32 +43,23 @@ jobs:
     - name: Run unit and integration tests
       run: dotnet test PoImageGc.slnx --configuration Release --no-build --verbosity normal
       
-    - name: Publish application
-      run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --output ./publish
-      
     - name: Azure Login (OIDC)
       uses: azure/login@v2
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-    - name: Build and push container image to ACR
+    
+    - name: Deploy with Aspire CLI
       run: |
-        az acr build --registry ${{ env.AZURE_ACR_NAME }} \
-          --image poredoimage:${{ github.sha }} \
-          --image poredoimage:latest \
-          --file src/PoImageGc.Web/Dockerfile \
-          .
-        
-    - name: Deploy to Azure Container Apps
-      run: |
-        az containerapp update \
-          --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
+        aspire deploy src/PoImageGc.AppHost/PoImageGc.AppHost.csproj \
+          --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --image ${{ env.AZURE_ACR_NAME }}.azurecr.io/poredoimage:${{ github.sha }} \
-          --set-env-vars \
-            "ASPNETCORE_ENVIRONMENT=Production" \
-            "AZURE_KEY_VAULT_ENDPOINT=https://kv-poshared.vault.azure.net/" \
-            "AZURE_CLIENT_ID=183a4196-d24f-4519-afea-783ff01dbb17"
+          --location ${{ env.AZURE_LOCATION }} \
+          --azure-container-registry acrposhared \
+          --azure-container-apps-environment cae-poshared \
+          --no-prompt
+      env:
+        AZURE_KEY_VAULT_ENDPOINT: "https://kv-poshared.vault.azure.net/"
+        AZURE_CLIENT_ID: "183a4196-d24f-4519-afea-783ff01dbb17"
 
