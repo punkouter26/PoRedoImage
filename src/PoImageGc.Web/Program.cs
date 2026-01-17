@@ -2,6 +2,7 @@ using Azure.Identity;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.AspNetCore.Components;
 using PoImageGc.Web.Components;
 using PoImageGc.Web.Features.ImageAnalysis;
 using Serilog;
@@ -14,9 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults (OpenTelemetry, health checks, resilience)
 builder.AddServiceDefaults();
 
-// Configure Azure Key Vault for production with secret name mapping
+// Configure Azure Key Vault for all environments with secret name mapping
 var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
-if (!string.IsNullOrEmpty(keyVaultEndpoint) && builder.Environment.IsProduction())
+if (!string.IsNullOrEmpty(keyVaultEndpoint))
 {
     var credential = new DefaultAzureCredential();
     var secretClient = new SecretClient(new Uri(keyVaultEndpoint), credential);
@@ -53,8 +54,14 @@ builder.Services.AddOpenApi();
 builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddSingleton<Microsoft.ApplicationInsights.TelemetryClient>();
 
-// Add HttpClient
-builder.Services.AddHttpClient();
+// Add HttpClient with base address for server-side Blazor
+builder.Services.AddScoped(sp =>
+{
+    var httpClient = new HttpClient();
+    var navigationManager = sp.GetRequiredService<NavigationManager>();
+    httpClient.BaseAddress = new Uri(navigationManager.BaseUri);
+    return httpClient;
+});
 
 // Register Feature services (Vertical Slice)
 builder.Services.AddScoped<IComputerVisionService, ComputerVisionService>();
@@ -115,6 +122,8 @@ public class KeyVaultSecretNameMapping : KeyVaultSecretManager
         ["AzureOpenAI-ApiKey"] = "OpenAI:Key",
         ["AzureOpenAI-Endpoint"] = "OpenAI:Endpoint",
         ["AzureOpenAI-DeploymentName"] = "OpenAI:ChatCompletionsDeployment",
+        ["AzureOpenAI-ImageEndpoint"] = "OpenAI:ImageEndpoint",
+        ["AzureOpenAI-ImageKey"] = "OpenAI:ImageKey",
         ["ApplicationInsights-ConnectionString"] = "ApplicationInsights:ConnectionString",
         ["PoRedoImage-StorageConnectionString"] = "Storage:ConnectionString"
     };

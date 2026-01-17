@@ -2,8 +2,34 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
+h1:focus {
+    outline: none;
+}
+
 a, .btn-link {
-    color: #006bb7;
+    color: #0071c1;
+}
+
+/* Image loading and display styles */
+.result-image {
+    transition: opacity 0.6s ease, transform 0.3s ease;
+    opacity: 0.3;
+    max-height: 500px;
+    transform: scale(0.98);
+    object-fit: contain;
+    width: 100%;
+    border-radius: 4px;
+}
+
+.result-image.loaded {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.result-image.error {
+    opacity: 0.8;
+    border: 2px solid #ff6b6b;
+    background-color: #fff5f5;
 }
 
 .btn-primary {
@@ -20,20 +46,16 @@ a, .btn-link {
     padding-top: 1.1rem;
 }
 
-h1:focus {
-    outline: none;
-}
-
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }
 
 .invalid {
-    outline: 1px solid #e50000;
+    outline: 1px solid red;
 }
 
 .validation-message {
-    color: #e50000;
+    color: red;
 }
 
 .blazor-error-boundary {
@@ -57,4 +79,133 @@ h1:focus {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* Description and analysis styles */
+.description-text {
+    line-height: 1.6;
+    font-size: 1.1rem;
+    text-align: justify;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 10px;
+    white-space: pre-line;
+}
+
+/* Preview image styles */
+.preview-image {
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Fade in animation for completed results */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+code {
+    color: #c02d76;
+}
+
+.diagnostics-grid {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.status-item {
+    display: grid;
+    grid-template-columns: 24px 1fr 2fr;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.healthy .status-indicator {
+    background-color: #28a745;
+}
+
+.unhealthy .status-indicator {
+    background-color: #dc3545;
+}
+
+.status-name {
+    font-weight: bold;
+}
+
+.status-message {
+    color: #6c757d;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .row.mb-4 .col-md-6 + .col-md-6 {
+        margin-top: 1.5rem;
+    }
+    
+    .result-image {
+        max-height: 300px;
+    }
+
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .card {
+        margin-bottom: 1.5rem;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    .mb-4 {
+        margin-bottom: 1rem !important;
+    }
+}
+
+/* Further adjustments for even smaller screens (e.g., phones) */
+@media (max-width: 576px) {
+    .display-4 {
+        font-size: 2rem;
+    }
+
+    .lead {
+        font-size: 1rem;
+    }
+
+    .preview-image,
+    .result-image {
+        max-height: 150px;
+    }
+
+    .description-text {
+        font-size: 0.9rem;
+    }
+
+    .status-item {
+        grid-template-columns: 24px 1fr;
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+
+    .status-message {
+        grid-column: 2;
+    }
 }

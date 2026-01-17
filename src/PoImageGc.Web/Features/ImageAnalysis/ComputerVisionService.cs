@@ -57,6 +57,8 @@ public class ComputerVisionService : IComputerVisionService
             var credential = new AzureKeyCredential(_key);
             var client = new ImageAnalysisClient(new Uri(_endpoint), credential);
 
+            // Caption feature requires specific regions: East US, France Central, Korea Central, 
+            // North Europe, Southeast Asia, West Europe, West US
             var visualFeatures = VisualFeatures.Caption | VisualFeatures.Tags;
 
             var response = await client.AnalyzeAsync(

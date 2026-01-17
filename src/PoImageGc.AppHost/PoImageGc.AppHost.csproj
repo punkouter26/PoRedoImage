@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,12 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting" />
-    <PackageReference Include="Aspire.Hosting.AppHost" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\PoImageGc.Web\PoImageGc.Web.csproj" IsAspireProjectResource="true" />
+    <ProjectReference Include="..\PoImageGc.Web\PoImageGc.Web.csproj" />
   </ItemGroup>
 
 </Project>

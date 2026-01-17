@@ -5,15 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Aspire -->
-    <PackageVersion Include="Aspire.Hosting" Version="9.3.0" />
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.3.0" />
-    <PackageVersion Include="Aspire.Azure.Security.KeyVault" Version="9.3.0" />
-    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="9.3.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
-    
-    <!-- Pin transitive dependencies to resolve vulnerabilities -->
-    <PackageVersion Include="KubernetesClient" Version="18.0.13" />
+    <!-- Aspire (Note: Aspire.Hosting.AppHost is implicit in SDK 13.x) -->
+    <PackageVersion Include="Aspire.Azure.Security.KeyVault" Version="9.1.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="9.1.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.1.0" />
     
     <!-- Azure SDKs -->
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />

@@ -1,0 +1,49 @@
+Summary
+  Generated on: 1/16/2026 - 9:56:09 PM
+  Coverage date: 1/16/2026 - 3:29:36 PM - 1/16/2026 - 9:37:08 PM
+  Parser: MultiReport (4x Cobertura)
+  Assemblies: 4
+  Classes: 21
+  Files: 19
+  Line coverage: 7.8%
+  Covered lines: 126
+  Uncovered lines: 1470
+  Coverable lines: 1596
+  Total lines: 2959
+  Branch coverage: 0.8% (5 of 612)
+  Covered branches: 5
+  Total branches: 612
+  Method coverage: 14.6% (18 of 123)
+  Full method coverage: 11.3% (14 of 123)
+  Covered methods: 18
+  Fully covered methods: 14
+  Total methods: 123
+
+PoImageGc.ServiceDefaults                                         94.4%
+  Microsoft.Extensions.Hosting.Extensions                         94.4%
+
+PoImageGc.Shared                                                    45%
+  PoImageGc.Shared.Models.ImageAnalysisRequest                     100%
+  PoImageGc.Shared.Models.ImageAnalysisResult                        0%
+  PoImageGc.Shared.Models.ProcessingMetrics                       57.1%
+
+PoImageGc.Web                                                      4.3%
+  KeyVaultSecretNameMapping                                          0%
+  Microsoft.AspNetCore.OpenApi.Generated                             0%
+  Microsoft.AspNetCore.OpenApi.Generated                             1%
+  PoImageGc.Web.Components.Layout.MainLayout                         0%
+  PoImageGc.Web.Components.Pages.Error                               0%
+  PoImageGc.Web.Components.Pages.Home                                0%
+  PoImageGc.Web.Components.Pages.Weather                             0%
+  PoImageGc.Web.Features.ImageAnalysis.ComputerVisionService         0%
+  PoImageGc.Web.Features.ImageAnalysis.ImageAnalysisEndpoints     18.3%
+  PoImageGc.Web.Features.ImageAnalysis.MemeGeneratorService          0%
+  PoImageGc.Web.Features.ImageAnalysis.NullMemeGeneratorService      0%
+  PoImageGc.Web.Features.ImageAnalysis.OpenAIService                 0%
+  Program                                                         61.2%
+  System.Runtime.CompilerServices                                    0%
+  System.Runtime.CompilerServices                                    0%
+
+PoImageGc.Web.Client                                                 0%
+  PoImageGc.Web.Client.Pages.Counter                                 0%
+  Program                                                            0%
