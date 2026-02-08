@@ -1,7 +1,8 @@
-namespace PoImageGc.Shared.Models;
+namespace PoImageGc.Web.Models;
 
 /// <summary>
-/// Represents metrics collected during image processing for performance tracking and diagnostics
+/// Represents metrics collected during image processing for performance tracking and diagnostics.
+/// Follows the Value Object pattern — immutable data carrier for telemetry aggregation.
 /// </summary>
 public class ProcessingMetrics
 {

@@ -1,4 +1,4 @@
-name: Build and Deploy to Azure Container Apps
+name: Build and Deploy to Azure App Service
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 env:
   AZURE_RESOURCE_GROUP: 'PoRedoImage'
-  AZURE_LOCATION: 'eastus'
+  AZURE_APP_NAME: 'poredoimage-web'
   DOTNET_VERSION: '10.0.x'
 
 jobs:
@@ -27,22 +27,19 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
-    
-    - name: Install Aspire workload
-      run: dotnet workload install aspire
-        
-    - name: Install Aspire CLI
-      run: dotnet tool install -g aspire.cli
         
     - name: Restore dependencies
-      run: dotnet restore PoImageGc.slnx
+      run: dotnet restore PoRedoImage.slnx
       
     - name: Build solution
-      run: dotnet build PoImageGc.slnx --configuration Release --no-restore
+      run: dotnet build PoRedoImage.slnx --configuration Release --no-restore
       
     - name: Run unit and integration tests
-      run: dotnet test PoImageGc.slnx --configuration Release --no-build --verbosity normal
+      run: dotnet test PoRedoImage.slnx --configuration Release --no-build --verbosity normal
       
+    - name: Publish web project
+      run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
+
     - name: Azure Login (OIDC)
       uses: azure/login@v2
       with:
@@ -50,16 +47,9 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     
-    - name: Deploy with Aspire CLI
-      run: |
-        aspire deploy src/PoImageGc.AppHost/PoImageGc.AppHost.csproj \
-          --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --location ${{ env.AZURE_LOCATION }} \
-          --azure-container-registry acrposhared \
-          --azure-container-apps-environment cae-poshared \
-          --no-prompt
-      env:
-        AZURE_KEY_VAULT_ENDPOINT: "https://kv-poshared.vault.azure.net/"
-        AZURE_CLIENT_ID: "183a4196-d24f-4519-afea-783ff01dbb17"
+    - name: Deploy to Azure App Service
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_APP_NAME }}
+        package: ./publish
 

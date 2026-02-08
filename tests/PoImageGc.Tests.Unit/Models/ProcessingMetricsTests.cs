@@ -1,4 +1,4 @@
-using PoImageGc.Shared.Models;
+using PoImageGc.Web.Models;
 
 namespace PoImageGc.Tests.Unit.Models;
 

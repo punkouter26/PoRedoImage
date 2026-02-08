@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/PoImageGc.slnx",
+                "${workspaceFolder}/PoRedoImage.slnx",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -23,10 +23,24 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/PoImageGc.slnx"
+                "${workspaceFolder}/PoRedoImage.slnx"
             ],
             "problemMatcher": "$msCompile",
             "group": "test"
+        },
+        {
+            "label": "kill-dotnet",
+            "type": "shell",
+            "command": "taskkill /F /IM dotnet.exe /T 2>$null; exit 0",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
+            "label": "kill-dotnet-and-build",
+            "dependsOrder": "sequence",
+            "dependsOn": ["kill-dotnet", "build"]
         },
         {
             "label": "watch",
@@ -36,7 +50,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/src/PoImageGc.AppHost"
+                "${workspaceFolder}/src/PoImageGc.Web"
             ],
             "problemMatcher": "$msCompile",
             "isBackground": true
@@ -47,7 +61,7 @@
             "type": "process",
             "args": [
                 "clean",
-                "${workspaceFolder}/PoImageGc.slnx"
+                "${workspaceFolder}/PoRedoImage.slnx"
             ],
             "problemMatcher": "$msCompile"
         },
@@ -57,7 +71,7 @@
             "type": "process",
             "args": [
                 "restore",
-                "${workspaceFolder}/PoImageGc.slnx"
+                "${workspaceFolder}/PoRedoImage.slnx"
             ],
             "problemMatcher": "$msCompile"
         },
@@ -114,6 +128,34 @@
                 "focus": true,
                 "panel": "new"
             },
+            "problemMatcher": []
+        },
+        {
+            "label": "test-coverage",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "test",
+                "${workspaceFolder}/PoRedoImage.slnx",
+                "--collect:\"XPlat Code Coverage\"",
+                "--results-directory",
+                "${workspaceFolder}/TestResults"
+            ],
+            "group": "test",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "test-e2e",
+            "type": "shell",
+            "command": "npx",
+            "args": [
+                "playwright",
+                "test"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/tests/PoImageGc.Tests.E2E"
+            },
+            "group": "test",
             "problemMatcher": []
         }
     ]

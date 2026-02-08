@@ -1,0 +1,60 @@
+### PoImageGc API - HTTP Request File
+### Use this file for manual API debugging in VS Code / Visual Studio
+
+@baseUrl = https://localhost:5001
+
+### Health Check
+GET {{baseUrl}}/health
+Accept: application/json
+
+###
+
+### Alive Check (liveness probe)
+GET {{baseUrl}}/alive
+Accept: application/json
+
+###
+
+### Diagnostics (masked config values)
+GET {{baseUrl}}/api/diag
+Accept: application/json
+
+###
+
+### Image Analysis Feature Health
+GET {{baseUrl}}/api/images/health
+Accept: application/json
+
+###
+
+### Analyze Image - Image Regeneration Mode
+POST {{baseUrl}}/api/images/analyze
+Content-Type: application/json
+
+{
+  "imageData": "<BASE64_IMAGE_DATA>",
+  "contentType": "image/jpeg",
+  "fileName": "test-image.jpg",
+  "descriptionLength": 350,
+  "mode": 0
+}
+
+###
+
+### Analyze Image - Meme Generation Mode
+POST {{baseUrl}}/api/images/analyze
+Content-Type: application/json
+
+{
+  "imageData": "<BASE64_IMAGE_DATA>",
+  "contentType": "image/png",
+  "fileName": "test-meme.png",
+  "descriptionLength": 200,
+  "mode": 1
+}
+
+###
+
+### OpenAPI Spec
+GET {{baseUrl}}/openapi/v1.json
+Accept: application/json

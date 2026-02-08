@@ -1,7 +1,8 @@
-namespace PoImageGc.Shared.Models;
+namespace PoImageGc.Web.Models;
 
 /// <summary>
-/// Represents the analysis results returned from the server after processing an image
+/// Represents the analysis results returned from the server after processing an image.
+/// DTO pattern: carries data between the API layer and client without business logic.
 /// </summary>
 public class ImageAnalysisResult
 {

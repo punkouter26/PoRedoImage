@@ -2,39 +2,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch AppHost (Aspire)",
+            "name": "Launch PoRedoImage",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/PoImageGc.AppHost/bin/Debug/net10.0/PoImageGc.AppHost.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/src/PoImageGc.AppHost",
-            "stopAtEntry": false,
-            "serverReadyAction": {
-                "action": "openExternally",
-                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-            },
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development",
-                "DOTNET_ENVIRONMENT": "Development"
-            },
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Launch Web (Direct)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build",
+            "preLaunchTask": "kill-dotnet-and-build",
             "program": "${workspaceFolder}/src/PoImageGc.Web/bin/Debug/net10.0/PoImageGc.Web.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src/PoImageGc.Web",
             "stopAtEntry": false,
             "serverReadyAction": {
                 "action": "openExternally",
-                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+                "pattern": "\\bNow listening on:\\s+https?://\\S+",
+                "uriFormat": "http://localhost:5000"
             },
             "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://localhost:5000"
             },
             "console": "integratedTerminal"
         },
@@ -72,10 +55,5 @@
             "request": "attach"
         }
     ],
-    "compounds": [
-        {
-            "name": "Debug Full Stack (Aspire)",
-            "configurations": ["Launch AppHost (Aspire)"]
-        }
-    ]
+    "compounds": []
 }

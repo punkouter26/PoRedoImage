@@ -1,7 +1,8 @@
-namespace PoImageGc.Shared.Models;
+namespace PoImageGc.Web.Models;
 
 /// <summary>
-/// Defines the processing mode for image analysis
+/// Defines the processing mode for image analysis.
+/// Strategy pattern: determines which processing pipeline to execute.
 /// </summary>
 public enum ProcessingMode
 {

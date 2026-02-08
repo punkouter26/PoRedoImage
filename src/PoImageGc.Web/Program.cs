@@ -3,8 +3,15 @@ using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using PoImageGc.Web.Components;
+using PoImageGc.Web.Features.Diagnostics;
 using PoImageGc.Web.Features.ImageAnalysis;
+using PoImageGc.Web.Models;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
@@ -12,10 +19,8 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Aspire service defaults (OpenTelemetry, health checks, resilience)
-builder.AddServiceDefaults();
-
-// Configure Azure Key Vault for all environments with secret name mapping
+// ─── Azure Key Vault ────────────────────────────────────────────────
+// Key Vault integration for all environments; secrets mapped via KeyVaultSecretNameMapping
 var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
 if (!string.IsNullOrEmpty(keyVaultEndpoint))
 {
@@ -24,13 +29,14 @@ if (!string.IsNullOrEmpty(keyVaultEndpoint))
     builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretNameMapping());
 }
 
-// Get Application Insights connection string for Serilog
+// ─── Serilog ────────────────────────────────────────────────────────
+// Structured logging: Console in Development, Application Insights in Production
 var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
 
-// Configure Serilog
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
     .MinimumLevel.Override("System", LogEventLevel.Warning)
     .Enrich.FromLogContext()
     .Enrich.WithProperty("Application", "PoImageGc")
@@ -43,18 +49,43 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// Add services to the container.
+// ─── OpenTelemetry ──────────────────────────────────────────────────
+// Global OpenTelemetry: traces + metrics exported to Application Insights via OTLP
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService("PoImageGc", serviceVersion: "1.0.0"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation())
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation());
+
+// If an OTLP exporter endpoint is configured, export telemetry there
+var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+if (!string.IsNullOrEmpty(otlpEndpoint))
+{
+    builder.Services.AddOpenTelemetry()
+        .WithTracing(tracing => tracing.AddOtlpExporter())
+        .WithMetrics(metrics => metrics.AddOtlpExporter());
+}
+
+// ─── Core services ──────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add OpenAPI with Scalar documentation
 builder.Services.AddOpenApi();
 
-// Add Application Insights
+// Application Insights SDK (works alongside OpenTelemetry for rich .NET telemetry)
 builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddSingleton<Microsoft.ApplicationInsights.TelemetryClient>();
 
-// Add HttpClient with base address for server-side Blazor
+// ─── Health checks ──────────────────────────────────────────────────
+// Verifies connectivity to all external API dependencies
+builder.Services.AddHealthChecks();
+
+// ─── HTTP client ────────────────────────────────────────────────────
 builder.Services.AddScoped(sp =>
 {
     var httpClient = new HttpClient();
@@ -63,11 +94,11 @@ builder.Services.AddScoped(sp =>
     return httpClient;
 });
 
-// Register Feature services (Vertical Slice)
+// ─── Feature services (Vertical Slice Architecture) ─────────────────
 builder.Services.AddScoped<IComputerVisionService, ComputerVisionService>();
 builder.Services.AddScoped<IOpenAIService, OpenAIService>();
 
-// MemeGeneratorService is Windows-only due to System.Drawing dependency
+// MemeGeneratorService — Platform Adapter pattern: Windows-only System.Drawing
 if (OperatingSystem.IsWindows())
 {
     builder.Services.AddScoped<IMemeGeneratorService, MemeGeneratorService>();
@@ -79,7 +110,7 @@ else
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// ─── Middleware pipeline ────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -90,15 +121,35 @@ app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 
-// Map OpenAPI endpoint and enable Scalar UI
+// OpenAPI + Scalar API documentation
 app.MapOpenApi();
 app.MapScalarApiReference();
 
-// Map default Aspire endpoints (health checks)
-app.MapDefaultEndpoints();
+// Health check endpoints
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            Status = report.Status.ToString(),
+            Duration = report.TotalDuration.TotalMilliseconds,
+            Entries = report.Entries.Select(e => new
+            {
+                e.Key,
+                Status = e.Value.Status.ToString(),
+                Duration = e.Value.Duration.TotalMilliseconds,
+                e.Value.Description
+            })
+        });
+    }
+});
+app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false });
 
-// Map Minimal API endpoints (Vertical Slice)
+// Minimal API endpoints (Vertical Slice)
 app.MapImageAnalysisEndpoints();
+app.MapDiagnosticsEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
@@ -110,8 +161,9 @@ app.Run();
 public partial class Program { }
 
 /// <summary>
-/// Maps Key Vault secret names to configuration keys for this application.
-/// Key Vault secrets use format: "PoRedoImage-SecretName" or "AzureOpenAI-SecretName"
+/// Maps Key Vault secret names to configuration keys.
+/// Implements the Adapter pattern to bridge Key Vault naming convention
+/// (e.g., "ComputerVision-ApiKey") with .NET configuration keys (e.g., "ComputerVision:ApiKey").
 /// </summary>
 public class KeyVaultSecretNameMapping : KeyVaultSecretManager
 {

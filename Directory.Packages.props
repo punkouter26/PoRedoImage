@@ -5,11 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Aspire (Note: Aspire.Hosting.AppHost is implicit in SDK 13.x) -->
-    <PackageVersion Include="Aspire.Azure.Security.KeyVault" Version="9.1.0" />
-    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="9.1.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.1.0" />
-    
     <!-- Azure SDKs -->
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageVersion Include="Azure.AI.Vision.ImageAnalysis" Version="1.0.0" />
@@ -20,11 +15,7 @@
     
     <!-- Microsoft Core -->
     <PackageVersion Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.2" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.2" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.2" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.2" />
     
     <!-- OpenTelemetry -->
@@ -46,9 +37,7 @@
     <PackageVersion Include="FluentValidation" Version="11.11.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
     <PackageVersion Include="OpenAI" Version="2.5.0" />
-    <PackageVersion Include="Radzen.Blazor" Version="8.1.5" />
     <PackageVersion Include="Scalar.AspNetCore" Version="1.2.61" />
-    <PackageVersion Include="Swashbuckle.AspNetCore" Version="7.2.0" />
     <PackageVersion Include="System.Drawing.Common" Version="10.0.0" />
     
     <!-- Testing -->

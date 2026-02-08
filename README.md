@@ -86,7 +86,7 @@ tests/
 ```bash
 git clone https://github.com/punkouter26/PoRedoImage.git
 cd PoRedoImage
-dotnet restore PoImageGc.slnx
+dotnet restore PoRedoImage.slnx
 ```
 
 #### 2. Configure Secrets
@@ -128,7 +128,7 @@ dotnet run
 
 ```bash
 # All tests
-dotnet test PoImageGc.slnx
+dotnet test PoRedoImage.slnx
 
 # Unit tests only
 dotnet test tests/PoImageGc.Tests.Unit
@@ -137,7 +137,7 @@ dotnet test tests/PoImageGc.Tests.Unit
 dotnet test tests/PoImageGc.Tests.Integration
 
 # With coverage
-dotnet test PoImageGc.slnx --collect:"XPlat Code Coverage"
+dotnet test PoRedoImage.slnx --collect:"XPlat Code Coverage"
 ```
 
 ## 📡 API Endpoints

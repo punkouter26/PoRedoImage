@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using PoImageGc.Shared.Models;
+using PoImageGc.Web.Models;
 
 namespace PoImageGc.Web.Features.ImageAnalysis;
 

@@ -1,9 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PoImageGc.Shared.Models;
+namespace PoImageGc.Web.Models;
 
 /// <summary>
-/// Represents an image analysis request sent from client to server
+/// Represents an image analysis request sent from client to server.
+/// Uses the Data Transfer Object (DTO) pattern to decouple API contract from internal domain.
 /// </summary>
 public class ImageAnalysisRequest
 {
