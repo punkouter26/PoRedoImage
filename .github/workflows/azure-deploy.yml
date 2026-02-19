@@ -32,6 +32,13 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+        restore-keys: nuget-
+
     - name: Publish
       run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --output ./publish
 
