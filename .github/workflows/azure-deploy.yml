@@ -42,16 +42,6 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Stop App Service
-      run: az webapp stop --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
-
-    - name: Disable run-from-package
-      run: |
-        az webapp config appsettings set \
-          --name ${{ env.AZURE_APP_NAME }} \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --settings WEBSITE_RUN_FROM_PACKAGE=0
-
     - name: Zip publish output
       run: cd ./publish && zip -r ../app.zip . && cd ..
 
@@ -61,9 +51,4 @@ jobs:
           --name ${{ env.AZURE_APP_NAME }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
           --src-path ./app.zip \
-          --type zip \
-          --async false
-
-    - name: Start App Service
-      if: always()
-      run: az webapp start --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+          --type zip
