@@ -1,0 +1,128 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using PoImageGc.Web.Models
+
+<div class="upload-panel">
+
+    @* ── Drop Zone ──────────────────────────────────────────────────── *@
+    <div class="drop-zone @(_isDragging ? "drop-zone--active" : "") @(ImagePreviewUrl != null ? "drop-zone--has-image" : "")"
+         @ondragover:preventDefault
+         @ondragover="@(() => _isDragging = true)"
+         @ondragleave="@(() => _isDragging = false)"
+         @ondrop:preventDefault
+         @ondrop="HandleDrop">
+
+        @if (ImagePreviewUrl != null)
+        {
+            <div class="drop-zone__preview">
+                <img src="@ImagePreviewUrl" class="preview-image" alt="Selected image" />
+                <div class="drop-zone__preview-overlay">
+                    <span class="drop-zone__preview-hint">
+                        <i class="bi bi-arrow-repeat me-1"></i>Replace image
+                    </span>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="drop-zone__empty">
+                <div class="drop-zone__icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.25">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                </div>
+                <p class="drop-zone__title">Drop your image here</p>
+                <p class="drop-zone__sub">or <span class="drop-zone__browse">browse to upload</span></p>
+                <p class="drop-zone__formats">JPG &amp; PNG &middot; up to 20 MB</p>
+            </div>
+        }
+
+        <InputFile OnChange="@OnFileChange" class="drop-zone__input" accept=".jpg,.jpeg,.png" />
+    </div>
+
+    @* ── Error ─────────────────────────────────────────────────────── *@
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger d-flex align-items-center gap-2 mt-3">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+            <span>@ErrorMessage</span>
+        </div>
+    }
+
+    @* ── Mode Cards ────────────────────────────────────────────────── *@
+    <div class="mode-cards mt-4">
+        <div class="mode-card @(SelectedMode == ProcessingMode.ImageRegeneration ? "mode-card--active" : "")"
+             @onclick="@(() => OnModeChanged.InvokeAsync(ProcessingMode.ImageRegeneration))">
+            <div class="mode-card__icon">🎨</div>
+            <div>
+                <div class="mode-card__title">Image Regeneration</div>
+                <div class="mode-card__desc">AI creates a new artistic interpretation of your photo</div>
+            </div>
+        </div>
+
+        <div class="mode-card @(SelectedMode == ProcessingMode.MemeGeneration ? "mode-card--active" : "")"
+             @onclick="@(() => OnModeChanged.InvokeAsync(ProcessingMode.MemeGeneration))">
+            <div class="mode-card__icon">😂</div>
+            <div>
+                <div class="mode-card__title">Meme Generation</div>
+                <div class="mode-card__desc">AI writes a witty caption and overlays it on your image</div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Description Length Presets ────────────────────────────────── *@
+    @if (SelectedMode == ProcessingMode.ImageRegeneration)
+    {
+        <div class="preset-group mt-4">
+            <label class="preset-group__label">AI Description Detail</label>
+            <div class="preset-group__buttons">
+                <button type="button"
+                        class="preset-btn @(DescriptionLength <= 220 ? "preset-btn--active" : "")"
+                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(200))">
+                    <span class="preset-btn__name">Quick</span>
+                    <span class="preset-btn__words">~200 words</span>
+                </button>
+                <button type="button"
+                        class="preset-btn @(DescriptionLength > 220 && DescriptionLength <= 420 ? "preset-btn--active" : "")"
+                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(350))">
+                    <span class="preset-btn__name">Standard</span>
+                    <span class="preset-btn__words">~350 words</span>
+                    <span class="preset-btn__badge">Recommended</span>
+                </button>
+                <button type="button"
+                        class="preset-btn @(DescriptionLength > 420 ? "preset-btn--active" : "")"
+                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(500))">
+                    <span class="preset-btn__name">Detailed</span>
+                    <span class="preset-btn__words">~500 words</span>
+                </button>
+            </div>
+        </div>
+    }
+
+    @* ── Process Button ────────────────────────────────────────────── *@
+    <button class="btn-process mt-4 w-100" @onclick="OnProcessClicked" disabled="@(!CanProcess)">
+        <i class="bi @(SelectedMode == ProcessingMode.MemeGeneration ? "bi-emoji-laughing" : "bi-cpu") me-2"></i>
+        @(SelectedMode == ProcessingMode.MemeGeneration ? "Generate Meme" : "Process Image")
+    </button>
+
+</div>
+
+@code {
+    [Parameter] public ProcessingMode SelectedMode { get; set; }
+    [Parameter] public int DescriptionLength { get; set; }
+    [Parameter] public string? ImagePreviewUrl { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public bool CanProcess { get; set; }
+    [Parameter] public EventCallback<InputFileChangeEventArgs> OnFileChange { get; set; }
+    [Parameter] public EventCallback OnProcessClicked { get; set; }
+    [Parameter] public EventCallback<ProcessingMode> OnModeChanged { get; set; }
+    [Parameter] public EventCallback<int> OnDescriptionLengthChanged { get; set; }
+
+    private bool _isDragging;
+
+    private Task HandleDrop(DragEventArgs e)
+    {
+        _isDragging = false;
+        // The InputFile overlay covers the drop area and captures files natively
+        return Task.CompletedTask;
+    }
+}

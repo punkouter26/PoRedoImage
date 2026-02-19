@@ -27,7 +27,9 @@ public class ProcessingMetrics
     public int DescriptionTokensUsed { get; set; }
 
     /// <summary>
-    /// Gets or sets the number of tokens used for image regeneration
+    /// Gets or sets the number of tokens used for image regeneration.
+    /// Always 0 for DALL-E 3 — the Azure OpenAI API does not report token usage
+    /// for image generation requests; this field is retained for schema compatibility.
     /// </summary>
     public int RegenerationTokensUsed { get; set; }
 

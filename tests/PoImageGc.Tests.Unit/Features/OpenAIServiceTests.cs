@@ -1,6 +1,3 @@
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Channel;
-using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -16,13 +13,6 @@ namespace PoImageGc.Tests.Unit.Features;
 public class OpenAIServiceTests
 {
     private readonly Mock<ILogger<OpenAIService>> _loggerMock = new();
-    private readonly TelemetryClient _telemetryClient;
-
-    public OpenAIServiceTests()
-    {
-        var config = new TelemetryConfiguration { TelemetryChannel = new InMemoryChannel() };
-        _telemetryClient = new TelemetryClient(config);
-    }
 
     private static IConfiguration BuildConfig(string? endpoint = "https://test.openai.azure.com/",
         string? key = "test-key")
@@ -40,29 +30,30 @@ public class OpenAIServiceTests
     {
         var config = BuildConfig(endpoint: null);
         Assert.Throws<ArgumentNullException>(() =>
-            new OpenAIService(config, _loggerMock.Object, _telemetryClient));
+            new OpenAIService(config, _loggerMock.Object));
     }
 
     [Fact]
-    public void Constructor_MissingKey_Throws()
+    public void Constructor_MissingKey_UsesManagedIdentity_DoesNotThrow()
     {
+        // When no API key is configured, the service falls back to DefaultAzureCredential
+        // (Managed Identity / Workload Identity on ACA). Construction must succeed.
         var config = BuildConfig(key: null);
-        Assert.Throws<ArgumentNullException>(() =>
-            new OpenAIService(config, _loggerMock.Object, _telemetryClient));
+        var service = new OpenAIService(config, _loggerMock.Object);
+        Assert.NotNull(service);
     }
 
     [Fact]
     public void Constructor_ValidConfig_DoesNotThrow()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         Assert.NotNull(service);
     }
 
     [Fact]
     public void Constructor_DefaultDeployments_UsedWhenNotConfigured()
     {
-        // When no deployment names are configured, defaults should be used without throwing
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         Assert.NotNull(service);
     }
 
@@ -71,7 +62,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_NullDescription_ThrowsArgumentNull()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             service.EnhanceDescriptionAsync(null!, new List<string> { "tag" }, 200));
     }
@@ -79,7 +70,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_NullTags_ThrowsArgumentNull()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             service.EnhanceDescriptionAsync("desc", null!, 200));
     }
@@ -87,7 +78,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_ZeroTargetLength_ThrowsArgumentOutOfRange()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, 0));
     }
@@ -95,27 +86,9 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_NegativeTargetLength_ThrowsArgumentOutOfRange()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, -1));
-    }
-
-    // ─── GenerateDetailedDescriptionAsync guard-clause tests ────────
-
-    [Fact]
-    public async Task GenerateDetailedDescriptionAsync_NullTags_ThrowsArgumentNull()
-    {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            service.GenerateDetailedDescriptionAsync(null!, 200));
-    }
-
-    [Fact]
-    public async Task GenerateDetailedDescriptionAsync_ZeroLength_ThrowsArgumentOutOfRange()
-    {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            service.GenerateDetailedDescriptionAsync(new List<string> { "tag" }, 0));
     }
 
     // ─── GenerateImageAsync guard-clause tests ──────────────────────
@@ -123,7 +96,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateImageAsync_NullDescription_ThrowsArgumentException()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             service.GenerateImageAsync(null!));
     }
@@ -131,7 +104,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateImageAsync_EmptyDescription_ThrowsArgumentException()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.GenerateImageAsync(""));
     }
@@ -139,7 +112,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateImageAsync_WhitespaceDescription_ThrowsArgumentException()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.GenerateImageAsync("   "));
     }
@@ -149,20 +122,8 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateMemeCaptionAsync_NullTags_ThrowsArgumentNull()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object, _telemetryClient);
+        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            service.GenerateMemeCaptionAsync(null!, 0.8));
+            service.GenerateMemeCaptionAsync(null!));
     }
-}
-
-/// <summary>
-/// Helper in-memory telemetry channel for TelemetryClient construction in tests
-/// </summary>
-file class InMemoryChannel : ITelemetryChannel
-{
-    public bool? DeveloperMode { get; set; }
-    public string EndpointAddress { get; set; } = "";
-    public void Send(ITelemetry item) { }
-    public void Flush() { }
-    public void Dispose() { }
 }

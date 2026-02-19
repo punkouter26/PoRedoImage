@@ -1,8 +1,10 @@
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
-using System.Drawing.Text;
-using System.Runtime.Versioning;
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace PoImageGc.Web.Features.ImageAnalysis;
 
@@ -15,9 +17,10 @@ public interface IMemeGeneratorService
 }
 
 /// <summary>
-/// Service for generating meme images with caption overlays
+/// Cross-platform meme image generator using SixLabors.ImageSharp.
+/// Replaces the Windows-only System.Drawing implementation so the service
+/// works identically on the Linux Azure App Service host.
 /// </summary>
-[SupportedOSPlatform("windows")]
 public class MemeGeneratorService : IMemeGeneratorService
 {
     private readonly ILogger<MemeGeneratorService> _logger;
@@ -27,41 +30,30 @@ public class MemeGeneratorService : IMemeGeneratorService
         _logger = logger;
     }
 
-    [SupportedOSPlatform("windows")]
     public byte[] AddCaptionToImage(byte[] imageData, string? topText, string? bottomText)
     {
         ArgumentNullException.ThrowIfNull(imageData);
         if (imageData.Length == 0)
             throw new ArgumentException("Image data cannot be empty", nameof(imageData));
 
-        _logger.LogInformation("Adding meme caption. Top: '{Top}', Bottom: '{Bottom}'", 
+        _logger.LogInformation("Adding meme caption. Top: '{Top}', Bottom: '{Bottom}'",
             topText ?? "(none)", bottomText ?? "(none)");
 
         try
         {
-            using var ms = new MemoryStream(imageData);
-            using var originalImage = Image.FromStream(ms);
-            using var bitmap = new Bitmap(originalImage.Width, originalImage.Height);
-            using var graphics = Graphics.FromImage(bitmap);
+            using var image = Image.Load<Rgba32>(imageData);
 
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            graphics.TextRenderingHint = TextRenderingHint.AntiAlias;
-
-            graphics.DrawImage(originalImage, 0, 0, originalImage.Width, originalImage.Height);
-
-            if (!string.IsNullOrWhiteSpace(topText))
+            image.Mutate(ctx =>
             {
-                DrawMemeText(graphics, topText.ToUpperInvariant(), originalImage.Width, originalImage.Height, isTop: true);
-            }
+                if (!string.IsNullOrWhiteSpace(topText))
+                    DrawMemeText(ctx, topText.ToUpperInvariant(), image.Width, image.Height, isTop: true);
 
-            if (!string.IsNullOrWhiteSpace(bottomText))
-            {
-                DrawMemeText(graphics, bottomText.ToUpperInvariant(), originalImage.Width, originalImage.Height, isTop: false);
-            }
+                if (!string.IsNullOrWhiteSpace(bottomText))
+                    DrawMemeText(ctx, bottomText.ToUpperInvariant(), image.Width, image.Height, isTop: false);
+            });
 
             using var outputStream = new MemoryStream();
-            bitmap.Save(outputStream, ImageFormat.Png);
+            image.Save(outputStream, new PngEncoder());
             var result = outputStream.ToArray();
 
             _logger.LogInformation("Meme generated. Output size: {Size} bytes", result.Length);
@@ -74,46 +66,56 @@ public class MemeGeneratorService : IMemeGeneratorService
         }
     }
 
-    private static void DrawMemeText(Graphics graphics, string text, int imageWidth, int imageHeight, bool isTop)
+    private static void DrawMemeText(
+        IImageProcessingContext ctx, string text, int imageWidth, int imageHeight, bool isTop)
     {
         float padding = imageWidth * 0.04f;
         float maxFontSize = imageHeight / 8f;
         float minFontSize = Math.Max(12f, imageHeight / 40f);
-        float currentFontSize = maxFontSize;
 
-        using var fontFamily = new FontFamily("Impact");
-        using var format = new StringFormat
+        // Prefer Impact (classic meme font); fall back to first available system font
+        if (!SystemFonts.TryGet("Impact", out var fontFamily))
         {
-            Alignment = StringAlignment.Center,
-            LineAlignment = isTop ? StringAlignment.Near : StringAlignment.Far
-        };
-
-        while (currentFontSize >= minFontSize)
-        {
-            using var font = new Font(fontFamily, currentFontSize, FontStyle.Bold, GraphicsUnit.Pixel);
-            var textSize = graphics.MeasureString(text, font, imageWidth - (int)(padding * 2));
-
-            if (textSize.Width <= imageWidth - (padding * 2))
-                break;
-
-            currentFontSize -= 2;
+            var families = SystemFonts.Families.ToList();
+            if (families.Count == 0)
+                throw new InvalidOperationException("No system fonts are available");
+            fontFamily = families[0];
         }
 
-        using var finalFont = new Font(fontFamily, Math.Max(currentFontSize, minFontSize), FontStyle.Bold, GraphicsUnit.Pixel);
-        
-        var rect = new RectangleF(
-            padding,
-            isTop ? padding : imageHeight * 0.65f,
-            imageWidth - (padding * 2),
-            imageHeight * 0.35f - padding);
+        // Scale font down until the text fits within the image width
+        float fontSize = maxFontSize;
+        while (fontSize > minFontSize)
+        {
+            var probe = fontFamily.CreateFont(fontSize, FontStyle.Bold);
+            var measured = TextMeasurer.MeasureBounds(text, new TextOptions(probe)
+            {
+                WrappingLength = imageWidth - padding * 2
+            });
 
-        using var outlinePen = new Pen(Color.Black, finalFont.Size / 8f) { LineJoin = LineJoin.Round };
-        using var fillBrush = new SolidBrush(Color.White);
-        using var path = new GraphicsPath();
+            if (measured.Width <= imageWidth - padding * 2)
+                break;
 
-        path.AddString(text, fontFamily, (int)FontStyle.Bold, finalFont.Size, rect, format);
+            fontSize -= 2f;
+        }
 
-        graphics.DrawPath(outlinePen, path);
-        graphics.FillPath(fillBrush, path);
+        fontSize = Math.Max(fontSize, minFontSize);
+        var font = fontFamily.CreateFont(fontSize, FontStyle.Bold);
+        float strokeWidth = Math.Max(fontSize / 8f, 1.5f);
+
+        float yPos = isTop ? padding : imageHeight * 0.65f;
+
+        var textOptions = new RichTextOptions(font)
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            Origin = new PointF(imageWidth / 2f, yPos),
+            WrappingLength = imageWidth - padding * 2
+        };
+
+        // White fill with black outline — classic meme style
+        var outlinePen = Pens.Solid(Color.Black, strokeWidth);
+        var fillBrush = Brushes.Solid(Color.White);
+
+        ctx.DrawText(new DrawingOptions(), textOptions, text, fillBrush, outlinePen);
     }
 }

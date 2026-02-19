@@ -1,0 +1,152 @@
+@using PoImageGc.Web.Models
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Original Image</h5>
+            </div>
+            <div class="card-body d-flex flex-column">
+                <div class="text-center mb-3 flex-grow-1">
+                    <img src="@ImagePreviewUrl" class="img-fluid result-image" alt="Original"
+                         onload="this.classList.add('loaded')" />
+                </div>
+                <button class="btn btn-outline-primary" @onclick="OnDownloadOriginal">
+                    <i class="bi bi-download me-2"></i>Download Original
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">@(SelectedMode == ProcessingMode.MemeGeneration ? "Meme Result" : "Regenerated Image")</h5>
+            </div>
+            <div class="card-body d-flex flex-column">
+                <div class="text-center mb-3 flex-grow-1">
+                    @if (SelectedMode == ProcessingMode.MemeGeneration)
+                    {
+                        @if (!string.IsNullOrEmpty(AnalysisResult?.MemeImageData))
+                        {
+                            var memeUrl = $"data:image/png;base64,{AnalysisResult.MemeImageData}";
+                            <img src="@memeUrl" class="img-fluid result-image" alt="Meme"
+                                 onload="this.classList.add('loaded')" />
+                        }
+                        else
+                        {
+                            <div class="d-flex justify-content-center align-items-center h-100 flex-column">
+                                <div class="spinner-border text-primary mb-2" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="text-muted mb-1">Generating your meme...</p>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @if (RegeneratedImageUrl != null)
+                        {
+                            <img src="@RegeneratedImageUrl" class="img-fluid result-image" alt="Regenerated"
+                                 onload="this.classList.add('loaded')"
+                                 onerror="this.onerror=null; this.src='images/image-error.png'; this.classList.add('error');" />
+                        }
+                        else
+                        {
+                            <div class="d-flex justify-content-center align-items-center h-100 flex-column">
+                                <div class="spinner-border text-primary mb-2" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="text-muted mb-1">Image generation in progress...</p>
+                                <p class="text-muted small fst-italic">Typically takes 45–90 seconds.</p>
+                            </div>
+                        }
+                    }
+                </div>
+                @if ((SelectedMode == ProcessingMode.MemeGeneration && !string.IsNullOrEmpty(AnalysisResult?.MemeImageData)) ||
+                     (SelectedMode == ProcessingMode.ImageRegeneration && RegeneratedImageUrl != null))
+                {
+                    <button class="btn btn-outline-primary" @onclick="@(SelectedMode == ProcessingMode.MemeGeneration ? OnDownloadMeme : OnDownloadRegenerated)">
+                        <i class="bi bi-download me-2"></i>Download @(SelectedMode == ProcessingMode.MemeGeneration ? "Meme" : "Regenerated")
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">@(SelectedMode == ProcessingMode.MemeGeneration ? "Meme Caption" : "Image Description")</h5>
+                @if (AnalysisResult?.Metrics != null)
+                {
+                    <span class="badge bg-info text-dark">
+                        Processing time: @(AnalysisResult.Metrics.TotalProcessingTimeMs / 1000.0)s
+                    </span>
+                }
+            </div>
+            <div class="card-body">
+                @if (SelectedMode == ProcessingMode.MemeGeneration && !string.IsNullOrEmpty(AnalysisResult?.MemeCaption))
+                {
+                    <div class="text-center">
+                        @foreach (var line in AnalysisResult.MemeCaption.Split('\n'))
+                        {
+                            <h3 class="fw-bold text-uppercase">@line</h3>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="description-text">@((MarkupString)(string.IsNullOrEmpty(ImageDescription) ? "" : System.Net.WebUtility.HtmlEncode(ImageDescription).Replace("\n", "<br />")))</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted">@(string.IsNullOrEmpty(ImageDescription) ? 0 : ImageDescription.Split(' ').Length) words</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between">
+        @* Side-by-side comparison only makes sense for Image Regeneration with a ready result *@
+        @if (SelectedMode == ProcessingMode.ImageRegeneration && RegeneratedImageUrl != null)
+        {
+            <button class="btn btn-primary" @onclick="OnDownloadSideBySide" disabled="@SideBySideGenerating">
+                @if (SideBySideGenerating)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <text>Generating...</text>
+                }
+                else
+                {
+                    <i class="bi bi-download me-2"></i>
+                    <text>Download Side-by-Side Comparison</text>
+                }
+            </button>
+        }
+        else
+        {
+            <span></span>
+        }
+        <button class="btn btn-outline-primary" @onclick="OnStartOver">
+            <i class="bi bi-arrow-repeat me-2"></i>Start New
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? ImagePreviewUrl { get; set; }
+    [Parameter] public string? RegeneratedImageUrl { get; set; }
+    [Parameter] public ImageAnalysisResult? AnalysisResult { get; set; }
+    [Parameter] public string? ImageDescription { get; set; }
+    [Parameter] public ProcessingMode SelectedMode { get; set; }
+    [Parameter] public bool SideBySideGenerating { get; set; }
+    [Parameter] public EventCallback OnDownloadOriginal { get; set; }
+    [Parameter] public EventCallback OnDownloadMeme { get; set; }
+    [Parameter] public EventCallback OnDownloadRegenerated { get; set; }
+    [Parameter] public EventCallback OnDownloadSideBySide { get; set; }
+    [Parameter] public EventCallback OnStartOver { get; set; }
+}

@@ -1,0 +1,50 @@
+<div class="shimmer-wrapper">
+
+    <div class="shimmer-header d-flex align-items-center gap-3 mb-4">
+        <div class="shimmer-spinner">
+            <svg class="spinner-svg" xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24">
+                <path class="spinner-track" stroke="#e2e8f0" stroke-width="3" d="M12 3a9 9 0 1 0 9 9" />
+                <path class="spinner-arc" stroke="url(#spinGrad)" stroke-width="3" stroke-linecap="round" d="M12 3a9 9 0 0 1 9 9" />
+                <defs>
+                    <linearGradient id="spinGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#052767" />
+                        <stop offset="100%" stop-color="#3a0647" />
+                    </linearGradient>
+                </defs>
+            </svg>
+        </div>
+        <div class="flex-grow-1">
+            <div class="shimmer-status-label">@Message</div>
+            <div class="shimmer-progress mt-1">
+                <div class="shimmer-progress__fill" style="width: @(Percentage)%"></div>
+            </div>
+        </div>
+        <span class="shimmer-pct">@Percentage%</span>
+    </div>
+
+    <div class="shimmer-cards">
+        <div class="shimmer-card shimmer-card--tall">
+            <div class="shimmer-bar shimmer-bar--w60 mb-2"></div>
+            <div class="shimmer-img shimmer-anim"></div>
+            <div class="shimmer-bar shimmer-bar--w40 mt-3"></div>
+        </div>
+        <div class="shimmer-card shimmer-card--tall">
+            <div class="shimmer-bar shimmer-bar--w50 mb-2"></div>
+            <div class="shimmer-img shimmer-anim"></div>
+            <div class="shimmer-bar shimmer-bar--w40 mt-3"></div>
+        </div>
+    </div>
+
+    <div class="shimmer-card mt-3">
+        <div class="shimmer-bar shimmer-bar--w30 mb-3"></div>
+        <div class="shimmer-bar shimmer-anim mb-2"></div>
+        <div class="shimmer-bar shimmer-anim shimmer-bar--w80 mb-2"></div>
+        <div class="shimmer-bar shimmer-anim shimmer-bar--w60"></div>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public int Percentage { get; set; }
+    [Parameter] public string Message { get; set; } = string.Empty;
+}

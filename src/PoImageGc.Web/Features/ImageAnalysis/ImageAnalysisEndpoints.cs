@@ -40,12 +40,30 @@ public static class ImageAnalysisEndpoints
                 title: "Validation Error");
         }
 
+        // Enforce the [Range(200, 500)] annotation that Minimal API does not auto-evaluate
+        if (request.DescriptionLength < 200 || request.DescriptionLength > 500)
+        {
+            return Results.Problem(
+                detail: $"DescriptionLength must be between 200 and 500. Provided: {request.DescriptionLength}",
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Validation Error");
+        }
+
         try
         {
             logger.LogInformation("Processing image analysis request. Mode: {Mode}", request.Mode);
 
             // Convert base64 to bytes
             var imageBytes = Convert.FromBase64String(request.ImageData);
+
+            // Validate magic bytes to reject renamed non-image files (e.g. .gif renamed to .jpg)
+            if (!IsValidImageBytes(imageBytes))
+            {
+                return Results.Problem(
+                    detail: "The uploaded file is not a valid JPEG or PNG image.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Image");
+            }
 
             // Step 1: Analyze image with Computer Vision
             var (description, tags, confidence, analysisTime) = await computerVisionService.AnalyzeImageAsync(imageBytes);
@@ -65,7 +83,7 @@ public static class ImageAnalysisEndpoints
             if (request.Mode == ProcessingMode.MemeGeneration)
             {
                 // Generate meme caption
-                var (topText, bottomText, memeTokens, memeTime) = await openAIService.GenerateMemeCaptionAsync(tags, confidence);
+                var (topText, bottomText, memeTokens, memeTime) = await openAIService.GenerateMemeCaptionAsync(tags);
                 result.MemeCaption = $"{topText}\n{bottomText}";
                 result.Metrics.DescriptionTokensUsed = memeTokens;
                 result.Metrics.DescriptionGenerationTimeMs = memeTime;
@@ -88,6 +106,7 @@ public static class ImageAnalysisEndpoints
                 result.RegeneratedImageData = Convert.ToBase64String(generatedImage);
                 result.RegeneratedImageContentType = contentType;
                 result.Metrics.ImageRegenerationTimeMs = regenTime;
+                result.Metrics.RegenerationTokensUsed = 0; // DALL-E 3 does not report token usage
             }
 
             logger.LogInformation("Image analysis completed. Total time: {TotalTime}ms", result.Metrics.TotalProcessingTimeMs);
@@ -110,5 +129,21 @@ public static class ImageAnalysisEndpoints
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "Processing Error");
         }
+    }
+
+    /// <summary>
+    /// Validates image magic bytes to prevent renamed non-image files from reaching the AI services.
+    /// Accepts JPEG (FF D8 FF) and PNG (89 50 4E 47 0D 0A 1A 0A) signatures.
+    /// </summary>
+    private static bool IsValidImageBytes(byte[] bytes)
+    {
+        // JPEG: FF D8 FF
+        if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+            return true;
+        // PNG: first 4 bytes = 89 50 4E 47 (sufficient for unambiguous identification)
+        if (bytes.Length >= 4 &&
+            bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
+            return true;
+        return false;
     }
 }

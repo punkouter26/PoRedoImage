@@ -6,55 +6,108 @@
 
 <PageTitle>Diagnostics - PoImageGc</PageTitle>
 
-<div class="container">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="display-5">Diagnostics</h1>
-            <p class="text-muted">Configuration values, connection strings, and runtime info. Sensitive values are masked.</p>
+<div class="container py-4">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="diag-title mb-1">
+                <i class="bi bi-activity me-2 text-primary"></i>Diagnostics
+            </h1>
+            <p class="text-muted mb-0 small">Runtime configuration &amp; service connectivity. Sensitive values are masked.</p>
         </div>
-    </div>
-
-    <div class="row">
-        <div class="col-12">
+        <button class="btn btn-sm btn-outline-primary px-3" @onclick="LoadDiagnostics" disabled="@isLoading">
             @if (isLoading)
             {
-                <div class="d-flex justify-content-center my-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            }
-            else if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger">@errorMessage</div>
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
             }
             else
             {
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Runtime Configuration</h5>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="LoadDiagnostics">
-                            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <pre class="mb-0" style="white-space: pre-wrap; word-break: break-all; background: #f8f9fa; padding: 1rem; border-radius: 0.375rem;">@diagJson</pre>
-                    </div>
-                </div>
+                <i class="bi bi-arrow-clockwise me-1"></i>
+            }
+            Refresh
+        </button>
+    </div>
+
+    @if (isLoading && diagData == null)
+    {
+        <div class="diag-skeleton">
+            @for (int i = 0; i < 3; i++)
+            {
+                <div class="diag-skeleton__card shimmer-anim mb-3"></div>
             }
         </div>
-    </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger d-flex align-items-center gap-2">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+            <span>@errorMessage</span>
+        </div>
+    }
+    else if (diagData != null)
+    {
+        @* Runtime info row *@
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-md-3">
+                <div class="diag-stat">
+                    <div class="diag-stat__label">Environment</div>
+                    <div class="diag-stat__value diag-stat__value--env">@diagData.Environment</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="diag-stat">
+                    <div class="diag-stat__label">.NET Version</div>
+                    <div class="diag-stat__value">@diagData.DotNetVersion</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="diag-stat">
+                    <div class="diag-stat__label">Machine</div>
+                    <div class="diag-stat__value">@diagData.MachineName</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="diag-stat">
+                    <div class="diag-stat__label">Process ID</div>
+                    <div class="diag-stat__value">@diagData.ProcessId</div>
+                </div>
+            </div>
+        </div>
+
+        @* Config groups *@
+        @foreach (var group in GetConfigGroups())
+        {
+            <div class="diag-group mb-3">
+                <div class="diag-group__header" @onclick="@(() => ToggleGroup(group.Key))">
+                    <span class="diag-group__title">
+                        <i class="bi @group.Value.Icon me-2"></i>@group.Key
+                    </span>
+                    <span class="diag-group__count">@group.Value.Items.Count key@(group.Value.Items.Count != 1 ? "s" : "")</span>
+                    <i class="bi bi-chevron-@(_expandedGroups.Contains(group.Key) ? "up" : "down") ms-auto diag-group__chevron"></i>
+                </div>
+                @if (_expandedGroups.Contains(group.Key))
+                {
+                    <div class="diag-group__body">
+                        @foreach (var kv in group.Value.Items)
+                        {
+                            <div class="diag-row">
+                                <span class="diag-row__key">@kv.Key</span>
+                                <span class="diag-row__val @(kv.Value?.Contains("****") == true ? "diag-row__val--masked" : "diag-row__val--plain")">@kv.Value</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
 </div>
 
 @code {
-    private string? diagJson;
+    private DiagPayload? diagData;
     private string? errorMessage;
     private bool isLoading = true;
+    private readonly HashSet<string> _expandedGroups = new();
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadDiagnostics();
-    }
+    protected override async Task OnInitializedAsync() => await LoadDiagnostics();
 
     private async Task LoadDiagnostics()
     {
@@ -68,9 +121,12 @@
             response.EnsureSuccessStatusCode();
 
             var raw = await response.Content.ReadAsStringAsync();
-            // Pretty-print the JSON
             using var doc = JsonDocument.Parse(raw);
-            diagJson = JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+            diagData = JsonSerializer.Deserialize<DiagPayload>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            // Expand all groups by default
+            foreach (var k in GetConfigGroups().Keys)
+                _expandedGroups.Add(k);
         }
         catch (Exception ex)
         {
@@ -81,5 +137,58 @@
         {
             isLoading = false;
         }
+    }
+
+    private void ToggleGroup(string key)
+    {
+        if (!_expandedGroups.Remove(key)) _expandedGroups.Add(key);
+    }
+
+    private Dictionary<string, ConfigGroup> GetConfigGroups()
+    {
+        var groups = new Dictionary<string, ConfigGroup>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Azure Key Vault"] = new("bi-shield-lock", new()),
+            ["Computer Vision"] = new("bi-eye", new()),
+            ["OpenAI"] = new("bi-cpu", new()),
+            ["Application Insights"] = new("bi-graph-up", new()),
+            ["Storage"] = new("bi-database", new()),
+            ["Other"] = new("bi-gear", new()),
+        };
+
+        if (diagData?.Configuration == null) return groups;
+
+        foreach (var kv in diagData.Configuration)
+        {
+            var key = kv.Key ?? "";
+            if (key.StartsWith("AZURE_KEY_VAULT", StringComparison.OrdinalIgnoreCase))
+                groups["Azure Key Vault"].Items.Add(kv);
+            else if (key.StartsWith("ComputerVision", StringComparison.OrdinalIgnoreCase))
+                groups["Computer Vision"].Items.Add(kv);
+            else if (key.StartsWith("OpenAI", StringComparison.OrdinalIgnoreCase))
+                groups["OpenAI"].Items.Add(kv);
+            else if (key.StartsWith("ApplicationInsights", StringComparison.OrdinalIgnoreCase))
+                groups["Application Insights"].Items.Add(kv);
+            else if (key.StartsWith("Storage", StringComparison.OrdinalIgnoreCase))
+                groups["Storage"].Items.Add(kv);
+            else
+                groups["Other"].Items.Add(kv);
+        }
+
+        return groups.Where(g => g.Value.Items.Count > 0)
+                     .ToDictionary(g => g.Key, g => g.Value);
+    }
+
+    private sealed record ConfigGroup(string Icon, List<KeyValuePair<string, string?>> Items);
+
+    private sealed class DiagPayload
+    {
+        public string? Environment { get; set; }
+        public string? MachineName { get; set; }
+        public string? OSVersion { get; set; }
+        public string? DotNetVersion { get; set; }
+        public int ProcessId { get; set; }
+        public string? Timestamp { get; set; }
+        public Dictionary<string, string?>? Configuration { get; set; }
     }
 }

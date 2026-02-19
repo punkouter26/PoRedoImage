@@ -199,13 +199,10 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
         mock.Setup(s => s.EnhanceDescriptionAsync(It.IsAny<string>(), It.IsAny<List<string>>(), It.IsAny<int>()))
             .ReturnsAsync(("An enhanced detailed description of the image", 120, 250L));
 
-        mock.Setup(s => s.GenerateDetailedDescriptionAsync(It.IsAny<List<string>>(), It.IsAny<int>(), It.IsAny<double>()))
-            .ReturnsAsync(("A detailed description from tags", 100, 200L));
-
         mock.Setup(s => s.GenerateImageAsync(It.IsAny<string>()))
             .ReturnsAsync((new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 }, "image/png", 0, 500L));
 
-        mock.Setup(s => s.GenerateMemeCaptionAsync(It.IsAny<List<string>>(), It.IsAny<double>()))
+        mock.Setup(s => s.GenerateMemeCaptionAsync(It.IsAny<List<string>>()))
             .ReturnsAsync(("FUNNY TOP", "FUNNY BOTTOM", 50, 180L));
 
         return mock.Object;

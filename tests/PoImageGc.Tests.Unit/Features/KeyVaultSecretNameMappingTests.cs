@@ -1,10 +1,12 @@
 using Azure.Security.KeyVault.Secrets;
+using PoImageGc.Web.Features.Diagnostics;
 
 namespace PoImageGc.Tests.Unit.Features;
 
 /// <summary>
 /// Unit tests for KeyVaultSecretNameMapping — the Adapter pattern implementation
 /// that bridges Key Vault naming conventions (dashes) with .NET configuration keys (colons).
+/// All secrets use the "PoRedoImage-" prefix to namespace them within the shared PoShared Key Vault.
 /// </summary>
 public class KeyVaultSecretNameMappingTests
 {
@@ -13,14 +15,14 @@ public class KeyVaultSecretNameMappingTests
     // ─── Load tests — should accept known secrets ───────────────────
 
     [Theory]
-    [InlineData("ComputerVision-ApiKey")]
-    [InlineData("ComputerVision-Endpoint")]
-    [InlineData("AzureOpenAI-ApiKey")]
-    [InlineData("AzureOpenAI-Endpoint")]
-    [InlineData("AzureOpenAI-DeploymentName")]
-    [InlineData("AzureOpenAI-ImageEndpoint")]
-    [InlineData("AzureOpenAI-ImageKey")]
-    [InlineData("ApplicationInsights-ConnectionString")]
+    [InlineData("PoRedoImage-ComputerVision-ApiKey")]
+    [InlineData("PoRedoImage-ComputerVision-Endpoint")]
+    [InlineData("PoRedoImage-OpenAI-ApiKey")]
+    [InlineData("PoRedoImage-OpenAI-Endpoint")]
+    [InlineData("PoRedoImage-OpenAI-DeploymentName")]
+    [InlineData("PoRedoImage-OpenAI-ImageEndpoint")]
+    [InlineData("PoRedoImage-OpenAI-ImageKey")]
+    [InlineData("PoRedoImage-ApplicationInsights-ConnectionString")]
     [InlineData("PoRedoImage-StorageConnectionString")]
     public void Load_KnownSecret_ReturnsTrue(string secretName)
     {
@@ -31,6 +33,8 @@ public class KeyVaultSecretNameMappingTests
     [Theory]
     [InlineData("UnknownSecret")]
     [InlineData("SomeOtherApp-ApiKey")]
+    [InlineData("ComputerVision-ApiKey")]  // old unprefixed — should now be rejected
+    [InlineData("AzureOpenAI-ApiKey")]     // old unprefixed — should now be rejected
     [InlineData("")]
     public void Load_UnknownSecret_ReturnsFalse(string secretName)
     {
@@ -41,8 +45,8 @@ public class KeyVaultSecretNameMappingTests
     [Fact]
     public void Load_IsCaseInsensitive()
     {
-        var lower = SecretModelFactory.SecretProperties(name: "computervision-apikey");
-        var upper = SecretModelFactory.SecretProperties(name: "COMPUTERVISION-APIKEY");
+        var lower = SecretModelFactory.SecretProperties(name: "poredoimage-computervision-apikey");
+        var upper = SecretModelFactory.SecretProperties(name: "POREDOIMAGE-COMPUTERVISION-APIKEY");
         Assert.True(_mapping.Load(lower));
         Assert.True(_mapping.Load(upper));
     }
@@ -50,15 +54,15 @@ public class KeyVaultSecretNameMappingTests
     // ─── GetKey tests — maps secret names to config keys ────────────
 
     [Theory]
-    [InlineData("ComputerVision-ApiKey", "ComputerVision:ApiKey")]
-    [InlineData("ComputerVision-Endpoint", "ComputerVision:Endpoint")]
-    [InlineData("AzureOpenAI-ApiKey", "OpenAI:Key")]
-    [InlineData("AzureOpenAI-Endpoint", "OpenAI:Endpoint")]
-    [InlineData("AzureOpenAI-DeploymentName", "OpenAI:ChatCompletionsDeployment")]
-    [InlineData("AzureOpenAI-ImageEndpoint", "OpenAI:ImageEndpoint")]
-    [InlineData("AzureOpenAI-ImageKey", "OpenAI:ImageKey")]
-    [InlineData("ApplicationInsights-ConnectionString", "ApplicationInsights:ConnectionString")]
-    [InlineData("PoRedoImage-StorageConnectionString", "Storage:ConnectionString")]
+    [InlineData("PoRedoImage-ComputerVision-ApiKey",             "ComputerVision:ApiKey")]
+    [InlineData("PoRedoImage-ComputerVision-Endpoint",           "ComputerVision:Endpoint")]
+    [InlineData("PoRedoImage-OpenAI-ApiKey",                     "OpenAI:Key")]
+    [InlineData("PoRedoImage-OpenAI-Endpoint",                   "OpenAI:Endpoint")]
+    [InlineData("PoRedoImage-OpenAI-DeploymentName",             "OpenAI:ChatCompletionsDeployment")]
+    [InlineData("PoRedoImage-OpenAI-ImageEndpoint",              "OpenAI:ImageEndpoint")]
+    [InlineData("PoRedoImage-OpenAI-ImageKey",                   "OpenAI:ImageKey")]
+    [InlineData("PoRedoImage-ApplicationInsights-ConnectionString", "ApplicationInsights:ConnectionString")]
+    [InlineData("PoRedoImage-StorageConnectionString",           "Storage:ConnectionString")]
     public void GetKey_KnownSecret_ReturnsMappedConfigKey(string secretName, string expectedConfigKey)
     {
         var secret = SecretModelFactory.KeyVaultSecret(

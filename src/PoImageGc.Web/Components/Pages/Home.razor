@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Text.Json
@@ -8,231 +8,77 @@
 @inject ILogger<Home> Logger
 @inject NavigationManager NavigationManager
 
-<PageTitle>PoImageGc</PageTitle>
+<PageTitle>PoImageGc — AI Image Studio</PageTitle>
 
-<div class="container">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="display-4 text-center">AI-Powered Image Analysis</h1>
-            <p class="lead text-center">
-                Choose your adventure: Transform your image with AI regeneration
-                or create hilarious memes with AI-generated captions. 
-                Upload an image and select your processing mode below to experience the power of
-                computer vision and generative AI.
-            </p>
-        </div>
-    </div>
-
+<div class="container py-4">
     @if (!isProcessing && !isComplete)
     {
-        <div class="row justify-content-center mb-4">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">Upload Image</h5>
-                    </div>
-                    <div class="card-body">
-                        <InputFile OnChange="@LoadFile" class="form-control mb-3" accept=".jpg,.jpeg,.png" />
-                        
-                        @if (!string.IsNullOrEmpty(errorMessage))
-                        {
-                            <div class="alert alert-danger">
-                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                @errorMessage
-                            </div>
-                        }
-                        
-                        @if (imagePreviewUrl != null)
-                        {
-                            <div class="text-center mb-3">
-                                <img src="@imagePreviewUrl" class="img-fluid preview-image" alt="Preview" />
-                            </div>
-                        }
-                        
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Processing Mode</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="processingMode" id="modeRegeneration" 
-                                       @onchange="@(() => selectedMode = ProcessingMode.ImageRegeneration)"
-                                       checked="@(selectedMode == ProcessingMode.ImageRegeneration)" />
-                                <label class="form-check-label" for="modeRegeneration">
-                                    <strong>Image Regeneration</strong> - AI analyzes your image, creates a detailed description, and generates a new artistic interpretation
-                                </label>
-                            </div>
-                            <div class="form-check mt-2">
-                                <input class="form-check-input" type="radio" name="processingMode" id="modeMeme" 
-                                       @onchange="@(() => selectedMode = ProcessingMode.MemeGeneration)"
-                                       checked="@(selectedMode == ProcessingMode.MemeGeneration)" />
-                                <label class="form-check-label" for="modeMeme">
-                                    <strong>Meme Generation</strong> - AI analyzes your image and creates a funny meme with witty captions
-                                </label>
-                            </div>
-                        </div>
+        <div class="hero-section text-center mb-5">
+            <div class="hero-icon mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="url(#grad1)" stroke-width="1.5">
+                    <defs>
+                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#0527671" />
+                            <stop offset="100%" style="stop-color:#3a0647" />
+                        </linearGradient>
+                    </defs>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                </svg>
+            </div>
+            <h1 class="hero-title">AI Image Studio</h1>
+            <p class="hero-subtitle">Reimagine your photos — regenerate with AI artistry or generate memes instantly.</p>
+        </div>
 
-                        @if (selectedMode == ProcessingMode.ImageRegeneration)
-                        {
-                            <div class="mb-3">
-                                <label for="descriptionLength" class="form-label">
-                                    Description Length: <strong>@descriptionLength words</strong>
-                                    <span class="text-muted small fst-italic d-block">Longer descriptions (350+ words) generally produce better results</span>
-                                </label>
-                                <input type="range" class="form-range" min="200" max="500" step="10" 
-                                       @bind="descriptionLength" id="descriptionLength" />
-                            </div>
-                        }
-                        
-                        <button class="btn btn-primary w-100" @onclick="ProcessImage" disabled="@(!canProcessImage)">
-                            <i class="bi bi-cpu me-2"></i>@GetProcessButtonText()
-                        </button>
-                    </div>
-                </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-7 col-md-9">
+                <ImageUploadPanel
+                    SelectedMode="@selectedMode"
+                    DescriptionLength="@descriptionLength"
+                    ImagePreviewUrl="@imagePreviewUrl"
+                    ErrorMessage="@errorMessage"
+                    CanProcess="@canProcessImage"
+                    OnFileChange="LoadFile"
+                    OnProcessClicked="ProcessImage"
+                    OnModeChanged="@(m => selectedMode = m)"
+                    OnDescriptionLengthChanged="@(l => descriptionLength = l)" />
             </div>
         </div>
     }
-    
+
     @if (isProcessing)
     {
-        <div class="row justify-content-center mb-4">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">Processing...</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="progress mb-3">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                 role="progressbar" style="width: @(progressPercentage)%" 
-                                 aria-valuenow="@progressPercentage" aria-valuemin="0" aria-valuemax="100">
-                                @progressPercentage%
-                            </div>
-                        </div>
-                        <p class="text-center">@progressMessage</p>
-                    </div>
-                </div>
+        <div class="row justify-content-center mt-4">
+            <div class="col-lg-7 col-md-9">
+                <ProcessingProgressBar Percentage="@progressPercentage" Message="@progressMessage" />
             </div>
         </div>
     }
-    
+
     @if (isComplete)
     {
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0">Original Image</h5>
-                    </div>
-                    <div class="card-body d-flex flex-column">
-                        <div class="text-center mb-3 flex-grow-1">
-                            <img src="@imagePreviewUrl" class="img-fluid result-image" alt="Original" 
-                                 onload="this.classList.add('loaded')" />
-                        </div>
-                        <button class="btn btn-outline-primary" @onclick="DownloadOriginal">
-                            <i class="bi bi-download me-2"></i>Download Original
-                        </button>
-                    </div>
+        <ResultsPanel
+            ImagePreviewUrl="@imagePreviewUrl"
+            RegeneratedImageUrl="@regeneratedImageUrl"
+            AnalysisResult="@analysisResult"
+            ImageDescription="@imageDescription"
+            SelectedMode="@selectedMode"
+            SideBySideGenerating="@_sideBySideGenerating"
+            OnDownloadOriginal="DownloadOriginal"
+            OnDownloadMeme="DownloadMeme"
+            OnDownloadRegenerated="DownloadRegenerated"
+            OnDownloadSideBySide="DownloadSideBySide"
+            OnStartOver="StartOver" />
+    }
+
+    @if (!isProcessing && !isComplete && !string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="row justify-content-center mt-2">
+            <div class="col-lg-7 col-md-9">
+                <div class="alert alert-danger d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+                    <span>@errorMessage</span>
                 </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0">@(selectedMode == ProcessingMode.MemeGeneration ? "Meme Result" : "Regenerated Image")</h5>
-                    </div>
-                    <div class="card-body d-flex flex-column">
-                        <div class="text-center mb-3 flex-grow-1">
-                            @if (selectedMode == ProcessingMode.MemeGeneration)
-                            {
-                                @if (!string.IsNullOrEmpty(analysisResult?.MemeImageData))
-                                {
-                                    var memeUrl = $"data:image/png;base64,{analysisResult.MemeImageData}";
-                                    <img src="@memeUrl" class="img-fluid result-image" alt="Meme" 
-                                         onload="this.classList.add('loaded')" />
-                                }
-                                else
-                                {
-                                    <div class="d-flex justify-content-center align-items-center h-100 flex-column">
-                                        <div class="spinner-border text-primary mb-2" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <p class="text-muted mb-1">Generating your meme...</p>
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                @if (regeneratedImageUrl != null)
-                                {
-                                    <img src="@regeneratedImageUrl" class="img-fluid result-image" alt="Regenerated" 
-                                         onload="this.classList.add('loaded')" 
-                                         onerror="this.onerror=null; this.src='images/image-error.png'; this.classList.add('error'); console.error('Failed to load regenerated image');" />
-                                }
-                                else
-                                {
-                                    <div class="d-flex justify-content-center align-items-center h-100 flex-column">
-                                        <div class="spinner-border text-primary mb-2" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <p class="text-muted mb-1">Image generation in progress...</p>
-                                        <p class="text-muted small fst-italic">This process typically takes 45-90 seconds. Complex images may take longer.</p>
-                                        <p class="text-muted small">Your browser will automatically display the image when ready.</p>
-                                    </div>
-                                }
-                            }
-                        </div>
-                        @if ((selectedMode == ProcessingMode.MemeGeneration && !string.IsNullOrEmpty(analysisResult?.MemeImageData)) ||
-                             (selectedMode == ProcessingMode.ImageRegeneration && regeneratedImageUrl != null))
-                        {
-                            <button class="btn btn-outline-primary" @onclick="@(selectedMode == ProcessingMode.MemeGeneration ? DownloadMeme : DownloadRegenerated)">
-                                <i class="bi bi-download me-2"></i>Download @(selectedMode == ProcessingMode.MemeGeneration ? "Meme" : "Regenerated")
-                            </button>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">@(selectedMode == ProcessingMode.MemeGeneration ? "Meme Caption" : "Image Description")</h5>
-                        @if (analysisResult?.Metrics != null)
-                        {
-                            <span class="badge bg-info text-dark">
-                                Processing time: @(analysisResult.Metrics.TotalProcessingTimeMs / 1000.0)s
-                            </span>
-                        }
-                    </div>
-                    <div class="card-body">
-                        @if (selectedMode == ProcessingMode.MemeGeneration && !string.IsNullOrEmpty(analysisResult?.MemeCaption))
-                        {
-                            <div class="text-center">
-                                @foreach (var line in analysisResult.MemeCaption.Split('\n'))
-                                {
-                                    <h3 class="fw-bold text-uppercase">@line</h3>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="description-text">@((MarkupString)(string.IsNullOrEmpty(imageDescription) ? "" : System.Net.WebUtility.HtmlEncode(imageDescription).Replace("\n", "<br />")))</p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-muted">@(string.IsNullOrEmpty(imageDescription) ? 0 : imageDescription.Split(' ').Length) words</span>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row mb-4">
-            <div class="col-12 d-flex justify-content-between">
-                <button class="btn btn-primary" @onclick="DownloadSideBySide">
-                    <i class="bi bi-download me-2"></i>Download Side-by-Side Comparison
-                </button>
-                <button class="btn btn-outline-primary" @onclick="StartOver">
-                    <i class="bi bi-arrow-repeat me-2"></i>Start New
-                </button>
             </div>
         </div>
     }
@@ -244,26 +90,17 @@
     private string? regeneratedImageUrl;
     private string? imageDescription;
     private string? errorMessage;
-    private bool isProcessing = false;
-    private bool isComplete = false;
+    private bool isProcessing;
+    private bool isComplete;
+    private bool _sideBySideGenerating;
     private bool canProcessImage => selectedFile != null && string.IsNullOrEmpty(errorMessage);
-    private int progressPercentage = 0;
-    private string progressMessage = "";
+    private int progressPercentage;
+    private string progressMessage = string.Empty;
     private int descriptionLength = 350;
-    private const int MaxFileSize = 20 * 1024 * 1024; // 20MB
+    private const int MaxFileSize = 20 * 1024 * 1024; // 20 MB
     private ImageAnalysisResult? analysisResult;
     private ProcessingMode selectedMode = ProcessingMode.ImageRegeneration;
 
-    protected override Task OnInitializedAsync()
-    {
-        return Task.CompletedTask;
-    }
-
-    private string GetProcessButtonText()
-    {
-        return selectedMode == ProcessingMode.MemeGeneration ? "Generate Meme" : "Process Image";
-    }
-    
     private async Task LoadFile(InputFileChangeEventArgs e)
     {
         try
@@ -271,7 +108,7 @@
             selectedFile = e.File;
             errorMessage = null;
             imagePreviewUrl = null;
-            
+
             var fileType = Path.GetExtension(selectedFile.Name).ToLower();
             if (fileType != ".jpg" && fileType != ".jpeg" && fileType != ".png")
             {
@@ -279,24 +116,21 @@
                 selectedFile = null;
                 return;
             }
-            
+
             if (selectedFile.Size > MaxFileSize)
             {
-                errorMessage = $"File size exceeds the maximum allowed (20MB). Current size: {Math.Round(selectedFile.Size / 1024.0 / 1024.0, 2)}MB";
+                errorMessage = $"File size exceeds the maximum allowed (20 MB). Current: {Math.Round(selectedFile.Size / 1024.0 / 1024.0, 2)} MB";
                 selectedFile = null;
                 return;
             }
-            
-            // Use MemoryStream to ensure all bytes are read
-            using var memoryStream = new MemoryStream();
-            await using var imageStream = selectedFile.OpenReadStream(MaxFileSize);
-            await imageStream.CopyToAsync(memoryStream);
-            var buffer = memoryStream.ToArray();
-            
+
+            using var ms = new MemoryStream();
+            await using var stream = selectedFile.OpenReadStream(MaxFileSize);
+            await stream.CopyToAsync(ms);
+            var buffer = ms.ToArray();
+
             var base64Image = Convert.ToBase64String(buffer);
             var contentType = selectedFile.ContentType;
-            
-            // Ensure content type is valid for images
             if (string.IsNullOrEmpty(contentType))
             {
                 contentType = fileType switch
@@ -306,12 +140,10 @@
                     _ => "image/jpeg"
                 };
             }
-            
+
             imagePreviewUrl = $"data:{contentType};base64,{base64Image}";
             StateHasChanged();
-            
-            Logger.LogInformation("Image loaded successfully: {FileName}, {FileSize}KB", 
-                selectedFile.Name, Math.Round(selectedFile.Size / 1024.0, 2));
+            Logger.LogInformation("Image loaded: {Name}, {KB:F1} KB", selectedFile.Name, selectedFile.Size / 1024.0);
         }
         catch (Exception ex)
         {
@@ -319,11 +151,11 @@
             Logger.LogError(ex, "Error loading image");
         }
     }
-    
+
     private async Task ProcessImage()
     {
         if (selectedFile == null || imagePreviewUrl == null) return;
-        
+
         try
         {
             isProcessing = true;
@@ -331,17 +163,12 @@
             progressPercentage = 10;
             progressMessage = "Preparing image for analysis...";
             StateHasChanged();
-            
-            // Extract raw base64 data from data URL (remove "data:image/...;base64," prefix)
+
             var base64Data = imagePreviewUrl;
             var base64Index = imagePreviewUrl.IndexOf(";base64,", StringComparison.OrdinalIgnoreCase);
             if (base64Index >= 0)
-            {
-                base64Data = imagePreviewUrl[(base64Index + 8)..]; // Skip ";base64,"
-            }
-            
-            Logger.LogDebug("Sending image data, length: {Length}", base64Data.Length);
-            
+                base64Data = imagePreviewUrl[(base64Index + 8)..];
+
             var request = new ImageAnalysisRequest
             {
                 ImageData = base64Data,
@@ -350,61 +177,50 @@
                 DescriptionLength = descriptionLength,
                 Mode = selectedMode
             };
-            
+
+            progressPercentage = 30;
+            progressMessage = "Analyzing image with Azure Computer Vision...";
+            StateHasChanged();
+
             try
             {
-                progressPercentage = 30;
-                progressMessage = "Analyzing image with Azure Computer Vision...";
-                StateHasChanged();
-                
                 using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-                
-                analysisResult = await Http.PostAsJsonAsync("api/images/analyze", request, cts.Token)
-                    .ContinueWith(async t => await t.Result.Content.ReadFromJsonAsync<ImageAnalysisResult>())
-                    .Unwrap();
-                
+                var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, cts.Token);
+                httpResponse.EnsureSuccessStatusCode();
+                analysisResult = await httpResponse.Content.ReadFromJsonAsync<ImageAnalysisResult>();
+
                 if (analysisResult == null)
-                {
-                    throw new Exception("Failed to process image analysis. No response received from API.");
-                }
-                
+                    throw new InvalidOperationException("No response received from API.");
+
                 imageDescription = analysisResult.Description;
-                
-                if (selectedMode == ProcessingMode.MemeGeneration)
-                {
-                    regeneratedImageUrl = null;
-                }
-                else if (!string.IsNullOrEmpty(analysisResult.RegeneratedImageData))
-                {
-                    regeneratedImageUrl = $"data:{analysisResult.RegeneratedImageContentType};base64,{analysisResult.RegeneratedImageData}";
-                }
+                regeneratedImageUrl = selectedMode == ProcessingMode.ImageRegeneration && !string.IsNullOrEmpty(analysisResult.RegeneratedImageData)
+                    ? $"data:{analysisResult.RegeneratedImageContentType};base64,{analysisResult.RegeneratedImageData}"
+                    : null;
             }
-            catch (TimeoutException ex)
+            catch (OperationCanceledException ex)
             {
-                Logger.LogError(ex, "Request timed out");
-                errorMessage = "The image generation process took too long to complete. Please try again with a different image.";
-                imageDescription = "Image analysis timed out. The server took too long to process your request.";
+                Logger.LogError(ex, "Request timed out after 3 minutes");
+                errorMessage = "Image generation timed out. Please try again with a different image.";
             }
             catch (HttpRequestException ex) when ((int?)ex.StatusCode >= 500)
             {
-                Logger.LogError(ex, "Server error occurred");
+                Logger.LogError(ex, "Server error");
                 errorMessage = $"A server error occurred: {ex.Message}";
-                imageDescription = "The server encountered an error while processing your image.";
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error calling API");
                 errorMessage = $"Error processing image: {ex.Message}";
-                imageDescription = "An unexpected error occurred during processing.";
             }
             finally
             {
                 progressPercentage = 100;
-                progressMessage = "Processing complete!";
+                progressMessage = string.IsNullOrEmpty(errorMessage) ? "Processing complete!" : "Processing failed.";
                 isProcessing = false;
-                isComplete = true;
+                // Only transition to results view when processing succeeded;
+                // on failure the user stays on the upload panel so they can retry.
+                isComplete = string.IsNullOrEmpty(errorMessage);
                 StateHasChanged();
-                Logger.LogInformation("Image processing completed successfully");
             }
         }
         catch (Exception ex)
@@ -414,96 +230,42 @@
             Logger.LogError(ex, "Error processing image");
         }
     }
-    
+
     private async Task DownloadOriginal()
     {
         if (imagePreviewUrl == null) return;
-        
-        try
-        {
-            var success = await JSRuntime.InvokeAsync<bool>("downloadImage", imagePreviewUrl, 
-                selectedFile?.Name ?? "original-image.jpg");
-            
-            if (success)
-            {
-                Logger.LogInformation("Original image download initiated");
-            }
-            else
-            {
-                errorMessage = "There was a problem downloading the image. Please try again.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error downloading original image: {ex.Message}";
-            Logger.LogError(ex, "Error downloading original image");
-        }
+        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", imagePreviewUrl, selectedFile?.Name ?? "original.jpg");
+        if (!ok) errorMessage = "There was a problem downloading the image.";
+        else Logger.LogInformation("Original image download initiated");
     }
-    
+
     private async Task DownloadMeme()
     {
         if (analysisResult?.MemeImageData == null) return;
-        
-        try
-        {
-            var memeUrl = $"data:image/png;base64,{analysisResult.MemeImageData}";
-            var success = await JSRuntime.InvokeAsync<bool>("downloadImage", memeUrl, 
-                "meme-" + (selectedFile?.Name ?? "image.png"));
-            
-            if (success)
-            {
-                Logger.LogInformation("Meme image download initiated");
-            }
-            else
-            {
-                errorMessage = "There was a problem downloading the meme image. Please try again.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error downloading meme image: {ex.Message}";
-            Logger.LogError(ex, "Error downloading meme image");
-        }
+        var url = $"data:image/png;base64,{analysisResult.MemeImageData}";
+        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", url, "meme-" + (selectedFile?.Name ?? "image.png"));
+        if (!ok) errorMessage = "There was a problem downloading the meme image.";
+        else Logger.LogInformation("Meme image download initiated");
     }
-    
+
     private async Task DownloadRegenerated()
     {
         if (regeneratedImageUrl == null) return;
-        
-        try
-        {
-            var success = await JSRuntime.InvokeAsync<bool>("downloadImage", regeneratedImageUrl, 
-                "regenerated-" + (selectedFile?.Name ?? "image.png"));
-            
-            if (success)
-            {
-                Logger.LogInformation("Regenerated image download initiated");
-            }
-            else
-            {
-                errorMessage = "There was a problem downloading the regenerated image. Please try again.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error downloading regenerated image: {ex.Message}";
-            Logger.LogError(ex, "Error downloading regenerated image");
-        }
+        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", regeneratedImageUrl, "regenerated-" + (selectedFile?.Name ?? "image.png"));
+        if (!ok) errorMessage = "There was a problem downloading the regenerated image.";
+        else Logger.LogInformation("Regenerated image download initiated");
     }
-    
+
     private async Task DownloadSideBySide()
     {
         if (imagePreviewUrl == null || regeneratedImageUrl == null) return;
-        
+        _sideBySideGenerating = true;
+        StateHasChanged();
         try
         {
-            errorMessage = "Generating comparison image...";
-            
-            await JSRuntime.InvokeVoidAsync("createSideBySideComparison", 
-                imagePreviewUrl, regeneratedImageUrl, 
+            await JSRuntime.InvokeVoidAsync("createSideBySideComparison",
+                imagePreviewUrl, regeneratedImageUrl,
                 "comparison-" + (selectedFile?.Name ?? "image.png"));
-            
-            errorMessage = null;
             Logger.LogInformation("Side-by-side comparison download initiated");
         }
         catch (Exception ex)
@@ -511,8 +273,13 @@
             errorMessage = $"Error creating comparison image: {ex.Message}";
             Logger.LogError(ex, "Error creating comparison image");
         }
+        finally
+        {
+            _sideBySideGenerating = false;
+            StateHasChanged();
+        }
     }
-    
+
     private void StartOver()
     {
         selectedFile = null;
@@ -522,11 +289,11 @@
         errorMessage = null;
         isProcessing = false;
         isComplete = false;
+        _sideBySideGenerating = false;
         progressPercentage = 0;
-        progressMessage = "";
+        progressMessage = string.Empty;
         analysisResult = null;
         selectedMode = ProcessingMode.ImageRegeneration;
-        
-        Logger.LogInformation("Process reset - starting over");
+        Logger.LogInformation("Process reset");
     }
 }

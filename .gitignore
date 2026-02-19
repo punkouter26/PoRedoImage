@@ -417,3 +417,8 @@ AzuriteData/*
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Scratch / AI artefacts
+*.potune-state.json
+screenshot-*.png
+.potune-state.json

@@ -1,7 +1,6 @@
 using Azure.Identity;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Security.KeyVault.Secrets;
-using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry;
@@ -17,16 +16,34 @@ using Serilog.Events;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 using Scalar.AspNetCore;
 
+// ─── Bootstrap logger ───────────────────────────────────────────────
+// Captures startup/Key Vault failures before the full Serilog pipeline is ready.
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Warning()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Azure Key Vault ────────────────────────────────────────────────
-// Key Vault integration for all environments; secrets mapped via KeyVaultSecretNameMapping
+// Load FIRST so ApplicationInsights:ConnectionString is available when Serilog is configured.
+// Secrets mapped via KeyVaultSecretNameMapping.
 var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
 if (!string.IsNullOrEmpty(keyVaultEndpoint))
 {
-    var credential = new DefaultAzureCredential();
-    var secretClient = new SecretClient(new Uri(keyVaultEndpoint), credential);
-    builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretNameMapping());
+    try
+    {
+        var credential = new DefaultAzureCredential();
+        var secretClient = new SecretClient(new Uri(keyVaultEndpoint), credential);
+        builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretNameMapping());
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex,
+            "Key Vault at {Endpoint} is unreachable; secrets will not be loaded. "
+            + "Application Insights and other Key Vault-dependent features may be unavailable.",
+            keyVaultEndpoint);
+    }
 }
 
 // ─── Serilog ────────────────────────────────────────────────────────
@@ -42,7 +59,14 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.WithProperty("Application", "PoImageGc")
     .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
     .Enrich.WithMachineName()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.Console(outputTemplate:
+        "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.File(
+        path: "logs/poredoimage-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate:
+            "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
     .WriteTo.Conditional(_ => !string.IsNullOrEmpty(appInsightsConnectionString),
         sink => sink.ApplicationInsights(appInsightsConnectionString!, TelemetryConverter.Traces))
     .CreateLogger();
@@ -77,13 +101,14 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddOpenApi();
 
-// Application Insights SDK (works alongside OpenTelemetry for rich .NET telemetry)
-builder.Services.AddApplicationInsightsTelemetry();
-builder.Services.AddSingleton<Microsoft.ApplicationInsights.TelemetryClient>();
+// HTTP client factory (used by health checks)
+builder.Services.AddHttpClient();
 
 // ─── Health checks ──────────────────────────────────────────────────
-// Verifies connectivity to all external API dependencies
-builder.Services.AddHealthChecks();
+// Named checks verify connectivity to Computer Vision and OpenAI endpoints
+builder.Services.AddHealthChecks()
+    .AddCheck<ComputerVisionHealthCheck>("computer-vision", tags: ["ready"])
+    .AddCheck<OpenAIHealthCheck>("openai", tags: ["ready"]);
 
 // ─── HTTP client ────────────────────────────────────────────────────
 builder.Services.AddScoped(sp =>
@@ -98,15 +123,8 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<IComputerVisionService, ComputerVisionService>();
 builder.Services.AddScoped<IOpenAIService, OpenAIService>();
 
-// MemeGeneratorService — Platform Adapter pattern: Windows-only System.Drawing
-if (OperatingSystem.IsWindows())
-{
-    builder.Services.AddScoped<IMemeGeneratorService, MemeGeneratorService>();
-}
-else
-{
-    builder.Services.AddScoped<IMemeGeneratorService, NullMemeGeneratorService>();
-}
+// MemeGeneratorService — cross-platform via SixLabors.ImageSharp (no longer Windows-only)
+builder.Services.AddScoped<IMemeGeneratorService, MemeGeneratorService>();
 
 var app = builder.Build();
 
@@ -119,6 +137,24 @@ if (!app.Environment.IsDevelopment())
 
 app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseHttpsRedirection();
+
+// Correlation ID must precede request logging so {CorrelationId} is in scope
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Structured request logging: one entry per request with timing and status
+app.UseSerilogRequestLogging(opts =>
+{
+    opts.MessageTemplate =
+        "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+    opts.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
+        diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+        diagnosticContext.Set("CorrelationId",
+            httpContext.Response.Headers["X-Correlation-ID"].FirstOrDefault() ?? string.Empty);
+    };
+});
+
 app.UseAntiforgery();
 
 // OpenAPI + Scalar API documentation
@@ -159,38 +195,3 @@ app.Run();
 
 // Make Program class accessible to integration tests
 public partial class Program { }
-
-/// <summary>
-/// Maps Key Vault secret names to configuration keys.
-/// Implements the Adapter pattern to bridge Key Vault naming convention
-/// (e.g., "ComputerVision-ApiKey") with .NET configuration keys (e.g., "ComputerVision:ApiKey").
-/// </summary>
-public class KeyVaultSecretNameMapping : KeyVaultSecretManager
-{
-    private static readonly Dictionary<string, string> SecretMappings = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["ComputerVision-ApiKey"] = "ComputerVision:ApiKey",
-        ["ComputerVision-Endpoint"] = "ComputerVision:Endpoint",
-        ["AzureOpenAI-ApiKey"] = "OpenAI:Key",
-        ["AzureOpenAI-Endpoint"] = "OpenAI:Endpoint",
-        ["AzureOpenAI-DeploymentName"] = "OpenAI:ChatCompletionsDeployment",
-        ["AzureOpenAI-ImageEndpoint"] = "OpenAI:ImageEndpoint",
-        ["AzureOpenAI-ImageKey"] = "OpenAI:ImageKey",
-        ["ApplicationInsights-ConnectionString"] = "ApplicationInsights:ConnectionString",
-        ["PoRedoImage-StorageConnectionString"] = "Storage:ConnectionString"
-    };
-
-    public override bool Load(SecretProperties secret)
-    {
-        // Only load secrets that are relevant to this application
-        return SecretMappings.ContainsKey(secret.Name);
-    }
-
-    public override string GetKey(KeyVaultSecret secret)
-    {
-        // Map Key Vault secret name to configuration key
-        return SecretMappings.TryGetValue(secret.Name, out var configKey) 
-            ? configKey 
-            : secret.Name.Replace("--", ":");
-    }
-}
