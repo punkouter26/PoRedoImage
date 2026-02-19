@@ -38,7 +38,9 @@ jobs:
       run: dotnet test PoRedoImage.slnx --configuration Release --no-build --verbosity normal
       
     - name: Publish web project
-      run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
+      run: |
+        dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
+        cd ./publish && zip -r ../app.zip . && cd ..
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2
@@ -46,15 +48,20 @@ jobs:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-    
+
     - name: Stop App Service before deploy
-      run: az webapp stop --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+      run: |
+        az webapp stop --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+        sleep 15
 
     - name: Deploy to Azure App Service
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: ${{ env.AZURE_APP_NAME }}
-        package: ./publish
+      run: |
+        az webapp deploy \
+          --name ${{ env.AZURE_APP_NAME }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --src-path ./app.zip \
+          --type zip \
+          --async false
 
     - name: Start App Service after deploy
       if: always()
