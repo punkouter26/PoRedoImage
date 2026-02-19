@@ -38,9 +38,7 @@ jobs:
       run: dotnet test PoRedoImage.slnx --configuration Release --no-build --verbosity normal
       
     - name: Publish web project
-      run: |
-        dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
-        cd ./publish && zip -r ../app.zip . && cd ..
+      run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2
@@ -50,12 +48,7 @@ jobs:
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
     - name: Deploy to Azure App Service
-      run: |
-        az webapp deploy \
-          --name ${{ env.AZURE_APP_NAME }} \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --src-path ./app.zip \
-          --type zip \
-          --restart true \
-          --async false
-
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_APP_NAME }}
+        package: ./publish
