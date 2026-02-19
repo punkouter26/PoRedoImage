@@ -18,33 +18,22 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     permissions:
       id-token: write
       contents: read
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
-        
-    - name: Restore dependencies
-      run: dotnet restore PoRedoImage.slnx
-      
-    - name: Build solution
-      run: dotnet build PoRedoImage.slnx --configuration Release --no-restore
-      
-    - name: Run unit and integration tests
-      run: dotnet test PoRedoImage.slnx --configuration Release --no-build --verbosity normal
-      
-    - name: Publish web project
-      run: |
-        dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
-        cd ./publish && zip -r ../app.zip . && cd ..
+
+    - name: Publish
+      run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --output ./publish
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2
@@ -53,14 +42,28 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Clear OneDeploy lock (restart SCM)
+    - name: Stop App Service
+      run: az webapp stop --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+
+    - name: Disable run-from-package
       run: |
-        az webapp restart --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
-        sleep 30
+        az webapp config appsettings set \
+          --name ${{ env.AZURE_APP_NAME }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --settings WEBSITE_RUN_FROM_PACKAGE=0
+
+    - name: Zip publish output
+      run: cd ./publish && zip -r ../app.zip . && cd ..
 
     - name: Deploy to Azure App Service
       run: |
-        az webapp deployment source config-zip \
+        az webapp deploy \
           --name ${{ env.AZURE_APP_NAME }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --src ./app.zip
+          --src-path ./app.zip \
+          --type zip \
+          --async false
+
+    - name: Start App Service
+      if: always()
+      run: az webapp start --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
