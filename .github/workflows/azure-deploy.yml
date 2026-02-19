@@ -49,11 +49,6 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Stop App Service before deploy
-      run: |
-        az webapp stop --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
-        sleep 15
-
     - name: Deploy to Azure App Service
       run: |
         az webapp deploy \
@@ -61,9 +56,6 @@ jobs:
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
           --src-path ./app.zip \
           --type zip \
+          --restart true \
           --async false
-
-    - name: Start App Service after deploy
-      if: always()
-      run: az webapp start --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
 
