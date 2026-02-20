@@ -46,7 +46,7 @@ jobs:
       run: dotnet build PoRedoImage.slnx --configuration Release --no-restore
 
     - name: Unit Tests
-      run: dotnet test tests/PoImageGc.Tests.Unit/PoImageGc.Tests.Unit.csproj --configuration Release --no-build --logger "github-actions;summary.includePassedTests=true"
+      run: dotnet test tests/PoImageGc.Tests.Unit/PoImageGc.Tests.Unit.csproj --configuration Release --no-build --verbosity normal
 
     - name: Publish
       run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
