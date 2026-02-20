@@ -422,3 +422,8 @@ AzuriteData/*
 *.potune-state.json
 screenshot-*.png
 .potune-state.json
+
+# Local publish test outputs
+publish-test/
+app-test.zip
+REDACTED/

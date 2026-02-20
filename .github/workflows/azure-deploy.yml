@@ -16,7 +16,7 @@ env:
   DOTNET_VERSION: '10.0.x'
 
 jobs:
-  build-and-deploy:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
     permissions:
@@ -39,8 +39,17 @@ jobs:
         key: nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
         restore-keys: nuget-
 
+    - name: Restore
+      run: dotnet restore PoRedoImage.slnx
+
+    - name: Build
+      run: dotnet build PoRedoImage.slnx --configuration Release --no-restore
+
+    - name: Unit Tests
+      run: dotnet test tests/PoImageGc.Tests.Unit/PoImageGc.Tests.Unit.csproj --configuration Release --no-build --logger "github-actions;summary.includePassedTests=true"
+
     - name: Publish
-      run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --output ./publish
+      run: dotnet publish src/PoImageGc.Web/PoImageGc.Web.csproj --configuration Release --no-build --output ./publish
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2
@@ -59,3 +68,14 @@ jobs:
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
           --src-path ./app.zip \
           --type zip
+
+    - name: Smoke Test – /health
+      run: |
+        echo "Waiting 30s for app to warm up..."
+        sleep 30
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/health)
+        echo "Health endpoint returned HTTP $STATUS"
+        if [ "$STATUS" != "200" ]; then
+          echo "::error::Health check failed with status $STATUS"
+          exit 1
+        fi
