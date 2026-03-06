@@ -69,10 +69,24 @@ jobs:
           --src-path ./app.zip \
           --type zip
 
+    - name: Set startup command
+      run: |
+        az webapp config set \
+          --name ${{ env.AZURE_APP_NAME }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --startup-file "dotnet /home/site/wwwroot/PoRedoImage.Web.dll"
+
     - name: Smoke Test – /health
       run: |
-        echo "Waiting 30s for app to warm up..."
-        sleep 30
+        echo "Waiting for app to warm up (polling /health up to 120s)..."
+        for i in $(seq 1 12); do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/health)
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "503" ]; then
+            break
+          fi
+          echo "Attempt $i: got $STATUS, retrying in 10s..."
+          sleep 10
+        done
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/health)
         echo "Health endpoint returned HTTP $STATUS"
         if [ "$STATUS" != "200" ]; then
