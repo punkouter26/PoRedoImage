@@ -6,9 +6,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "kill-dotnet-and-build",
-            "program": "${workspaceFolder}/src/PoImageGc.Web/bin/Debug/net10.0/PoImageGc.Web.dll",
+            "program": "${workspaceFolder}/src/PoRedoImage.Web/bin/Debug/net10.0/PoRedoImage.Web.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/src/PoImageGc.Web",
+            "cwd": "${workspaceFolder}/src/PoRedoImage.Web",
             "stopAtEntry": false,
             "serverReadyAction": {
                 "action": "openExternally",
@@ -29,7 +29,7 @@
             "program": "dotnet",
             "args": [
                 "test",
-                "${workspaceFolder}/tests/PoImageGc.Tests.Unit/PoImageGc.Tests.Unit.csproj",
+                "${workspaceFolder}/tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj",
                 "--no-build"
             ],
             "cwd": "${workspaceFolder}",
@@ -43,7 +43,7 @@
             "program": "dotnet",
             "args": [
                 "test",
-                "${workspaceFolder}/tests/PoImageGc.Tests.Integration/PoImageGc.Tests.Integration.csproj",
+                "${workspaceFolder}/tests/PoRedoImage.Tests.Integration/PoRedoImage.Tests.Integration.csproj",
                 "--no-build"
             ],
             "cwd": "${workspaceFolder}",

@@ -1,4 +1,4 @@
-# PoImageGc - AI-Powered Image Analysis Platform
+# PoRedoImage - AI-Powered Image Analysis Platform
 
 An intelligent image analysis application leveraging Azure AI services to analyze images, generate enhanced descriptions, and create new images. Built with .NET 10 Unified Blazor Web App architecture and .NET Aspire for orchestration.
 
@@ -8,7 +8,7 @@ An intelligent image analysis application leveraging Azure AI services to analyz
 
 ## 🎯 Application Overview
 
-PoImageGc demonstrates the power of AI-driven image analysis and generation. Users can upload images to receive detailed AI-generated descriptions and see new images created based on those descriptions.
+PoRedoImage demonstrates the power of AI-driven image analysis and generation. Users can upload images to receive detailed AI-generated descriptions and see new images created based on those descriptions.
 
 ### Key Capabilities
 - 🔍 **Image Analysis**: Azure Computer Vision powered analysis
@@ -24,7 +24,7 @@ The application follows .NET 10 Unified Blazor Web App architecture with Vertica
 
 ```
 src/
-├── PoImageGc.Web/              # Main Blazor Web App (Server)
+├── PoRedoImage.Web/              # Main Blazor Web App (Server)
 │   ├── Components/             # Blazor components (SSR default)
 │   └── Features/               # Vertical slices
 │       └── ImageAnalysis/      # Image analysis feature
@@ -32,14 +32,14 @@ src/
 │           ├── OpenAIService.cs
 │           ├── MemeGeneratorService.cs
 │           └── ImageAnalysisEndpoints.cs  # Minimal APIs
-├── PoImageGc.Web.Client/       # Blazor WASM (Interactive)
-├── PoImageGc.AppHost/          # Aspire orchestration
-├── PoImageGc.ServiceDefaults/  # OpenTelemetry, health checks
-└── PoImageGc.Shared/           # DTOs and contracts
+├── PoRedoImage.Web.Client/       # Blazor WASM (Interactive)
+├── PoRedoImage.AppHost/          # Aspire orchestration
+├── PoRedoImage.ServiceDefaults/  # OpenTelemetry, health checks
+└── PoRedoImage.Shared/           # DTOs and contracts
 
 tests/
-├── PoImageGc.Tests.Unit/       # Unit tests
-└── PoImageGc.Tests.Integration/ # Integration tests
+├── PoRedoImage.Tests.Unit/       # Unit tests
+└── PoRedoImage.Tests.Integration/ # Integration tests
 ```
 
 ### Key Design Decisions
@@ -91,7 +91,7 @@ dotnet restore PoRedoImage.slnx
 
 #### 2. Configure Secrets
 
-Create or update `src/PoImageGc.Web/appsettings.Development.json`:
+Create or update `src/PoRedoImage.Web/appsettings.Development.json`:
 ```json
 {
   "AzureOpenAI": {
@@ -111,13 +111,13 @@ Create or update `src/PoImageGc.Web/appsettings.Development.json`:
 
 **Option A: Direct (Web only)**
 ```bash
-cd src/PoImageGc.Web
+cd src/PoRedoImage.Web
 dotnet run
 ```
 
 **Option B: With Aspire AppHost**
 ```bash
-cd src/PoImageGc.AppHost
+cd src/PoRedoImage.AppHost
 dotnet run
 ```
 
@@ -131,10 +131,10 @@ dotnet run
 dotnet test PoRedoImage.slnx
 
 # Unit tests only
-dotnet test tests/PoImageGc.Tests.Unit
+dotnet test tests/PoRedoImage.Tests.Unit
 
 # Integration tests only
-dotnet test tests/PoImageGc.Tests.Integration
+dotnet test tests/PoRedoImage.Tests.Integration
 
 # With coverage
 dotnet test PoRedoImage.slnx --collect:"XPlat Code Coverage"
@@ -158,13 +158,13 @@ dotnet test PoRedoImage.slnx --collect:"XPlat Code Coverage"
 
 | Project | Purpose |
 |---------|---------|
-| `PoImageGc.Web` | Main Blazor Web App, hosts API and UI |
-| `PoImageGc.Web.Client` | WASM client for interactive components |
-| `PoImageGc.AppHost` | Aspire orchestration host |
-| `PoImageGc.ServiceDefaults` | Shared Aspire config (OpenTelemetry, health) |
-| `PoImageGc.Shared` | DTOs shared between Web and Client |
-| `PoImageGc.Tests.Unit` | Unit tests with xUnit |
-| `PoImageGc.Tests.Integration` | Integration tests with WebApplicationFactory |
+| `PoRedoImage.Web` | Main Blazor Web App, hosts API and UI |
+| `PoRedoImage.Web.Client` | WASM client for interactive components |
+| `PoRedoImage.AppHost` | Aspire orchestration host |
+| `PoRedoImage.ServiceDefaults` | Shared Aspire config (OpenTelemetry, health) |
+| `PoRedoImage.Shared` | DTOs shared between Web and Client |
+| `PoRedoImage.Tests.Unit` | Unit tests with xUnit |
+| `PoRedoImage.Tests.Integration` | Integration tests with WebApplicationFactory |
 
 ## 🔧 Configuration
 

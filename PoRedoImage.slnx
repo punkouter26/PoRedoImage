@@ -1,9 +1,9 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/PoImageGc.Web/PoImageGc.Web.csproj" />
+    <Project Path="src/PoRedoImage.Web/PoRedoImage.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/PoImageGc.Tests.Integration/PoImageGc.Tests.Integration.csproj" />
-    <Project Path="tests/PoImageGc.Tests.Unit/PoImageGc.Tests.Unit.csproj" />
+    <Project Path="tests/PoRedoImage.Tests.Integration/PoRedoImage.Tests.Integration.csproj" />
+    <Project Path="tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj" />
   </Folder>
 </Solution>

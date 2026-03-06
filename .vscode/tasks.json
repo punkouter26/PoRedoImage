@@ -50,7 +50,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/src/PoImageGc.Web"
+                "${workspaceFolder}/src/PoRedoImage.Web"
             ],
             "problemMatcher": "$msCompile",
             "isBackground": true
@@ -153,7 +153,7 @@
                 "test"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/tests/PoImageGc.Tests.E2E"
+                "cwd": "${workspaceFolder}/tests/PoRedoImage.Tests.E2E"
             },
             "group": "test",
             "problemMatcher": []
