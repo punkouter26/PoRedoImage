@@ -73,13 +73,17 @@ public class MemeGeneratorService : IMemeGeneratorService
         float maxFontSize = imageHeight / 8f;
         float minFontSize = Math.Max(12f, imageHeight / 40f);
 
-        // Prefer Impact (classic meme font); fall back to first available system font
-        if (!SystemFonts.TryGet("Impact", out var fontFamily))
+        // Prefer Impact (classic meme font); then common Linux/macOS fonts; then first usable system font
+        if (!SystemFonts.TryGet("Impact", out var fontFamily) &&
+            !SystemFonts.TryGet("Liberation Sans", out fontFamily) &&
+            !SystemFonts.TryGet("DejaVu Sans", out fontFamily) &&
+            !SystemFonts.TryGet("Arial", out fontFamily) &&
+            !SystemFonts.TryGet("Helvetica", out fontFamily))
         {
-            var families = SystemFonts.Families.ToList();
-            if (families.Count == 0)
-                throw new InvalidOperationException("No system fonts are available");
-            fontFamily = families[0];
+            fontFamily = SystemFonts.Families
+                .FirstOrDefault(IsFontUsable);
+            if (fontFamily == default)
+                throw new InvalidOperationException("No usable system fonts are available");
         }
 
         // Scale font down until the text fits within the image width
@@ -117,5 +121,20 @@ public class MemeGeneratorService : IMemeGeneratorService
         var fillBrush = Brushes.Solid(Color.White);
 
         ctx.DrawText(new DrawingOptions(), textOptions, text, fillBrush, outlinePen);
+    }
+
+    // Returns true only if the font family can be loaded and measured (skips SVG/bitmap fonts missing 'loca')
+    private static bool IsFontUsable(FontFamily family)
+    {
+        try
+        {
+            var probe = family.CreateFont(12f);
+            TextMeasurer.MeasureBounds("A", new TextOptions(probe));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

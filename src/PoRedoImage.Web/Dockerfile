@@ -22,6 +22,9 @@ RUN dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj -c Release --no-re
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
 WORKDIR /app
 
+# Install fonts required by MemeGeneratorService (SixLabors.Fonts needs TrueType fonts on Linux)
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-liberation && rm -rf /var/lib/apt/lists/*
+
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 
