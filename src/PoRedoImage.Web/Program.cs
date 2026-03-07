@@ -9,6 +9,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using PoRedoImage.Web.Components;
+using PoRedoImage.Web.Features.Auth;
+using PoRedoImage.Web.Features.BulkGenerate;
 using PoRedoImage.Web.Features.Diagnostics;
 using PoRedoImage.Web.Features.ImageAnalysis;
 using PoRedoImage.Web.Models;
@@ -108,7 +110,9 @@ builder.Services.AddHttpClient();
 // Named checks verify connectivity to Computer Vision and OpenAI endpoints
 builder.Services.AddHealthChecks()
     .AddCheck<ComputerVisionHealthCheck>("computer-vision", tags: ["ready"])
-    .AddCheck<OpenAIHealthCheck>("openai", tags: ["ready"]);
+    .AddCheck<OpenAIHealthCheck>("openai", tags: ["ready"])
+    .AddCheck<BulkPromptStorageHealthCheck>("table-storage", tags: ["ready"])
+    .AddCheck<Imagen3HealthCheck>("imagen3", tags: ["ready"]);
 
 // ─── HTTP client ────────────────────────────────────────────────────
 builder.Services.AddScoped(sp =>
@@ -120,11 +124,21 @@ builder.Services.AddScoped(sp =>
 });
 
 // ─── Feature services (Vertical Slice Architecture) ─────────────────
-builder.Services.AddScoped<IComputerVisionService, ComputerVisionService>();
-builder.Services.AddScoped<IOpenAIService, OpenAIService>();
+builder.Services.AddSingleton<IComputerVisionService, ComputerVisionService>();
+builder.Services.AddSingleton<IOpenAIService, OpenAIService>();
 
 // MemeGeneratorService — cross-platform via SixLabors.ImageSharp (no longer Windows-only)
 builder.Services.AddScoped<IMemeGeneratorService, MemeGeneratorService>();
+builder.Services.AddScoped<IBulkPromptStorageService, BulkPromptStorageService>();
+
+// Singleton: PredictionServiceClient owns a gRPC channel that should be reused across requests
+builder.Services.AddSingleton<IImagen3Service, Imagen3Service>();
+
+// Scoped: persists the active uploaded image across feature pages for first the lifetime of the circuit
+builder.Services.AddScoped<PoRedoImage.Web.Features.ImageSession.ImageSessionService>();
+
+// ─── Authentication & Authorization ─────────────────────────────────
+builder.Services.AddPoRedoImageAuth(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -158,6 +172,8 @@ app.UseSerilogRequestLogging(opts =>
 });
 
 app.UseAntiforgery();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // OpenAPI + Scalar API documentation
 app.MapOpenApi();
@@ -186,8 +202,10 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false });
 
 // Minimal API endpoints (Vertical Slice)
+app.MapAuthEndpoints();
 app.MapImageAnalysisEndpoints();
 app.MapDiagnosticsEndpoints();
+app.MapBulkGenerateEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

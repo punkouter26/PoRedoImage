@@ -1,0 +1,45 @@
+flowchart TD
+    subgraph Client["Client Browser"]
+        WebApp["Blazor Web App (SSR/WASM)"]
+    end
+
+    subgraph Azure["Azure Cloud (PoRedoImage/PoShared)"]
+        subgraph Compute["App Service Plan (PoShared)"]
+            Service["poredoimage-web (App Service)"]
+        end
+
+        subgraph Storage["Data Tier (PoRedoImage)"]
+            TableStorage[("Azure Table Storage")]
+        end
+
+        subgraph AI["AI Services (PoShared)"]
+            OpenAI["Azure OpenAI (GPT-4/DALL-E)"]
+            Vision["Azure Computer Vision"]
+        end
+
+        subgraph Security["Security & Ops (PoShared)"]
+            KeyVault["Azure Key Vault"]
+            AppInsights["Application Insights"]
+        end
+    end
+
+    WebApp -- "HTTPS (Port 5001)" --> Service
+    Service -- "Managed Identity" --> TableStorage
+    Service -- "Managed Identity" --> KeyVault
+    Service -- "API Key/Managed Identity" --> OpenAI
+    Service -- "API Key/Managed Identity" --> Vision
+    Service -- "Telemetry" --> AppInsights
+
+    style Client fill:#333,stroke:#fff,color:#fff
+    style Azure fill:#111,stroke:#fff,color:#fff
+    style Compute fill:#222,stroke:#fff,color:#fff
+    style Storage fill:#222,stroke:#fff,color:#fff
+    style AI fill:#222,stroke:#fff,color:#fff
+    style Security fill:#222,stroke:#fff,color:#fff
+    style Service fill:#005a9e,stroke:#fff,color:#fff
+    style TableStorage fill:#f2c811,stroke:#000,color:#000
+    style KeyVault fill:#0078d4,stroke:#fff,color:#fff
+    style OpenAI fill:#10a37f,stroke:#fff,color:#fff
+    style Vision fill:#5c2d91,stroke:#fff,color:#fff
+    style AppInsights fill:#c00,stroke:#fff,color:#fff
+    style WebApp fill:#512bd4,stroke:#fff,color:#fff

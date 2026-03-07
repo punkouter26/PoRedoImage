@@ -1,0 +1,137 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@inject IWebHostEnvironment Env
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Sign in — PoRedoImage</PageTitle>
+
+<div class="login-page d-flex align-items-center justify-content-center" style="min-height:80vh">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor" stroke-width="1.5" class="mb-3 text-primary">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813
+                         a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12
+                         l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+            <h2 class="login-title">PoRedoImage</h2>
+            <p class="login-subtitle">Sign in to access your image variations and saved prompts</p>
+        </div>
+
+        @* Microsoft sign-in button — both environments *@
+        <a href="@($"/challenge-microsoft?returnUrl={Uri.EscapeDataString(_returnUrl)}")" class="btn-ms-signin w-100 mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 21 21" class="me-2">
+                <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+            </svg>
+            Sign in with Microsoft
+        </a>
+
+        @if (Env.IsDevelopment())
+        {
+            <div class="login-divider"><span>or</span></div>
+
+            <div class="dev-login-section">
+                <p class="dev-badge"><i class="bi bi-laptop me-1"></i>Dev Environment — Quick Login</p>
+                <form method="get" action="/dev-login">
+                    <input type="hidden" name="returnUrl" value="@_returnUrl" />
+                    <div class="mb-3">
+                        <input type="email" name="email" class="form-control form-control-sm"
+                               placeholder="dev@example.com" required autofocus
+                               value="dev@example.com" />
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary w-100 btn-sm">
+                        <i class="bi bi-person-check me-1"></i>Sign in as Developer
+                    </button>
+                </form>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .login-card {
+        background: var(--bs-body-bg, #161b22);
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 2rem 2.25rem;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 8px 32px rgba(0,0,0,.35);
+    }
+    .login-title { font-size: 1.4rem; font-weight: 700; margin: 0; }
+    .login-subtitle { font-size: .85rem; color: #8b949e; margin-top: .3rem; }
+
+    .btn-ms-signin {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        color: #1a1a1a;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: .6rem 1rem;
+        font-size: .95rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: background .15s, box-shadow .15s;
+    }
+    .btn-ms-signin:hover {
+        background: #f3f4f6;
+        box-shadow: 0 2px 8px rgba(0,0,0,.12);
+        color: #1a1a1a;
+    }
+
+    .login-divider {
+        display: flex; align-items: center; gap: .75rem;
+        color: #484f58; font-size: .8rem; margin: 1.25rem 0;
+    }
+    .login-divider::before, .login-divider::after {
+        content: ''; flex: 1; height: 1px; background: #30363d;
+    }
+
+    .dev-login-section { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; }
+    .dev-badge {
+        font-size: .75rem; color: #f0883e;
+        background: rgba(240,136,62,.1); border: 1px solid rgba(240,136,62,.25);
+        border-radius: 5px; padding: .25rem .6rem; margin-bottom: .75rem; display: inline-block;
+    }
+    .dev-login-section .form-control {
+        background: #161b22; border-color: #30363d; color: #e6edf3;
+    }
+    .dev-login-section .form-control:focus {
+        background: #161b22; color: #e6edf3;
+        border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,.15);
+    }
+</style>
+
+@code {
+    [SupplyParameterFromQuery(Name = "ReturnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private string _returnUrl = "/";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Redirect away if already authenticated
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            NavigationManager.NavigateTo(_returnUrl, forceLoad: true);
+            return;
+        }
+
+        // Sanitize ReturnUrl: only allow relative paths to prevent open-redirect
+        if (!string.IsNullOrWhiteSpace(ReturnUrl)
+            && Uri.IsWellFormedUriString(ReturnUrl, UriKind.Relative)
+            && !ReturnUrl.StartsWith("//"))
+        {
+            _returnUrl = ReturnUrl;
+        }
+    }
+}

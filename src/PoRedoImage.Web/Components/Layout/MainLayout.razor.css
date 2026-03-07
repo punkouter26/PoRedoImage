@@ -4,7 +4,7 @@
     top: 0;
     z-index: 100;
     background: linear-gradient(135deg, #052767 0%, #3a0647 100%);
-    box-shadow: 0 2px 12px rgba(5,39,103,0.3);
+    box-shadow: 0 2px 16px rgba(5,39,103,0.35);
 }
 
 .app-nav {
@@ -39,19 +39,27 @@
 }
 
 .app-nav__link {
-    color: rgba(255,255,255,0.75);
+    color: rgba(255,255,255,0.72);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     font-weight: 500;
     padding: 0.4rem 0.85rem;
     border-radius: 6px;
     transition: background 0.15s, color 0.15s;
+    border-bottom: 2px solid transparent;
+    letter-spacing: 0.01em;
 }
 
-.app-nav__link:hover,
-.app-nav__link.active {
-    background: rgba(255,255,255,0.15);
+.app-nav__link:hover {
+    background: rgba(255,255,255,0.12);
     color: #fff;
+}
+
+.app-nav__link.active {
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    font-weight: 600;
+    border-bottom-color: rgba(255,255,255,0.6);
 }
 
 .app-main {

@@ -1,0 +1,43 @@
+@inject IJSRuntime JSRuntime
+
+@if (_items.Count > 0)
+{
+    <div class="recents-bar">
+        <span class="recents-bar__label">
+            <i class="bi bi-clock-history me-1"></i><span class="d-none d-sm-inline">Recent</span>
+        </span>
+        <div class="recents-bar__scroll" role="list" aria-label="Recent images">
+            @foreach (var item in _items)
+            {
+                <button class="recents-thumb" @onclick="@(() => Select(item))" title="@item.FileName" role="listitem">
+                    <img src="@item.ThumbUrl" alt="@item.FileName" loading="lazy" />
+                </button>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<RecentItem> OnImageSelected { get; set; }
+
+    private List<RecentItem> _items = [];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var raw = await JSRuntime.InvokeAsync<RecentItem[]>("recentsManager.get");
+            if (raw is { Length: > 0 })
+            {
+                _items = raw.ToList();
+                StateHasChanged();
+            }
+        }
+        catch { /* JS unavailable or no recents */ }
+    }
+
+    private Task Select(RecentItem item) => OnImageSelected.InvokeAsync(item);
+
+    public sealed record RecentItem(string StoredUrl, string ThumbUrl, string? FileName, long SavedAt);
+}

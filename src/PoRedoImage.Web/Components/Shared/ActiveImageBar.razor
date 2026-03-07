@@ -1,0 +1,45 @@
+@implements IDisposable
+@inject ImageSessionService SessionService
+@inject NavigationManager NavigationManager
+
+@if (SessionService.HasImage)
+{
+    <div class="active-image-bar">
+        <div class="container-fluid active-image-bar__inner">
+            <div class="active-image-bar__thumb-wrap">
+                <img src="@SessionService.PreviewUrl" class="active-image-bar__thumb" alt="Active image" />
+            </div>
+            <span class="active-image-bar__label">
+                <i class="bi bi-images me-1 d-none d-sm-inline"></i>
+                <span class="active-image-bar__filename">@(SessionService.FileName ?? "Active Image")</span>
+            </span>
+            <div class="active-image-bar__actions">
+                <span class="active-image-bar__try d-none d-md-inline">Also try:</span>
+                @foreach (var (href, icon, label) in _features)
+                {
+                    if (!NavigationManager.Uri.Contains("/" + href, StringComparison.OrdinalIgnoreCase))
+                    {
+                        <a href="@href" class="active-image-bar__btn">
+                            <i class="bi @icon"></i><span class="ms-1 d-none d-sm-inline">@label</span>
+                        </a>
+                    }
+                }
+                <button class="active-image-bar__clear" @onclick="SessionService.Clear" title="Clear active image">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly (string href, string icon, string label)[] _features =
+    [
+        ("image-regeneration", "bi-palette2", "Regen"),
+        ("meme-generation",    "bi-emoji-laughing", "Meme"),
+        ("bulk-generate",      "bi-collection", "Bulk"),
+    ];
+
+    protected override void OnInitialized() => SessionService.OnChange += StateHasChanged;
+    public void Dispose()              => SessionService.OnChange -= StateHasChanged;
+}

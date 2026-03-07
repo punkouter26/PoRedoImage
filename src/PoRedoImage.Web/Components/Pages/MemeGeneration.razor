@@ -1,0 +1,225 @@
+@page "/meme-generation"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Forms
+@using PoRedoImage.Web.Models
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject ILogger<MemeGeneration> Logger
+@inject ImageSessionService SessionService
+
+<PageTitle>Meme Generation — PoRedoImage</PageTitle>
+
+<div class="container py-4">
+    <div class="feature-page-header mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <span class="feature-page-icon"><i class="bi bi-emoji-laughing"></i></span>
+            <div>
+                <h1 class="feature-page-title">Meme Generation</h1>
+                <p class="feature-page-desc">Upload a photo and AI will write a witty caption and overlay it on your image.</p>
+            </div>
+        </div>
+    </div>
+
+    @if (!isProcessing && !isComplete)
+    {
+        <div class="row justify-content-center">
+            <div class="col-lg-7 col-md-9">
+                <RecentImages OnImageSelected="HandleRecentImage" />
+                <ImageUploadPanel
+                    ShowDescriptionLength="false"
+                    ButtonLabel="Generate Meme"
+                    ButtonIcon="bi-emoji-laughing"
+                    DescriptionLength="350"
+                    ImagePreviewUrl="@imagePreviewUrl"
+                    ErrorMessage="@errorMessage"
+                    CanProcess="@canProcessImage"
+                    OnFileChange="LoadFile"
+                    OnProcessClicked="ProcessImage" />
+            </div>
+        </div>
+    }
+
+    @if (isProcessing)
+    {
+        <div class="row justify-content-center mt-4">
+            <div class="col-lg-7 col-md-9">
+                <ProcessingProgressBar Percentage="@progressPercentage" Message="@progressMessage" />
+            </div>
+        </div>
+    }
+
+    @if (isComplete)
+    {
+        <ResultsPanel
+            ImagePreviewUrl="@imagePreviewUrl"
+            AnalysisResult="@analysisResult"
+            SelectedMode="@ProcessingMode.MemeGeneration"
+            OnDownloadOriginal="DownloadOriginal"
+            OnDownloadMeme="DownloadMeme"
+            OnStartOver="StartOver" />
+    }
+
+    @if (!isProcessing && !isComplete && !string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="row justify-content-center mt-2">
+            <div class="col-lg-7 col-md-9">
+                <div class="alert alert-danger d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+                    <span>@errorMessage</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IBrowserFile? selectedFile;
+    private string? imagePreviewUrl;
+    private string? errorMessage;
+    private bool isProcessing;
+    private bool isComplete;
+    private bool canProcessImage => (selectedFile != null || imagePreviewUrl != null) && string.IsNullOrEmpty(errorMessage);
+    private int progressPercentage;
+    private string progressMessage = string.Empty;
+    private ImageAnalysisResult? analysisResult;
+
+    protected override void OnInitialized()
+    {
+        if (SessionService.HasImage)
+            imagePreviewUrl = SessionService.PreviewUrl;
+    }
+
+    private async Task LoadFile(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        errorMessage = null;
+        imagePreviewUrl = null;
+
+        var (result, error) = await ImageLoadHelper.LoadAsync(selectedFile);
+        if (error is not null) { errorMessage = error; selectedFile = null; return; }
+
+        imagePreviewUrl = result!.PreviewUrl;
+        SessionService.SetImage(result!.PreviewUrl, result.ContentType, selectedFile.Name, result.Bytes);
+        _ = JSRuntime.InvokeVoidAsync("recentsManager.save", result!.PreviewUrl, selectedFile.Name).AsTask();
+        StateHasChanged();
+        Logger.LogInformation("Image loaded: {Name}, {KB:F1} KB", selectedFile.Name, selectedFile.Size / 1024.0);
+    }
+
+    private void HandleRecentImage(RecentImages.RecentItem item)
+    {
+        selectedFile = null;
+        imagePreviewUrl = item.StoredUrl;
+        analysisResult = null;
+        isComplete = false;
+        errorMessage = null;
+        var ct = item.StoredUrl.Contains("image/png") ? "image/png" : "image/jpeg";
+        SessionService.SetImage(item.StoredUrl, ct, item.FileName);
+        StateHasChanged();
+    }
+
+    private async Task ProcessImage()
+    {
+        if (imagePreviewUrl == null) return;
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            progressPercentage = 10;
+            progressMessage = "Preparing image for analysis...";
+            StateHasChanged();
+
+            var base64Data = imagePreviewUrl;
+            var base64Index = imagePreviewUrl.IndexOf(";base64,", StringComparison.OrdinalIgnoreCase);
+            if (base64Index >= 0)
+                base64Data = imagePreviewUrl[(base64Index + 8)..];
+
+            var request = new ImageAnalysisRequest
+            {
+                ImageData = base64Data,
+                ContentType = selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                FileName = selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
+                DescriptionLength = 350,
+                Mode = ProcessingMode.MemeGeneration
+            };
+
+            progressPercentage = 30;
+            progressMessage = "Analyzing image with Azure Computer Vision...";
+            StateHasChanged();
+
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+                var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, cts.Token);
+
+                if (!httpResponse.IsSuccessStatusCode)
+                {
+                    var problem = await httpResponse.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+                    errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
+                }
+                else
+                {
+                    analysisResult = await httpResponse.Content.ReadFromJsonAsync<ImageAnalysisResult>();
+
+                    if (analysisResult == null)
+                        throw new InvalidOperationException("No response received from API.");
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                Logger.LogError(ex, "Request timed out after 3 minutes");
+                errorMessage = "Meme generation timed out. Please try again with a different image.";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error calling API");
+                errorMessage = $"Error generating meme: {ex.Message}";
+            }
+            finally
+            {
+                progressPercentage = 100;
+                progressMessage = string.IsNullOrEmpty(errorMessage) ? "Meme generated!" : "Generation failed.";
+                isProcessing = false;
+                isComplete = string.IsNullOrEmpty(errorMessage);
+                try { StateHasChanged(); } catch (ObjectDisposedException) { }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error generating meme: {ex.Message}";
+            isProcessing = false;
+            Logger.LogError(ex, "Error generating meme");
+        }
+    }
+
+    private async Task DownloadOriginal()
+    {
+        if (imagePreviewUrl == null) return;
+        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", imagePreviewUrl, selectedFile?.Name ?? "original.jpg");
+        if (!ok) errorMessage = "There was a problem downloading the image.";
+        else Logger.LogInformation("Original image download initiated");
+    }
+
+    private async Task DownloadMeme()
+    {
+        if (analysisResult?.MemeImageData == null) return;
+        var url = $"data:image/png;base64,{analysisResult.MemeImageData}";
+        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", url, "meme-" + (selectedFile?.Name ?? "image.png"));
+        if (!ok) errorMessage = "There was a problem downloading the meme image.";
+        else Logger.LogInformation("Meme image download initiated");
+    }
+
+    private void StartOver()
+    {
+        selectedFile = null;
+        // Keep imagePreviewUrl from session so user can quickly re-generate a meme
+        errorMessage = null;
+        isProcessing = false;
+        isComplete = false;
+        progressPercentage = 0;
+        progressMessage = string.Empty;
+        analysisResult = null;
+        Logger.LogInformation("Meme Generation reset");
+    }
+}

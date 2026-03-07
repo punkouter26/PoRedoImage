@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PoRedoImage.Web.Models;
+using System.ClientModel;
 
 namespace PoRedoImage.Web.Features.ImageAnalysis;
 
@@ -106,7 +107,6 @@ public static class ImageAnalysisEndpoints
                 result.RegeneratedImageData = Convert.ToBase64String(generatedImage);
                 result.RegeneratedImageContentType = contentType;
                 result.Metrics.ImageRegenerationTimeMs = regenTime;
-                result.Metrics.RegenerationTokensUsed = 0; // DALL-E 3 does not report token usage
             }
 
             logger.LogInformation("Image analysis completed. Total time: {TotalTime}ms", result.Metrics.TotalProcessingTimeMs);
@@ -120,6 +120,14 @@ public static class ImageAnalysisEndpoints
                 detail: "Invalid base64 image data",
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid Input");
+        }
+        catch (ClientResultException ex) when (ex.Message.Contains("content_policy_violation"))
+        {
+            logger.LogWarning(ex, "Image generation blocked by content policy");
+            return Results.Problem(
+                detail: "The image was blocked by content safety filters. Please try a different image.",
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                title: "Content Policy Violation");
         }
         catch (Exception ex)
         {

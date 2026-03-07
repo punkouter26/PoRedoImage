@@ -1,0 +1,41 @@
+@namespace PoRedoImage.Web.Components.Pages
+@using PoRedoImage.Web.Models
+
+@if (IsVisible && Result is not null)
+{
+    <div class="bulk-modal-backdrop" @onclick="() => OnClose.InvokeAsync()">
+        <div class="bulk-modal-panel" @onclick:stopPropagation>
+            <div class="bulk-modal-header">
+                <span class="bulk-modal-num">Variation #@(Result.Index + 1)</span>
+                <button class="bulk-modal-close" @onclick="() => OnClose.InvokeAsync()" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="bulk-modal-img-wrap">
+                <img src="@Result.ImageUrl" alt="Variation @(Result.Index + 1)" />
+            </div>
+            <div class="bulk-modal-footer">
+                <p class="bulk-modal-prompt">@Result.Prompt</p>
+                <div class="bulk-modal-actions">
+                    <button class="btn-heart-modal @(IsFavorite ? "btn-heart-modal--active" : "")"
+                            @onclick="() => OnToggleFavorite.InvokeAsync(Result.Index)">
+                        <i class="bi @(IsFavorite ? "bi-heart-fill" : "bi-heart")"></i>
+                        <span class="ms-1">@(IsFavorite ? "Saved" : "Save")</span>
+                    </button>
+                    <button class="btn-dl-modal" @onclick="() => OnDownload.InvokeAsync(Result.Index)">
+                        <i class="bi bi-download me-1"></i>Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public BulkGenerateImageResult? Result { get; set; }
+    [Parameter] public bool IsFavorite { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<int> OnToggleFavorite { get; set; }
+    [Parameter] public EventCallback<int> OnDownload { get; set; }
+}

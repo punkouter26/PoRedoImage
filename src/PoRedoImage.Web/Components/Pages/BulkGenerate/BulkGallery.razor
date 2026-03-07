@@ -1,0 +1,110 @@
+@namespace PoRedoImage.Web.Components.Pages
+@using PoRedoImage.Web.Models
+
+<div>
+    @if (Results.Count > 0)
+    {
+        <div class="mb-3">
+            <div class="bulk-progress-header">
+                <span>Generated @CompletedCount of @Results.Count images</span>
+                <span>@(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)%</span>
+            </div>
+            <div class="bulk-progress-bar">
+                <div class="bulk-progress-bar__fill"
+                     style="width: @(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)%">
+                </div>
+            </div>
+        </div>
+
+        <div class="bulk-gallery">
+            @foreach (var result in Results)
+            {
+                <div class="bulk-slot bulk-slot--@result.Status.ToString().ToLower()">
+                    <div class="bulk-slot__header">
+                        <span class="bulk-slot__num">#@(result.Index + 1)</span>
+                        @switch (result.Status)
+                        {
+                            case BulkGenerateStatus.Pending:
+                                <span class="text-muted" style="font-size:0.72rem">Queued</span>
+                                break;
+                            case BulkGenerateStatus.Processing:
+                                <span class="text-info">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    Processing…
+                                </span>
+                                break;
+                            case BulkGenerateStatus.Complete:
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Done</span>
+                                break;
+                            case BulkGenerateStatus.Failed:
+                                <span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>Failed</span>
+                                break;
+                        }
+                    </div>
+
+                    <div class="bulk-slot__img-area bulk-slot__img-area--@result.Status.ToString().ToLower()">
+                        @switch (result.Status)
+                        {
+                            case BulkGenerateStatus.Pending:
+                                <div class="bulk-slot__shimmer shimmer-anim"></div>
+                                break;
+                            case BulkGenerateStatus.Processing:
+                                <div class="bulk-slot__img-area--processing">
+                                    <div class="bulk-slot__spinner"></div>
+                                    <span>Generating…</span>
+                                </div>
+                                break;
+                            case BulkGenerateStatus.Complete when result.ImageUrl is not null:
+                                <img src="@result.ImageUrl" alt="Generated variation @(result.Index + 1)" loading="lazy"
+                                     class="bulk-slot__img-clickable"
+                                     @onclick="@(() => _modalResult = result)" />
+                                break;
+                            case BulkGenerateStatus.Failed:
+                                <div class="bulk-slot__img-area--failed">
+                                    <i class="bi bi-exclamation-triangle fs-4"></i>
+                                    <span>@(result.ErrorMessage ?? "Generation failed")</span>
+                                </div>
+                                break;
+                        }
+                    </div>
+
+                    <div class="bulk-slot__footer">
+                        <span class="bulk-slot__prompt-preview" title="@result.Prompt">@result.Prompt</span>
+                        @if (result.Status == BulkGenerateStatus.Complete && result.ImageUrl is not null)
+                        {
+                            <div class="bulk-slot__actions">
+                                <button class="btn-heart-slot @(Favorites.Contains(result.Index) ? "btn-heart-slot--active" : "")"
+                                        @onclick="@(() => OnToggleFavorite.InvokeAsync(result.Index))"
+                                        title="@(Favorites.Contains(result.Index) ? "Remove" : "Save to favorites")">
+                                    <i class="bi @(Favorites.Contains(result.Index) ? "bi-heart-fill" : "bi-heart")"></i>
+                                </button>
+                                <button class="btn-dl-slot"
+                                        @onclick="@(() => OnDownloadImage.InvokeAsync(result.Index))">
+                                    <i class="bi bi-download me-1"></i>Save
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <BulkImageModal
+        IsVisible="_modalResult is not null"
+        Result="_modalResult"
+        IsFavorite="@(_modalResult is not null && Favorites.Contains(_modalResult.Index))"
+        OnClose="@(() => _modalResult = null)"
+        OnToggleFavorite="@(idx => OnToggleFavorite.InvokeAsync(idx))"
+        OnDownload="@(async idx => { await OnDownloadImage.InvokeAsync(idx); _modalResult = null; })" />
+</div>
+
+@code {
+    [Parameter] public List<BulkGenerateImageResult> Results { get; set; } = [];
+    [Parameter] public int CompletedCount { get; set; }
+    [Parameter] public HashSet<int> Favorites { get; set; } = [];
+    [Parameter] public EventCallback<int> OnDownloadImage { get; set; }
+    [Parameter] public EventCallback<int> OnToggleFavorite { get; set; }
+
+    private BulkGenerateImageResult? _modalResult;
+}

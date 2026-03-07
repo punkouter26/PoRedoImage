@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant U as User
+    participant B as Blazor Web App
+    participant A as Auth Service
+    participant P as Processing Service (GPT-4/DALL-E)
+    participant S as Table Storage
+
+    U->>B: Access /bulk-generate
+    alt Not Authenticated
+        B->>A: Redirect to /dev-login or OpenID
+        A->>U: Login Prompt
+        U->>A: Provide Credentials
+        A->>B: Authenticated Session
+    end
+
+    U->>B: Trigger Bulk Generation
+    B->>S: Store Request Status (Pending)
+    loop For each image
+        B->>P: Analyze/Generate Image
+        P-->>B: Processing Result
+        B->>S: Update Record (Complete/Failed)
+    end
+    B-->>U: Display Results

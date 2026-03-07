@@ -216,3 +216,97 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
         return mock.Object;
     }
 }
+
+// ─── Service-failure tests ───────────────────────────────────────────────────
+
+/// <summary>
+/// Tests that verify the endpoint returns 500 when an upstream service throws,
+/// not leaking raw stack traces through the API boundary.
+/// </summary>
+public class ImageAnalysisEndpointFailureTests : IClassFixture<ThrowingComputerVisionWebApplicationFactory>
+{
+    private readonly HttpClient _client;
+
+    public ImageAnalysisEndpointFailureTests(ThrowingComputerVisionWebApplicationFactory factory)
+    {
+        _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task AnalyzeImage_WhenComputerVisionThrows_Returns500()
+    {
+        var validBase64 = Convert.ToBase64String(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 });
+        var request = new ImageAnalysisRequest
+        {
+            ImageData = validBase64,
+            ContentType = "image/png",
+            Mode = ProcessingMode.ImageRegeneration,
+            DescriptionLength = 200
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AnalyzeImage_WhenComputerVisionThrows_ReturnsJsonProblemDetails()
+    {
+        var validBase64 = Convert.ToBase64String(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00 });
+        var request = new ImageAnalysisRequest
+        {
+            ImageData = validBase64,
+            ContentType = "image/jpeg",
+            Mode = ProcessingMode.MemeGeneration
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var content = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        // Should be ProblemDetails JSON, not a raw HTML error page
+        using var doc = JsonDocument.Parse(content);
+        Assert.True(doc.RootElement.TryGetProperty("title", out var title));
+        Assert.Equal("Processing Error", title.GetString());
+    }
+}
+
+/// <summary>
+/// WebApplicationFactory where IComputerVisionService always throws HttpRequestException.
+/// Used to verify the endpoint handles upstream failures gracefully (500, not crash).
+/// </summary>
+public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory<Program>
+{
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.UseEnvironment("Development");
+
+        builder.ConfigureHostConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AZURE_KEY_VAULT_ENDPOINT"] = "",
+                ["ComputerVision:Endpoint"] = "https://test.cognitiveservices.azure.com/",
+                ["ComputerVision:ApiKey"] = "test-key",
+                ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",
+                ["OpenAI:Key"] = "test-key",
+                ["ApplicationInsights:ConnectionString"] = ""
+            });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            // Replace ComputerVision with a mock that always simulates a network failure
+            var descriptors = services.Where(d => d.ServiceType == typeof(IComputerVisionService)).ToList();
+            foreach (var d in descriptors) services.Remove(d);
+
+            var throwingMock = new Mock<IComputerVisionService>();
+            throwingMock
+                .Setup(s => s.AnalyzeImageAsync(It.IsAny<byte[]>()))
+                .ThrowsAsync(new HttpRequestException("Simulated Azure CV outage"));
+
+            services.AddSingleton(_ => throwingMock.Object);
+        });
+
+        return base.CreateHost(builder);
+    }
+}

@@ -32,6 +32,8 @@ public static partial class DiagnosticsEndpoints
             ["Configuration"] = new Dictionary<string, string?>
             {
                 ["AZURE_KEY_VAULT_ENDPOINT"] = MaskValue(configuration["AZURE_KEY_VAULT_ENDPOINT"]),
+                ["AzureAd:TenantId"] = configuration["AzureAd:TenantId"],
+                ["AzureAd:ClientId"] = MaskValue(configuration["AzureAd:ClientId"]),
                 ["ComputerVision:Endpoint"] = MaskValue(configuration["ComputerVision:Endpoint"]),
                 ["ComputerVision:ApiKey"] = MaskValue(configuration["ComputerVision:ApiKey"]),
                 ["ComputerVision:MinTagConfidence"] = configuration["ComputerVision:MinTagConfidence"],

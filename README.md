@@ -1,77 +1,220 @@
-# PoRedoImage - AI-Powered Image Analysis Platform
+# PoRedoImage - AI-Powered Image Studio
 
-An intelligent image analysis application leveraging Azure AI services to analyze images, generate enhanced descriptions, and create new images. Built with .NET 10 Unified Blazor Web App architecture and .NET Aspire for orchestration.
+A Blazor Web App that uses Azure AI to analyze, describe, and artistically transform your photos. Built on .NET 10 with Vertical Slice Architecture.
 
-## 🌐 Live Application
+## 🗂️ Architecture
 
-**Production URL**: TBD after deployment
+```mermaid
+flowchart TD
+    subgraph Client["Client Browser"]
+        WebApp["Blazor Web App (SSR+Interactive)"]
+    end
 
-## 🎯 Application Overview
+    subgraph Azure["Azure Cloud"]
+        Service["poredoimage-web (App Service)"]
+        TableStorage[("Azure Table Storage")]
+        OpenAI["Azure OpenAI (GPT-4o / DALL-E 3)"]
+        Vision["Azure Computer Vision"]
+        Imagen3["Google Imagen 3"]
+    end
 
-PoRedoImage demonstrates the power of AI-driven image analysis and generation. Users can upload images to receive detailed AI-generated descriptions and see new images created based on those descriptions.
+    WebApp -- "HTTPS" --> Service
+    Service -- "Managed Identity" --> TableStorage
+    Service -- "API Key / Managed Identity" --> OpenAI
+    Service -- "API Key / Managed Identity" --> Vision
+    Service -- "API Key" --> Imagen3
 
-### Key Capabilities
-- 🔍 **Image Analysis**: Azure Computer Vision powered analysis
-- 📝 **Enhanced Descriptions**: Azure OpenAI GPT-4 generated descriptions  
-- 🎨 **Image Regeneration**: DALL-E powered image creation
-- 🃏 **Meme Generation**: AI-generated captions with image overlay
-- 📊 **Performance Metrics**: Real-time processing time tracking
-- 🏥 **Health Monitoring**: Aspire health endpoints with OpenTelemetry
+    style Client fill:#333,stroke:#fff,color:#fff
+    style Azure fill:#111,stroke:#fff,color:#fff
+    style Service fill:#005a9e,stroke:#fff,color:#fff
+    style WebApp fill:#512bd4,stroke:#fff,color:#fff
+```
 
-## 🏗️ Architecture
+Detailed views: [Architecture](docs/Architecture.mmd) | [System Flow](docs/SystemFlow.mmd) | [Data Model](docs/DataModel.mmd)
 
-The application follows .NET 10 Unified Blazor Web App architecture with Vertical Slice organization:
+## 📄 Documentation
+
+- [Product Specification](docs/ProductSpec.md)
+- [DevOps Guide](docs/DevOps.md)
+
+## 🎯 Key Features
+
+| Feature | Description |
+|---------|-------------|
+| Image Regeneration | Computer Vision + GPT-4o + DALL-E 3 |
+| Meme Generation | Auto-caption with witty text overlay |
+| Bulk Generate | 10 art-style variations via Google Imagen 3 |
+| Auth | Dev: `/dev-login`; Prod: Microsoft Entra ID OIDC |
+| Diagnostics | `/diag` page with masked config values |
+
+## 🛠️ Tech Stack
+
+- **Framework**: .NET 10 Blazor Web App (Interactive Server)
+- **Infrastructure**: Azure Bicep + Managed Identity
+- **Observability**: Serilog + OpenTelemetry → Application Insights
+- **Testing**: xUnit (Unit + Integration) + Playwright (E2E)
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- .NET 10.0 SDK
+- Azure subscription with Computer Vision and OpenAI resources
+- VS Code with C# Dev Kit
+
+### 1. Clone and Restore
+
+```bash
+git clone https://github.com/punkouter26/PoRedoImage.git
+cd PoRedoImage
+dotnet restore PoRedoImage.slnx
+```
+
+### 2. Configure Secrets (local dev)
+
+Use `dotnet user-secrets` or `appsettings.Development.json`:
+
+```json
+{
+  "ComputerVision": {
+    "Endpoint": "https://your-resource.cognitiveservices.azure.com/",
+    "ApiKey": "your-key"
+  },
+  "OpenAI": {
+    "Endpoint": "https://your-resource.openai.azure.com/",
+    "Key": "your-key",
+    "ChatCompletionsDeployment": "gpt-4o",
+    "ImageGenerationDeployment": "dall-e-3"
+  },
+  "Google": {
+    "ApiKey": "your-gemini-key"
+  },
+  "Storage": {
+    "ConnectionString": "DefaultEndpointsProtocol=https;..."
+  }
+}
+```
+
+### 3. Run
+
+```bash
+dotnet run --project src/PoRedoImage.Web
+# → http://localhost:5000  https://localhost:5001
+```
+
+### 4. Running Tests
+
+```bash
+# Unit + Integration
+dotnet test PoRedoImage.slnx
+
+# E2E (requires running app on :5000)
+cd tests/PoRedoImage.Tests.E2E && npx playwright test
+```
+
+## 📡 API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Full health check (JSON) |
+| GET | `/alive` | Liveness probe |
+| GET | `/api/diag` | Masked config diagnostics |
+| POST | `/api/images/analyze` | Analyze + process image |
+| GET | `/api/bulk-generate/prompts` | Load saved art prompts |
+| POST | `/api/bulk-generate/prompts` | Save art prompts |
+| GET | `/scalar/v1` | Interactive API docs |
+
+## 📁 Project Structure
 
 ```
 src/
-├── PoRedoImage.Web/              # Main Blazor Web App (Server)
-│   ├── Components/             # Blazor components (SSR default)
-│   └── Features/               # Vertical slices
-│       └── ImageAnalysis/      # Image analysis feature
-│           ├── ComputerVisionService.cs
-│           ├── OpenAIService.cs
-│           ├── MemeGeneratorService.cs
-│           └── ImageAnalysisEndpoints.cs  # Minimal APIs
-├── PoRedoImage.Web.Client/       # Blazor WASM (Interactive)
-├── PoRedoImage.AppHost/          # Aspire orchestration
-├── PoRedoImage.ServiceDefaults/  # OpenTelemetry, health checks
-└── PoRedoImage.Shared/           # DTOs and contracts
-
+  PoRedoImage.Web/
+    Features/
+      Auth/           # OIDC + dev login
+      BulkGenerate/   # Imagen 3 bulk generation, prompt storage
+      Diagnostics/    # /diag endpoint, Key Vault mapping, middleware
+      ImageAnalysis/  # Computer Vision, OpenAI, Meme Generator
+      ImageSession/   # Per-circuit image state service
+    Components/       # Blazor pages + shared components
+    Models/           # DTOs
 tests/
-├── PoRedoImage.Tests.Unit/       # Unit tests
-└── PoRedoImage.Tests.Integration/ # Integration tests
+  PoRedoImage.Tests.Unit/        # xUnit, pure logic
+  PoRedoImage.Tests.Integration/ # xUnit, WebApplicationFactory
+  PoRedoImage.Tests.E2E/         # Playwright TypeScript
+infra/
+  main.bicep          # Azure App Service + Storage provisioning
 ```
 
-### Key Design Decisions
-- **Unified Blazor**: Single project for both server-rendered and WASM components
-- **InteractiveAuto**: SSR by default, interactive components where needed
-- **Vertical Slice**: Feature-based organization, not layer-based
-- **Minimal APIs**: No controllers, endpoints defined with `MapGroup`
-- **Aspire**: Service orchestration, OpenTelemetry, health checks
+## 🔧 Configuration Reference
+
+All secrets load from Azure Key Vault in Production (via `AZURE_KEY_VAULT_ENDPOINT` env var).
+Locally, use `dotnet user-secrets` or `appsettings.Development.json`.
+
+Key Vault secret names use the `PoRedoImage-` prefix (see `KeyVaultSecretNameMapping.cs`).
+
+## 📙 Dev Guidelines
+
+See [.github/copilot-instructions.md](.github/copilot-instructions.md) for conventions:
+
+- **Vertical Slice Architecture** — feature files live in `Features/{Name}/`
+- **Minimal APIs** — no MVC controllers; use `MapGroup`
+- **Central Package Management** — all versions in `Directory.Packages.props`
+- **TreatWarningsAsErrors** — enforced in `Directory.Build.props`
+
+## �️ Architecture Overview
+
+The application follows a modern cloud-native architecture, utilizing Microsoft Azure for compute, storage, and AI processing.
+
+```mermaid
+flowchart TD
+    subgraph Client["Client Browser"]
+        WebApp["Blazor Web App (SSR/WASM)"]
+    end
+
+    subgraph Azure["Azure Cloud"]
+        Service["poredoimage-web (App Service)"]
+        TableStorage[("Azure Table Storage")]
+        OpenAI["Azure OpenAI (GPT-4/DALL-E)"]
+        Vision["Azure Computer Vision"]
+    end
+
+    WebApp -- "HTTPS" --> Service
+    Service -- "Identity" --> TableStorage
+    Service -- "Identity" --> OpenAI
+    Service -- "Identity" --> Vision
+
+    style Client fill:#333,stroke:#fff,color:#fff
+    style Azure fill:#111,stroke:#fff,color:#fff
+    style Service fill:#005a9e,stroke:#fff,color:#fff
+    style WebApp fill:#512bd4,stroke:#fff,color:#fff
+```
+
+Detailed architectural views:
+- [System Architecture](docs/Architecture.mmd) | [Simple View](docs/Architecture_SIMPLE.mmd)
+- [System Flow & User Journey](docs/SystemFlow.mmd) | [Simple View](docs/SystemFlow_SIMPLE.mmd)
+- [Entity Data Model](docs/DataModel.mmd) | [Simple View](docs/DataModel_SIMPLE.mmd)
+
+## 📄 Documentation Index
+
+- [Product Specification (PRD & Metrics)](docs/ProductSpec.md)
+- [DevOps Guide (Deployment & Onboarding)](docs/DevOps.md)
+
+## 🎯 Key Capabilities
+- 🔍 **Image Analysis**: Azure Computer Vision powered analysis
+- 📝 **Enhanced Descriptions**: Azure OpenAI GPT-4 generated descriptions  
+- 🎨 **Bulk Regeneration**: DALL-E powered image creation sets
+- 📊 **Performance Metrics**: Real-time processing time tracking
+- 🏥 **Health Monitoring**: Aspire-integrated health endpoints
+
+## 🧪 Documentation Refactor: Blast Radius Assessment
+The recent documentation consolidation merges multiple fragmented files into high-signal mermaid diagrams and PRD assets. This improves AI context utilization and human readability. No code logic was modified, ensuring zero impact on downstream service dependencies or runtime behavior.
 
 ## 🛠️ Technology Stack
-
-### Core Framework
-- **.NET 10.0** - Latest .NET with modern C# features
-- **Blazor Web App** - Unified rendering (SSR + WASM)
-- **.NET Aspire 9.3** - Service orchestration and observability
-- **Central Package Management** - Directory.Packages.props
-
-### Azure Services
-- **Azure Key Vault** - Secret management (Production)
-- **Azure Computer Vision** - Image analysis
-- **Azure OpenAI Service** - GPT-4 descriptions, DALL-E generation
-- **Application Insights** - Telemetry and monitoring
-
-### Observability
-- **OpenTelemetry** - Traces, metrics, logs
-- **Serilog** - Structured logging
-- **Application Insights** - Azure integration
-
-### Testing
-- **xUnit** - Test framework
-- **Moq** - Mocking
-- **WebApplicationFactory** - Integration testing
+- **Framework**: .NET 10.0 Unified Blazor
+- **Orchestration**: .NET Aspire 9.3
+- **Infrastructure**: Azure Bicep & Managed Identity
+- **Observability**: OpenTelemetry / Application Insights
+- **Testing**: xUnit / Playwright
 
 ## 🚀 Getting Started
 

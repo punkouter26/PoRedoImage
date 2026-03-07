@@ -1,0 +1,391 @@
+@page "/bulk-generate"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IComputerVisionService ComputerVision
+@inject IOpenAIService OpenAI
+@inject IImagen3Service Imagen3
+@inject IBulkPromptStorageService PromptStorage
+@inject IJSRuntime JSRuntime
+@inject ILogger<BulkGenerate> Logger
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ImageSessionService SessionService
+
+<PageTitle>Bulk Generate — PoRedoImage</PageTitle>
+
+<div class="container py-4">
+    <div class="feature-page-header mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <span class="feature-page-icon"><i class="bi bi-images"></i></span>
+            <div>
+                <h1 class="feature-page-title">Bulk Generate</h1>
+                <p class="feature-page-desc">Upload a photo and generate 10 artistic variations. Use <code>&lt;PERSON&gt;</code> in prompts — AI replaces it with a description of your image.
+                    @if (Imagen3.IsConfigured)
+                    {
+                        <span class="badge bg-success ms-2">Gemini 2.0 Flash (img2img)</span>
+                    }
+                </p>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+            <span>@_errorMessage</span>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill flex-shrink-0"></i>
+            <span>@_successMessage</span>
+        </div>
+    }
+
+    <div class="row g-4">
+        @* Left: Upload + Action Button *@
+        <div class="col-lg-4 col-xl-3">
+            @if (!_isGenerating)
+            {
+                <ImageUploadPanel
+                    ShowDescriptionLength="false"
+                    ShowProcessButton="false"
+                    ImagePreviewUrl="@_imagePreviewUrl"
+                    ErrorMessage="@_uploadError"
+                    CanProcess="false"
+                    OnFileChange="LoadFile" />
+            }
+            else
+            {
+                @if (_imagePreviewUrl is not null)
+                {
+                    <div class="bulk-upload-preview mb-3">
+                        <img src="@_imagePreviewUrl" alt="Source image" />
+                    </div>
+                }
+            }
+
+            @if (!_isGenerating)
+            {
+                <RecentImages OnImageSelected="ApplyRecentImage" />
+                <button class="btn-generate-all w-100 mt-3"
+                        @onclick="StartGeneration"
+                        disabled="@(string.IsNullOrEmpty(_imagePreviewUrl) || _activePromptCount == 0)">
+                    <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString()) Variation@(_activePromptCount == 1 ? "" : "s")
+                </button>
+                @if (_favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
+                {
+                    <button class="btn-download-favs w-100 mt-2" @onclick="DownloadFavorites">
+                        <i class="bi bi-heart-fill me-1"></i>Download Favorites (@_favorites.Count)
+                    </button>
+                }
+            }
+            else
+            {
+                <button class="btn btn-outline-danger w-100 mt-3" @onclick="CancelGeneration">
+                    <i class="bi bi-stop-circle me-1"></i>Cancel
+                </button>
+            }
+        </div>
+
+        @* Right: Gallery *@
+        <div class="col-lg-8 col-xl-9">
+            <BulkGallery
+                Results="@_results"
+                CompletedCount="@_completedCount"
+                Favorites="@_favorites"
+                OnDownloadImage="DownloadImage"
+                OnToggleFavorite="ToggleFavorite" />
+        </div>
+    </div>
+
+    @* Full-width collapsible Prompt Editor *@
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="prompt-accordion">
+                <button class="prompt-accordion__toggle" @onclick="@(() => _promptsExpanded = !_promptsExpanded)">
+                    <span>
+                        <i class="bi bi-list-ul me-2"></i>Art Style Prompts
+                        <span class="prompt-accordion__badge ms-2">@_activePromptCount active</span>
+                    </span>
+                    <i class="bi @(_promptsExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                </button>
+                @if (_promptsExpanded)
+                {
+                    <BulkPromptEditor
+                        Prompts="@_prompts"
+                        IsSaving="@_isSaving"
+                        OnPromptsChanged="@(p => { _prompts = p; StateHasChanged(); })"
+                        OnSaveRequested="SavePrompts"
+                        OnLoadRequested="LoadPrompts" />
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Sticky processing pill *@
+    @if (_isGenerating)
+    {
+        <div class="processing-pill">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span>Generating @_completedCount / @(_results.Count)</span>
+            <button class="processing-pill__cancel" @onclick="CancelGeneration" title="Cancel">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private IBrowserFile? _selectedFile;
+    private byte[]? _imageBytes;
+    private string? _imagePreviewUrl;
+    private string? _uploadError;
+    private string? _errorMessage;
+    private string? _successMessage;
+    private string[] _prompts = DefaultPrompts.All.ToArray();
+    private int _activePromptCount => _prompts.Count(p => !string.IsNullOrWhiteSpace(p));
+    private List<BulkGenerateImageResult> _results = [];
+    private int _completedCount;
+    private bool _isGenerating;
+    private bool _isSaving;
+    private bool _promptsExpanded;
+    private HashSet<int> _favorites = [];
+    private string? _userId;
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (SessionService.HasImage && _imagePreviewUrl is null)
+        {
+            _imagePreviewUrl = SessionService.PreviewUrl;
+            if (SessionService.Bytes is not null)
+            {
+                _imageBytes = SessionService.Bytes;
+            }
+            else if (_imagePreviewUrl is not null)
+            {
+                try
+                {
+                    var idx = _imagePreviewUrl.IndexOf(',');
+                    if (idx >= 0) _imageBytes = Convert.FromBase64String(_imagePreviewUrl[(idx + 1)..]);
+                }
+                catch { /* bytes unavailable */ }
+            }
+        }
+    }
+
+    private async Task LoadFile(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _uploadError = null;
+        _imagePreviewUrl = null;
+        _imageBytes = null;
+        _results = [];
+        _completedCount = 0;
+
+        var (result, error) = await ImageLoadHelper.LoadAsync(_selectedFile);
+        if (error is not null) { _uploadError = error; _selectedFile = null; return; }
+
+        _imageBytes = result!.Bytes;
+        _imagePreviewUrl = result.PreviewUrl;
+        _successMessage = null;
+        SessionService.SetImage(result!.PreviewUrl, result.ContentType, _selectedFile!.Name, result.Bytes);
+        _ = JSRuntime.InvokeVoidAsync("recentsManager.save", result!.PreviewUrl, _selectedFile!.Name).AsTask();
+        StateHasChanged();
+    }
+
+    private async Task StartGeneration()
+    {
+        if (_imageBytes is null || _imagePreviewUrl is null) return;
+
+        _cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        _isGenerating = true;
+        _errorMessage = null;
+        _successMessage = null;
+        _completedCount = 0;
+
+        var activePrompts = _prompts
+            .Select((p, i) => (prompt: p, index: i))
+            .Where(x => !string.IsNullOrWhiteSpace(x.prompt))
+            .ToList();
+
+        _results = activePrompts.Select((x, slot) => new BulkGenerateImageResult
+        {
+            Index = slot,
+            Status = BulkGenerateStatus.Pending,
+            Prompt = x.prompt
+        }).ToList();
+
+        StateHasChanged();
+
+        try
+        {
+            // Use GPT-4o vision to get a detailed physical description of the person
+            // (bald, age, glasses, skin tone, etc.) — far more accurate than Azure CV caption
+            var description = await OpenAI.DescribePersonAsync(_imageBytes);
+            Logger.LogInformation("Bulk Generate: Vision description acquired: {Description}", description);
+
+            // Generate each variation sequentially
+            for (int i = 0; i < _results.Count; i++)
+            {
+                if (_cts.Token.IsCancellationRequested) break;
+
+                _results[i].Status = BulkGenerateStatus.Processing;
+                StateHasChanged();
+
+                try
+                {
+                    var rawPrompt = activePrompts[i].prompt;
+                    var finalPrompt = rawPrompt.Replace(DefaultPrompts.PersonToken, description, StringComparison.Ordinal);
+
+                    if (!Imagen3.IsConfigured)
+                        throw new InvalidOperationException("Gemini image generation is not configured. Please set Google:ApiKey to use Bulk Generate.");
+
+                    // True image-to-image: Gemini 2.0 Flash uses the uploaded photo as subject reference
+                    var (imgData, imgCt, _) = await Imagen3.GenerateImageAsync(
+                        finalPrompt, _imageBytes, _cts!.Token);
+
+                    _results[i].Status = BulkGenerateStatus.Complete;
+                    _results[i].Prompt = rawPrompt;
+                    _results[i].ImageUrl = $"data:{imgCt};base64,{Convert.ToBase64String(imgData)}";
+                    _completedCount++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _results[i].Status = BulkGenerateStatus.Failed;
+                    _results[i].ErrorMessage = ex.Message;
+                    Logger.LogError(ex, "Failed to generate bulk image {Index}", i);
+                }
+
+                StateHasChanged();
+            }
+
+            if (!_cts.Token.IsCancellationRequested)
+            {
+                if (_completedCount > 0)
+                    _successMessage = $"Completed {_completedCount} of {activePrompts.Count} variation{(activePrompts.Count == 1 ? "" : "s")}!";
+                else
+                    _errorMessage = "All generations failed. Check the error messages on each card for details.";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _errorMessage = "Generation was cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error during generation: {ex.Message}";
+            Logger.LogError(ex, "Bulk Generate failed");
+        }
+        finally
+        {
+            _isGenerating = false;
+            _cts?.Dispose();
+            _cts = null;
+            try { StateHasChanged(); } catch (ObjectDisposedException) { }
+        }
+    }
+
+    private void CancelGeneration()
+    {
+        _cts?.Cancel();
+    }
+
+    private void ApplyRecentImage(RecentImages.RecentItem item)
+    {
+        _selectedFile = null;
+        _imagePreviewUrl = item.StoredUrl;
+        _uploadError = null;
+        _results = [];
+        _completedCount = 0;
+        _favorites = [];
+        try
+        {
+            var idx = item.StoredUrl.IndexOf(',');
+            if (idx >= 0) _imageBytes = Convert.FromBase64String(item.StoredUrl[(idx + 1)..]);
+        }
+        catch { _imageBytes = null; }
+        if (_imageBytes is not null)
+            SessionService.SetImage(item.StoredUrl, "image/jpeg", item.FileName, _imageBytes);
+        StateHasChanged();
+    }
+
+    private void ToggleFavorite(int index)
+    {
+        if (!_favorites.Add(index))
+            _favorites.Remove(index);
+        StateHasChanged();
+    }
+
+    private async Task DownloadFavorites()
+    {
+        foreach (var idx in _favorites.OrderBy(i => i))
+            await DownloadImage(idx);
+    }
+
+    private async Task SavePrompts()
+    {
+        if (_userId is null)
+        {
+            _errorMessage = "Unable to save: no user ID found. Please sign out and sign back in.";
+            return;
+        }
+        _isSaving = true;
+        _successMessage = null;
+        _errorMessage = null;
+        try
+        {
+            await PromptStorage.SavePromptsAsync(_userId, _prompts);
+            _successMessage = "Prompts saved!";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to save prompts: {ex.Message}";
+            Logger.LogError(ex, "Failed to save bulk prompts");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task LoadPrompts()
+    {
+        if (_userId is null)
+        {
+            _errorMessage = "Unable to load: no user ID found. Please sign out and sign back in.";
+            return;
+        }
+        try
+        {
+            var saved = await PromptStorage.LoadPromptsAsync(_userId);
+            if (saved is not null)
+            {
+                _prompts = saved;
+                _successMessage = "Prompts loaded!";
+            }
+            else
+            {
+                _successMessage = "No saved prompts found for your account.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load prompts: {ex.Message}";
+            Logger.LogError(ex, "Failed to load bulk prompts");
+        }
+    }
+
+    private async Task DownloadImage(int index)
+    {
+        var result = _results.ElementAtOrDefault(index);
+        if (result?.ImageUrl is null) return;
+        await JSRuntime.InvokeAsync<bool>("downloadImage", result.ImageUrl, $"bulk-variation-{index + 1}.png");
+    }
+}

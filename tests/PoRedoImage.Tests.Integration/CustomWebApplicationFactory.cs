@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace PoRedoImage.Tests.Integration;
@@ -10,7 +12,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         // Set environment to Development to skip Key Vault configuration
         builder.UseEnvironment("Development");
-        
+
         builder.ConfigureHostConfiguration(config =>
         {
             // Clear Key Vault endpoint to prevent Azure authentication attempts in CI
@@ -27,7 +29,21 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Override services for testing if needed
+            // Override authentication: test handler always authenticates as TestAuthHandler.UserId.
+            // PostConfigure runs after Program.cs, so this correctly overrides dev cookie auth.
+            services.AddAuthentication()
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
+                    TestAuthHandler.SchemeName, _ => { });
+
+            services.PostConfigure<AuthenticationOptions>(options =>
+            {
+                options.DefaultScheme = TestAuthHandler.SchemeName;
+                options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                options.DefaultForbidScheme = TestAuthHandler.SchemeName;
+                options.DefaultSignInScheme = TestAuthHandler.SchemeName;
+                options.DefaultSignOutScheme = TestAuthHandler.SchemeName;
+            });
         });
 
         return base.CreateHost(builder);

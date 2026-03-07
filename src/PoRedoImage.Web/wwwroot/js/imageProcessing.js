@@ -138,3 +138,18 @@ function createSideBySideComparison(originalImageUrl, regeneratedImageUrl, fileN
         regeneratedImage.src = regeneratedImageUrl;
     });
 }
+
+/**
+ * Returns a persistent session ID for Bulk Generate stored in localStorage.
+ * Creates a new UUID if one does not yet exist.
+ * @returns {string} The session ID
+ */
+function getBulkSessionId() {
+    const key = 'poredoimage_bulk_session_id';
+    let sessionId = localStorage.getItem(key);
+    if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem(key, sessionId);
+    }
+    return sessionId;
+}

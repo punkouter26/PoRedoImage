@@ -1,0 +1,99 @@
+@namespace PoRedoImage.Web.Components.Pages
+@using PoRedoImage.Web.Models
+
+<div class="prompt-editor">
+    <div class="prompt-editor__header">
+        <h3 class="prompt-editor__title">
+            <i class="bi bi-list-ul me-2"></i>Art Style Prompts
+        </h3>
+        <div class="prompt-editor__actions">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ResetDefaults" title="Clear all prompts">
+                <i class="bi bi-eraser"></i><span class="ms-1 d-none d-sm-inline">Clear</span>
+            </button>
+            <button class="btn btn-sm btn-outline-primary" @onclick="() => OnLoadRequested.InvokeAsync()" title="Load saved prompts">
+                <i class="bi bi-cloud-download"></i><span class="ms-1 d-none d-sm-inline">Load</span>
+            </button>
+            <button class="btn btn-sm btn-primary" @onclick="() => OnSaveRequested.InvokeAsync()" disabled="@IsSaving" title="Save prompts">
+                @if (IsSaving)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <i class="bi bi-cloud-upload"></i>
+                }
+                <span class="ms-1 d-none d-sm-inline">Save</span>
+            </button>
+        </div>
+        <div class="prompt-editor__token-hint">
+            <i class="bi bi-info-circle-fill"></i>
+            Use <code>&lt;PERSON&gt;</code> — replaced with AI description of your uploaded image
+        </div>
+    </div>
+    <div class="prompt-editor__list">
+        @for (int i = 0; i < _localPrompts.Length; i++)
+        {
+            var idx = i;
+            <div class="prompt-editor__item" @key="@($"{_resetKey}-{idx}")">
+                <span class="prompt-editor__num">@(idx + 1)</span>
+                <textarea class="prompt-editor__textarea"
+                          rows="2"
+                          value="@_localPrompts[idx]"
+                          @oninput="@(e => UpdatePrompt(idx, e.Value?.ToString() ?? string.Empty))"
+                          placeholder="@(idx < DefaultPrompts.All.Length ? DefaultPrompts.All[idx][..Math.Min(60, DefaultPrompts.All[idx].Length)] + "…" : "Enter an art style prompt…")" />
+                @if (idx < DefaultPrompts.All.Length
+                    && !string.IsNullOrWhiteSpace(_localPrompts[idx])
+                    && _localPrompts[idx] != DefaultPrompts.All[idx])
+                {
+                    <button class="btn-reset-row" @onclick="@(() => ResetRow(idx))" title="Reset to default">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string[] Prompts { get; set; } = DefaultPrompts.All;
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public EventCallback<string[]> OnPromptsChanged { get; set; }
+    [Parameter] public EventCallback OnSaveRequested { get; set; }
+    [Parameter] public EventCallback OnLoadRequested { get; set; }
+
+    private string[] _localPrompts = DefaultPrompts.All.ToArray();
+    private int _resetKey = 0;
+
+    protected override void OnParametersSet()
+    {
+        // Only sync incoming Prompts if they differ (avoid overwriting user edits during re-renders)
+        if (Prompts is not null && !Prompts.SequenceEqual(_localPrompts))
+            _localPrompts = Prompts.ToArray();
+    }
+
+    private async Task UpdatePrompt(int index, string value)
+    {
+        _localPrompts[index] = value;
+        await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+    }
+
+    private async Task ResetDefaults()
+    {
+        _localPrompts = new string[_localPrompts.Length];
+        for (int i = 0; i < _localPrompts.Length; i++) _localPrompts[i] = string.Empty;
+        _resetKey++;
+        await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+        StateHasChanged();
+    }
+
+    private async Task ResetRow(int index)
+    {
+        if (index < DefaultPrompts.All.Length)
+        {
+            _localPrompts[index] = DefaultPrompts.All[index];
+            _resetKey++;
+            await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+            StateHasChanged();
+        }
+    }
+}

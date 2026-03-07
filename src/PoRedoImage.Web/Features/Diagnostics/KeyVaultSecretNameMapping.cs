@@ -22,7 +22,10 @@ public class KeyVaultSecretNameMapping : KeyVaultSecretManager
         ["PoRedoImage-OpenAI-ImageEndpoint"]              = "OpenAI:ImageEndpoint",
         ["PoRedoImage-OpenAI-ImageKey"]                   = "OpenAI:ImageKey",
         ["PoRedoImage-ApplicationInsights-ConnectionString"] = "ApplicationInsights:ConnectionString",
-        ["PoRedoImage-StorageConnectionString"]           = "Storage:ConnectionString"
+        ["PoRedoImage-StorageConnectionString"]           = "Storage:ConnectionString",
+        ["PoRedoImage-AzureAd-ClientId"]                  = "AzureAd:ClientId",
+        ["PoRedoImage-AzureAd-ClientSecret"]              = "AzureAd:ClientSecret",
+        ["PoRedoImage-Google-ApiKey"]                     = "Google:ApiKey"
     };
 
     public override bool Load(SecretProperties secret) =>

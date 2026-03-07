@@ -1,7 +1,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using PoRedoImage.Web.Models
 
-<div class="upload-panel">
+<div class="upload-panel" @onkeydown="HandleKeyDown" tabindex="0" role="region" aria-label="Image upload">
 
     @* ── Drop Zone ──────────────────────────────────────────────────── *@
     <div class="drop-zone @(_isDragging ? "drop-zone--active" : "") @(ImagePreviewUrl != null ? "drop-zone--has-image" : "")"
@@ -30,8 +30,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
                 </div>
-                <p class="drop-zone__title">Drop your image here</p>
-                <p class="drop-zone__sub">or <span class="drop-zone__browse">browse to upload</span></p>
+                <p class="drop-zone__title">
+                    <span class="drop-zone__title--desktop">Drop your image here</span>
+                    <span class="drop-zone__title--mobile">Tap to upload a photo</span>
+                </p>
+                <p class="drop-zone__sub drop-zone__sub--desktop">or <span class="drop-zone__browse">browse to upload</span></p>
                 <p class="drop-zone__formats">JPG &amp; PNG &middot; up to 20 MB</p>
             </div>
         }
@@ -48,29 +51,8 @@
         </div>
     }
 
-    @* ── Mode Cards ────────────────────────────────────────────────── *@
-    <div class="mode-cards mt-4">
-        <div class="mode-card @(SelectedMode == ProcessingMode.ImageRegeneration ? "mode-card--active" : "")"
-             @onclick="@(() => OnModeChanged.InvokeAsync(ProcessingMode.ImageRegeneration))">
-            <div class="mode-card__icon">🎨</div>
-            <div>
-                <div class="mode-card__title">Image Regeneration</div>
-                <div class="mode-card__desc">AI creates a new artistic interpretation of your photo</div>
-            </div>
-        </div>
-
-        <div class="mode-card @(SelectedMode == ProcessingMode.MemeGeneration ? "mode-card--active" : "")"
-             @onclick="@(() => OnModeChanged.InvokeAsync(ProcessingMode.MemeGeneration))">
-            <div class="mode-card__icon">😂</div>
-            <div>
-                <div class="mode-card__title">Meme Generation</div>
-                <div class="mode-card__desc">AI writes a witty caption and overlays it on your image</div>
-            </div>
-        </div>
-    </div>
-
-    @* ── Description Length Presets ────────────────────────────────── *@
-    @if (SelectedMode == ProcessingMode.ImageRegeneration)
+    @* ── Description Length Presets (Image Regeneration only) ─────── *@
+    @if (ShowDescriptionLength)
     {
         <div class="preset-group mt-4">
             <label class="preset-group__label">AI Description Detail</label>
@@ -99,25 +81,36 @@
     }
 
     @* ── Process Button ────────────────────────────────────────────── *@
-    <button class="btn-process mt-4 w-100" @onclick="OnProcessClicked" disabled="@(!CanProcess)">
-        <i class="bi @(SelectedMode == ProcessingMode.MemeGeneration ? "bi-emoji-laughing" : "bi-cpu") me-2"></i>
-        @(SelectedMode == ProcessingMode.MemeGeneration ? "Generate Meme" : "Process Image")
-    </button>
+    @if (ShowProcessButton)
+    {
+        <button class="btn-process mt-4 w-100" @onclick="OnProcessClicked" disabled="@(!CanProcess)">
+            <i class="bi @ButtonIcon me-2"></i>@ButtonLabel
+        </button>
+    }
 
 </div>
 
 @code {
-    [Parameter] public ProcessingMode SelectedMode { get; set; }
+    [Parameter] public bool ShowDescriptionLength { get; set; }
+    [Parameter] public bool ShowProcessButton { get; set; } = true;
+    [Parameter] public string ButtonLabel { get; set; } = "Process Image";
+    [Parameter] public string ButtonIcon { get; set; } = "bi-cpu";
     [Parameter] public int DescriptionLength { get; set; }
     [Parameter] public string? ImagePreviewUrl { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public bool CanProcess { get; set; }
     [Parameter] public EventCallback<InputFileChangeEventArgs> OnFileChange { get; set; }
     [Parameter] public EventCallback OnProcessClicked { get; set; }
-    [Parameter] public EventCallback<ProcessingMode> OnModeChanged { get; set; }
     [Parameter] public EventCallback<int> OnDescriptionLengthChanged { get; set; }
 
     private bool _isDragging;
+
+    private Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && CanProcess)
+            return OnProcessClicked.InvokeAsync();
+        return Task.CompletedTask;
+    }
 
     private Task HandleDrop(DragEventArgs e)
     {

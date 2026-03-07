@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using System.Text.Json
 @inject HttpClient Http
+@inject IJSRuntime JSRuntime
 @inject ILogger<Diag> Logger
 
 <PageTitle>Diagnostics - PoRedoImage</PageTitle>
@@ -73,29 +74,40 @@
             </div>
         </div>
 
-        @* Config groups *@
-        @foreach (var group in GetConfigGroups())
+        @* Config key/value table *@
+        @if (diagData?.Configuration != null)
         {
-            <div class="diag-group mb-3">
-                <div class="diag-group__header" @onclick="@(() => ToggleGroup(group.Key))">
-                    <span class="diag-group__title">
-                        <i class="bi @group.Value.Icon me-2"></i>@group.Key
-                    </span>
-                    <span class="diag-group__count">@group.Value.Items.Count key@(group.Value.Items.Count != 1 ? "s" : "")</span>
-                    <i class="bi bi-chevron-@(_expandedGroups.Contains(group.Key) ? "up" : "down") ms-auto diag-group__chevron"></i>
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Configuration</h5>
+                    <span class="badge bg-secondary">@diagData.Configuration.Count entries</span>
                 </div>
-                @if (_expandedGroups.Contains(group.Key))
-                {
-                    <div class="diag-group__body">
-                        @foreach (var kv in group.Value.Items)
-                        {
-                            <div class="diag-row">
-                                <span class="diag-row__key">@kv.Key</span>
-                                <span class="diag-row__val @(kv.Value?.Contains("****") == true ? "diag-row__val--masked" : "diag-row__val--plain")">@kv.Value</span>
-                            </div>
-                        }
-                    </div>
-                }
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0 diag-config-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3" style="width:40%">Key</th>
+                                <th>Value</th>
+                                <th style="width:3rem"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var kv in diagData.Configuration)
+                            {
+                                <tr>
+                                    <td class="ps-3 text-muted" style="word-break:break-all;font-size:0.8rem">@kv.Key</td>
+                                    <td style="word-break:break-all;font-size:0.8rem;font-family:monospace">@(kv.Value ?? "(null)")</td>
+                                    <td class="pe-2 text-end">
+                                        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem" title="Copy value"
+                                                @onclick="@(() => CopyToClipboard(kv.Value ?? string.Empty))">
+                                            <i class="bi bi-copy"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         }
     }
@@ -105,7 +117,6 @@
     private DiagPayload? diagData;
     private string? errorMessage;
     private bool isLoading = true;
-    private readonly HashSet<string> _expandedGroups = new();
 
     protected override async Task OnInitializedAsync() => await LoadDiagnostics();
 
@@ -119,14 +130,8 @@
 
             var response = await Http.GetAsync("api/diag");
             response.EnsureSuccessStatusCode();
-
             var raw = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(raw);
             diagData = JsonSerializer.Deserialize<DiagPayload>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            // Expand all groups by default
-            foreach (var k in GetConfigGroups().Keys)
-                _expandedGroups.Add(k);
         }
         catch (Exception ex)
         {
@@ -139,47 +144,10 @@
         }
     }
 
-    private void ToggleGroup(string key)
+    private async Task CopyToClipboard(string text)
     {
-        if (!_expandedGroups.Remove(key)) _expandedGroups.Add(key);
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
     }
-
-    private Dictionary<string, ConfigGroup> GetConfigGroups()
-    {
-        var groups = new Dictionary<string, ConfigGroup>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Azure Key Vault"] = new("bi-shield-lock", new()),
-            ["Computer Vision"] = new("bi-eye", new()),
-            ["OpenAI"] = new("bi-cpu", new()),
-            ["Application Insights"] = new("bi-graph-up", new()),
-            ["Storage"] = new("bi-database", new()),
-            ["Other"] = new("bi-gear", new()),
-        };
-
-        if (diagData?.Configuration == null) return groups;
-
-        foreach (var kv in diagData.Configuration)
-        {
-            var key = kv.Key ?? "";
-            if (key.StartsWith("AZURE_KEY_VAULT", StringComparison.OrdinalIgnoreCase))
-                groups["Azure Key Vault"].Items.Add(kv);
-            else if (key.StartsWith("ComputerVision", StringComparison.OrdinalIgnoreCase))
-                groups["Computer Vision"].Items.Add(kv);
-            else if (key.StartsWith("OpenAI", StringComparison.OrdinalIgnoreCase))
-                groups["OpenAI"].Items.Add(kv);
-            else if (key.StartsWith("ApplicationInsights", StringComparison.OrdinalIgnoreCase))
-                groups["Application Insights"].Items.Add(kv);
-            else if (key.StartsWith("Storage", StringComparison.OrdinalIgnoreCase))
-                groups["Storage"].Items.Add(kv);
-            else
-                groups["Other"].Items.Add(kv);
-        }
-
-        return groups.Where(g => g.Value.Items.Count > 0)
-                     .ToDictionary(g => g.Key, g => g.Value);
-    }
-
-    private sealed record ConfigGroup(string Icon, List<KeyValuePair<string, string?>> Items);
 
     private sealed class DiagPayload
     {

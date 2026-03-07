@@ -1,0 +1,25 @@
+{
+  "cookies": [
+    {
+      "name": ".AspNetCore.Cookies",
+      "value": "CfDJ8OKlDvO_wuRNvXU2U9FSn58kXcsYfC2hRhoKIx1Gd_AM8BeGpnY1O6Gk0ypuegYs6uFmU8ojJyoSZhefOhhq7P-8JrY70hPd_h2LwF86Cg3lP2SGEl8uclh7__dgKXjTaJfa-JSOX_jIL9LqfiV2zOzpVqQwkBOrptj_1eyY0tY_TbwjEOpwPMlYGJd6-RRD_eJQ4IaZvme8HNMBm8TMhza3EQpCa1eSYMCVavEu74y18uDRRECcJ2oSv5Pb_0eG_siotytpL-Jq2yj3KFLRzf6JzhDO_AIs4PiagyDTYpeLeuz1vnNbM5nMdXblPJktVxr4VPX0J5XH5yihuHUcfi3GWVZ_0fcIP6aj8Ra-bmF3XY06KxvEDGsb1iAyoB4QwcrkaRLjP7dzLp3HLtejSSsJQcEAGjpglUIf-eNQ0a0_Xk2lRnpC03xVwaQ9NjAqnVGQok2Af-P6gkspDtgTxkxpgk29dN5OV0J5iZCwfwIcF2IjYMd1fZYk5djuMGZijPFQO4wxLzC9OS0_5Icruh2YRsegq9x7VakZH5SYPAiw",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": ".AspNetCore.Antiforgery.0XVyup-bwBY",
+      "value": "CfDJ8OKlDvO_wuRNvXU2U9FSn5876s8AjuNpz6-mvPnRC_XQ99UC3GH7lCQV3uJrHg7WNN0vG-85ufnYzBpDI7f3uWn8FDmlha_IpGUOvMp8rEhOlp3QSa0FevSrMb9hJi2TuvWMPamgHgAMhBnJ_X6GS7Q",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": []
+}

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Azure;
 using Azure.AI.Vision.ImageAnalysis;
 
@@ -48,7 +49,7 @@ public class ComputerVisionService : IComputerVisionService
             throw new ArgumentException("Image data cannot be empty", nameof(imageData));
 
         _logger.LogInformation("Starting image analysis with Azure Computer Vision. Size: {Size} bytes", imageData.Length);
-        var startTime = DateTime.UtcNow;
+        var startTimestamp = Stopwatch.GetTimestamp();
 
         try
         {
@@ -76,7 +77,7 @@ public class ComputerVisionService : IComputerVisionService
                 }
             }
 
-            var processingTime = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            var processingTime = (long)Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
 
             _logger.LogInformation("Image analysis completed in {ProcessingTime}ms. Tags: {TagCount}, Confidence: {Confidence:F2}",
                 processingTime, tags.Count, confidenceScore);
@@ -85,7 +86,7 @@ public class ComputerVisionService : IComputerVisionService
         }
         catch (Exception ex)
         {
-            var processingTime = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            var processingTime = (long)Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
             _logger.LogError(ex, "Error analyzing image after {ProcessingTime}ms", processingTime);
             throw;
         }

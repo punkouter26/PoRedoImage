@@ -1,0 +1,20 @@
+erDiagram
+    USER ||--o{ BULK_PROMPT : creates
+    USER {
+        string NameIdentifier PK
+        string Email
+    }
+    BULK_PROMPT {
+        string PartitionKey PK "ClaimTypes.NameIdentifier"
+        string RowKey PK "PromptId"
+        string PromptText
+        string Status "Pending | Processing | Complete | Failed"
+        datetime Timestamp
+    }
+    IMAGE_RESULT {
+        string PromptId FK
+        string ImageUrl
+        string AnalysisResult
+        int Index
+    }
+    BULK_PROMPT ||--o{ IMAGE_RESULT : contains
