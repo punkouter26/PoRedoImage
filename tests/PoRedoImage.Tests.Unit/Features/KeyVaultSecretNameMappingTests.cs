@@ -96,6 +96,7 @@ public class KeyVaultSecretNameMappingTests
             "PoRedoImage-AzureAd-ClientId",
             "PoRedoImage-AzureAd-ClientSecret",
             "PoRedoImage-Google-ApiKey",
+            "PoRedoImage-Google-Imagen3Model",
         };
 
         Assert.Equal(expected.OrderBy(x => x), KeyVaultSecretNameMapping.RequiredSecretNames.OrderBy(x => x));

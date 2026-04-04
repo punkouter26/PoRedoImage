@@ -27,19 +27,21 @@ public class ComputerVisionServiceTests
     // ─── Constructor tests ──────────────────────────────────────────
 
     [Fact]
-    public void Constructor_MissingEndpoint_Throws()
+    public void Constructor_MissingEndpoint_DoesNotThrow_SetsConfigError()
     {
+        // Service now degrades gracefully; errors are reported at call time, not construction
         var config = BuildConfig(endpoint: null);
-        Assert.Throws<ArgumentNullException>(() =>
-            new ComputerVisionService(config, _loggerMock.Object));
+        var service = new ComputerVisionService(config, _loggerMock.Object);
+        Assert.NotNull(service);
     }
 
     [Fact]
-    public void Constructor_MissingApiKey_Throws()
+    public void Constructor_MissingApiKey_DoesNotThrow_SetsConfigError()
     {
+        // Service now degrades gracefully; errors are reported at call time, not construction
         var config = BuildConfig(apiKey: null);
-        Assert.Throws<ArgumentNullException>(() =>
-            new ComputerVisionService(config, _loggerMock.Object));
+        var service = new ComputerVisionService(config, _loggerMock.Object);
+        Assert.NotNull(service);
     }
 
     [Fact]

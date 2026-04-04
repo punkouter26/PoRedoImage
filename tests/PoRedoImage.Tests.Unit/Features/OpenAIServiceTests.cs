@@ -26,11 +26,12 @@ public class OpenAIServiceTests
     // ─── Constructor tests ──────────────────────────────────────────
 
     [Fact]
-    public void Constructor_MissingEndpoint_Throws()
+    public void Constructor_MissingEndpoint_DoesNotThrow_SetsConfigError()
     {
+        // Service now degrades gracefully; errors are reported at call time, not construction
         var config = BuildConfig(endpoint: null);
-        Assert.Throws<ArgumentNullException>(() =>
-            new OpenAIService(config, _loggerMock.Object));
+        var service = new OpenAIService(config, _loggerMock.Object);
+        Assert.NotNull(service);
     }
 
     [Fact]
