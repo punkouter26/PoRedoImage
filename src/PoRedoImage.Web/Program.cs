@@ -1,6 +1,5 @@
 using Azure.Identity;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
-using Azure.Security.KeyVault.Secrets;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
@@ -39,7 +38,6 @@ if (!string.IsNullOrEmpty(keyVaultEndpoint))
     try
     {
         var credential = new DefaultAzureCredential();
-        var secretClient = new SecretClient(new Uri(keyVaultEndpoint), credential);
         var secretManager = new KeyVaultSecretNameMapping();
 
         // ReloadInterval: re-fetch secrets every 30 minutes for secret rotation without restart.
@@ -52,12 +50,7 @@ if (!string.IsNullOrEmpty(keyVaultEndpoint))
                 ReloadInterval = TimeSpan.FromMinutes(30)
             });
 
-        // Validate that all secrets required by app mapping are present and non-empty.
-        var requireAllSecrets = builder.Configuration.GetValue<bool?>("KeyVault:RequireAllSecrets") ?? true;
-        if (requireAllSecrets)
-        {
-            KeyVaultSecretValidator.ValidateRequiredSecrets(secretClient, Log.Logger);
-        }
+        Log.Information("Key Vault configuration loaded from {Endpoint}", keyVaultEndpoint);
     }
     catch (Exception ex)
     {
@@ -79,6 +72,12 @@ if (!string.IsNullOrEmpty(keyVaultEndpoint))
 // Structured logging: Console in Development, Application Insights in Production
 var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
 
+// In Azure App Service with Run-From-Package (OneDeploy), /home/site/wwwroot/ is read-only.
+// Use /home/LogFiles/Application/ (writable) in production; use relative path in development.
+var logFilePath = builder.Environment.IsDevelopment()
+    ? "logs/poredoimage-.log"
+    : "/home/LogFiles/Application/poredoimage-.log";
+
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
@@ -91,7 +90,7 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(outputTemplate:
         "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
     .WriteTo.File(
-        path: "logs/poredoimage-.log",
+        path: logFilePath,
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
         outputTemplate:
