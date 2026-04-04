@@ -1,0 +1,68 @@
+flowchart TD
+    subgraph Edge["Edge Delivery"]
+        User["👤 End User"]
+        CDN["HTTPS · TLS 1.3"]
+    end
+
+    subgraph Compute["Compute Tier — poredoimage-web · App Service B1 Linux · .NET 10"]
+        Blazor["Blazor Web App\nSSR + Interactive Server"]
+        Auth["Auth Middleware\nCookie (dev) · OIDC Entra ID (prod)"]
+        RateLimit["Rate Limiter\nFixed Window — AI endpoints"]
+        subgraph Features["Vertical Slice Features"]
+            ImageF["ImageAnalysis\nanalyze · regen · meme"]
+            BulkF["BulkGenerate\n10 art-style variations"]
+            DiagF["Diagnostics\n/health · /diag · /scalar"]
+        end
+        OTel["OpenTelemetry SDK\n+ Serilog structured logs"]
+    end
+
+    subgraph AI["AI Services"]
+        CV["Azure Computer Vision\ncv-poshared-eastus"]
+        OpenAI["Azure OpenAI GPT-4.1-nano\nopenai-poshared-eastus"]
+        Gemini["Google Gemini\ngemini-2.5-flash-image"]
+    end
+
+    subgraph Data["Data Persistence"]
+        Tables["Azure Table Storage\nstporedoimage26\nBulkPrompts · ImageResults"]
+        KV["Azure Key Vault\nkv-poshared\nAccess Policy · secret rotation 30 min"]
+    end
+
+    subgraph Ops["Observability and DevOps"]
+        AppIns["Application Insights\nTraces · Metrics · Logs"]
+        GHA["GitHub Actions\nOIDC → az webapp deploy"]
+    end
+
+    User -->|"HTTPS"| CDN --> Blazor
+    Blazor --> Auth
+    Blazor --> RateLimit --> Features
+    ImageF -->|"Vision API"| CV
+    ImageF -->|"Chat Completion"| OpenAI
+    ImageF -->|"Image Gen"| Gemini
+    BulkF -->|"10 parallel requests"| Gemini
+    Blazor -->|"Managed Identity"| Tables
+    Blazor -->|"Access Policy"| KV
+    OTel -->|"Ingestion"| AppIns
+    GHA -->|"ZIP Deploy"| Blazor
+
+    style Edge fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style Compute fill:#16213e,stroke:#4a9eff,color:#fff
+    style Features fill:#0f3460,stroke:#4a9eff,color:#fff
+    style AI fill:#1b2838,stroke:#00b4d8,color:#fff
+    style Data fill:#1b2838,stroke:#f2c811,color:#fff
+    style Ops fill:#1b2838,stroke:#57cc99,color:#fff
+    style User fill:#4a9eff,stroke:#fff,color:#fff
+    style CDN fill:#005a9e,stroke:#fff,color:#fff
+    style Blazor fill:#512bd4,stroke:#fff,color:#fff
+    style Auth fill:#6b21a8,stroke:#fff,color:#fff
+    style RateLimit fill:#374151,stroke:#9ca3af,color:#fff
+    style ImageF fill:#1e5799,stroke:#4a9eff,color:#fff
+    style BulkF fill:#1e5799,stroke:#4a9eff,color:#fff
+    style DiagF fill:#1e5799,stroke:#4a9eff,color:#fff
+    style OTel fill:#374151,stroke:#9ca3af,color:#fff
+    style CV fill:#5c2d91,stroke:#fff,color:#fff
+    style OpenAI fill:#10a37f,stroke:#fff,color:#fff
+    style Gemini fill:#1a73e8,stroke:#fff,color:#fff
+    style Tables fill:#f2c811,stroke:#000,color:#000
+    style KV fill:#c8a600,stroke:#000,color:#000
+    style AppIns fill:#0078d4,stroke:#fff,color:#fff
+    style GHA fill:#238636,stroke:#fff,color:#fff

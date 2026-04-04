@@ -1,0 +1,44 @@
+sequenceDiagram
+    actor U as User
+    participant B as Blazor Server
+    participant Coord as Parallel Task Coordinator
+    participant G1 as Gemini Slot 1
+    participant G2 as Gemini Slot 2
+    participant GN as Gemini Slots 3-10
+    participant TS as Table Storage
+
+    Note over U,TS: Bulk Generate — parallel multi-slot image generation
+
+    U->>B: Submit prompt with art style count (up to 10)
+    B->>TS: INSERT BulkPrompt (PromptId=GUID, Status=Pending)
+    B->>TS: UPDATE BulkPrompt (Status=Processing)
+    B->>Coord: Dispatch Task.WhenAll (10 parallel slots)
+
+    Note over Coord,GN: Concurrent generation — no ordering guarantee
+
+    par Slot 1 — Watercolor
+        Coord->>G1: GenerateImageAsync("Watercolor style: {prompt}")
+        G1-->>Coord: PNG bytes [index=0, ~3-8s]
+        Coord->>TS: INSERT ImageResult [index=0]
+        Coord->>B: StateHasChanged() → render slot 1
+        B-->>U: Slot 1 image appears live
+    and Slot 2 — Oil Painting
+        Coord->>G2: GenerateImageAsync("Oil painting: {prompt}")
+        G2-->>Coord: PNG bytes [index=1, ~3-8s]
+        Coord->>TS: INSERT ImageResult [index=1]
+        Coord->>B: StateHasChanged() → render slot 2
+        B-->>U: Slot 2 image appears live
+    and Slots 3-10 — remaining art styles
+        Coord->>GN: GenerateImageAsync(styles 3-10 concurrently)
+        GN-->>Coord: PNG bytes [index=2..9, variable timing]
+        Coord->>TS: INSERT ImageResult [index=2..9]
+        Coord->>B: StateHasChanged() batch updates
+        B-->>U: Slots 3-10 appear as ready
+    end
+
+    Note over B,TS: Rate Limiter enforces Fixed Window per client on /api routes
+
+    Coord->>B: All slots complete
+    B->>TS: UPDATE BulkPrompt (Status=Complete)
+    B-->>U: Full grid of 10 images rendered
+    Note over U: Conflict resolution: last-write-wins per index slot in Table Storage

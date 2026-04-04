@@ -1,0 +1,13 @@
+sequenceDiagram
+    actor U as User
+    participant App as Blazor Server
+    participant AI as Gemini x10 parallel
+    participant DB as Table Storage
+
+    U->>App: Submit bulk prompt
+    App->>DB: Persist BulkPrompt (Pending)
+    App->>AI: 10 concurrent GenerateImage calls
+    AI-->>App: Images streamed as each completes
+    App->>DB: Store each ImageResult
+    App-->>U: Live slot-by-slot UI updates via SignalR
+    App->>DB: Mark BulkPrompt Complete

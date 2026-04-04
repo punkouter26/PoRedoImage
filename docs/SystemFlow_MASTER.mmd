@@ -1,0 +1,56 @@
+sequenceDiagram
+    actor U as User
+    participant B as Blazor App
+    participant Auth as Auth Middleware
+    participant CV as Computer Vision
+    participant GPT as Azure OpenAI GPT-4.1-nano
+    participant G as Google Gemini
+    participant TS as Table Storage
+
+    Note over U,TS: Authentication Flow
+
+    U->>B: GET /login or /challenge-microsoft
+    alt Dev Environment (no AzureAd:ClientId)
+        B->>Auth: TestAuthHandler (cookie-only)
+        Auth-->>B: Set dev cookie (fake identity)
+    else Production
+        B->>Auth: OIDC challenge → Entra ID
+        Auth-->>B: JWT validated → session cookie issued
+    end
+    B-->>U: 302 Redirect → Home
+
+    Note over U,TS: Image Analysis and Regeneration Flow
+
+    U->>B: Upload image JPEG or PNG (base64)
+    B->>B: Validate magic bytes (FF D8 or 89 50 4E 47)
+    B->>CV: AnalyzeImageAsync(bytes)
+    CV-->>B: description + tags[] + confidence float
+    B->>GPT: EnhanceDescriptionAsync(raw description)
+    GPT-->>B: Refined 200-500 char creative prompt
+
+    alt Mode = Regenerate
+        B->>G: GenerateImageAsync(prompt, referenceBytes)
+        G-->>B: PNG bytes (gemini-2.5-flash-image)
+    else Mode = Meme
+        B->>B: MemeGeneratorService overlay caption on image
+    else Mode = Analyze only
+        B->>B: Return description and tags only
+    end
+
+    B-->>U: ImageAnalysisResult (base64 + metrics + tags)
+
+    Note over U,TS: Bulk Generate Flow
+
+    U->>B: Submit prompt text + art style count
+    B->>TS: INSERT BulkPrompt (Status=Pending)
+    B->>TS: UPDATE BulkPrompt (Status=Processing)
+
+    loop 10 art styles in parallel (Task.WhenAll)
+        B->>G: GenerateImageAsync(style + prompt)
+        G-->>B: PNG bytes per style
+        B->>TS: INSERT ImageResult (index, imageUrl, generationMs)
+        B->>B: StateHasChanged() → live progress update
+    end
+
+    B->>TS: UPDATE BulkPrompt (Status=Complete)
+    B-->>U: All 10 images rendered via Blazor Server SignalR

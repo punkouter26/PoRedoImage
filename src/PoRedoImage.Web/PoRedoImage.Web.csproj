@@ -10,9 +10,6 @@
     <InternalsVisibleTo Include="PoRedoImage.Tests.Integration" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\PoShared\PoShared.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <!-- Azure -->

@@ -1,0 +1,19 @@
+sequenceDiagram
+    actor U as User
+    participant App as Blazor App
+    participant AI as AI Services
+    participant DB as Table Storage
+
+    U->>App: Login (dev cookie or prod OIDC)
+    App-->>U: Authenticated session
+
+    U->>App: Upload image
+    App->>AI: Analyze + Enhance + Generate
+    AI-->>App: Result image + metadata
+    App-->>U: Rendered result
+
+    U->>App: Bulk generate prompt
+    App->>DB: Persist + stream progress
+    App->>AI: 10 parallel image calls
+    AI-->>App: Images as completed
+    App-->>U: Live UI updates via SignalR

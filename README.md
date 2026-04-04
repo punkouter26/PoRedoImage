@@ -1,351 +1,173 @@
-# PoRedoImage - AI-Powered Image Studio
+# PoRedoImage — AI-Powered Image Studio
 
-A Blazor Web App that uses Azure AI to analyze, describe, and artistically transform your photos. Built on .NET 10 with Vertical Slice Architecture.
+A .NET 10 Blazor Web App that uses **Azure Computer Vision**, **Azure OpenAI GPT-4.1-nano**, and **Google Gemini** to analyze, describe, and artistically transform photos. Built with Vertical Slice Architecture, deployed to Azure App Service via GitHub Actions OIDC.
 
-## 🗂️ Architecture
+**Live:** https://poredoimage-web.azurewebsites.net | **API Docs:** `/scalar/v1` | **Health:** `/health`
+
+---
+
+## Architecture Overview
 
 ```mermaid
-flowchart TD
-    subgraph Client["Client Browser"]
-        WebApp["Blazor Web App (SSR+Interactive)"]
-    end
+flowchart LR
+    User["👤 User"] -->|"HTTPS"| App["Blazor Web App\nAzure App Service"]
+    App -->|"Vision + GPT + Imagen"| AI["AI Services\nCV · OpenAI · Gemini"]
+    App -->|"Store"| Data["Table Storage\n+ Key Vault"]
+    App -->|"Telemetry"| Ops["Application Insights"]
+    CI["GitHub Actions"] -->|"Deploy"| App
 
-    subgraph Azure["Azure Cloud"]
-        Service["poredoimage-web (App Service)"]
-        TableStorage[("Azure Table Storage")]
-        OpenAI["Azure OpenAI (GPT-4o / DALL-E 3)"]
-        Vision["Azure Computer Vision"]
-        Imagen3["Google Imagen 3"]
-    end
-
-    WebApp -- "HTTPS" --> Service
-    Service -- "Managed Identity" --> TableStorage
-    Service -- "API Key / Managed Identity" --> OpenAI
-    Service -- "API Key / Managed Identity" --> Vision
-    Service -- "API Key" --> Imagen3
-
-    style Client fill:#333,stroke:#fff,color:#fff
-    style Azure fill:#111,stroke:#fff,color:#fff
-    style Service fill:#005a9e,stroke:#fff,color:#fff
-    style WebApp fill:#512bd4,stroke:#fff,color:#fff
+    style User fill:#4a9eff,stroke:#fff,color:#fff
+    style App fill:#512bd4,stroke:#fff,color:#fff
+    style AI fill:#10a37f,stroke:#fff,color:#fff
+    style Data fill:#f2c811,stroke:#000,color:#000
+    style Ops fill:#0078d4,stroke:#fff,color:#fff
+    style CI fill:#238636,stroke:#fff,color:#fff
 ```
 
-Detailed views: [Architecture](docs/Architecture.mmd) | [System Flow](docs/SystemFlow.mmd) | [Data Model](docs/DataModel.mmd)
+---
 
-## 📄 Documentation
-
-- [Product Specification](docs/ProductSpec.md)
-- [DevOps Guide](docs/DevOps.md)
-
-## 🎯 Key Features
+## Key Features
 
 | Feature | Description |
 |---------|-------------|
-| Image Regeneration | Computer Vision + GPT-4o + DALL-E 3 |
-| Meme Generation | Auto-caption with witty text overlay |
-| Bulk Generate | 10 art-style variations via Google Imagen 3 |
-| Auth | Dev: `/dev-login`; Prod: Microsoft Entra ID OIDC |
-| Diagnostics | `/diag` page with masked config values |
+| Image Analysis | Computer Vision → GPT-4.1-nano enhancement → tags + confidence |
+| Image Regeneration | Gemini `gemini-2.5-flash-image` with reference bytes |
+| Meme Generation | SkiaSharp text overlay on analysed image |
+| Bulk Generate | 10 art-style variations via parallel Gemini calls, streamed live |
+| Auth | Dev: `/dev-login` cookie · Prod: Microsoft Entra ID OIDC |
+| Diagnostics | `/diag` masked config · `/health` · `/scalar/v1` API docs |
 
-## 🛠️ Tech Stack
+---
 
-- **Framework**: .NET 10 Blazor Web App (Interactive Server)
-- **Infrastructure**: Azure Bicep + Managed Identity
-- **Observability**: Serilog + OpenTelemetry → Application Insights
-- **Testing**: xUnit (Unit + Integration) + Playwright (E2E)
+## Tech Stack
 
-## 🚀 Getting Started
+| Layer | Technology |
+|-------|-----------|
+| Framework | .NET 10 Blazor Web App (SSR + Interactive Server) |
+| AI — Vision | Azure Computer Vision `cv-poshared-eastus` |
+| AI — Language | Azure OpenAI GPT-4.1-nano `openai-poshared-eastus` |
+| AI — Image Gen | Google Gemini `gemini-2.5-flash-image` |
+| Storage | Azure Table Storage `stporedoimage26` |
+| Secrets | Azure Key Vault `kv-poshared` (Access Policy + 30 min rotation) |
+| Observability | OpenTelemetry + Serilog → Application Insights |
+| Infrastructure | Azure Bicep + GitHub Actions OIDC |
+| Testing | xUnit · Testcontainers · Playwright TypeScript |
+
+---
+
+## Documentation
+
+### Master Diagrams
+| Diagram | Description | Simplified |
+|---------|-------------|------------|
+| [Architecture_MASTER.mmd](docs/Architecture_MASTER.mmd) | C4 L1+L2 — Edge, Compute, Data, AI, Ops subgraphs | [SIMPLE](docs/Architecture_MASTER_SIMPLE.mmd) |
+| [DataLifecycle_MASTER.mmd](docs/DataLifecycle_MASTER.mmd) | Ingestion → Processing → Egress pipeline | [SIMPLE](docs/DataLifecycle_MASTER_SIMPLE.mmd) |
+| [DataModel.mmd](docs/DataModel.mmd) | ERD — USER · BULK_PROMPT · IMAGE_RESULT + state enum | [SIMPLE](docs/DataModel_SIMPLE.mmd) |
+| [SystemFlow_MASTER.mmd](docs/SystemFlow_MASTER.mmd) | Auth flow + Image Analysis + Bulk Generate sequence | [SIMPLE](docs/SystemFlow_MASTER_SIMPLE.mmd) |
+| [MultiplayerFlow.mmd](docs/MultiplayerFlow.mmd) | Parallel bulk generation — slot concurrency + conflict resolution | [SIMPLE](docs/MultiplayerFlow_SIMPLE.mmd) |
+
+Screenshots: [docs/screenshots/](docs/screenshots/)
+
+---
+
+## Getting Started
 
 ### Prerequisites
+- .NET 10 SDK
+- Azure subscription with Computer Vision + OpenAI resources
 
-- .NET 10.0 SDK
-- Azure subscription with Computer Vision and OpenAI resources
-- VS Code with C# Dev Kit
-
-### 1. Clone and Restore
-
+### 1. Clone and restore
 ```bash
 git clone https://github.com/punkouter26/PoRedoImage.git
 cd PoRedoImage
 dotnet restore PoRedoImage.slnx
 ```
 
-### 2. Configure Secrets (local dev)
-
-Use `dotnet user-secrets` or `appsettings.Development.json`:
-
-```json
-{
-  "ComputerVision": {
-    "Endpoint": "https://your-resource.cognitiveservices.azure.com/",
-    "ApiKey": "your-key"
-  },
-  "OpenAI": {
-    "Endpoint": "https://your-resource.openai.azure.com/",
-    "Key": "your-key",
-    "ChatCompletionsDeployment": "gpt-4o",
-    "ImageGenerationDeployment": "dall-e-3"
-  },
-  "Google": {
-    "ApiKey": "your-gemini-key"
-  },
-  "Storage": {
-    "ConnectionString": "DefaultEndpointsProtocol=https;..."
-  }
-}
+### 2. Configure secrets (local)
+```bash
+dotnet user-secrets set "ComputerVision:ApiKey" "your-key" --project src/PoRedoImage.Web
+dotnet user-secrets set "ComputerVision:Endpoint" "https://eastus.api.cognitive.microsoft.com/" --project src/PoRedoImage.Web
+dotnet user-secrets set "OpenAI:Key" "your-key" --project src/PoRedoImage.Web
+dotnet user-secrets set "OpenAI:Endpoint" "https://your-resource.openai.azure.com/" --project src/PoRedoImage.Web
+dotnet user-secrets set "OpenAI:ChatCompletionsDeployment" "gpt-4.1-nano" --project src/PoRedoImage.Web
+dotnet user-secrets set "Google:ApiKey" "your-gemini-key" --project src/PoRedoImage.Web
+dotnet user-secrets set "Google:Imagen3Model" "gemini-2.5-flash-image" --project src/PoRedoImage.Web
+dotnet user-secrets set "Storage:ConnectionString" "your-connection-string" --project src/PoRedoImage.Web
 ```
 
 ### 3. Run
-
 ```bash
 dotnet run --project src/PoRedoImage.Web
-# → http://localhost:5000  https://localhost:5001
+# → http://localhost:5000  |  https://localhost:5001
+# Dev login: http://localhost:5000/dev-login?email=you@example.com
 ```
 
-### 4. Running Tests
-
+### 4. Test
 ```bash
-# Unit + Integration
-dotnet test PoRedoImage.slnx
-
-# E2E (requires running app on :5000)
-cd tests/PoRedoImage.Tests.E2E && npx playwright test
+dotnet test PoRedoImage.slnx                                    # Unit + Integration
+cd tests/PoRedoImage.Tests.E2E && npx playwright test           # E2E
 ```
 
-## 📡 API Endpoints
+---
+
+## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Full health check (JSON) |
 | GET | `/alive` | Liveness probe |
-| GET | `/api/diag` | Masked config diagnostics |
+| GET | `/diag` | Masked config diagnostics |
 | POST | `/api/images/analyze` | Analyze + process image |
 | GET | `/api/bulk-generate/prompts` | Load saved art prompts |
 | POST | `/api/bulk-generate/prompts` | Save art prompts |
 | GET | `/scalar/v1` | Interactive API docs |
 
-## 📁 Project Structure
+---
 
+## Project Structure
 ```
-src/
-  PoRedoImage.Web/
-    Features/
-      Auth/           # OIDC + dev login
-      BulkGenerate/   # Imagen 3 bulk generation, prompt storage
-      Diagnostics/    # /diag endpoint, Key Vault mapping, middleware
-      ImageAnalysis/  # Computer Vision, OpenAI, Meme Generator
-      ImageSession/   # Per-circuit image state service
-    Components/       # Blazor pages + shared components
-    Models/           # DTOs
+src/PoRedoImage.Web/
+  Features/
+    Auth/             # OIDC + dev login cookie handler
+    BulkGenerate/     # Imagen3Service, parallel generation, prompt storage
+    Diagnostics/      # /diag endpoint, KeyVaultSecretNameMapping, middleware
+    ImageAnalysis/    # ComputerVisionService, OpenAIService, MemeGeneratorService
+    ImageSession/     # Per-circuit image state service
+  Components/         # Blazor pages + shared layout
+  Models/             # DTOs and enums
 tests/
-  PoRedoImage.Tests.Unit/        # xUnit, pure logic
-  PoRedoImage.Tests.Integration/ # xUnit, WebApplicationFactory
-  PoRedoImage.Tests.E2E/         # Playwright TypeScript
+  PoRedoImage.Tests.Unit/            # xUnit pure logic
+  PoRedoImage.Tests.Integration/     # xUnit + WebApplicationFactory + Testcontainers
+  PoRedoImage.Tests.E2E/             # Playwright TypeScript
 infra/
-  main.bicep          # Azure App Service + Storage provisioning
+  main.bicep          # App Service + Storage provisioning
+docs/                 # All .mmd diagrams + screenshots
 ```
 
-## 🔧 Configuration Reference
+---
 
-All secrets load from Azure Key Vault in Production (via `AZURE_KEY_VAULT_ENDPOINT` env var).
-Locally, use `dotnet user-secrets` or `appsettings.Development.json`.
+## Key Vault Secrets (Production)
 
-Key Vault secret names use the `PoRedoImage-` prefix (see `KeyVaultSecretNameMapping.cs`).
+All secrets load from `kv-poshared` via `AZURE_KEY_VAULT_ENDPOINT` app setting.
 
-## 📙 Dev Guidelines
+| Key Vault Secret | Config Key |
+|-----------------|------------|
+| `PoRedoImage-ComputerVision-ApiKey` | `ComputerVision:ApiKey` |
+| `PoRedoImage-ComputerVision-Endpoint` | `ComputerVision:Endpoint` |
+| `PoRedoImage-OpenAI-ApiKey` | `OpenAI:Key` |
+| `PoRedoImage-OpenAI-Endpoint` | `OpenAI:Endpoint` |
+| `PoRedoImage-OpenAI-DeploymentName` | `OpenAI:ChatCompletionsDeployment` |
+| `PoRedoImage-StorageConnectionString` | `Storage:ConnectionString` |
+| `PoRedoImage-Google-ApiKey` | `Google:ApiKey` |
+| `PoRedoImage-Google-Imagen3Model` | `Google:Imagen3Model` |
+| `PoRedoImage-ApplicationInsights-ConnectionString` | `ApplicationInsights:ConnectionString` |
 
-See [.github/copilot-instructions.md](.github/copilot-instructions.md) for conventions:
+---
 
-- **Vertical Slice Architecture** — feature files live in `Features/{Name}/`
-- **Minimal APIs** — no MVC controllers; use `MapGroup`
-- **Central Package Management** — all versions in `Directory.Packages.props`
-- **TreatWarningsAsErrors** — enforced in `Directory.Build.props`
+## Dev Guidelines
 
-## �️ Architecture Overview
-
-The application follows a modern cloud-native architecture, utilizing Microsoft Azure for compute, storage, and AI processing.
-
-```mermaid
-flowchart TD
-    subgraph Client["Client Browser"]
-        WebApp["Blazor Web App (SSR/WASM)"]
-    end
-
-    subgraph Azure["Azure Cloud"]
-        Service["poredoimage-web (App Service)"]
-        TableStorage[("Azure Table Storage")]
-        OpenAI["Azure OpenAI (GPT-4/DALL-E)"]
-        Vision["Azure Computer Vision"]
-    end
-
-    WebApp -- "HTTPS" --> Service
-    Service -- "Identity" --> TableStorage
-    Service -- "Identity" --> OpenAI
-    Service -- "Identity" --> Vision
-
-    style Client fill:#333,stroke:#fff,color:#fff
-    style Azure fill:#111,stroke:#fff,color:#fff
-    style Service fill:#005a9e,stroke:#fff,color:#fff
-    style WebApp fill:#512bd4,stroke:#fff,color:#fff
-```
-
-Detailed architectural views:
-- [System Architecture](docs/Architecture.mmd) | [Simple View](docs/Architecture_SIMPLE.mmd)
-- [System Flow & User Journey](docs/SystemFlow.mmd) | [Simple View](docs/SystemFlow_SIMPLE.mmd)
-- [Entity Data Model](docs/DataModel.mmd) | [Simple View](docs/DataModel_SIMPLE.mmd)
-
-## 📄 Documentation Index
-
-- [Product Specification (PRD & Metrics)](docs/ProductSpec.md)
-- [DevOps Guide (Deployment & Onboarding)](docs/DevOps.md)
-
-## 🎯 Key Capabilities
-- 🔍 **Image Analysis**: Azure Computer Vision powered analysis
-- 📝 **Enhanced Descriptions**: Azure OpenAI GPT-4 generated descriptions  
-- 🎨 **Bulk Regeneration**: DALL-E powered image creation sets
-- 📊 **Performance Metrics**: Real-time processing time tracking
-- 🏥 **Health Monitoring**: Aspire-integrated health endpoints
-
-## 🧪 Documentation Refactor: Blast Radius Assessment
-The recent documentation consolidation merges multiple fragmented files into high-signal mermaid diagrams and PRD assets. This improves AI context utilization and human readability. No code logic was modified, ensuring zero impact on downstream service dependencies or runtime behavior.
-
-## 🛠️ Technology Stack
-- **Framework**: .NET 10.0 Unified Blazor
-- **Orchestration**: .NET Aspire 9.3
-- **Infrastructure**: Azure Bicep & Managed Identity
-- **Observability**: OpenTelemetry / Application Insights
-- **Testing**: xUnit / Playwright
-
-## 🚀 Getting Started
-
-### Prerequisites
-- .NET 10.0 SDK (10.0.100+)
-- Azure Subscription with Computer Vision and OpenAI services
-- VS Code with C# Dev Kit extension
-
-### Local Development
-
-#### 1. Clone and Restore
-```bash
-git clone https://github.com/punkouter26/PoRedoImage.git
-cd PoRedoImage
-dotnet restore PoRedoImage.slnx
-```
-
-#### 2. Configure Secrets
-
-Create or update `src/PoRedoImage.Web/appsettings.Development.json`:
-```json
-{
-  "AzureOpenAI": {
-    "ApiKey": "your-key",
-    "Endpoint": "https://your-resource.openai.azure.com/",
-    "DeploymentName": "gpt-4",
-    "DalleDeploymentName": "dall-e-3"
-  },
-  "ComputerVision": {
-    "Key": "your-key",
-    "Endpoint": "https://your-resource.cognitiveservices.azure.com/"
-  }
-}
-```
-
-#### 3. Run the Application
-
-**Option A: Direct (Web only)**
-```bash
-cd src/PoRedoImage.Web
-dotnet run
-```
-
-**Option B: With Aspire AppHost**
-```bash
-cd src/PoRedoImage.AppHost
-dotnet run
-```
-
-**Option C: VS Code F5**
-- Select "Launch Web (Direct)" or "Launch AppHost (Aspire)"
-
-### Running Tests
-
-```bash
-# All tests
-dotnet test PoRedoImage.slnx
-
-# Unit tests only
-dotnet test tests/PoRedoImage.Tests.Unit
-
-# Integration tests only
-dotnet test tests/PoRedoImage.Tests.Integration
-
-# With coverage
-dotnet test PoRedoImage.slnx --collect:"XPlat Code Coverage"
-```
-
-## 📡 API Endpoints
-
-### Health Checks (Aspire Defaults)
-- `GET /health` - Full health check
-- `GET /alive` - Liveness probe
-
-### Image Analysis (Minimal API)
-- `GET /api/images/status` - Service status
-- `POST /api/images/analyze` - Analyze image
-
-### Documentation
-- `GET /openapi/v1.json` - OpenAPI spec
-- `GET /scalar/v1` - Interactive API docs
-
-## 📁 Project Structure
-
-| Project | Purpose |
-|---------|---------|
-| `PoRedoImage.Web` | Main Blazor Web App, hosts API and UI |
-| `PoRedoImage.Web.Client` | WASM client for interactive components |
-| `PoRedoImage.AppHost` | Aspire orchestration host |
-| `PoRedoImage.ServiceDefaults` | Shared Aspire config (OpenTelemetry, health) |
-| `PoRedoImage.Shared` | DTOs shared between Web and Client |
-| `PoRedoImage.Tests.Unit` | Unit tests with xUnit |
-| `PoRedoImage.Tests.Integration` | Integration tests with WebApplicationFactory |
-
-## 🔧 Configuration
-
-### Environment Variables
-- `ASPNETCORE_ENVIRONMENT` - Development/Production
-- `AZURE_KEY_VAULT_ENDPOINT` - Key Vault URI (Production)
-
-### appsettings.json Structure
-```json
-{
-  "Logging": { ... },
-  "AzureOpenAI": {
-    "ApiKey": "",
-    "Endpoint": "",
-    "DeploymentName": "gpt-4",
-    "DalleDeploymentName": "dall-e-3"
-  },
-  "ComputerVision": {
-    "Key": "",
-    "Endpoint": ""
-  },
-  "ApplicationInsights": {
-    "ConnectionString": ""
-  }
-}
-```
-
-## 📝 Development Guidelines
-
-Following [copilot-instructions.md](.github/copilot-instructions.md):
-
-- **Vertical Slice Architecture** - Features in `/Features/{FeatureName}/`
-- **Minimal APIs** - No controllers, use `MapGroup`
-- **Central Package Management** - All versions in Directory.Packages.props
-- **Test Naming** - `MethodName_StateUnderTest_ExpectedBehavior`
-- **TDD Workflow** - Red → Green → Refactor
-- **80% Code Coverage** - Target for business logic
-
-## 📄 License
-
-MIT License - See LICENSE file for details.
+See [.github/copilot-instructions.md](.github/copilot-instructions.md):
+- **Vertical Slice Architecture** — all feature files in `Features/{Name}/`
+- **Minimal APIs** — no MVC controllers; use `MapGroup` + static handler methods
+- **Nullable + warnings as errors** enforced via `Directory.Build.props`
+- **Prefix**: `PoRedoImage` for all namespaces and Azure resources

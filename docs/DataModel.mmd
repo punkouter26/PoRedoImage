@@ -1,20 +1,32 @@
 erDiagram
-    USER ||--o{ BULK_PROMPT : creates
+    USER ||--o{ BULK_PROMPT : "creates"
+    BULK_PROMPT ||--o{ IMAGE_RESULT : "contains"
+    BULK_PROMPT }|--|| PROMPT_STATUS : "tracks state via"
+
     USER {
-        string NameIdentifier PK
+        string NameIdentifier PK "ClaimTypes.NameIdentifier"
         string Email
+        string DisplayName
     }
+
     BULK_PROMPT {
-        string PartitionKey PK "ClaimTypes.NameIdentifier"
-        string RowKey PK "PromptId"
+        string PartitionKey PK "= NameIdentifier"
+        string RowKey PK "= PromptId GUID"
         string PromptText
-        string Status "Pending | Processing | Complete | Failed"
+        string ArtStyle
+        string Status "Pending|Processing|Complete|Failed"
+        int ImageCount
         datetime Timestamp
     }
+
     IMAGE_RESULT {
-        string PromptId FK
+        string PromptId FK "= BulkPrompt RowKey"
+        int Index PK "0-based art style index"
         string ImageUrl
-        string AnalysisResult
-        int Index
+        string ContentType "image/png"
+        int GenerationMs
     }
-    BULK_PROMPT ||--o{ IMAGE_RESULT : contains
+
+    PROMPT_STATUS {
+        string Value PK "Pending → Processing → Complete|Failed"
+    }
