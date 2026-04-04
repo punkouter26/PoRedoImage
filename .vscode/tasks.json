@@ -43,6 +43,26 @@
             "dependsOn": ["kill-dotnet", "build"]
         },
         {
+            "label": "test-coverage",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "test",
+                "${workspaceFolder}/PoRedoImage.slnx",
+                "--collect:XPlat Code Coverage",
+                "--results-directory",
+                "${workspaceFolder}/TestResults",
+                "--logger",
+                "trx;LogFileName=results.trx"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "watch",
             "command": "dotnet",
             "type": "process",

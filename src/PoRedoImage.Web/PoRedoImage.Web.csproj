@@ -11,6 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PoShared\PoShared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Azure -->
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Azure.AI.Vision.ImageAnalysis" />

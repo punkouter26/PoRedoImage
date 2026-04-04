@@ -78,4 +78,26 @@ public class KeyVaultSecretNameMappingTests
             SecretModelFactory.SecretProperties(name: "Foo--Bar--Baz"), "val");
         Assert.Equal("Foo:Bar:Baz", _mapping.GetKey(secret));
     }
+
+    [Fact]
+    public void RequiredSecretNames_ContainsAllExpectedKeyVaultNames()
+    {
+        var expected = new[]
+        {
+            "PoRedoImage-ComputerVision-ApiKey",
+            "PoRedoImage-ComputerVision-Endpoint",
+            "PoRedoImage-OpenAI-ApiKey",
+            "PoRedoImage-OpenAI-Endpoint",
+            "PoRedoImage-OpenAI-DeploymentName",
+            "PoRedoImage-OpenAI-ImageEndpoint",
+            "PoRedoImage-OpenAI-ImageKey",
+            "PoRedoImage-ApplicationInsights-ConnectionString",
+            "PoRedoImage-StorageConnectionString",
+            "PoRedoImage-AzureAd-ClientId",
+            "PoRedoImage-AzureAd-ClientSecret",
+            "PoRedoImage-Google-ApiKey",
+        };
+
+        Assert.Equal(expected.OrderBy(x => x), KeyVaultSecretNameMapping.RequiredSecretNames.OrderBy(x => x));
+    }
 }

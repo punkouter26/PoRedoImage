@@ -5,7 +5,6 @@
 
 # IDE folders
 .vscode/
-
 # User-specific files
 *.rsuser
 *.suo
@@ -409,6 +408,22 @@ log.txt
 # Azurite local storage data
 AzuriteData/*
 !AzuriteData/README.md
+
+# Test artifacts & temp files
+response.json
+test-person.jpg
+app-logs.zip
+TestResults/
+playwright-report/
+playwright/.auth/
+
+# App logs (Kudu/deployment)
+app-logs/
+
+# Node modules (Playwright)
+tests/playwright/node_modules/
+tests/playwright/test-results/
+
 
 # Configuration files with sensitive data (commented out for private repo)
 # appsettings.json

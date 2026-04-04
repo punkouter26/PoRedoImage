@@ -48,12 +48,22 @@ public class OpenAIService : IOpenAIService
     private readonly ImageClient _imageClient;
     private readonly ImageClient? _imageEditClient;
 
+    private readonly string? _configurationError;
+
     public OpenAIService(IConfiguration configuration, ILogger<OpenAIService> logger)
     {
         _logger = logger;
 
-        var endpoint = configuration["OpenAI:Endpoint"] ??
-            throw new ArgumentNullException("OpenAI:Endpoint is not configured");
+        var endpoint = configuration["OpenAI:Endpoint"];
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            _configurationError = "OpenAI:Endpoint is not configured. Set it via user-secrets or Key Vault.";
+            _logger.LogWarning("OpenAI Service is not configured: {Error}", _configurationError);
+            // Initialize required fields to satisfy compiler
+            _chatClient = null!;
+            _imageClient = null!;
+            return;
+        }
 
         var imageEndpoint = configuration["OpenAI:ImageEndpoint"] ?? endpoint;
         var chatDeployment = configuration["OpenAI:ChatCompletionsDeployment"] ?? "gpt-4o";
@@ -92,6 +102,7 @@ public class OpenAIService : IOpenAIService
     public async Task<(string EnhancedDescription, int TokensUsed, long ProcessingTimeMs)> EnhanceDescriptionAsync(
         string basicDescription, List<string> tags, int targetLength)
     {
+        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentNullException.ThrowIfNull(basicDescription);
         ArgumentNullException.ThrowIfNull(tags);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(targetLength, 0);
@@ -140,6 +151,7 @@ Enhanced description:";
 
     public async Task<(byte[] ImageData, string ContentType, int TokensUsed, long ProcessingTimeMs)> GenerateImageAsync(string description)
     {
+        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
 
         _logger.LogInformation("Generating image with DALL-E");
@@ -171,6 +183,7 @@ Enhanced description:";
     public async Task<(byte[] ImageData, string ContentType, long ProcessingTimeMs)> GenerateImageEditAsync(
         byte[] imageBytes, string prompt, CancellationToken cancellationToken = default)
     {
+        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentNullException.ThrowIfNull(imageBytes);
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
@@ -239,6 +252,7 @@ Enhanced description:";
     public async Task<(string TopText, string BottomText, int TokensUsed, long ProcessingTimeMs)> GenerateMemeCaptionAsync(
         List<string> tags)
     {
+        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentNullException.ThrowIfNull(tags);
 
         _logger.LogInformation("Generating meme caption from {TagCount} tags", tags.Count);
@@ -291,6 +305,7 @@ Keep captions short (3-7 words each). Make it humorous and relatable.";
 
     public async Task<string> DescribePersonAsync(byte[] imageData)
     {
+        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentNullException.ThrowIfNull(imageData);
 
         _logger.LogInformation("Describing person via GPT-4o vision. Image size: {Size} bytes", imageData.Length);

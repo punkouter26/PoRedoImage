@@ -82,3 +82,10 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
 output appServiceDefaultHostName string = webApp.properties.defaultHostName
 output appServicePrincipalId string = webApp.identity.principalId
 output storageAccountName string = storageAccount.name
+output webAppPrincipalId string = webApp.identity.principalId
+output webAppDefaultHostName string = webApp.properties.defaultHostName
+
+// NOTE: Key Vault role assignment (Key Vault Secrets User) is applied post-deploy via:
+//   az role assignment create --role "Key Vault Secrets User" \
+//     --assignee <webAppPrincipalId> \
+//     --scope /subscriptions/bbb8dfbe-9169-432f-9b7a-fbf861b51037/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared

@@ -19,8 +19,22 @@ public static partial class DiagnosticsEndpoints
             .WithSummary("Get masked configuration values for diagnostics");
     }
 
-    private static IResult GetDiagnostics(IConfiguration configuration, IWebHostEnvironment env)
+    private static async Task<IResult> GetDiagnostics(
+        IConfiguration configuration,
+        IWebHostEnvironment env,
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckService healthCheckService)
     {
+        var healthReport = await healthCheckService.CheckHealthAsync();
+
+        var healthData = healthReport.Entries.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new
+            {
+                Status = kvp.Value.Status.ToString(),
+                Description = kvp.Value.Description,
+                DurationMs = kvp.Value.Duration.TotalMilliseconds
+            });
+
         var diagnostics = new Dictionary<string, object>
         {
             ["Environment"] = env.EnvironmentName,
@@ -29,6 +43,12 @@ public static partial class DiagnosticsEndpoints
             ["DotNetVersion"] = Environment.Version.ToString(),
             ["ProcessId"] = Environment.ProcessId,
             ["Timestamp"] = DateTime.UtcNow.ToString("O"),
+            ["Health"] = new
+            {
+                Status = healthReport.Status.ToString(),
+                TotalDurationMs = healthReport.TotalDuration.TotalMilliseconds,
+                Entries = healthData
+            },
             ["Configuration"] = new Dictionary<string, string?>
             {
                 ["AZURE_KEY_VAULT_ENDPOINT"] = MaskValue(configuration["AZURE_KEY_VAULT_ENDPOINT"]),

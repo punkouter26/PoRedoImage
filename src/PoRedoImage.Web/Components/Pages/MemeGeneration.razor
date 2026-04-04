@@ -155,8 +155,15 @@
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
-                    var problem = await httpResponse.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
-                    errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
+                    try
+                    {
+                        var problem = await httpResponse.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+                        errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
+                    }
+                    catch
+                    {
+                        errorMessage = $"Request failed ({(int)httpResponse.StatusCode}). Check that Azure services are configured.";
+                    }
                 }
                 else
                 {

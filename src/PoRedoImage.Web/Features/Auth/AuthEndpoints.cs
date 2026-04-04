@@ -45,14 +45,23 @@ public static class AuthEndpoints
             }).AllowAnonymous();
         }
 
-        // Trigger Microsoft OIDC challenge — both environments (no-op in dev since OIDC not configured)
-        app.MapGet("/challenge-microsoft", async (HttpContext context, string? returnUrl) =>
+        // Trigger Microsoft OIDC challenge — in Dev (no OIDC registered) redirect to dev-login instead
+        app.MapGet("/challenge-microsoft", async (HttpContext context, IWebHostEnvironment env, string? returnUrl) =>
         {
             // Sanitize returnUrl to prevent open-redirect
             var destination = (!string.IsNullOrWhiteSpace(returnUrl)
                 && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)
                 && !returnUrl.StartsWith("//"))
                 ? returnUrl : "/";
+
+            var clientId = context.RequestServices.GetRequiredService<IConfiguration>()["AzureAd:ClientId"];
+            var hasOidc = !string.IsNullOrWhiteSpace(clientId);
+
+            if (env.IsDevelopment() && !hasOidc)
+            {
+                context.Response.Redirect("/login");
+                return;
+            }
 
             await context.ChallengeAsync(
                 OpenIdConnectDefaults.AuthenticationScheme,

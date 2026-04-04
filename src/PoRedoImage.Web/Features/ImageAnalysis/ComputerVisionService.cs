@@ -21,8 +21,9 @@ public interface IComputerVisionService
 public class ComputerVisionService : IComputerVisionService
 {
     private readonly ILogger<ComputerVisionService> _logger;
-    private readonly ImageAnalysisClient _client;
+    private readonly ImageAnalysisClient? _client;
     private readonly float _minTagConfidence;
+    private readonly string? _configurationError;
 
     public ComputerVisionService(
         IConfiguration configuration,
@@ -30,20 +31,27 @@ public class ComputerVisionService : IComputerVisionService
     {
         _logger = logger;
 
-        var endpoint = configuration["ComputerVision:Endpoint"] ??
-            throw new ArgumentNullException("ComputerVision:Endpoint is not configured");
-        var key = configuration["ComputerVision:ApiKey"] ?? configuration["ComputerVision:Key"] ??
-            throw new ArgumentNullException("ComputerVision:ApiKey or ComputerVision:Key is not configured");
+        var endpoint = configuration["ComputerVision:Endpoint"];
+        var key = configuration["ComputerVision:ApiKey"] ?? configuration["ComputerVision:Key"];
         _minTagConfidence = configuration.GetValue<float>("ComputerVision:MinTagConfidence", 0.6f);
+
+        if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(key))
+        {
+            _configurationError = "ComputerVision:Endpoint and ComputerVision:ApiKey are not configured. Set them via user-secrets or Key Vault.";
+            _logger.LogWarning("Computer Vision Service is not configured: {Error}", _configurationError);
+            return;
+        }
 
         // Cache the client — reuses HTTP connections across all requests (avoids socket exhaustion)
         _client = new ImageAnalysisClient(new Uri(endpoint), new AzureKeyCredential(key));
-
         _logger.LogInformation("Computer Vision Service initialized with endpoint: {Endpoint}", endpoint);
     }
 
     public async Task<(string Description, List<string> Tags, double ConfidenceScore, long ProcessingTimeMs)> AnalyzeImageAsync(byte[] imageData)
     {
+        if (_configurationError is not null)
+            throw new InvalidOperationException(_configurationError);
+
         ArgumentNullException.ThrowIfNull(imageData);
         if (imageData.Length == 0)
             throw new ArgumentException("Image data cannot be empty", nameof(imageData));
@@ -57,7 +65,7 @@ public class ComputerVisionService : IComputerVisionService
             // North Europe, Southeast Asia, West Europe, West US
             var visualFeatures = VisualFeatures.Caption | VisualFeatures.Tags;
 
-            var response = await _client.AnalyzeAsync(
+            var response = await _client!.AnalyzeAsync(
                 BinaryData.FromBytes(imageData),
                 visualFeatures,
                 new ImageAnalysisOptions { Language = "en", GenderNeutralCaption = true });

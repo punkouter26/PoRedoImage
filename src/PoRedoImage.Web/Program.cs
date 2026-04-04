@@ -3,6 +3,8 @@ using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -38,14 +40,38 @@ if (!string.IsNullOrEmpty(keyVaultEndpoint))
     {
         var credential = new DefaultAzureCredential();
         var secretClient = new SecretClient(new Uri(keyVaultEndpoint), credential);
-        builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretNameMapping());
+        var secretManager = new KeyVaultSecretNameMapping();
+
+        // ReloadInterval: re-fetch secrets every 30 minutes for secret rotation without restart.
+        builder.Configuration.AddAzureKeyVault(
+            new Uri(keyVaultEndpoint),
+            credential,
+            new AzureKeyVaultConfigurationOptions
+            {
+                Manager = secretManager,
+                ReloadInterval = TimeSpan.FromMinutes(30)
+            });
+
+        // Validate that all secrets required by app mapping are present and non-empty.
+        var requireAllSecrets = builder.Configuration.GetValue<bool?>("KeyVault:RequireAllSecrets") ?? true;
+        if (requireAllSecrets)
+        {
+            KeyVaultSecretValidator.ValidateRequiredSecrets(secretClient, Log.Logger);
+        }
     }
     catch (Exception ex)
     {
         Log.Warning(ex,
-            "Key Vault at {Endpoint} is unreachable; secrets will not be loaded. "
+            "Key Vault at {Endpoint} is unreachable or missing required secrets; secrets may not be loaded. "
             + "Application Insights and other Key Vault-dependent features may be unavailable.",
             keyVaultEndpoint);
+
+        // In production fail-fast if key vault cannot be read, otherwise continue in Dev.
+        if (!builder.Environment.IsDevelopment())
+        {
+            Log.Fatal(ex, "Key Vault startup validation failed, terminating app startup.");
+            throw;
+        }
     }
 }
 
@@ -106,9 +132,26 @@ builder.Services.AddOpenApi();
 // HTTP client factory (used by health checks)
 builder.Services.AddHttpClient();
 
+// ─── Rate limiting ──────────────────────────────────────────────────
+// Protect costly AI endpoints: 10 requests/minute per IP (sliding window).
+// Returns HTTP 429 when the limit is exceeded.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddSlidingWindowLimiter("ai-endpoints", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.SegmentsPerWindow = 6;
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 2;
+    });
+});
+
 // ─── Health checks ──────────────────────────────────────────────────
 // Named checks verify connectivity to Computer Vision and OpenAI endpoints
 builder.Services.AddHealthChecks()
+    .AddCheck<KeyVaultHealthCheck>("key-vault", tags: ["ready"])
     .AddCheck<ComputerVisionHealthCheck>("computer-vision", tags: ["ready"])
     .AddCheck<OpenAIHealthCheck>("openai", tags: ["ready"])
     .AddCheck<BulkPromptStorageHealthCheck>("table-storage", tags: ["ready"])
@@ -171,6 +214,7 @@ app.UseSerilogRequestLogging(opts =>
     };
 });
 
+app.UseRateLimiter();
 app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using PoRedoImage.Web.Features.BulkGenerate;
 using PoRedoImage.Web.Models;
 using System.ClientModel;
 
@@ -19,7 +20,8 @@ public static class ImageAnalysisEndpoints
             .WithSummary("Analyze an image and optionally generate content")
             .Produces<ImageAnalysisResult>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
-            .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
+            .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
+            .RequireRateLimiting("ai-endpoints");
 
         group.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Service = "ImageAnalysis" }))
             .WithName("ImageAnalysisHealth")
@@ -31,6 +33,7 @@ public static class ImageAnalysisEndpoints
         IComputerVisionService computerVisionService,
         IOpenAIService openAIService,
         IMemeGeneratorService memeGeneratorService,
+        IImagen3Service imagen3Service,
         ILogger<ImageAnalysisRequest> logger)
     {
         if (string.IsNullOrEmpty(request.ImageData))
@@ -95,15 +98,29 @@ public static class ImageAnalysisEndpoints
             }
             else // ImageRegeneration mode
             {
-                // Enhance description
+                // Enhance description via GPT
                 var (enhancedDesc, descTokens, descTime) = await openAIService.EnhanceDescriptionAsync(
                     description, tags, request.DescriptionLength);
                 result.Description = enhancedDesc;
                 result.Metrics.DescriptionGenerationTimeMs = descTime;
                 result.Metrics.DescriptionTokensUsed = descTokens;
 
-                // Generate new image with DALL-E
-                var (generatedImage, contentType, _, regenTime) = await openAIService.GenerateImageAsync(enhancedDesc);
+                // Generate image: prefer Gemini (DALL-E 3 deprecated 2026-04-03)
+                byte[] generatedImage;
+                string contentType;
+                long regenTime;
+                if (imagen3Service.IsConfigured)
+                {
+                    logger.LogInformation("Using Gemini API for image generation");
+                    var imageBytes2 = Convert.FromBase64String(request.ImageData);
+                    (generatedImage, contentType, regenTime) = await imagen3Service.GenerateImageAsync(
+                        enhancedDesc, imageBytes2);
+                }
+                else
+                {
+                    logger.LogInformation("Falling back to DALL-E for image generation");
+                    (generatedImage, contentType, _, regenTime) = await openAIService.GenerateImageAsync(enhancedDesc);
+                }
                 result.RegeneratedImageData = Convert.ToBase64String(generatedImage);
                 result.RegeneratedImageContentType = contentType;
                 result.Metrics.ImageRegenerationTimeMs = regenTime;
