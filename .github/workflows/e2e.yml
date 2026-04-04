@@ -1,7 +1,9 @@
 name: E2E Tests
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Build and Deploy to Azure App Service"]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
 
@@ -13,6 +15,7 @@ jobs:
     name: Playwright E2E (headless)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
