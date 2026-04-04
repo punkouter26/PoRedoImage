@@ -159,7 +159,12 @@ builder.Services.AddHealthChecks()
 // ─── HTTP client ────────────────────────────────────────────────────
 builder.Services.AddScoped(sp =>
 {
-    var httpClient = new HttpClient();
+    var httpClient = new HttpClient
+    {
+        // AI endpoints (Computer Vision + OpenAI) can take up to 3 minutes on cold start.
+        // Default is 100 s which causes spurious "timed out" errors in the Blazor components.
+        Timeout = TimeSpan.FromMinutes(4)
+    };
     var navigationManager = sp.GetRequiredService<NavigationManager>();
     httpClient.BaseAddress = new Uri(navigationManager.BaseUri);
     return httpClient;
