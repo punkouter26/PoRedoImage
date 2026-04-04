@@ -420,6 +420,14 @@ playwright/.auth/
 # App logs (Kudu/deployment)
 app-logs/
 
+# Environment variable files (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Zip archives (build/deploy artifacts)
+*.zip
+
 # Node modules (Playwright)
 tests/playwright/node_modules/
 tests/playwright/test-results/
