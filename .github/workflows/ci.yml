@@ -69,6 +69,10 @@ jobs:
     needs: build-and-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
 
@@ -80,17 +84,35 @@ jobs:
       - name: Publish
         run: dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj --configuration Release --output ./publish
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
+      - name: Zip publish output
+        run: cd ./publish && zip -r ../app.zip . && cd ..
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
         with:
-          app-name: poredoimage-web
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./publish
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure App Service
+        run: |
+          az webapp deploy \
+            --name poredoimage-web \
+            --resource-group PoRedoImage \
+            --src-path ./app.zip \
+            --type zip
 
       - name: Smoke test /health
         run: |
           echo "Waiting for app to start..."
-          sleep 30
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://poredoimage-web.azurewebsites.net/health)
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "503" ]; then
+              break
+            fi
+            echo "Attempt $i: got $STATUS, retrying in 10s..."
+            sleep 10
+          done
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://poredoimage-web.azurewebsites.net/health)
           echo "Health check status: $STATUS"
           if [ "$STATUS" != "200" ]; then
