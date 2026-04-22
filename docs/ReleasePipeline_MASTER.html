@@ -1,0 +1,393 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Release Pipeline · PoRedoImage</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #f5f4ed;
+      --paper-2: #efeee5;
+      --ink: #0b0d0b;
+      --muted: #52534e;
+      --soft: #65655c;
+      --rule: rgba(11,13,11,0.12);
+      --rule-strong: rgba(11,13,11,0.25);
+      --accent: #f7591f;
+      --accent-tint: rgba(247,89,31,0.08);
+      --link: #1a70c7;
+      --sans: 'Geist', system-ui, sans-serif;
+      --serif: 'Instrument Serif', serif;
+      --mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    html { font-size: 16px; }
+    body {
+      font-family: var(--sans);
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+      padding-bottom: 4rem;
+    }
+
+    /* Dot pattern background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(11,13,11,0.10) 0.9px, transparent 0.9px);
+      background-size: 22px 22px;
+      opacity: 0.45;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    * { position: relative; z-index: 1; }
+
+    .page-header {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 3rem 2rem 1.5rem;
+    }
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .page-title {
+      font-family: var(--serif);
+      font-size: 1.75rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--ink);
+      margin-bottom: 0.75rem;
+    }
+    .page-subtitle {
+      font-family: var(--sans);
+      font-size: 0.9375rem;
+      color: var(--soft);
+      line-height: 1.6;
+      max-width: 64ch;
+    }
+
+    .diagram-wrap {
+      max-width: 960px;
+      margin: 2rem auto;
+      padding: 0 2rem;
+    }
+    .diagram-container {
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      overflow-x: auto;
+      padding: 2rem;
+      min-height: 200px;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      font-family: var(--sans) !important;
+    }
+    .mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .cards-grid {
+      max-width: 960px;
+      margin: 1.5rem auto 0;
+      padding: 0 2rem;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 0.9fr;
+      gap: 0.875rem;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 1.25rem;
+    }
+    .card-eyebrow {
+      font-family: var(--mono);
+      font-size: 0.625rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.625rem;
+    }
+    .card-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .card-dot.coral { background: var(--accent); }
+    .card-dot.ink { background: var(--ink); }
+    .card-dot.link { background: var(--link); }
+    .card-dot.muted { background: var(--muted); }
+    .card h3 {
+      font-family: var(--sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .card ul {
+      list-style: none;
+      padding: 0;
+    }
+    .card ul li {
+      font-family: var(--sans);
+      font-size: 0.8125rem;
+      color: var(--soft);
+      line-height: 1.6;
+      padding: 0.125rem 0 0.125rem 0.875rem;
+      position: relative;
+    }
+    .card ul li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+      font-size: 0.625rem;
+      top: 0.4rem;
+    }
+
+    .page-footer {
+      max-width: 960px;
+      margin: 2.5rem auto 0;
+      padding: 1rem 2rem 0;
+      border-top: 1px solid var(--rule);
+    }
+    .footer-text {
+      font-family: var(--mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <p class="eyebrow">POREDOIMAGE · CI/CD · MASTER</p>
+    <h1 class="page-title">Release Pipeline</h1>
+    <p class="page-subtitle">Three GitHub Actions workflows: ci.yml on PRs (build + unit + integration + coverage), e2e.yml (Playwright headless), and azure-deploy.yml (OIDC → App Service zip deploy + smoke check).</p>
+  </header>
+
+  <div class="diagram-wrap">
+    <div class="diagram-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Triggers["Triggers"]
+        PR["Pull Request\nto master"]
+        Push["Push to master\nor manual dispatch"]
+    end
+
+    subgraph CI["ci.yml — CI Gate"]
+        direction TB
+        Restore["dotnet restore\nNuGet cache hit"]
+        Build["dotnet build\nRelease config\nWarningsAsErrors"]
+        UnitTest["Unit Tests\nxUnit pure logic"]
+        IntTest["Integration Tests\nTestcontainers\nAzurite Table Storage"]
+        CovGate["Coverage Gate\n≥ 80% opencover\n⚠ warn-only today"]
+        Artifacts["Upload\nTestResults TRX\nCoverage XML"]
+    end
+
+    subgraph E2EJob["e2e.yml — E2E Gate"]
+        direction TB
+        InstallPW["npm ci\nPlaywright install"]
+        ServePW["Start App\nASP.NET Development"]
+        RunPW["npx playwright test\nHeadless Chromium\nMobile viewports"]
+        PWReport["Upload\nPlaywright Report\nScreenshots on failure"]
+    end
+
+    subgraph Deploy["azure-deploy.yml — Production Deploy"]
+        direction TB
+        DotnetPub["dotnet publish\nRelease → ./publish"]
+        AzLogin["Azure Login\nOIDC Federated Identity\nNo long-lived secrets"]
+        ZipDeploy["az webapp deploy\nzip → OneDeploy API\nasync=true"]
+        Startup["Set startup command\ndotnet PoRedoImage.Web.dll"]
+        Smoke["Smoke check\ncurl /health → 200"]
+    end
+
+    PR -->|"triggers"| CI
+    CI --> CovGate
+    CovGate --> Artifacts
+
+    Push -->|"triggers"| Deploy
+    Push -->|"optional"| E2EJob
+
+    Deploy --> Smoke
+
+    Restore --> Build --> UnitTest --> IntTest --> CovGate
+    InstallPW --> ServePW --> RunPW --> PWReport
+    DotnetPub --> AzLogin --> ZipDeploy --> Startup --> Smoke
+
+    style PR fill:#238636,stroke:#196228,color:#fff
+    style Push fill:#238636,stroke:#196228,color:#fff
+    style Restore fill:#1a2e1a,stroke:#238636,color:#fff
+    style Build fill:#1a2e1a,stroke:#238636,color:#fff
+    style UnitTest fill:#1a2e1a,stroke:#238636,color:#fff
+    style IntTest fill:#1a2e1a,stroke:#238636,color:#fff
+    style CovGate fill:#d4512b,stroke:#a83a1f,color:#fff
+    style Artifacts fill:#1a2e1a,stroke:#238636,color:#fff
+    style InstallPW fill:#1a2e1a,stroke:#238636,color:#fff
+    style ServePW fill:#1a2e1a,stroke:#238636,color:#fff
+    style RunPW fill:#1a2e1a,stroke:#238636,color:#fff
+    style PWReport fill:#1a2e1a,stroke:#238636,color:#fff
+    style DotnetPub fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style AzLogin fill:#0078d4,stroke:#005fa3,color:#fff
+    style ZipDeploy fill:#0078d4,stroke:#005fa3,color:#fff
+    style Startup fill:#0078d4,stroke:#005fa3,color:#fff
+    style Smoke fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style Triggers fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style CI fill:#1a1a2e,stroke:#238636,color:#fff
+    style E2EJob fill:#1a1a2e,stroke:#238636,color:#fff
+    style Deploy fill:#16213e,stroke:#0078d4,color:#fff
+
+      </pre>
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <div class="card">
+      <p class="card-eyebrow">CI GATE</p>
+      <div class="card-header">
+        <span class="card-dot coral"></span>
+        <h3>ci.yml on Pull Requests</h3>
+      </div>
+      <ul>
+        <li>dotnet build — WarningsAsErrors</li>
+        <li>Unit tests: pure logic (xUnit)</li>
+        <li>Integration: Testcontainers + Azurite</li>
+        <li>Coverage gate: ≥80% opencover (warn-only)</li>
+      </ul>
+    </div>    <div class="card">
+      <p class="card-eyebrow">E2E GATE</p>
+      <div class="card-header">
+        <span class="card-dot link"></span>
+        <h3>e2e.yml — Playwright</h3>
+      </div>
+      <ul>
+        <li>npm ci + playwright install</li>
+        <li>Start ASP.NET in Development mode</li>
+        <li>Headless Chromium + mobile viewports</li>
+        <li>Upload report + screenshots on failure</li>
+      </ul>
+    </div>    <div class="card">
+      <p class="card-eyebrow">DEPLOY</p>
+      <div class="card-header">
+        <span class="card-dot ink"></span>
+        <h3>azure-deploy.yml on master</h3>
+      </div>
+      <ul>
+        <li>dotnet publish Release</li>
+        <li>OIDC federated identity — no long-lived secrets</li>
+        <li>az webapp deploy zip → OneDeploy API</li>
+        <li>Smoke: curl /health → 200</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <p class="footer-text">PoRedoImage · CI/CD · MASTER · April 2026</p>
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#efeee5',
+        primaryTextColor: '#0b0d0b',
+        primaryBorderColor: 'rgba(11,13,11,0.20)',
+        lineColor: '#52534e',
+        secondaryColor: '#f5f4ed',
+        tertiaryColor: '#efeee5',
+        background: '#f5f4ed',
+        mainBkg: '#efeee5',
+        nodeBorder: 'rgba(11,13,11,0.20)',
+        clusterBkg: '#efeee5',
+        clusterBorder: 'rgba(11,13,11,0.18)',
+        titleColor: '#0b0d0b',
+        edgeLabelBackground: '#f5f4ed',
+        attributeBackgroundColorEven: '#f5f4ed',
+        attributeBackgroundColorOdd: '#efeee5',
+        activationBorderColor: '#f7591f',
+        activationBkgColor: 'rgba(247,89,31,0.08)',
+        sequenceNumberColor: '#f5f4ed',
+        actorBkg: '#efeee5',
+        actorBorder: 'rgba(11,13,11,0.25)',
+        actorTextColor: '#0b0d0b',
+        actorLineColor: '#52534e',
+        signalColor: '#52534e',
+        signalTextColor: '#0b0d0b',
+        labelBoxBkgColor: '#f5f4ed',
+        labelBoxBorderColor: 'rgba(11,13,11,0.18)',
+        labelTextColor: '#0b0d0b',
+        loopTextColor: '#0b0d0b',
+        noteBorderColor: 'rgba(11,13,11,0.18)',
+        noteBkgColor: '#fff8f0',
+        noteTextColor: '#52534e',
+        sectionBkgColor: '#efeee5',
+        altSectionBkgColor: '#f5f4ed',
+        sectionBkgColor2: '#efeee5',
+        taskBorderColor: 'rgba(11,13,11,0.20)',
+        taskBkgColor: '#efeee5',
+        taskTextColor: '#0b0d0b',
+        taskTextLightColor: '#52534e',
+        taskTextOutsideColor: '#0b0d0b',
+        taskTextClickableColor: '#1a70c7',
+        activeTaskBorderColor: '#f7591f',
+        activeTaskBkgColor: 'rgba(247,89,31,0.12)',
+        gridColor: 'rgba(11,13,11,0.08)',
+        doneTaskBkgColor: '#d4edda',
+        doneTaskBorderColor: '#28a745',
+        critBorderColor: '#f7591f',
+        critBkgColor: 'rgba(247,89,31,0.08)',
+        stateLabelColor: '#0b0d0b',
+        stateBkg: '#efeee5',
+        labelColor: '#0b0d0b',
+        errorBkgColor: 'rgba(212,81,43,0.08)',
+        errorTextColor: '#d4512b',
+        classText: '#0b0d0b',
+        fontFamily: 'Geist, system-ui, sans-serif',
+        fontSize: '13px',
+      },
+      flowchart: {
+        htmlLabels: true,
+        curve: 'basis',
+        padding: 20,
+      },
+      sequence: {
+        actorMargin: 60,
+        messageMargin: 35,
+        mirrorActors: false,
+        useMaxWidth: true,
+        diagramMarginX: 20,
+        diagramMarginY: 10,
+        boxTextMargin: 5,
+        noteMargin: 10,
+        messageAlign: 'center',
+      },
+      er: {
+        useMaxWidth: true,
+      },
+      stateDiagram: {
+        useMaxWidth: true,
+      },
+    });
+  </script>
+</body>
+</html>

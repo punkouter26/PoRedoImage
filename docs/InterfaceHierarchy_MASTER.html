@@ -1,0 +1,399 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interface Hierarchy & Component Map · PoRedoImage</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #f5f4ed;
+      --paper-2: #efeee5;
+      --ink: #0b0d0b;
+      --muted: #52534e;
+      --soft: #65655c;
+      --rule: rgba(11,13,11,0.12);
+      --rule-strong: rgba(11,13,11,0.25);
+      --accent: #f7591f;
+      --accent-tint: rgba(247,89,31,0.08);
+      --link: #1a70c7;
+      --sans: 'Geist', system-ui, sans-serif;
+      --serif: 'Instrument Serif', serif;
+      --mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    html { font-size: 16px; }
+    body {
+      font-family: var(--sans);
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+      padding-bottom: 4rem;
+    }
+
+    /* Dot pattern background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(11,13,11,0.10) 0.9px, transparent 0.9px);
+      background-size: 22px 22px;
+      opacity: 0.45;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    * { position: relative; z-index: 1; }
+
+    .page-header {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 3rem 2rem 1.5rem;
+    }
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .page-title {
+      font-family: var(--serif);
+      font-size: 1.75rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--ink);
+      margin-bottom: 0.75rem;
+    }
+    .page-subtitle {
+      font-family: var(--sans);
+      font-size: 0.9375rem;
+      color: var(--soft);
+      line-height: 1.6;
+      max-width: 64ch;
+    }
+
+    .diagram-wrap {
+      max-width: 960px;
+      margin: 2rem auto;
+      padding: 0 2rem;
+    }
+    .diagram-container {
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      overflow-x: auto;
+      padding: 2rem;
+      min-height: 200px;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      font-family: var(--sans) !important;
+    }
+    .mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .cards-grid {
+      max-width: 960px;
+      margin: 1.5rem auto 0;
+      padding: 0 2rem;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 0.9fr;
+      gap: 0.875rem;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 1.25rem;
+    }
+    .card-eyebrow {
+      font-family: var(--mono);
+      font-size: 0.625rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.625rem;
+    }
+    .card-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .card-dot.coral { background: var(--accent); }
+    .card-dot.ink { background: var(--ink); }
+    .card-dot.link { background: var(--link); }
+    .card-dot.muted { background: var(--muted); }
+    .card h3 {
+      font-family: var(--sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .card ul {
+      list-style: none;
+      padding: 0;
+    }
+    .card ul li {
+      font-family: var(--sans);
+      font-size: 0.8125rem;
+      color: var(--soft);
+      line-height: 1.6;
+      padding: 0.125rem 0 0.125rem 0.875rem;
+      position: relative;
+    }
+    .card ul li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+      font-size: 0.625rem;
+      top: 0.4rem;
+    }
+
+    .page-footer {
+      max-width: 960px;
+      margin: 2.5rem auto 0;
+      padding: 1rem 2rem 0;
+      border-top: 1px solid var(--rule);
+    }
+    .footer-text {
+      font-family: var(--mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <p class="eyebrow">POREDOIMAGE · COMPONENT HIERARCHY · MASTER</p>
+    <h1 class="page-title">Interface Hierarchy & Component Map</h1>
+    <p class="page-subtitle">Full UI component tree from App.razor root through layouts, SSR page hosts, WASM interactive components, and shared UI primitives. State management via DI and Radzen.</p>
+  </header>
+
+  <div class="diagram-wrap">
+    <div class="diagram-container">
+      <pre class="mermaid">
+flowchart TB
+    subgraph AppRazor["App.razor — Root"]
+        Router["Router\n(Routes.razor)\nRoute detection + fallback"]
+    end
+
+    subgraph Layouts["Layout Layer"]
+        MainLayout["MainLayout.razor\n• NavMenu + top bar\n• RadzenNotification\n• Theme provider"]
+        NavMenu["NavMenu.razor\n• / Studio\n• /bulk-generate Bulk Generate\n• /user-images My Images\n• /diag Diagnostics\n• Login/Logout state"]
+    end
+
+    subgraph SSRPages["Server Pages (PoRedoImage.Web/Components/Pages)"]
+        StudioSSR["Studio.razor (SSR host)\nRoute: /\n• Embeds Client Studio component\n• Auth context injected"]
+        BulkSSR["BulkGenerate.razor (SSR host)\nRoute: /bulk-generate\n• Embeds Client BulkGenerate"]
+        LoginPage["Login.razor\nRoute: /login\n• Dev login form\n• 'Sign in with Microsoft' button"]
+        DiagPage["Diag.razor\nRoute: /diag\n• JSON config dump\n• Masked sensitive values\n• Health summary"]
+        ErrorPage["Error.razor\nRoute: /error · fallback"]
+        NotFoundPage["NotFound.razor\nRoute: *"]
+    end
+
+    subgraph ClientComponents["WASM Client (PoRedoImage.Client/Pages)"]
+        StudioClient["Studio.razor (Interactive)\n• ImageUploadPanel\n• Mode selector\n• ProcessingProgressBar\n• Results panels"]
+        BulkClient["BulkGenerate.razor (Interactive)\n• Photo upload\n• 10 prompt editors\n• BulkResultsGrid\n• ProcessingProgressBar"]
+        UserImagesClient["UserImages.razor\n• Gallery grid\n• Delete + download"]
+    end
+
+    subgraph CompUI["Shared UI Components"]
+        UploadPanel["ImageUploadPanel.razor\n• File picker\n• Drag-drop zone\n• Clipboard paste\n• Preview thumbnail"]
+        RegenPanel["ImageRegenerationResultsPanel.razor\n• Before/After split\n• Tags + confidence badges\n• Description text\n• Save button"]
+        MemePanel["MemeResultsPanel.razor\n• Meme image\n• Caption overlay\n• Download button"]
+        ProgressBar["ProcessingProgressBar.razor\n• Step indicator\n• Elapsed time\n• Slot fill for bulk"]
+    end
+
+    subgraph StateManagement["State & API Binding"]
+        AppState["Blazor Component State\nCascadingParameter / @inject\nRadzen NotificationService\nImageSession (Scoped)"]
+        HttpClient["HttpClient (DI)\nIHttpClientFactory\n→ /api/* calls"]
+    end
+
+    Router --> Layouts
+    Layouts --> SSRPages
+    SSRPages --> ClientComponents
+    ClientComponents --> CompUI
+    ClientComponents --> StateManagement
+
+    StudioClient --> UploadPanel
+    StudioClient --> RegenPanel
+    StudioClient --> MemePanel
+    StudioClient --> ProgressBar
+    BulkClient --> UploadPanel
+    BulkClient --> ProgressBar
+
+    style Router fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style MainLayout fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style NavMenu fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style StudioSSR fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style BulkSSR fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style LoginPage fill:#d4512b,stroke:#a83a1f,color:#fff
+    style DiagPage fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style ErrorPage fill:#d4512b,stroke:#a83a1f,color:#fff
+    style NotFoundPage fill:#d4512b,stroke:#a83a1f,color:#fff
+    style StudioClient fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style BulkClient fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style UserImagesClient fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style UploadPanel fill:#1a73e8,stroke:#1259b5,color:#fff
+    style RegenPanel fill:#1a73e8,stroke:#1259b5,color:#fff
+    style MemePanel fill:#1a73e8,stroke:#1259b5,color:#fff
+    style ProgressBar fill:#1a73e8,stroke:#1259b5,color:#fff
+    style AppState fill:#f2c811,stroke:#c9a000,color:#000
+    style HttpClient fill:#f2c811,stroke:#c9a000,color:#000
+    style AppRazor fill:#1a1a2e,stroke:#512bd4,color:#fff
+    style Layouts fill:#1a1a2e,stroke:#512bd4,color:#fff
+    style SSRPages fill:#16213e,stroke:#7b2fb5,color:#fff
+    style ClientComponents fill:#16213e,stroke:#4a9eff,color:#fff
+    style CompUI fill:#1a1a2e,stroke:#1a73e8,color:#fff
+    style StateManagement fill:#2e2a1a,stroke:#f2c811,color:#fff
+
+      </pre>
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <div class="card">
+      <p class="card-eyebrow">SSR LAYER</p>
+      <div class="card-header">
+        <span class="card-dot coral"></span>
+        <h3>Server-Side Pages</h3>
+      </div>
+      <ul>
+        <li>Studio.razor — SSR host for client Studio</li>
+        <li>BulkGenerate.razor — SSR host</li>
+        <li>Login.razor — Dev + Microsoft OIDC</li>
+        <li>Diag.razor — masked config JSON dump</li>
+      </ul>
+    </div>    <div class="card">
+      <p class="card-eyebrow">WASM LAYER</p>
+      <div class="card-header">
+        <span class="card-dot link"></span>
+        <h3>Interactive Components</h3>
+      </div>
+      <ul>
+        <li>Studio.razor — upload + mode + results</li>
+        <li>BulkGenerate.razor — 10 prompts + grid</li>
+        <li>UserImages.razor — gallery + delete</li>
+      </ul>
+    </div>    <div class="card">
+      <p class="card-eyebrow">PRIMITIVES</p>
+      <div class="card-header">
+        <span class="card-dot ink"></span>
+        <h3>Shared UI Components</h3>
+      </div>
+      <ul>
+        <li>ImageUploadPanel — file/drag/paste/preview</li>
+        <li>ImageRegenerationResultsPanel — before/after</li>
+        <li>MemeResultsPanel — overlay + download</li>
+        <li>ProcessingProgressBar — step + elapsed time</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <p class="footer-text">PoRedoImage · COMPONENT HIERARCHY · MASTER · April 2026</p>
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#efeee5',
+        primaryTextColor: '#0b0d0b',
+        primaryBorderColor: 'rgba(11,13,11,0.20)',
+        lineColor: '#52534e',
+        secondaryColor: '#f5f4ed',
+        tertiaryColor: '#efeee5',
+        background: '#f5f4ed',
+        mainBkg: '#efeee5',
+        nodeBorder: 'rgba(11,13,11,0.20)',
+        clusterBkg: '#efeee5',
+        clusterBorder: 'rgba(11,13,11,0.18)',
+        titleColor: '#0b0d0b',
+        edgeLabelBackground: '#f5f4ed',
+        attributeBackgroundColorEven: '#f5f4ed',
+        attributeBackgroundColorOdd: '#efeee5',
+        activationBorderColor: '#f7591f',
+        activationBkgColor: 'rgba(247,89,31,0.08)',
+        sequenceNumberColor: '#f5f4ed',
+        actorBkg: '#efeee5',
+        actorBorder: 'rgba(11,13,11,0.25)',
+        actorTextColor: '#0b0d0b',
+        actorLineColor: '#52534e',
+        signalColor: '#52534e',
+        signalTextColor: '#0b0d0b',
+        labelBoxBkgColor: '#f5f4ed',
+        labelBoxBorderColor: 'rgba(11,13,11,0.18)',
+        labelTextColor: '#0b0d0b',
+        loopTextColor: '#0b0d0b',
+        noteBorderColor: 'rgba(11,13,11,0.18)',
+        noteBkgColor: '#fff8f0',
+        noteTextColor: '#52534e',
+        sectionBkgColor: '#efeee5',
+        altSectionBkgColor: '#f5f4ed',
+        sectionBkgColor2: '#efeee5',
+        taskBorderColor: 'rgba(11,13,11,0.20)',
+        taskBkgColor: '#efeee5',
+        taskTextColor: '#0b0d0b',
+        taskTextLightColor: '#52534e',
+        taskTextOutsideColor: '#0b0d0b',
+        taskTextClickableColor: '#1a70c7',
+        activeTaskBorderColor: '#f7591f',
+        activeTaskBkgColor: 'rgba(247,89,31,0.12)',
+        gridColor: 'rgba(11,13,11,0.08)',
+        doneTaskBkgColor: '#d4edda',
+        doneTaskBorderColor: '#28a745',
+        critBorderColor: '#f7591f',
+        critBkgColor: 'rgba(247,89,31,0.08)',
+        stateLabelColor: '#0b0d0b',
+        stateBkg: '#efeee5',
+        labelColor: '#0b0d0b',
+        errorBkgColor: 'rgba(212,81,43,0.08)',
+        errorTextColor: '#d4512b',
+        classText: '#0b0d0b',
+        fontFamily: 'Geist, system-ui, sans-serif',
+        fontSize: '13px',
+      },
+      flowchart: {
+        htmlLabels: true,
+        curve: 'basis',
+        padding: 20,
+      },
+      sequence: {
+        actorMargin: 60,
+        messageMargin: 35,
+        mirrorActors: false,
+        useMaxWidth: true,
+        diagramMarginX: 20,
+        diagramMarginY: 10,
+        boxTextMargin: 5,
+        noteMargin: 10,
+        messageAlign: 'center',
+      },
+      er: {
+        useMaxWidth: true,
+      },
+      stateDiagram: {
+        useMaxWidth: true,
+      },
+    });
+  </script>
+</body>
+</html>

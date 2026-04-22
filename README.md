@@ -3,7 +3,7 @@
 > **Product Requirements Document (PRD) · v2.0 · April 2026**
 
 ---
-
+  ...
 ## Product Vision
 
 PoRedoImage is a cloud-native AI image studio that transforms ordinary photos into artistic masterpieces, memes, and stylistic variations in seconds. By chaining Azure Computer Vision, Azure OpenAI GPT-4.1-nano, and Google Gemini Imagen3 behind a clean Blazor Web App, PoRedoImage makes professional-grade AI image manipulation accessible to anyone — no prompt engineering required.
