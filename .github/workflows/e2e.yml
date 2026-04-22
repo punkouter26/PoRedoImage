@@ -2,7 +2,7 @@ name: E2E Tests
 
 on:
   workflow_run:
-    workflows: ["Build and Deploy to Azure App Service"]
+    workflows: ["Deploy to Azure"]
     types: [completed]
     branches: [master]
   workflow_dispatch:
