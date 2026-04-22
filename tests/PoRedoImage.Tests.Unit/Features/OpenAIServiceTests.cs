@@ -1,18 +1,18 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
-using PoRedoImage.Web.Features.ImageAnalysis;
+using PoRedoImage.Infrastructure.Services;
 
 namespace PoRedoImage.Tests.Unit.Features;
 
 /// <summary>
-/// Unit tests for OpenAIService — constructor validation and argument guard clauses.
+/// Unit tests for AzureOpenAiService — constructor validation and argument guard clauses.
 /// Azure OpenAI calls are NOT invoked; only pure logic and preconditions are tested.
 /// Cost control: zero token usage.
 /// </summary>
-public class OpenAIServiceTests
+public class AzureOpenAiServiceTests
 {
-    private readonly Mock<ILogger<OpenAIService>> _loggerMock = new();
+    private readonly Mock<ILogger<AzureOpenAiService>> _loggerMock = new();
 
     private static IConfiguration BuildConfig(string? endpoint = "https://test.openai.azure.com/",
         string? key = "test-key")
@@ -30,7 +30,7 @@ public class OpenAIServiceTests
     {
         // Service now degrades gracefully; errors are reported at call time, not construction
         var config = BuildConfig(endpoint: null);
-        var service = new OpenAIService(config, _loggerMock.Object);
+        var service = new AzureOpenAiService(config, _loggerMock.Object);
         Assert.NotNull(service);
     }
 
@@ -40,21 +40,21 @@ public class OpenAIServiceTests
         // When no API key is configured, the service falls back to DefaultAzureCredential
         // (Managed Identity / Workload Identity on ACA). Construction must succeed.
         var config = BuildConfig(key: null);
-        var service = new OpenAIService(config, _loggerMock.Object);
+        var service = new AzureOpenAiService(config, _loggerMock.Object);
         Assert.NotNull(service);
     }
 
     [Fact]
     public void Constructor_ValidConfig_DoesNotThrow()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         Assert.NotNull(service);
     }
 
     [Fact]
     public void Constructor_DefaultDeployments_UsedWhenNotConfigured()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         Assert.NotNull(service);
     }
 
@@ -63,7 +63,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_NullDescription_ThrowsArgumentNull()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             service.EnhanceDescriptionAsync(null!, new List<string> { "tag" }, 200));
     }
@@ -71,7 +71,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_NullTags_ThrowsArgumentNull()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             service.EnhanceDescriptionAsync("desc", null!, 200));
     }
@@ -79,7 +79,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_ZeroTargetLength_ThrowsArgumentOutOfRange()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, 0));
     }
@@ -87,7 +87,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task EnhanceDescriptionAsync_NegativeTargetLength_ThrowsArgumentOutOfRange()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, -1));
     }
@@ -97,7 +97,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateImageAsync_NullDescription_ThrowsArgumentException()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             service.GenerateImageAsync(null!));
     }
@@ -105,7 +105,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateImageAsync_EmptyDescription_ThrowsArgumentException()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.GenerateImageAsync(""));
     }
@@ -113,7 +113,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateImageAsync_WhitespaceDescription_ThrowsArgumentException()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.GenerateImageAsync("   "));
     }
@@ -123,7 +123,7 @@ public class OpenAIServiceTests
     [Fact]
     public async Task GenerateMemeCaptionAsync_NullTags_ThrowsArgumentNull()
     {
-        var service = new OpenAIService(BuildConfig(), _loggerMock.Object);
+        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             service.GenerateMemeCaptionAsync(null!));
     }

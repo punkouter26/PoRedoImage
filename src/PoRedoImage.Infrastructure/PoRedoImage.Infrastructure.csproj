@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PoRedoImage.Application\PoRedoImage.Application.csproj" />
+    <ProjectReference Include="..\PoRedoImage.Domain\PoRedoImage.Domain.csproj" />
+    <ProjectReference Include="..\PoRedoImage.Shared\PoRedoImage.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Azure SDKs used by infrastructure implementations -->
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Azure.AI.Vision.ImageAnalysis" />
+    <PackageReference Include="Azure.Data.Tables" />
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" />
+  </ItemGroup>
+
+</Project>

@@ -23,7 +23,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["ComputerVision:ApiKey"] = "test-key",
                 ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",
                 ["OpenAI:Key"] = "test-key",
-                ["ApplicationInsights:ConnectionString"] = ""
+                ["ApplicationInsights:ConnectionString"] = "",
+                ["Storage:ConnectionString"] = "",
+                ["Google:ApiKey"] = ""
             });
         });
 

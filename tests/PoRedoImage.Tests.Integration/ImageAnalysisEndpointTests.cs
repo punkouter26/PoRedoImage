@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
-using PoRedoImage.Web.Features.ImageAnalysis;
+using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Web.Models;
 
 namespace PoRedoImage.Tests.Integration;
@@ -163,12 +163,23 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
             });
         });
 
+        builder.ConfigureHostConfiguration(config =>
+        {
+            // Clear user-secret keys that can trigger real external API calls
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Google:ApiKey"] = "",
+                ["Storage:ConnectionString"] = ""
+            });
+        });
+
         builder.ConfigureServices(services =>
         {
             // Remove real service registrations and replace with mocks
-            ReplaceService<IComputerVisionService>(services, CreateMockComputerVision());
-            ReplaceService<IOpenAIService>(services, CreateMockOpenAI());
+            ReplaceService<IVisionService>(services, CreateMockComputerVision());
+            ReplaceService<IGenerativeAiService>(services, CreateMockOpenAI());
             ReplaceService<IMemeGeneratorService>(services, CreateMockMemeGenerator());
+            ReplaceService<IImagen3Service>(services, CreateMockImagen3());
         });
 
         return base.CreateHost(builder);
@@ -184,25 +195,25 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
         services.AddScoped(_ => mockInstance);
     }
 
-    private static IComputerVisionService CreateMockComputerVision()
+    private static IVisionService CreateMockComputerVision()
     {
-        var mock = new Mock<IComputerVisionService>();
-        mock.Setup(s => s.AnalyzeImageAsync(It.IsAny<byte[]>()))
-            .ReturnsAsync(("A test description", new List<string> { "cat", "animal", "pet" }, 0.92, 150L));
+        var mock = new Mock<IVisionService>();
+        mock.Setup(s => s.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(("A test description", (IReadOnlyList<string>)new List<string> { "cat", "animal", "pet" }, 0.92, 150L));
         return mock.Object;
     }
 
-    private static IOpenAIService CreateMockOpenAI()
+    private static IGenerativeAiService CreateMockOpenAI()
     {
-        var mock = new Mock<IOpenAIService>();
+        var mock = new Mock<IGenerativeAiService>();
 
-        mock.Setup(s => s.EnhanceDescriptionAsync(It.IsAny<string>(), It.IsAny<List<string>>(), It.IsAny<int>()))
+        mock.Setup(s => s.EnhanceDescriptionAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("An enhanced detailed description of the image", 120, 250L));
 
-        mock.Setup(s => s.GenerateImageAsync(It.IsAny<string>()))
-            .ReturnsAsync((new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 }, "image/png", 0, 500L));
+        mock.Setup(s => s.GenerateImageAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 }, "image/png", 500L));
 
-        mock.Setup(s => s.GenerateMemeCaptionAsync(It.IsAny<List<string>>()))
+        mock.Setup(s => s.GenerateMemeCaptionAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("FUNNY TOP", "FUNNY BOTTOM", 50, 180L));
 
         return mock.Object;
@@ -211,8 +222,15 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
     private static IMemeGeneratorService CreateMockMemeGenerator()
     {
         var mock = new Mock<IMemeGeneratorService>();
-        mock.Setup(s => s.AddCaptionToImage(It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<string?>()))
-            .Returns((byte[] img, string? _, string? _) => img); // Return original image
+        mock.Setup(s => s.GenerateMemeAsync(It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[] img, string _, string _, CancellationToken _) => (img, "image/png"));
+        return mock.Object;
+    }
+
+    private static IImagen3Service CreateMockImagen3()
+    {
+        var mock = new Mock<IImagen3Service>();
+        mock.SetupGet(s => s.IsConfigured).Returns(false);
         return mock.Object;
     }
 }
@@ -296,12 +314,12 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
         builder.ConfigureServices(services =>
         {
             // Replace ComputerVision with a mock that always simulates a network failure
-            var descriptors = services.Where(d => d.ServiceType == typeof(IComputerVisionService)).ToList();
+            var descriptors = services.Where(d => d.ServiceType == typeof(IVisionService)).ToList();
             foreach (var d in descriptors) services.Remove(d);
 
-            var throwingMock = new Mock<IComputerVisionService>();
+            var throwingMock = new Mock<IVisionService>();
             throwingMock
-                .Setup(s => s.AnalyzeImageAsync(It.IsAny<byte[]>()))
+                .Setup(s => s.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new HttpRequestException("Simulated Azure CV outage"));
 
             services.AddSingleton(_ => throwingMock.Object);

@@ -3,19 +3,19 @@ using Moq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
-using PoRedoImage.Web.Features.ImageAnalysis;
+using PoRedoImage.Infrastructure.Services;
 
 namespace PoRedoImage.Tests.Unit.Features;
 
 /// <summary>
-/// Unit tests for MemeGeneratorService.
+/// Unit tests for ImageSharpMemeGeneratorService.
 /// Uses a programmatically generated minimal PNG so no external assets are required.
 /// </summary>
 public class MemeGeneratorServiceTests
 {
-    private readonly Mock<ILogger<MemeGeneratorService>> _loggerMock = new();
+    private readonly Mock<ILogger<ImageSharpMemeGeneratorService>> _loggerMock = new();
 
-    private MemeGeneratorService CreateService() =>
+    private ImageSharpMemeGeneratorService CreateService() =>
         new(_loggerMock.Object);
 
     /// <summary>Generates a valid 1×1 transparent PNG byte array at test time.</summary>
@@ -30,57 +30,57 @@ public class MemeGeneratorServiceTests
     // ─── Guard clauses ──────────────────────────────────────────────
 
     [Fact]
-    public void AddCaptionToImage_NullImageData_ThrowsArgumentNullException()
+    public async Task GenerateMemeAsync_NullImageData_ThrowsArgumentNullException()
     {
         var svc = CreateService();
-        Assert.Throws<ArgumentNullException>(() =>
-            svc.AddCaptionToImage(null!, "TOP", "BOTTOM"));
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            svc.GenerateMemeAsync(null!, "TOP", "BOTTOM"));
     }
 
     [Fact]
-    public void AddCaptionToImage_EmptyImageData_ThrowsArgumentException()
+    public async Task GenerateMemeAsync_EmptyImageData_ThrowsArgumentException()
     {
         var svc = CreateService();
-        Assert.Throws<ArgumentException>(() =>
-            svc.AddCaptionToImage([], "TOP", "BOTTOM"));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.GenerateMemeAsync([], "TOP", "BOTTOM"));
     }
 
     // ─── Output correctness ─────────────────────────────────────────
 
     [Fact]
-    public void AddCaptionToImage_ValidPng_ReturnsNonEmptyBytes()
+    public async Task GenerateMemeAsync_ValidPng_ReturnsNonEmptyBytes()
     {
         var svc = CreateService();
-        var result = svc.AddCaptionToImage(CreateMinimalPng(), "TOP TEXT", "BOTTOM TEXT");
+        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), "TOP TEXT", "BOTTOM TEXT");
 
         Assert.NotNull(result);
         Assert.NotEmpty(result);
     }
 
     [Fact]
-    public void AddCaptionToImage_NullCaptions_ReturnsImageWithoutThrow()
+    public async Task GenerateMemeAsync_NullCaptions_ReturnsImageWithoutThrow()
     {
         var svc = CreateService();
         // Null top and bottom text — service should skip drawing and return the image unchanged
-        var result = svc.AddCaptionToImage(CreateMinimalPng(), null, null);
+        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), null!, null!);
 
         Assert.NotEmpty(result);
     }
 
     [Fact]
-    public void AddCaptionToImage_EmptyCaptions_ReturnsImageWithoutThrow()
+    public async Task GenerateMemeAsync_EmptyCaptions_ReturnsImageWithoutThrow()
     {
         var svc = CreateService();
-        var result = svc.AddCaptionToImage(CreateMinimalPng(), "", "");
+        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), "", "");
 
         Assert.NotEmpty(result);
     }
 
     [Fact]
-    public void AddCaptionToImage_ValidPng_OutputIsPng()
+    public async Task GenerateMemeAsync_ValidPng_OutputIsPng()
     {
         var svc = CreateService();
-        var result = svc.AddCaptionToImage(CreateMinimalPng(), "HELLO", "WORLD");
+        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), "HELLO", "WORLD");
 
         // PNG magic bytes: 89 50 4E 47
         Assert.Equal(0x89, result[0]);

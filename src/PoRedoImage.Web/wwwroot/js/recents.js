@@ -1,59 +1,36 @@
-// localStorage-based recent images manager for PoRedoImage.
-// Saves up to 8 recently processed images (resized to 800 px max) with 80 px thumbnails.
-// Items auto-expire after 30 days.
+// recentsManager — persists recent images in localStorage for the RecentImages component.
+window.recentsManager = (function () {
+    const KEY = 'poRedoImage_recents';
+    const MAX = 10;
 
-const RECENTS_KEY = 'pori_recents_v1';
-const MAX_RECENTS = 8;
-const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-
-async function _resizeDataUrl(dataUrl, maxPx, quality) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-            const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(img.width * scale));
-            canvas.height = Math.max(1, Math.round(img.height * scale));
-            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.onerror = () => resolve(null);
-        img.src = dataUrl;
-    });
-}
-
-window.recentsManager = {
-    async save(previewUrl, fileName) {
+    function load() {
         try {
-            const storedUrl = await _resizeDataUrl(previewUrl, 800, 0.85);
-            const thumbUrl = await _resizeDataUrl(previewUrl, 80, 0.7);
-            if (!storedUrl || !thumbUrl) return;
-
-            let items = this._load();
-            // Deduplicate by fileName
-            items = items.filter(i => i.fileName !== fileName);
-            items.unshift({ storedUrl, thumbUrl, fileName, savedAt: Date.now() });
-            items = items.slice(0, MAX_RECENTS);
-
-            try {
-                localStorage.setItem(RECENTS_KEY, JSON.stringify(items));
-            } catch (e) {
-                // Storage full — keep only the 3 most recent
-                items = items.slice(0, 3);
-                try { localStorage.setItem(RECENTS_KEY, JSON.stringify(items)); } catch (_) { }
-            }
-        } catch (e) {
-            console.warn('recentsManager.save failed:', e);
+            return JSON.parse(localStorage.getItem(KEY) || '[]');
+        } catch {
+            return [];
         }
-    },
-
-    get() {
-        const cutoff = Date.now() - MAX_AGE_MS;
-        return this._load().filter(i => i.savedAt > cutoff);
-    },
-
-    _load() {
-        try { return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]'); }
-        catch { return []; }
     }
-};
+
+    function persist(items) {
+        try {
+            localStorage.setItem(KEY, JSON.stringify(items));
+        } catch { /* storage full — ignore */ }
+    }
+
+    return {
+        save: function (dataUrl, fileName) {
+            const items = load().filter(i => i.fileName !== fileName);
+            items.unshift({ dataUrl, fileName, savedAt: new Date().toISOString() });
+            persist(items.slice(0, MAX));
+        },
+        get: function () {
+            return load();
+        },
+        remove: function (fileName) {
+            persist(load().filter(i => i.fileName !== fileName));
+        },
+        clear: function () {
+            localStorage.removeItem(KEY);
+        }
+    };
+})();

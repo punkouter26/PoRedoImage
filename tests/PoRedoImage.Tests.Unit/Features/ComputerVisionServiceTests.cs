@@ -1,18 +1,18 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
-using PoRedoImage.Web.Features.ImageAnalysis;
+using PoRedoImage.Infrastructure.Services;
 
 namespace PoRedoImage.Tests.Unit.Features;
 
 /// <summary>
-/// Unit tests for ComputerVisionService — constructor validation and argument guard clauses.
+/// Unit tests for AzureVisionService — constructor validation and argument guard clauses.
 /// Verifies that the service rejects invalid configuration and null/empty image data.
 /// Azure SDK calls are NOT tested here (they'd require real API keys); only pure logic is tested.
 /// </summary>
-public class ComputerVisionServiceTests
+public class AzureVisionServiceTests
 {
-    private readonly Mock<ILogger<ComputerVisionService>> _loggerMock = new();
+    private readonly Mock<ILogger<AzureVisionService>> _loggerMock = new();
 
     private static IConfiguration BuildConfig(string? endpoint = "https://test.cognitiveservices.azure.com/",
         string? apiKey = "test-key", string? minTagConfidence = null)
@@ -31,7 +31,7 @@ public class ComputerVisionServiceTests
     {
         // Service now degrades gracefully; errors are reported at call time, not construction
         var config = BuildConfig(endpoint: null);
-        var service = new ComputerVisionService(config, _loggerMock.Object);
+        var service = new AzureVisionService(config, _loggerMock.Object);
         Assert.NotNull(service);
     }
 
@@ -40,7 +40,7 @@ public class ComputerVisionServiceTests
     {
         // Service now degrades gracefully; errors are reported at call time, not construction
         var config = BuildConfig(apiKey: null);
-        var service = new ComputerVisionService(config, _loggerMock.Object);
+        var service = new AzureVisionService(config, _loggerMock.Object);
         Assert.NotNull(service);
     }
 
@@ -48,23 +48,23 @@ public class ComputerVisionServiceTests
     public void Constructor_ValidConfig_DoesNotThrow()
     {
         var config = BuildConfig();
-        var service = new ComputerVisionService(config, _loggerMock.Object);
+        var service = new AzureVisionService(config, _loggerMock.Object);
         Assert.NotNull(service);
     }
 
     // ─── AnalyzeImageAsync guard-clause tests ───────────────────────
 
     [Fact]
-    public async Task AnalyzeImageAsync_NullData_ThrowsArgumentNull()
+    public async Task AnalyzeAsync_NullData_ThrowsArgumentNull()
     {
-        var service = new ComputerVisionService(BuildConfig(), _loggerMock.Object);
-        await Assert.ThrowsAsync<ArgumentNullException>(() => service.AnalyzeImageAsync(null!));
+        var service = new AzureVisionService(BuildConfig(), _loggerMock.Object);
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.AnalyzeAsync(null!));
     }
 
     [Fact]
-    public async Task AnalyzeImageAsync_EmptyData_ThrowsArgument()
+    public async Task AnalyzeAsync_EmptyData_ThrowsArgument()
     {
-        var service = new ComputerVisionService(BuildConfig(), _loggerMock.Object);
-        await Assert.ThrowsAsync<ArgumentException>(() => service.AnalyzeImageAsync([]));
+        var service = new AzureVisionService(BuildConfig(), _loggerMock.Object);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.AnalyzeAsync([]));
     }
 }

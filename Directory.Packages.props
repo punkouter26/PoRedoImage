@@ -16,6 +16,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.3" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
     <!-- OpenTelemetry -->
     <PackageVersion Include="OpenTelemetry" Version="1.12.0" />
     <PackageVersion Include="OpenTelemetry.Api" Version="1.12.0" />
@@ -33,6 +34,12 @@
     <PackageVersion Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
     <!-- Other Dependencies -->
     <PackageVersion Include="Scalar.AspNetCore" Version="1.2.61" />
+    <!-- Blazor WASM -->
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.6" />
+    <!-- Radzen Blazor UI -->
+    <PackageVersion Include="Radzen.Blazor" Version="5.5.5" />
     <!-- Testing -->
     <PackageVersion Include="bunit" Version="1.32.7" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />

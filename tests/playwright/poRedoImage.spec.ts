@@ -3,14 +3,14 @@ import { test, expect } from '@playwright/test';
 test('landing page loads and contains app title', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/PoRedoImage/i);
-  await expect(page.getByText('AI Image Studio')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'PoRedoImage' })).toBeVisible();
 });
 
 test('/health returns healthy JSON', async ({ request }) => {
   const res = await request.get('/health');
   expect(res.ok()).toBeTruthy();
   const json = await res.json();
-  expect(json).toHaveProperty('Status');
+  expect(json).toHaveProperty('status');
 });
 
 test('/api/diag returns masked configuration', async ({ request }) => {

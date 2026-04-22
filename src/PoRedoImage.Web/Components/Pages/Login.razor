@@ -36,20 +36,11 @@
         {
             <div class="login-divider"><span>or</span></div>
 
-            <div class="dev-login-section">
-                <p class="dev-badge"><i class="bi bi-laptop me-1"></i>Dev Environment — Quick Login</p>
-                <form method="get" action="/dev-login">
-                    <input type="hidden" name="returnUrl" value="@_returnUrl" />
-                    <div class="mb-3">
-                        <input type="email" name="email" class="form-control form-control-sm"
-                               placeholder="dev@example.com" required autofocus
-                               value="dev@example.com" />
-                    </div>
-                    <button type="submit" class="btn btn-outline-secondary w-100 btn-sm">
-                        <i class="bi bi-person-check me-1"></i>Sign in as Developer
-                    </button>
-                </form>
-            </div>
+            <a href="/dev-login?email=anon%40anon.local&returnUrl=@Uri.EscapeDataString(_returnUrl)"
+               class="btn-anon-signin w-100">
+                <i class="bi bi-incognito me-2"></i>Continue as ANON
+                <span class="anon-badge">testing</span>
+            </a>
         }
     </div>
 </div>
@@ -95,18 +86,37 @@
         content: ''; flex: 1; height: 1px; background: #30363d;
     }
 
-    .dev-login-section { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; }
-    .dev-badge {
-        font-size: .75rem; color: #f0883e;
-        background: rgba(240,136,62,.1); border: 1px solid rgba(240,136,62,.25);
-        border-radius: 5px; padding: .25rem .6rem; margin-bottom: .75rem; display: inline-block;
+    .btn-anon-signin {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        color: #94a3b8;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: .6rem 1rem;
+        font-size: .95rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: background .15s, border-color .15s, color .15s;
+        gap: .25rem;
     }
-    .dev-login-section .form-control {
-        background: #161b22; border-color: #30363d; color: #e6edf3;
+    .btn-anon-signin:hover {
+        background: rgba(148,163,184,.08);
+        border-color: #94a3b8;
+        color: #e2e8f0;
     }
-    .dev-login-section .form-control:focus {
-        background: #161b22; color: #e6edf3;
-        border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,.15);
+    .anon-badge {
+        font-size: .65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #f0883e;
+        background: rgba(240,136,62,.12);
+        border: 1px solid rgba(240,136,62,.25);
+        border-radius: 4px;
+        padding: .1rem .35rem;
+        margin-left: .4rem;
     }
 </style>
 

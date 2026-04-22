@@ -1,6 +1,5 @@
 using Azure.Identity;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -9,12 +8,13 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using PoRedoImage.Infrastructure;
 using PoRedoImage.Web.Components;
 using PoRedoImage.Web.Features.Auth;
 using PoRedoImage.Web.Features.BulkGenerate;
 using PoRedoImage.Web.Features.Diagnostics;
 using PoRedoImage.Web.Features.ImageAnalysis;
-using PoRedoImage.Web.Models;
+using Radzen;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
@@ -124,7 +124,12 @@ if (!string.IsNullOrWhiteSpace(appInsightsCs))
 
 // ─── Core services ──────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddInteractiveWebAssemblyComponents();
+
+// Register Radzen services on the server so SSR pre-rendering can resolve
+// Radzen-injected properties on Client WASM components (e.g. NotificationService).
+builder.Services.AddRadzenComponents();
 
 builder.Services.AddOpenApi();
 
@@ -163,25 +168,20 @@ builder.Services.AddScoped(sp =>
     {
         // AI endpoints (Computer Vision + OpenAI) can take up to 3 minutes on cold start.
         // Default is 100 s which causes spurious "timed out" errors in the Blazor components.
-        Timeout = TimeSpan.FromMinutes(4)
+        Timeout = TimeSpan.FromMinutes(4),
+        BaseAddress = new Uri("http://localhost:5000")
     };
-    var navigationManager = sp.GetRequiredService<NavigationManager>();
-    httpClient.BaseAddress = new Uri(navigationManager.BaseUri);
     return httpClient;
 });
 
-// ─── Feature services (Vertical Slice Architecture) ─────────────────
-builder.Services.AddSingleton<IComputerVisionService, ComputerVisionService>();
-builder.Services.AddSingleton<IOpenAIService, OpenAIService>();
+// ─── Feature services (Onion Architecture — Infrastructure layer wires all services) ──
+// DI registration follows Dependency Inversion Principle (SOLID-D)
+builder.Services.AddPoRedoImageInfrastructure();
 
-// MemeGeneratorService — cross-platform via SixLabors.ImageSharp (no longer Windows-only)
-builder.Services.AddScoped<IMemeGeneratorService, MemeGeneratorService>();
+// Legacy per-user prompt storage (still used by BulkGenerate feature until migrated to IBulkPromptRepository)
 builder.Services.AddScoped<IBulkPromptStorageService, BulkPromptStorageService>();
 
-// Singleton: PredictionServiceClient owns a gRPC channel that should be reused across requests
-builder.Services.AddSingleton<IImagen3Service, Imagen3Service>();
-
-// Scoped: persists the active uploaded image across feature pages for first the lifetime of the circuit
+// Scoped: persists the active uploaded image across feature pages for the lifetime of the circuit
 builder.Services.AddScoped<PoRedoImage.Web.Features.ImageSession.ImageSessionService>();
 
 // ─── Authentication & Authorization ─────────────────────────────────
@@ -257,7 +257,9 @@ app.MapBulkGenerateEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly);
 
 app.Run();
 

@@ -1,0 +1,207 @@
+Build started 4/21/2026 7:58:25 PM.
+Test run for C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\bin\Debug\net10.0\PoRedoImage.Tests.Unit.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.6)
+[xUnit.net 00:00:00.10]   Discovering: PoRedoImage.Tests.Unit
+[xUnit.net 00:00:00.14]   Discovered:  PoRedoImage.Tests.Unit
+[xUnit.net 00:00:00.15]   Starting:    PoRedoImage.Tests.Unit
+  Passed PoRedoImage.Tests.Unit.Models.ImageAnalysisResultTests.Constructor_DefaultValues_AreCorrect [16 ms]
+  Passed PoRedoImage.Tests.Unit.Models.ImageAnalysisRequestTests.Constructor_DefaultValues_AreCorrect [15 ms]
+  Passed PoRedoImage.Tests.Unit.Models.ProcessingMetricsTests.TotalProcessingTimeMs_ZeroWhenAllZero [15 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_UnknownSecret_ReturnsFalse(secretName: "ComputerVision-ApiKey") [17 ms]
+  Passed PoRedoImage.Tests.Unit.Features.DiagnosticsEndpointsTests.MaskValue_NineChars_PartiallyMasked [15 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_UnknownSecret_ReturnsFalse(secretName: "AzureOpenAI-ApiKey") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_UnknownSecret_ReturnsFalse(secretName: "SomeOtherApp-ApiKey") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_UnknownSecret_ReturnsFalse(secretName: "UnknownSecret") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.DiagnosticsEndpointsTests.MaskValue_ShortValue_FullyMasked [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_UnknownSecret_ReturnsFalse(secretName: "") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Models.ImageAnalysisRequestTests.DescriptionLength_ValidRange_Accepted [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Models.ProcessingMetricsTests.TotalProcessingTimeMs_SumsAllTimes [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.DiagnosticsEndpointsTests.MaskValue_ExactlyEightChars_FullyMasked [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.DiagnosticsEndpointsTests.MaskValue_NullValue_ReturnsNotSet [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-OpenAI-ApiKey") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-OpenAI-ImageKey") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-ComputerVision-ApiKey") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-ApplicationInsights-ConnectionString") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-ComputerVision-Endpoint") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-OpenAI-ImageEndpoint") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.DiagnosticsEndpointsTests.MaskValue_LongValue_ShowsStartAndEnd [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-OpenAI-DeploymentName") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-OpenAI-Endpoint") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_KnownSecret_ReturnsTrue(secretName: "PoRedoImage-StorageConnectionString") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.DiagnosticsEndpointsTests.MaskValue_EmptyString_ReturnsNotSet [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-OpenAI-ApiKey", expectedConfigKey: "OpenAI:Key") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-OpenAI-ImageKey", expectedConfigKey: "OpenAI:ImageKey") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-ApplicationInsights-ConnectionString", expectedConfigKey: "ApplicationInsights:ConnectionString") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-StorageConnectionString", expectedConfigKey: "Storage:ConnectionString") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-ComputerVision-Endpoint", expectedConfigKey: "ComputerVision:Endpoint") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-ComputerVision-ApiKey", expectedConfigKey: "ComputerVision:ApiKey") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-OpenAI-DeploymentName", expectedConfigKey: "OpenAI:ChatCompletionsDeployment") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-OpenAI-Endpoint", expectedConfigKey: "OpenAI:Endpoint") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_KnownSecret_ReturnsMappedConfigKey(secretName: "PoRedoImage-OpenAI-ImageEndpoint", expectedConfigKey: "OpenAI:ImageEndpoint") [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.Load_IsCaseInsensitive [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.RequiredSecretNames_ContainsAllExpectedKeyVaultNames [5 ms]
+  Passed PoRedoImage.Tests.Unit.Features.KeyVaultSecretNameMappingTests.GetKey_UnknownSecret_FallsBackToDoubleHyphenReplacement [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.Constructor_WithNoApiKey_DoesNotThrow [61 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.Constructor_WithValidConfig_DoesNotThrow [1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.GenerateAsync_WhenNotConfigured_ThrowsInvalidOperationException [2 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.GenerateAsync_EmptyPrompt_ThrowsArgumentException [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.IsConfigured_WhenApiKeySet_ReturnsTrue [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.GenerateAsync_WhitespacePrompt_ThrowsArgumentException [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.Constructor_CustomModel_DoesNotThrow [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.IsConfigured_WhenApiKeyMissing_ReturnsFalse [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.Imagen3ServiceTests.IsConfigured_WhenApiKeyWhitespace_ReturnsFalse [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.BulkPromptStorageServiceTests.Constructor_NullConnectionString_DoesNotThrow [68 ms]
+  Passed PoRedoImage.Tests.Unit.Features.BulkPromptStorageServiceTests.LoadPromptsAsync_NoConnectionString_ReturnsNull [4 ms]
+  Passed PoRedoImage.Tests.Unit.Features.BulkPromptStorageServiceTests.Constructor_EmptyConnectionString_DoesNotThrow [< 1 ms]
+[xUnit.net 00:00:00.28]       Assert.Throws() Failure: Exception type was not an exact match
+[xUnit.net 00:00:00.28]       Expected: typeof(System.ArgumentNullException)
+[xUnit.net 00:00:00.28]     PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.GenerateMemeCaptionAsync_NullTags_ThrowsArgumentNull [FAIL]
+[xUnit.net 00:00:00.28]       Actual:   typeof(System.NullReferenceException)
+[xUnit.net 00:00:00.28]       ---- System.NullReferenceException : Object reference not set to an instance of an object.
+[xUnit.net 00:00:00.28]       Stack Trace:
+[xUnit.net 00:00:00.28]         C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs(127,0): at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.GenerateMemeCaptionAsync_NullTags_ThrowsArgumentNull()
+[xUnit.net 00:00:00.28]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:00.28]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:00.28]         C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs(157,0): at PoRedoImage.Infrastructure.Services.AzureOpenAiService.GenerateMemeCaptionAsync(IReadOnlyList`1 tags, CancellationToken ct)
+  Passed PoRedoImage.Tests.Unit.Features.BulkPromptStorageServiceTests.SavePromptsAsync_NoConnectionString_DoesNotThrow [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.MemeGeneratorServiceTests.GenerateMemeAsync_NullImageData_ThrowsArgumentNullException [76 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureVisionServiceTests.AnalyzeAsync_EmptyData_ThrowsArgument [87 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureVisionServiceTests.Constructor_MissingApiKey_DoesNotThrow_SetsConfigError [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureVisionServiceTests.AnalyzeAsync_NullData_ThrowsArgumentNull [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureVisionServiceTests.Constructor_MissingEndpoint_DoesNotThrow_SetsConfigError [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureVisionServiceTests.Constructor_ValidConfig_DoesNotThrow [< 1 ms]
+  Failed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.GenerateMemeCaptionAsync_NullTags_ThrowsArgumentNull [89 ms]
+  Error Message:
+   Assert.Throws() Failure: Exception type was not an exact match
+Expected: typeof(System.ArgumentNullException)
+Actual:   typeof(System.NullReferenceException)
+---- System.NullReferenceException : Object reference not set to an instance of an object.
+  Stack Trace:
+     at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.GenerateMemeCaptionAsync_NullTags_ThrowsArgumentNull() in C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs:line 127
+--- End of stack trace from previous location ---
+----- Inner Stack Trace -----
+   at PoRedoImage.Infrastructure.Services.AzureOpenAiService.GenerateMemeCaptionAsync(IReadOnlyList`1 tags, CancellationToken ct) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs:line 157
+[xUnit.net 00:00:00.76]     PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NegativeTargetLength_ThrowsArgumentOutOfRange [FAIL]
+[xUnit.net 00:00:00.76]       Assert.Throws() Failure: Exception type was not an exact match
+[xUnit.net 00:00:00.76]       Expected: typeof(System.ArgumentOutOfRangeException)
+[xUnit.net 00:00:00.76]       Actual:   typeof(System.ClientModel.ClientResultException)
+[xUnit.net 00:00:00.76]       ---- System.ClientModel.ClientResultException : HTTP 401 (401)
+[xUnit.net 00:00:00.76]       
+[xUnit.net 00:00:00.76]       Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a correct regional API endpoint for your resource.
+[xUnit.net 00:00:00.76]       Stack Trace:
+[xUnit.net 00:00:00.76]         C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs(91,0): at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NegativeTargetLength_ThrowsArgumentOutOfRange()
+[xUnit.net 00:00:00.76]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:00.76]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:00.76]            at Azure.AI.OpenAI.ClientPipelineExtensions.ProcessMessageAsync(ClientPipeline pipeline, PipelineMessage message, RequestOptions options)
+[xUnit.net 00:00:00.76]            at Azure.AI.OpenAI.Chat.AzureChatClient.CompleteChatAsync(BinaryContent content, RequestOptions options)
+[xUnit.net 00:00:00.76]            at OpenAI.Chat.ChatClient.CompleteChatAsync(IEnumerable`1 messages, ChatCompletionOptions options, CancellationToken cancellationToken)
+[xUnit.net 00:00:00.76]         C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs(97,0): at PoRedoImage.Infrastructure.Services.AzureOpenAiService.EnhanceDescriptionAsync(String description, IReadOnlyList`1 tags, Int32 targetLength, CancellationToken ct)
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.GenerateImageAsync_WhitespaceDescription_ThrowsArgumentException [1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.Constructor_MissingKey_UsesManagedIdentity_DoesNotThrow [17 ms]
+  Failed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NegativeTargetLength_ThrowsArgumentOutOfRange [463 ms]
+  Error Message:
+   Assert.Throws() Failure: Exception type was not an exact match
+Expected: typeof(System.ArgumentOutOfRangeException)
+Actual:   typeof(System.ClientModel.ClientResultException)
+---- System.ClientModel.ClientResultException : HTTP 401 (401)
+
+Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a correct regional API endpoint for your resource.
+  Stack Trace:
+     at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NegativeTargetLength_ThrowsArgumentOutOfRange() in C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs:line 91
+--- End of stack trace from previous location ---
+----- Inner Stack Trace -----
+   at Azure.AI.OpenAI.ClientPipelineExtensions.ProcessMessageAsync(ClientPipeline pipeline, PipelineMessage message, RequestOptions options)
+   at Azure.AI.OpenAI.Chat.AzureChatClient.CompleteChatAsync(BinaryContent content, RequestOptions options)
+   at OpenAI.Chat.ChatClient.CompleteChatAsync(IEnumerable`1 messages, ChatCompletionOptions options, CancellationToken cancellationToken)
+   at PoRedoImage.Infrastructure.Services.AzureOpenAiService.EnhanceDescriptionAsync(String description, IReadOnlyList`1 tags, Int32 targetLength, CancellationToken ct) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs:line 97
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.Constructor_DefaultDeployments_UsedWhenNotConfigured [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.GenerateImageAsync_NullDescription_ThrowsArgumentException [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.MemeGeneratorServiceTests.GenerateMemeAsync_ValidPng_ReturnsNonEmptyBytes [529 ms]
+  Passed PoRedoImage.Tests.Unit.Features.MemeGeneratorServiceTests.GenerateMemeAsync_ValidPng_OutputIsPng [8 ms]
+  Passed PoRedoImage.Tests.Unit.Features.MemeGeneratorServiceTests.GenerateMemeAsync_NullCaptions_ReturnsImageWithoutThrow [< 1 ms]
+[xUnit.net 00:00:00.87]     PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NullDescription_ThrowsArgumentNull [FAIL]
+[xUnit.net 00:00:00.87]       Assert.Throws() Failure: Exception type was not an exact match
+[xUnit.net 00:00:00.87]       Expected: typeof(System.ArgumentNullException)
+[xUnit.net 00:00:00.87]       Actual:   typeof(System.ClientModel.ClientResultException)
+[xUnit.net 00:00:00.87]       ---- System.ClientModel.ClientResultException : HTTP 401 (401)
+[xUnit.net 00:00:00.87]       
+[xUnit.net 00:00:00.87]       Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a correct regional API endpoint for your resource.
+[xUnit.net 00:00:00.87]       Stack Trace:
+[xUnit.net 00:00:00.87]         C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs(67,0): at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NullDescription_ThrowsArgumentNull()
+[xUnit.net 00:00:00.87]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:00.87]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:00.87]            at Azure.AI.OpenAI.ClientPipelineExtensions.ProcessMessageAsync(ClientPipeline pipeline, PipelineMessage message, RequestOptions options)
+[xUnit.net 00:00:00.87]            at Azure.AI.OpenAI.Chat.AzureChatClient.CompleteChatAsync(BinaryContent content, RequestOptions options)
+[xUnit.net 00:00:00.87]            at OpenAI.Chat.ChatClient.CompleteChatAsync(IEnumerable`1 messages, ChatCompletionOptions options, CancellationToken cancellationToken)
+[xUnit.net 00:00:00.87]         C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs(97,0): at PoRedoImage.Infrastructure.Services.AzureOpenAiService.EnhanceDescriptionAsync(String description, IReadOnlyList`1 tags, Int32 targetLength, CancellationToken ct)
+[xUnit.net 00:00:00.98]     PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_ZeroTargetLength_ThrowsArgumentOutOfRange [FAIL]
+[xUnit.net 00:00:00.98]       Assert.Throws() Failure: Exception type was not an exact match
+[xUnit.net 00:00:00.98]       Expected: typeof(System.ArgumentOutOfRangeException)
+[xUnit.net 00:00:00.98]       Actual:   typeof(System.ClientModel.ClientResultException)
+[xUnit.net 00:00:00.98]       ---- System.ClientModel.ClientResultException : HTTP 401 (401)
+[xUnit.net 00:00:00.98]       
+[xUnit.net 00:00:00.98]       Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a correct regional API endpoint for your resource.
+[xUnit.net 00:00:00.98]       Stack Trace:
+[xUnit.net 00:00:00.98]         C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs(83,0): at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_ZeroTargetLength_ThrowsArgumentOutOfRange()
+[xUnit.net 00:00:00.98]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:00.98]         ----- Inner Stack Trace -----
+[xUnit.net 00:00:00.98]            at Azure.AI.OpenAI.ClientPipelineExtensions.ProcessMessageAsync(ClientPipeline pipeline, PipelineMessage message, RequestOptions options)
+[xUnit.net 00:00:00.98]            at Azure.AI.OpenAI.Chat.AzureChatClient.CompleteChatAsync(BinaryContent content, RequestOptions options)
+[xUnit.net 00:00:00.98]            at OpenAI.Chat.ChatClient.CompleteChatAsync(IEnumerable`1 messages, ChatCompletionOptions options, CancellationToken cancellationToken)
+[xUnit.net 00:00:00.98]         C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs(97,0): at PoRedoImage.Infrastructure.Services.AzureOpenAiService.EnhanceDescriptionAsync(String description, IReadOnlyList`1 tags, Int32 targetLength, CancellationToken ct)
+[xUnit.net 00:00:00.98]   Finished:    PoRedoImage.Tests.Unit
+  Passed PoRedoImage.Tests.Unit.Features.MemeGeneratorServiceTests.GenerateMemeAsync_EmptyCaptions_ReturnsImageWithoutThrow [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.MemeGeneratorServiceTests.GenerateMemeAsync_EmptyImageData_ThrowsArgumentException [< 1 ms]
+  Failed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NullDescription_ThrowsArgumentNull [105 ms]
+  Error Message:
+   Assert.Throws() Failure: Exception type was not an exact match
+Expected: typeof(System.ArgumentNullException)
+Actual:   typeof(System.ClientModel.ClientResultException)
+---- System.ClientModel.ClientResultException : HTTP 401 (401)
+
+Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a correct regional API endpoint for your resource.
+  Stack Trace:
+     at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NullDescription_ThrowsArgumentNull() in C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs:line 67
+--- End of stack trace from previous location ---
+----- Inner Stack Trace -----
+   at Azure.AI.OpenAI.ClientPipelineExtensions.ProcessMessageAsync(ClientPipeline pipeline, PipelineMessage message, RequestOptions options)
+   at Azure.AI.OpenAI.Chat.AzureChatClient.CompleteChatAsync(BinaryContent content, RequestOptions options)
+   at OpenAI.Chat.ChatClient.CompleteChatAsync(IEnumerable`1 messages, ChatCompletionOptions options, CancellationToken cancellationToken)
+   at PoRedoImage.Infrastructure.Services.AzureOpenAiService.EnhanceDescriptionAsync(String description, IReadOnlyList`1 tags, Int32 targetLength, CancellationToken ct) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs:line 97
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_NullTags_ThrowsArgumentNull [4 ms]
+  Failed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_ZeroTargetLength_ThrowsArgumentOutOfRange [98 ms]
+  Error Message:
+   Assert.Throws() Failure: Exception type was not an exact match
+Expected: typeof(System.ArgumentOutOfRangeException)
+Actual:   typeof(System.ClientModel.ClientResultException)
+---- System.ClientModel.ClientResultException : HTTP 401 (401)
+
+Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a correct regional API endpoint for your resource.
+  Stack Trace:
+     at PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.EnhanceDescriptionAsync_ZeroTargetLength_ThrowsArgumentOutOfRange() in C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\Features\OpenAIServiceTests.cs:line 83
+--- End of stack trace from previous location ---
+----- Inner Stack Trace -----
+   at Azure.AI.OpenAI.ClientPipelineExtensions.ProcessMessageAsync(ClientPipeline pipeline, PipelineMessage message, RequestOptions options)
+   at Azure.AI.OpenAI.Chat.AzureChatClient.CompleteChatAsync(BinaryContent content, RequestOptions options)
+   at OpenAI.Chat.ChatClient.CompleteChatAsync(IEnumerable`1 messages, ChatCompletionOptions options, CancellationToken cancellationToken)
+   at PoRedoImage.Infrastructure.Services.AzureOpenAiService.EnhanceDescriptionAsync(String description, IReadOnlyList`1 tags, Int32 targetLength, CancellationToken ct) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Infrastructure\Services\AzureOpenAiService.cs:line 97
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.GenerateImageAsync_EmptyDescription_ThrowsArgumentException [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.Constructor_ValidConfig_DoesNotThrow [< 1 ms]
+  Passed PoRedoImage.Tests.Unit.Features.AzureOpenAiServiceTests.Constructor_MissingEndpoint_DoesNotThrow_SetsConfigError [< 1 ms]
+
+Test Run Failed.
+Total tests: 73
+     Passed: 69
+     Failed: 4
+ Total time: 1.6177 Seconds
+     1>Project "C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\PoRedoImage.Tests.Unit.csproj" on node 1 (VSTest target(s)).
+     1>_VSTestConsole:
+         MSB4181: The "VSTestTask" task returned false but did not log an error.
+     1>Done Building Project "C:\Users\punko\Downloads\PoRedoImage\tests\PoRedoImage.Tests.Unit\PoRedoImage.Tests.Unit.csproj" (VSTest target(s)) -- FAILED.
+
+Build FAILED.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.22

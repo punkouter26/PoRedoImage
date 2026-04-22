@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
-using PoRedoImage.Web.Features.BulkGenerate;
+using PoRedoImage.Infrastructure.Services;
 
 namespace PoRedoImage.Tests.Unit.Features;
 
@@ -11,7 +11,7 @@ namespace PoRedoImage.Tests.Unit.Features;
 /// </summary>
 public class Imagen3ServiceTests
 {
-    private readonly Mock<ILogger<Imagen3Service>> _loggerMock = new();
+    private readonly Mock<ILogger<GeminiImagen3Service>> _loggerMock = new();
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
 
     private IConfiguration BuildConfig(string? apiKey = "test-google-api-key", string? model = null)
@@ -22,7 +22,7 @@ public class Imagen3ServiceTests
         return new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
     }
 
-    private Imagen3Service CreateService(IConfiguration config) =>
+    private GeminiImagen3Service CreateService(IConfiguration config) =>
         new(config, _httpClientFactoryMock.Object, _loggerMock.Object);
 
     // ─── IsConfigured flag ──────────────────────────────────────────
@@ -72,30 +72,30 @@ public class Imagen3ServiceTests
         Assert.True(svc.IsConfigured);
     }
 
-    // ─── GenerateImageAsync guard clauses ───────────────────────────
+    // ─── GenerateAsync guard clauses ───────────────────────────
 
     [Fact]
-    public async Task GenerateImageAsync_WhenNotConfigured_ThrowsInvalidOperationException()
+    public async Task GenerateAsync_WhenNotConfigured_ThrowsInvalidOperationException()
     {
         var svc = CreateService(BuildConfig(apiKey: null));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.GenerateImageAsync("a prompt"));
+            svc.GenerateAsync("a prompt"));
     }
 
     [Fact]
-    public async Task GenerateImageAsync_WhitespacePrompt_ThrowsArgumentException()
+    public async Task GenerateAsync_WhitespacePrompt_ThrowsArgumentException()
     {
         var svc = CreateService(BuildConfig());
         // ArgumentException.ThrowIfNullOrWhiteSpace throws ArgumentException for whitespace
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            svc.GenerateImageAsync("   "));
+            svc.GenerateAsync("   "));
     }
 
     [Fact]
-    public async Task GenerateImageAsync_EmptyPrompt_ThrowsArgumentException()
+    public async Task GenerateAsync_EmptyPrompt_ThrowsArgumentException()
     {
         var svc = CreateService(BuildConfig());
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            svc.GenerateImageAsync(""));
+            svc.GenerateAsync(""));
     }
 }

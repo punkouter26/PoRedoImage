@@ -1,5 +1,10 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/PoRedoImage.Domain/PoRedoImage.Domain.csproj" />
+    <Project Path="src/PoRedoImage.Application/PoRedoImage.Application.csproj" />
+    <Project Path="src/PoRedoImage.Infrastructure/PoRedoImage.Infrastructure.csproj" />
+    <Project Path="src/PoRedoImage.Shared/PoRedoImage.Shared.csproj" />
+    <Project Path="src/PoRedoImage.Client/PoRedoImage.Client.csproj" />
     <Project Path="src/PoRedoImage.Web/PoRedoImage.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">

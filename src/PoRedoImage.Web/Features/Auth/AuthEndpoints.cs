@@ -16,15 +16,20 @@ public static class AuthEndpoints
         if (app.Environment.IsDevelopment())
         {
             // Dev-only sign-in action: /dev-login?email=X signs in and redirects.
-            // The login UI (Login.razor) posts to this endpoint.
+            // anon@anon.local is the reserved ANON identity for one-click bypass and E2E tests.
             app.MapGet("/dev-login", async (string? email, string? returnUrl, HttpContext context) =>
             {
                 if (!string.IsNullOrWhiteSpace(email))
                 {
+                    // Normalise ANON — anything hitting anon@anon.local becomes the canonical ANON account
+                    var isAnon = string.Equals(email, "anon@anon.local", StringComparison.OrdinalIgnoreCase);
+                    var userId = isAnon ? "anon|ANON" : $"dev|{email}";
+                    var displayName = isAnon ? "ANON" : email;
+
                     var claims = new List<Claim>
                     {
-                        new(ClaimTypes.NameIdentifier, $"dev|{email}"),
-                        new(ClaimTypes.Name, email),
+                        new(ClaimTypes.NameIdentifier, userId),
+                        new(ClaimTypes.Name, displayName),
                         new(ClaimTypes.Email, email),
                     };
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -33,7 +38,6 @@ public static class AuthEndpoints
                         new ClaimsPrincipal(identity));
 
                     var destination = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
-                    // Prevent open-redirect: only allow relative paths
                     if (!Uri.IsWellFormedUriString(destination, UriKind.Relative))
                         destination = "/";
                     context.Response.Redirect(destination);

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using PoRedoImage.Domain.Interfaces;
 
 namespace PoRedoImage.Web.Features.BulkGenerate;
 
