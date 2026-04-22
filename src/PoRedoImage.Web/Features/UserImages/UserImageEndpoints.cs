@@ -36,6 +36,10 @@ public static class UserImageEndpoints
         group.MapGet("/{id}", GetImageAsync)
             .WithName("GetUserImage")
             .WithSummary("Stream image bytes from blob storage");
+
+        group.MapDelete("/{id}", DeleteImageAsync)
+            .WithName("DeleteUserImage")
+            .WithSummary("Delete a user image from the gallery");
     }
 
     private static async Task<IResult> ListImagesAsync(
@@ -107,5 +111,21 @@ public static class UserImageEndpoints
         if (result is null) return Results.NotFound();
 
         return Results.File(result.Value.Bytes, result.Value.ContentType);
+    }
+
+    private static async Task<IResult> DeleteImageAsync(
+        string id,
+        HttpContext context,
+        IUserImageService service,
+        CancellationToken ct)
+    {
+        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null) return Results.Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 64 || !System.Text.RegularExpressions.Regex.IsMatch(id, @"^[a-fA-F0-9]+$"))
+            return Results.BadRequest("Invalid image id.");
+
+        var deleted = await service.DeleteImageAsync(userId, id, ct);
+        return deleted ? Results.NoContent() : Results.NotFound();
     }
 }

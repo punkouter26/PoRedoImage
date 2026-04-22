@@ -13,4 +13,7 @@ public interface IUserImageService
     Task<SaveImageResponse> SaveResultAsync(string userId, byte[] bytes, string contentType, UserImageKind kind, CancellationToken ct = default);
     Task<IReadOnlyList<UserImageDto>> GetGalleryAsync(string userId, CancellationToken ct = default);
     Task<(byte[] Bytes, string ContentType)?> GetImageAsync(string userId, string imageId, CancellationToken ct = default);
+
+    /// <summary>Deletes a user image from blob and metadata storage. Returns false if not found.</summary>
+    Task<bool> DeleteImageAsync(string userId, string imageId, CancellationToken ct = default);
 }

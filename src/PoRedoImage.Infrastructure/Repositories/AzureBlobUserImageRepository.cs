@@ -146,6 +146,31 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
     }
 
+    public async Task DeleteAsync(string userId, string imageId, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+
+        if (_blobContainer is not null)
+        {
+            var blobClient = _blobContainer.GetBlobClient($"{userId}/{imageId}");
+            await blobClient.DeleteIfExistsAsync(cancellationToken: ct);
+        }
+
+        if (_tableClient is not null)
+        {
+            try
+            {
+                await _tableClient.DeleteEntityAsync(userId, imageId, cancellationToken: ct);
+            }
+            catch (RequestFailedException ex) when (ex.Status == 404)
+            {
+                // Already removed — treat as success
+            }
+        }
+
+        _logger.LogInformation("Deleted user image {UserId}/{ImageId}", userId, imageId);
+    }
+
     private static UserImage MapToDomain(UserImageTableEntity entity) => new()
     {
         UserId = entity.PartitionKey,

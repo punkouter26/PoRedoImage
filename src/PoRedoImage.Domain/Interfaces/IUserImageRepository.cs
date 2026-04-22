@@ -22,4 +22,7 @@ public interface IUserImageRepository
 
     /// <summary>Returns metadata for a single image. Returns null if not found.</summary>
     Task<UserImage?> GetMetadataAsync(string userId, string imageId, CancellationToken ct = default);
+
+    /// <summary>Deletes a user image (blob bytes + metadata). No-op if not found.</summary>
+    Task DeleteAsync(string userId, string imageId, CancellationToken ct = default);
 }

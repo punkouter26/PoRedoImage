@@ -45,4 +45,14 @@ public sealed class UserImageService(
 
     public Task<(byte[] Bytes, string ContentType)?> GetImageAsync(string userId, string imageId, CancellationToken ct = default) =>
         repository.GetBlobAsync(userId, imageId, ct);
+
+    public async Task<bool> DeleteImageAsync(string userId, string imageId, CancellationToken ct = default)
+    {
+        var metadata = await repository.GetMetadataAsync(userId, imageId, ct);
+        if (metadata is null) return false;
+
+        await repository.DeleteAsync(userId, imageId, ct);
+        logger.LogInformation("Deleted image {Id} for user {UserId}", imageId, userId);
+        return true;
+    }
 }
