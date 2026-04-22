@@ -6,9 +6,6 @@ using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
 using OpenAI.Images;
 using PoRedoImage.Domain.Interfaces;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -19,14 +16,17 @@ namespace PoRedoImage.Infrastructure.Services;
 public sealed class AzureOpenAiService : IGenerativeAiService
 {
     private readonly ILogger<AzureOpenAiService> _logger;
+    private readonly IConfiguration _configuration;
     private readonly ChatClient _chatClient;
     private readonly ImageClient _imageClient;
-    private readonly ImageClient? _imageEditClient;
+    private readonly Azure.AzureKeyCredential? _chatKeyCredential;
+    private readonly Azure.AzureKeyCredential? _imageKeyCredential;
     private readonly string? _configurationError;
 
     public AzureOpenAiService(IConfiguration configuration, ILogger<AzureOpenAiService> logger)
     {
         _logger = logger;
+        _configuration = configuration;
 
         var endpoint = configuration["OpenAI:Endpoint"];
         if (string.IsNullOrWhiteSpace(endpoint))
@@ -46,27 +46,44 @@ public sealed class AzureOpenAiService : IGenerativeAiService
 
         if (string.Equals(endpoint, imageEndpoint, StringComparison.OrdinalIgnoreCase))
         {
-            var shared = BuildClient(endpoint, apiKey);
+            var (shared, cred) = BuildClientWithCredential(endpoint, apiKey);
+            _chatKeyCredential = cred;
+            _imageKeyCredential = cred;
             _chatClient = shared.GetChatClient(chatDeployment);
             _imageClient = shared.GetImageClient(imageDeployment);
         }
         else
         {
-            _chatClient = BuildClient(endpoint, apiKey).GetChatClient(chatDeployment);
-            _imageClient = BuildClient(imageEndpoint, imageApiKey).GetImageClient(imageDeployment);
+            var (chatClientObj, chatCred) = BuildClientWithCredential(endpoint, apiKey);
+            var (imgClientObj, imgCred) = BuildClientWithCredential(imageEndpoint, imageApiKey);
+            _chatKeyCredential = chatCred;
+            _imageKeyCredential = imgCred;
+            _chatClient = chatClientObj.GetChatClient(chatDeployment);
+            _imageClient = imgClientObj.GetImageClient(imageDeployment);
         }
-
-        var editDeployment = configuration["OpenAI:ImageEditDeployment"];
-        if (!string.IsNullOrWhiteSpace(editDeployment))
-            _imageEditClient = BuildClient(imageEndpoint, imageApiKey).GetImageClient(editDeployment);
 
         _logger.LogInformation("AzureOpenAI Service initialized. Chat={Chat}, Image={Image}", chatDeployment, imageDeployment);
     }
 
-    private static AzureOpenAIClient BuildClient(string endpoint, string? apiKey) =>
-        string.IsNullOrEmpty(apiKey)
-            ? new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential())
-            : new AzureOpenAIClient(new Uri(endpoint), new Azure.AzureKeyCredential(apiKey));
+    private static (AzureOpenAIClient Client, Azure.AzureKeyCredential? Credential) BuildClientWithCredential(string endpoint, string? apiKey)
+    {
+        if (string.IsNullOrEmpty(apiKey))
+            return (new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential()), null);
+        var cred = new Azure.AzureKeyCredential(apiKey);
+        return (new AzureOpenAIClient(new Uri(endpoint), cred), cred);
+    }
+
+    private void RefreshChatCredential()
+    {
+        var key = _configuration["OpenAI:Key"];
+        if (!string.IsNullOrWhiteSpace(key)) _chatKeyCredential?.Update(key);
+    }
+
+    private void RefreshImageCredential()
+    {
+        var key = _configuration["OpenAI:ImageKey"] ?? _configuration["OpenAI:Key"];
+        if (!string.IsNullOrWhiteSpace(key)) _imageKeyCredential?.Update(key);
+    }
 
     public async Task<(string EnhancedDescription, int TokensUsed, long ElapsedMs)>
         EnhanceDescriptionAsync(string description, IReadOnlyList<string> tags, int targetLength, CancellationToken ct = default)
@@ -76,6 +93,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         ArgumentNullException.ThrowIfNull(tags);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(targetLength, 0);
 
+        RefreshChatCredential();
         _logger.LogInformation("Enhancing description. TargetLength={Length}", targetLength);
         var start = Stopwatch.GetTimestamp();
 
@@ -100,6 +118,8 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         var response = await _chatClient.CompleteChatAsync(messages,
             new ChatCompletionOptions { MaxOutputTokenCount = 800, Temperature = 0.7f }, ct);
 
+        if (response.Value.Content.Count == 0)
+            throw new InvalidOperationException("OpenAI returned an empty response for description enhancement.");
         var enhanced = response.Value.Content[0].Text.Trim();
         var tokens = response.Value.Usage.TotalTokenCount;
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
@@ -113,6 +133,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
 
+        RefreshImageCredential();
         _logger.LogInformation("Generating image with DALL-E");
         var start = Stopwatch.GetTimestamp();
 
@@ -130,34 +151,13 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         return (imageData, "image/png", elapsed);
     }
 
-    public async Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
-        GenerateImageEditAsync(byte[] imageBytes, string prompt, CancellationToken ct = default)
-    {
-        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
-        if (_imageEditClient is null)
-            throw new InvalidOperationException("DALL-E 2 image edit is not configured. Add OpenAI:ImageEditDeployment to appsettings.");
-
-        _logger.LogInformation("Generating image edit with DALL-E 2");
-        var start = Stopwatch.GetTimestamp();
-
-        var pngBytes = await PrepareForImageEditAsync(imageBytes);
-        using var stream = new MemoryStream(pngBytes);
-        var response = await _imageEditClient.GenerateImageEditAsync(
-            stream, "source.png", prompt,
-            new ImageEditOptions { Size = GeneratedImageSize.W1024xH1024, ResponseFormat = GeneratedImageFormat.Bytes }, ct);
-
-        var resultBytes = response.Value.ImageBytes.ToArray();
-        var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Image edit complete in {Elapsed}ms. Size={Size} bytes", elapsed, resultBytes.Length);
-        return (resultBytes, "image/png", elapsed);
-    }
-
     public async Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)>
         GenerateMemeCaptionAsync(IReadOnlyList<string> tags, CancellationToken ct = default)
     {
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentNullException.ThrowIfNull(tags);
 
+        RefreshChatCredential();
         _logger.LogInformation("Generating meme caption from {Count} tags", tags.Count);
         var start = Stopwatch.GetTimestamp();
 
@@ -174,13 +174,25 @@ public sealed class AzureOpenAiService : IGenerativeAiService
             [new SystemChatMessage("You are a meme caption generator."), new UserChatMessage(prompt)],
             new ChatCompletionOptions { MaxOutputTokenCount = 150 }, ct);
 
+        if (response.Value.Content.Count == 0)
+            throw new InvalidOperationException("OpenAI returned an empty response for meme caption.");
         var content = response.Value.Content[0].Text.Trim();
         var tokens = response.Value.Usage.TotalTokenCount;
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
 
-        var cleaned = content.Contains("```")
-            ? content[content.IndexOf('{')..(content.LastIndexOf('}') + 1)]
-            : content;
+        string cleaned;
+        if (content.Contains("```"))
+        {
+            var start2 = content.IndexOf('{');
+            var end2 = content.LastIndexOf('}');
+            cleaned = start2 >= 0 && end2 > start2
+                ? content[start2..(end2 + 1)]
+                : content;
+        }
+        else
+        {
+            cleaned = content;
+        }
 
         using var json = System.Text.Json.JsonDocument.Parse(cleaned);
         var top = json.RootElement.GetProperty("topText").GetString() ?? "";
@@ -194,6 +206,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
     {
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
 
+        RefreshChatCredential();
         _logger.LogInformation("Describing person via GPT-4o vision. Size={Size} bytes", imageData.Length);
         var start = Stopwatch.GetTimestamp();
 
@@ -214,23 +227,11 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         var response = await _chatClient.CompleteChatAsync(messages,
             new ChatCompletionOptions { MaxOutputTokenCount = 80 }, ct);
 
+        if (response.Value.Content.Count == 0)
+            throw new InvalidOperationException("OpenAI returned an empty response for person description.");
         var description = response.Value.Content[0].Text.Trim().TrimEnd('.');
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         _logger.LogInformation("Person described in {Elapsed}ms: {Description}", elapsed, description);
         return description;
-    }
-
-    private static async Task<byte[]> PrepareForImageEditAsync(byte[] inputBytes)
-    {
-        using var img = Image.Load<Rgba32>(inputBytes);
-        img.Mutate(x => x.Resize(new ResizeOptions
-        {
-            Size = new SixLabors.ImageSharp.Size(1024, 1024),
-            Mode = ResizeMode.BoxPad,
-            PadColor = SixLabors.ImageSharp.Color.Transparent
-        }));
-        using var ms = new MemoryStream();
-        await img.SaveAsPngAsync(ms);
-        return ms.ToArray();
     }
 }

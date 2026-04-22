@@ -1,17 +1,15 @@
 flowchart LR
-    Upload["Upload\nImage"] --> CV["Computer\nVision"] --> GPT["GPT-4.1\nEnhance"] --> Branch{"Mode?"}
-    Branch -->|"Regen"| Gemini["Gemini\nImage Gen"]
-    Branch -->|"Meme"| Meme["Text\nOverlay"]
-    Branch -->|"Analyze"| Result["Analysis\nResult"]
-    Gemini --> Result
-    Meme --> Result
-    Result --> UI["Blazor\nUI Update"]
+    Upload["Upload\nbase64"] --> Validate["Magic byte\nvalidation"]
+    Validate --> CV["Computer Vision\ntags + confidence"]
+    CV --> OpenAI["OpenAI\nenhance / caption"]
+    OpenAI --> Gemini["Gemini\nregenerate image"]
+    Gemini --> Render["Blazor\nrender result"]
+    Render --> Storage["Table Storage\n(optional save)"]
 
-    style Upload fill:#374151,stroke:#9ca3af,color:#fff
-    style CV fill:#5c2d91,stroke:#fff,color:#fff
-    style GPT fill:#10a37f,stroke:#fff,color:#fff
-    style Branch fill:#f59e0b,stroke:#000,color:#000
-    style Gemini fill:#1a73e8,stroke:#fff,color:#fff
-    style Meme fill:#6b21a8,stroke:#fff,color:#fff
-    style Result fill:#238636,stroke:#fff,color:#fff
-    style UI fill:#512bd4,stroke:#fff,color:#fff
+    style Upload fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Validate fill:#d4512b,stroke:#a83a1f,color:#fff
+    style CV fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style OpenAI fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style Gemini fill:#1a73e8,stroke:#1259b5,color:#fff
+    style Render fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Storage fill:#f2c811,stroke:#c9a000,color:#000

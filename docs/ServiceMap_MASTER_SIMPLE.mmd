@@ -1,0 +1,15 @@
+flowchart LR
+    Web["PoRedoImage.Web"] --> App["Application"]
+    Web --> Shared["Shared DTOs"]
+    App --> Domain["Domain\nEntities + Interfaces"]
+    Domain --> Infra["Infrastructure\nServices + Repos"]
+    Infra --> Shared
+    Client["PoRedoImage.Client\n(WASM)"] --> Shared
+    Web --> Client
+
+    style Web fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style App fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style Domain fill:#f2c811,stroke:#c9a000,color:#000
+    style Infra fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style Shared fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style Client fill:#512bd4,stroke:#3a1fa8,color:#fff

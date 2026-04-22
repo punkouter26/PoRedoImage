@@ -15,16 +15,16 @@ public sealed class GeminiImagen3Service : IImagen3Service
 {
     private readonly ILogger<GeminiImagen3Service> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly string? _apiKey;
+    private readonly IConfiguration _configuration;
     private readonly string _model;
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration["Google:ApiKey"]);
 
     public GeminiImagen3Service(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<GeminiImagen3Service> logger)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
-        _apiKey = configuration["Google:ApiKey"];
+        _configuration = configuration;
         _model = configuration["Google:Imagen3Model"] ?? "gemini-2.0-flash-exp-image-generation";
 
         if (IsConfigured)
@@ -104,7 +104,8 @@ public sealed class GeminiImagen3Service : IImagen3Service
         var client = _httpClientFactory.CreateClient("GeminiApi");
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent";
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("x-goog-api-key", _apiKey);
+        // Re-read API key from IConfiguration to pick up Key Vault rotated secrets (singleton lifetime)
+        request.Headers.Add("x-goog-api-key", _configuration["Google:ApiKey"] ?? string.Empty);
         request.Content = JsonContent.Create(body);
         using var response = await client.SendAsync(request, ct);
 
@@ -157,7 +158,8 @@ public sealed class GeminiImagen3Service : IImagen3Service
         var client = _httpClientFactory.CreateClient("GeminiApi");
         var url = $"https://us-central1-aiplatform.googleapis.com/v1/projects/*/locations/us-central1/publishers/google/models/{_model}:predict";
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "Bearer", _configuration["Google:ApiKey"] ?? string.Empty);
         request.Content = JsonContent.Create(body);
         using var response = await client.SendAsync(request, ct);
 

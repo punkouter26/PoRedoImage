@@ -1,12 +1,14 @@
-<div class="shimmer-wrapper">
+@implements IDisposable
 
-    <div class="shimmer-header d-flex align-items-center gap-3 mb-4">
+<div class="shimmer-wrapper">
+    <div class="shimmer-header">
         <div class="shimmer-spinner">
-            <svg class="spinner-svg" xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24">
-                <path class="spinner-track" stroke="#e2e8f0" stroke-width="3" d="M12 3a9 9 0 1 0 9 9" />
-                <path class="spinner-arc" stroke="url(#spinGrad)" stroke-width="3" stroke-linecap="round" d="M12 3a9 9 0 0 1 9 9" />
+            <svg class="spinner-svg" viewBox="0 0 48 48" width="36" height="36">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" stroke-width="4" />
+                <circle cx="24" cy="24" r="20" fill="none" stroke="url(#spinGrad)" stroke-width="4"
+                        stroke-linecap="round" stroke-dasharray="60 200" />
                 <defs>
-                    <linearGradient id="spinGrad" x1="0" y1="0" x2="1" y2="1">
+                    <linearGradient id="spinGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stop-color="#052767" />
                         <stop offset="100%" stop-color="#3a0647" />
                     </linearGradient>
@@ -15,36 +17,76 @@
         </div>
         <div class="flex-grow-1">
             <div class="shimmer-status-label">@Message</div>
-            <div class="shimmer-progress mt-1">
-                <div class="shimmer-progress__fill" style="width: @(Percentage)%"></div>
+            <div class="shimmer-progress mt-2">
+                <div class="shimmer-progress__bar" style="width: @(Percentage)%;"></div>
+            </div>
+            <div class="shimmer-stages mt-2">
+                @foreach (var stage in _stages)
+                {
+                    <span class="shimmer-stage @(stage.Active ? "shimmer-stage--active" : "") @(stage.Done ? "shimmer-stage--done" : "")">
+                        @if (stage.Done)
+                        {
+                            <i class="bi bi-check-circle-fill me-1"></i>
+                        }
+                        else if (stage.Active)
+                        {
+                            <i class="bi bi-arrow-right-circle me-1"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-circle me-1"></i>
+                        }
+                        @stage.Label
+                    </span>
+                }
             </div>
         </div>
         <span class="shimmer-pct">@Percentage%</span>
     </div>
-
-    <div class="shimmer-cards">
-        <div class="shimmer-card shimmer-card--tall">
-            <div class="shimmer-bar shimmer-bar--w60 mb-2"></div>
-            <div class="shimmer-img shimmer-anim"></div>
-            <div class="shimmer-bar shimmer-bar--w40 mt-3"></div>
-        </div>
-        <div class="shimmer-card shimmer-card--tall">
-            <div class="shimmer-bar shimmer-bar--w50 mb-2"></div>
-            <div class="shimmer-img shimmer-anim"></div>
-            <div class="shimmer-bar shimmer-bar--w40 mt-3"></div>
-        </div>
-    </div>
-
-    <div class="shimmer-card mt-3">
-        <div class="shimmer-bar shimmer-bar--w30 mb-3"></div>
-        <div class="shimmer-bar shimmer-anim mb-2"></div>
-        <div class="shimmer-bar shimmer-anim shimmer-bar--w80 mb-2"></div>
-        <div class="shimmer-bar shimmer-anim shimmer-bar--w60"></div>
-    </div>
-
+    @if (_elapsed.TotalSeconds > 0)
+    {
+        <div class="shimmer-elapsed">Elapsed: @(_elapsed.Minutes > 0 ? $"{_elapsed.Minutes}m " : "")@(_elapsed.Seconds)s</div>
+    }
 </div>
 
 @code {
     [Parameter] public int Percentage { get; set; }
     [Parameter] public string Message { get; set; } = string.Empty;
+
+    private System.Timers.Timer? _timer;
+    private System.Diagnostics.Stopwatch _stopwatch = new();
+    private TimeSpan _elapsed;
+
+    private record Stage(string Label, int MinPct, int MaxPct)
+    {
+        public bool Active(int pct) => pct >= MinPct && pct < MaxPct;
+        public bool Done(int pct) => pct >= MaxPct;
+    }
+
+    private static readonly Stage[] StageDefinitions =
+    [
+        new("Uploading", 0, 20),
+        new("Analyzing image", 20, 55),
+        new("Generating art", 55, 90),
+        new("Finalizing", 90, 100)
+    ];
+
+    private IEnumerable<(string Label, bool Active, bool Done)> _stages =>
+        StageDefinitions.Select(s => (s.Label, s.Active(Percentage), s.Done(Percentage)));
+
+    protected override void OnInitialized()
+    {
+        _stopwatch.Start();
+        _timer = new System.Timers.Timer(1000);
+        _timer.Elapsed += (_, _) => { _elapsed = _stopwatch.Elapsed; InvokeAsync(StateHasChanged); };
+        _timer.Start();
+    }
+
+    public void Dispose()
+    {
+        _timer?.Stop();
+        _timer?.Dispose();
+        _stopwatch.Stop();
+    }
 }
+

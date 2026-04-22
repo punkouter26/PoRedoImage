@@ -1,0 +1,56 @@
+flowchart TD
+    Start(["👤 Authenticated User\non Studio page"])
+
+    Start --> OpenBulk["Navigate to /bulk-generate\nBulkGenerate.razor"]
+    OpenBulk --> UploadImg["Upload reference photo\n(file picker / drag-drop / paste)"]
+    UploadImg --> ViewPrompts["Review 10 art-style prompts\n(loaded from saved or defaults)"]
+
+    ViewPrompts --> EditPrompts{"Edit prompts?"}
+    EditPrompts -->|"Yes"| ModifyPrompt["Modify prompt text\n≤ 2000 chars each"]
+    EditPrompts -->|"No"| SaveOpt
+    ModifyPrompt --> SaveOpt
+
+    SaveOpt{"Save prompts?"}
+    SaveOpt -->|"Yes"| SavePrompts["POST /api/bulk-generate/prompts\nPersist to Table Storage\nPartition=userId"]
+    SaveOpt -->|"No"| Describe
+    SavePrompts --> Describe
+
+    Describe["POST /api/bulk-generate/describe\nGPT-4.1-nano describes person\nin uploaded image"]
+    --> ShowDesc["Person description displayed\nUsed as shared context for all prompts"]
+
+    ShowDesc --> GenerateAll["Click 'Generate All'\n10 parallel variation calls"]
+
+    subgraph Parallel["Parallel Execution — 10 slots"]
+        direction LR
+        V1["Slot 1\nPOST /variation\nGemini Imagen3"]
+        V2["Slot 2\nPOST /variation\nGemini Imagen3"]
+        Vdots["Slots 3–9\n..."]
+        V10["Slot 10\nPOST /variation\nGemini Imagen3"]
+    end
+
+    GenerateAll --> Parallel
+
+    V1 & V2 & Vdots & V10 --> StreamDisplay["Results stream live\nas each slot completes\nProgressBar updates"]
+
+    StreamDisplay --> AllDone["All 10 variations displayed\nin BulkResultsGrid"]
+    AllDone --> Download["Download individual images\nor save to gallery"]
+
+    style Start fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style OpenBulk fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style UploadImg fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style ViewPrompts fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style EditPrompts fill:#d4512b,stroke:#a83a1f,color:#fff
+    style ModifyPrompt fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style SaveOpt fill:#d4512b,stroke:#a83a1f,color:#fff
+    style SavePrompts fill:#f2c811,stroke:#c9a000,color:#000
+    style Describe fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style ShowDesc fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style GenerateAll fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style V1 fill:#1a73e8,stroke:#1259b5,color:#fff
+    style V2 fill:#1a73e8,stroke:#1259b5,color:#fff
+    style Vdots fill:#1a73e8,stroke:#1259b5,color:#fff
+    style V10 fill:#1a73e8,stroke:#1259b5,color:#fff
+    style StreamDisplay fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style AllDone fill:#f2c811,stroke:#c9a000,color:#000
+    style Download fill:#238636,stroke:#196228,color:#fff
+    style Parallel fill:#1a1a2e,stroke:#1a73e8,color:#fff

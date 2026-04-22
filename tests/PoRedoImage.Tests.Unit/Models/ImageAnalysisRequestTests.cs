@@ -1,4 +1,4 @@
-using PoRedoImage.Web.Models;
+using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Unit.Models;
 

@@ -1,5 +1,6 @@
 using Azure.Identity;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -10,10 +11,12 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using PoRedoImage.Infrastructure;
 using PoRedoImage.Web.Components;
+using PoRedoImage.Web.Configuration;
 using PoRedoImage.Web.Features.Auth;
 using PoRedoImage.Web.Features.BulkGenerate;
 using PoRedoImage.Web.Features.Diagnostics;
 using PoRedoImage.Web.Features.ImageAnalysis;
+using PoRedoImage.Web.Features.UserImages;
 using Radzen;
 using Serilog;
 using Serilog.Events;
@@ -137,18 +140,25 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpClient();
 
 // ─── Rate limiting ──────────────────────────────────────────────────
-// Protect costly AI endpoints: 10 requests/minute per IP (sliding window).
+// Protect costly AI endpoints: 10 requests/minute per authenticated user (falls back to IP).
 // Returns HTTP 429 when the limit is exceeded.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddSlidingWindowLimiter("ai-endpoints", limiterOptions =>
+    // Partition by user ID so one user's bulk batch cannot starve other users on the same IP
+    options.AddPolicy("ai-endpoints", context =>
     {
-        limiterOptions.PermitLimit = 10;
-        limiterOptions.Window = TimeSpan.FromMinutes(1);
-        limiterOptions.SegmentsPerWindow = 6;
-        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiterOptions.QueueLimit = 2;
+        var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+        return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            SegmentsPerWindow = 6,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 2
+        });
     });
 });
 
@@ -164,25 +174,20 @@ builder.Services.AddHealthChecks()
 // ─── HTTP client ────────────────────────────────────────────────────
 builder.Services.AddScoped(sp =>
 {
-    var httpClient = new HttpClient
+    var nav = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient
     {
-        // AI endpoints (Computer Vision + OpenAI) can take up to 3 minutes on cold start.
-        // Default is 100 s which causes spurious "timed out" errors in the Blazor components.
         Timeout = TimeSpan.FromMinutes(4),
-        BaseAddress = new Uri("http://localhost:5000")
+        BaseAddress = new Uri(nav.BaseUri)
     };
-    return httpClient;
 });
 
 // ─── Feature services (Onion Architecture — Infrastructure layer wires all services) ──
 // DI registration follows Dependency Inversion Principle (SOLID-D)
 builder.Services.AddPoRedoImageInfrastructure();
 
-// Legacy per-user prompt storage (still used by BulkGenerate feature until migrated to IBulkPromptRepository)
-builder.Services.AddScoped<IBulkPromptStorageService, BulkPromptStorageService>();
-
 // Scoped: persists the active uploaded image across feature pages for the lifetime of the circuit
-builder.Services.AddScoped<PoRedoImage.Web.Features.ImageSession.ImageSessionService>();
+builder.Services.AddScoped<PoRedoImage.Web.Components.Shared.ImageSessionService>();
 
 // ─── Authentication & Authorization ─────────────────────────────────
 builder.Services.AddPoRedoImageAuth(builder.Configuration, builder.Environment);
@@ -254,6 +259,7 @@ app.MapAuthEndpoints();
 app.MapImageAnalysisEndpoints();
 app.MapDiagnosticsEndpoints();
 app.MapBulkGenerateEndpoints();
+app.MapUserImageEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

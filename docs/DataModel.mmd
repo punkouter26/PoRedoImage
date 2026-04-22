@@ -1,32 +1,36 @@
 erDiagram
-    USER ||--o{ BULK_PROMPT : "creates"
-    BULK_PROMPT ||--o{ IMAGE_RESULT : "contains"
-    BULK_PROMPT }|--|| PROMPT_STATUS : "tracks state via"
-
     USER {
-        string NameIdentifier PK "ClaimTypes.NameIdentifier"
-        string Email
-        string DisplayName
+        string UserId PK "ClaimTypes.NameIdentifier\ne.g. dev|user@test.com"
+        string DisplayName "ClaimTypes.Name"
+        string Email "ClaimTypes.Email"
+        string AuthScheme "cookie | oidc"
+    }
+
+    USER_IMAGE {
+        string Id PK "Guid N-format — row key"
+        string UserId FK "= USER.UserId (partition key)"
+        string FileName "original upload filename"
+        string ContentType "image/jpeg | image/png"
+        UserImageKind Kind "enum — see below"
+        DateTimeOffset CreatedAt "UTC timestamp"
+        long SizeBytes "file size in bytes"
     }
 
     BULK_PROMPT {
-        string PartitionKey PK "= NameIdentifier"
-        string RowKey PK "= PromptId GUID"
-        string PromptText
-        string ArtStyle
-        string Status "Pending|Processing|Complete|Failed"
-        int ImageCount
-        datetime Timestamp
+        string PartitionKey "always 'prompts'"
+        string RowKey PK "= UserId"
+        string Name "= UserId (display label)"
+        string PromptText "JSON array of 10 prompt strings"
+        DateTimeOffset CreatedAt "UTC timestamp"
     }
 
-    IMAGE_RESULT {
-        string PromptId FK "= BulkPrompt RowKey"
-        int Index PK "0-based art style index"
-        string ImageUrl
-        string ContentType "image/png"
-        int GenerationMs
+    USER ||--o{ USER_IMAGE : "owns"
+    USER ||--o| BULK_PROMPT : "has saved prompts"
+
+    USER_IMAGE_KIND {
+        int Value "0=Original, 1=Regeneration, 2=Meme, 3=BulkVariation"
     }
 
-    PROMPT_STATUS {
-        string Value PK "Pending → Processing → Complete|Failed"
+    PROCESSING_MODE {
+        int Value "0=ImageRegeneration, 1=MemeGeneration"
     }

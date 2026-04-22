@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Services;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Repositories;
@@ -23,11 +24,23 @@ public static class InfrastructureServiceExtensions
         // Scoped services
         services.AddScoped<IMemeGeneratorService, ImageSharpMemeGeneratorService>();
 
-        // Repository (Scoped: matches request lifetime)
-        services.AddScoped<IBulkPromptRepository, AzureTableBulkPromptRepository>();
+        // Repository: Singleton — TableClient is thread-safe; avoids redundant CreateIfNotExists calls per-request
+        services.AddSingleton<IBulkPromptRepository, AzureTableBulkPromptRepository>();
+
+        // User image gallery: Singleton — BlobContainerClient + TableClient are both thread-safe
+        services.AddSingleton<IUserImageRepository, AzureBlobUserImageRepository>();
+        services.AddScoped<IUserImageService, UserImageService>();
 
         // Application layer orchestrator
         services.AddScoped<IImageAnalysisOrchestrator, ImageAnalysisOrchestrator>();
+
+        // Named HttpClient for Gemini with standard resilience: retry, timeout, circuit-breaker
+        services.AddHttpClient("GeminiApi")
+            .AddStandardResilienceHandler(options =>
+            {
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);
+                options.Retry.MaxRetryAttempts = 2;
+            });
 
         return services;
     }

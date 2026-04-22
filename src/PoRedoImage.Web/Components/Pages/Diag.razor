@@ -1,7 +1,10 @@
 @page "/diag"
+@attribute [Authorize]
 @rendermode InteractiveServer
-@using System.Text.Json
-@inject HttpClient Http
+@using Microsoft.Extensions.Diagnostics.HealthChecks
+@inject IConfiguration Configuration
+@inject IWebHostEnvironment Env
+@inject HealthCheckService HealthService
 @inject IJSRuntime JSRuntime
 @inject ILogger<Diag> Logger
 
@@ -74,6 +77,30 @@
             </div>
         </div>
 
+        @* Health checks *@
+        @if (diagData?.HealthEntries != null)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0"><i class="bi bi-heart-pulse me-2"></i>Health Checks</h5>
+                    <span class="badge @(diagData.HealthStatus == "Healthy" ? "bg-success" : "bg-danger")">@diagData.HealthStatus</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0 diag-config-table">
+                        <tbody>
+                            @foreach (var kv in diagData.HealthEntries)
+                            {
+                                <tr>
+                                    <td class="ps-3 text-muted" style="width:40%;font-size:0.8rem">@kv.Key</td>
+                                    <td style="font-size:0.8rem;font-family:monospace">@(kv.Value ?? "(null)")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
         @* Config key/value table *@
         @if (diagData?.Configuration != null)
         {
@@ -128,10 +155,38 @@
             errorMessage = null;
             StateHasChanged();
 
-            var response = await Http.GetAsync("api/diag");
-            response.EnsureSuccessStatusCode();
-            var raw = await response.Content.ReadAsStringAsync();
-            diagData = JsonSerializer.Deserialize<DiagPayload>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            diagData = new DiagPayload
+            {
+                Environment = Env.EnvironmentName,
+                MachineName = System.Environment.MachineName,
+                OSVersion = System.Environment.OSVersion.ToString(),
+                DotNetVersion = System.Environment.Version.ToString(),
+                ProcessId = System.Environment.ProcessId,
+                Timestamp = DateTime.UtcNow.ToString("O"),
+                Configuration = new Dictionary<string, string?>
+                {
+                    ["AZURE_KEY_VAULT_ENDPOINT"] = MaskValue(Configuration["AZURE_KEY_VAULT_ENDPOINT"]),
+                    ["AzureAd:TenantId"] = Configuration["AzureAd:TenantId"],
+                    ["AzureAd:ClientId"] = MaskValue(Configuration["AzureAd:ClientId"]),
+                    ["ComputerVision:Endpoint"] = MaskValue(Configuration["ComputerVision:Endpoint"]),
+                    ["ComputerVision:ApiKey"] = MaskValue(Configuration["ComputerVision:ApiKey"]),
+                    ["ComputerVision:MinTagConfidence"] = Configuration["ComputerVision:MinTagConfidence"],
+                    ["OpenAI:Endpoint"] = MaskValue(Configuration["OpenAI:Endpoint"]),
+                    ["OpenAI:Key"] = MaskValue(Configuration["OpenAI:Key"]),
+                    ["OpenAI:ChatCompletionsDeployment"] = Configuration["OpenAI:ChatCompletionsDeployment"],
+                    ["OpenAI:ImageGenerationDeployment"] = Configuration["OpenAI:ImageGenerationDeployment"],
+                    ["OpenAI:ImageEndpoint"] = MaskValue(Configuration["OpenAI:ImageEndpoint"]),
+                    ["OpenAI:ImageKey"] = MaskValue(Configuration["OpenAI:ImageKey"]),
+                    ["ApplicationInsights:ConnectionString"] = MaskValue(Configuration["ApplicationInsights:ConnectionString"]),
+                    ["Storage:ConnectionString"] = MaskValue(Configuration["Storage:ConnectionString"])
+                }
+            };
+
+            var healthReport = await HealthService.CheckHealthAsync();
+            diagData.HealthStatus = healthReport.Status.ToString();
+            diagData.HealthEntries = healthReport.Entries.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (string?)$"{kvp.Value.Status} ({kvp.Value.Duration.TotalMilliseconds:0}ms){(kvp.Value.Description is not null ? " — " + kvp.Value.Description : "")}");
         }
         catch (Exception ex)
         {
@@ -142,6 +197,15 @@
         {
             isLoading = false;
         }
+    }
+
+    private static string? MaskValue(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "(not set)";
+        if (value.Length <= 8) return new string('*', value.Length);
+        var start = Math.Min(4, value.Length / 4);
+        var end = Math.Min(4, value.Length / 4);
+        return string.Concat(value.AsSpan(0, start), new string('*', value.Length - start - end), value.AsSpan(value.Length - end));
     }
 
     private async Task CopyToClipboard(string text)
@@ -157,6 +221,8 @@
         public string? DotNetVersion { get; set; }
         public int ProcessId { get; set; }
         public string? Timestamp { get; set; }
+        public string? HealthStatus { get; set; }
+        public Dictionary<string, string?>? HealthEntries { get; set; }
         public Dictionary<string, string?>? Configuration { get; set; }
     }
 }

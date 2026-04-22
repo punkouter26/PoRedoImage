@@ -12,6 +12,6 @@ public sealed class BulkPrompt
     public string PromptText { get; init; } = string.Empty;
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
 
-    public static BulkPrompt Create(string name, string promptText) =>
-        new() { Name = name, PromptText = promptText };
+    public static BulkPrompt Create(string rowKey, string name, string promptText) =>
+        new() { RowKey = rowKey, Name = name, PromptText = promptText };
 }

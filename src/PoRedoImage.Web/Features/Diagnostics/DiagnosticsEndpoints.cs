@@ -12,7 +12,8 @@ public static partial class DiagnosticsEndpoints
     public static void MapDiagnosticsEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/diag")
-            .WithTags("Diagnostics");
+            .WithTags("Diagnostics")
+            .RequireAuthorization();
 
         group.MapGet("/", GetDiagnostics)
             .WithName("GetDiagnostics")

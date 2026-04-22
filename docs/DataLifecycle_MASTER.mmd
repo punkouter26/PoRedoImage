@@ -1,53 +1,88 @@
-flowchart TD
-    subgraph Ingestion["Ingestion"]
-        Upload["User Uploads JPEG or PNG\nbase64 encoded via browser"]
-        Validate["Magic Byte Validation\nJPEG: FF D8 · PNG: 89 50 4E 47"]
-        Mode["Select Processing Mode\nAnalyze · Regenerate · Meme"]
+flowchart LR
+    subgraph Ingestion["Ingestion — Client Side"]
+        direction TB
+        FileInput["File picker / drag-drop\nbrowser File API"]
+        Clipboard["Paste from clipboard\nClipboard API bytes"]
+        FileInput --> Base64Encode["FileReader.readAsDataURL\n→ base64 string"]
+        Clipboard --> Base64Encode
     end
 
-    subgraph Processing["Processing Pipeline"]
-        CVStep["Azure Computer Vision\nAnalyzeImageAsync\ndescription + tags + confidence score"]
-        GPTStep["Azure OpenAI GPT-4.1-nano\nEnhanceDescriptionAsync\n200-500 char prompt refinement"]
-        BranchRegen{"Mode?"}
-        GeminiRegen["Google Gemini\ngemini-2.5-flash-image\nGenerateImageAsync with reference bytes"]
-        MemeStep["Meme Generator Service\nSkiaSharp text overlay\non original image bytes"]
-        AnalysisOnly["Analysis Result Only\nno image generation"]
-        BulkPath["Bulk Generate Path\n10 art styles in parallel\nper-style Gemini calls"]
+    subgraph Transfer["Transfer — HTTPS"]
+        direction TB
+        Base64Encode --> HttpPost["POST /api/images/analyze\nContent-Type: application/json\n{ ImageData: base64, Mode, DescriptionLength }"]
+        HttpPost --> MagicValidate["Magic byte validation\nFF D8 FF (JPEG)\n89 50 4E 47 (PNG)"]
+        MagicValidate --> FromBase64["Convert.FromBase64String\nbyte[] imageBytes"]
     end
 
-    subgraph Egress["Egress and UI Update"]
-        Metrics["ProcessingMetrics\ncvMs · gptMs · regenMs · totalMs"]
-        ImageResult["ImageAnalysisResult\nbase64 image + tags + description"]
-        BulkStore["Azure Table Storage\nBulkPrompt entity persisted\nImageResult per index stored"]
-        RenderUI["Blazor Component Re-render\nStreaming update via SignalR"]
+    subgraph Processing["Processing — Application Layer"]
+        direction TB
+        FromBase64 --> CVStep["Azure Computer Vision\nAnalyzeAsync(bytes)\n→ tags[], confidence, description"]
+        CVStep --> AIBranch{"Processing Mode"}
+
+        AIBranch -->|"ImageRegeneration"| EnhanceStep["Azure OpenAI\nEnhanceDescriptionAsync\n(description, tags, length)"]
+        AIBranch -->|"MemeGeneration"| MemeCaption["Azure OpenAI\nGenerateMemeCaptionAsync\n(tags) → top + bottom"]
+
+        EnhanceStep --> RegenStep["Google Gemini\nRegenerateImageAsync\n(imageBytes, enhancedDesc)\n→ new bytes"]
+        MemeCaption --> MemeOverlay["SkiaSharp\nGenerateMemeAsync\n(bytes, top, bottom)\n→ JPEG bytes"]
     end
 
-    Upload --> Validate
-    Validate -->|"Valid"| Mode
-    Validate -->|"Invalid"| Reject["400 Bad Request\nInvalid Image"]
-    Mode --> CVStep --> GPTStep --> BranchRegen
-    BranchRegen -->|"Regenerate"| GeminiRegen --> ImageResult
-    BranchRegen -->|"Meme"| MemeStep --> ImageResult
-    BranchRegen -->|"Analyze"| AnalysisOnly --> ImageResult
-    BranchRegen -->|"Bulk"| BulkPath --> BulkStore
-    ImageResult --> Metrics --> RenderUI
-    BulkStore --> RenderUI
+    subgraph Egress["Egress — Response"]
+        direction TB
+        RegenStep --> BuildResp["ImageAnalysisResponse\n{ Description, RegeneratedImageData,\nTags, ConfidenceScore, Metrics }"]
+        MemeOverlay --> BuildResp2["ImageAnalysisResponse\n{ MemeImageData, MemeCaption,\nTags, Metrics }"]
 
-    style Ingestion fill:#1a1a2e,stroke:#4a9eff,color:#fff
-    style Processing fill:#16213e,stroke:#00b4d8,color:#fff
-    style Egress fill:#0f3460,stroke:#57cc99,color:#fff
-    style Upload fill:#374151,stroke:#9ca3af,color:#fff
-    style Validate fill:#374151,stroke:#9ca3af,color:#fff
-    style Mode fill:#374151,stroke:#9ca3af,color:#fff
-    style CVStep fill:#5c2d91,stroke:#fff,color:#fff
-    style GPTStep fill:#10a37f,stroke:#fff,color:#fff
-    style BranchRegen fill:#f59e0b,stroke:#000,color:#000
-    style GeminiRegen fill:#1a73e8,stroke:#fff,color:#fff
-    style MemeStep fill:#6b21a8,stroke:#fff,color:#fff
-    style AnalysisOnly fill:#374151,stroke:#9ca3af,color:#fff
-    style BulkPath fill:#1e5799,stroke:#4a9eff,color:#fff
-    style Metrics fill:#374151,stroke:#9ca3af,color:#fff
-    style ImageResult fill:#238636,stroke:#fff,color:#fff
-    style BulkStore fill:#f2c811,stroke:#000,color:#000
-    style RenderUI fill:#512bd4,stroke:#fff,color:#fff
-    style Reject fill:#dc2626,stroke:#fff,color:#fff
+        BuildResp --> BlazorRender["Blazor SSR\nImageRegenerationResultsPanel\n<img src='data:image/png;base64,...'>"]
+        BuildResp2 --> BlazorRender2["Blazor SSR\nMemeResultsPanel\n<img src='data:image/jpeg;base64,...'>"]
+    end
+
+    subgraph Persistence["Optional Persistence — Table Storage"]
+        direction TB
+        BlazorRender --> SaveDecision{"User saves?"}
+        BlazorRender2 --> SaveDecision
+        SaveDecision -->|"Yes"| SaveAPI["POST /api/user-images/save-result\n{ ImageData, ContentType, Kind }"]
+        SaveAPI --> TableUpsert["TableClient.UpsertEntityAsync\nPartitionKey=UserId\nRowKey=GUID"]
+        TableUpsert --> TableEntry["USER_IMAGES table entry\nstporedoimage26\nKind=Regeneration|Meme"]
+    end
+
+    subgraph Observability["Observability — Cross-cutting"]
+        OTel["OpenTelemetry traces\nHttpClient + ASP.NET auto"]
+        Serilog["Serilog structured logs\nCorrelationId enriched"]
+        Metrics["ProcessingMetricsDto\nanalysisMs · enhanceMs · tokens\nreturned in response body"]
+        AppInsights["Azure Application Insights\nAll telemetry aggregated"]
+        OTel --> AppInsights
+        Serilog --> AppInsights
+    end
+
+    Processing --> Observability
+    Transfer --> Observability
+
+    style FileInput fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Clipboard fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Base64Encode fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style HttpPost fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style MagicValidate fill:#d4512b,stroke:#a83a1f,color:#fff
+    style FromBase64 fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style CVStep fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style AIBranch fill:#d4512b,stroke:#a83a1f,color:#fff
+    style EnhanceStep fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style MemeCaption fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style RegenStep fill:#1a73e8,stroke:#1259b5,color:#fff
+    style MemeOverlay fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style BuildResp fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style BuildResp2 fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style BlazorRender fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style BlazorRender2 fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style SaveDecision fill:#d4512b,stroke:#a83a1f,color:#fff
+    style SaveAPI fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style TableUpsert fill:#f2c811,stroke:#c9a000,color:#000
+    style TableEntry fill:#f2c811,stroke:#c9a000,color:#000
+    style OTel fill:#0078d4,stroke:#005fa3,color:#fff
+    style Serilog fill:#0078d4,stroke:#005fa3,color:#fff
+    style Metrics fill:#0078d4,stroke:#005fa3,color:#fff
+    style AppInsights fill:#0078d4,stroke:#005fa3,color:#fff
+    style Ingestion fill:#16213e,stroke:#512bd4,color:#fff
+    style Transfer fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style Processing fill:#1a1a2e,stroke:#10a37f,color:#fff
+    style Egress fill:#16213e,stroke:#512bd4,color:#fff
+    style Persistence fill:#2e2a1a,stroke:#f2c811,color:#fff
+    style Observability fill:#1a1e2e,stroke:#0078d4,color:#fff

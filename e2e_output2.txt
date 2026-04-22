@@ -1,9 +1,0 @@
-
-Running 4 tests using 1 worker
-
-  Γ£ô  1 [chromium] ΓÇ║ poRedoImage.spec.ts:3:5 ΓÇ║ landing page loads and contains app title (760ms)
-  Γ£ô  2 [chromium] ΓÇ║ poRedoImage.spec.ts:9:5 ΓÇ║ /health returns healthy JSON (1.6s)
-  Γ£ô  3 [chromium] ΓÇ║ poRedoImage.spec.ts:16:5 ΓÇ║ /api/diag returns masked configuration (1.6s)
-  Γ£ô  4 [chromium] ΓÇ║ poRedoImage.spec.ts:24:5 ΓÇ║ dev login creates session cookie (651ms)
-
-  4 passed (16.0s)

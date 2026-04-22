@@ -1,0 +1,14 @@
+flowchart LR
+    Auth["Auth Error\n→ /login redirect"]
+    Validation["Validation Error\nHTTP 400"]
+    RateLimit["Rate Limit Hit\nHTTP 429"]
+    ContentPolicy["Content Policy\nHTTP 422"]
+    AIFail["AI Service Down\nHTTP 500"]
+    StorageFail["Storage Fail\n/health 503"]
+
+    style Auth fill:#d4512b,stroke:#a83a1f,color:#fff
+    style Validation fill:#d4512b,stroke:#a83a1f,color:#fff
+    style RateLimit fill:#d4512b,stroke:#a83a1f,color:#fff
+    style ContentPolicy fill:#d4512b,stroke:#a83a1f,color:#fff
+    style AIFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style StorageFail fill:#d4512b,stroke:#a83a1f,color:#fff

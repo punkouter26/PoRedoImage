@@ -1,0 +1,87 @@
+flowchart TB
+    subgraph WebProject["PoRedoImage.Web — Host"]
+        direction TB
+        ProgramCs["Program.cs\nComposition Root\n• Key Vault • Serilog • OTel\n• Auth • RateLimiter • Radzen"]
+    end
+
+    subgraph FeatureSlices["VSA Feature Slices"]
+        direction LR
+        AuthSlice["Auth\nAuthEndpoints\nAuthServiceExtensions\n→ /dev-login · /challenge-microsoft · /logout"]
+        ImageSlice["ImageAnalysis\nImageAnalysisEndpoints\n→ POST /api/images/analyze\nComputerVisionHealthCheck\nOpenAIHealthCheck\nValidationFilter"]
+        BulkSlice["BulkGenerate\nBulkGenerateEndpoints\n→ GET/POST /api/bulk-generate/prompts\n→ POST /describe · /variation\nBulkPromptStorageHealthCheck\nImagen3HealthCheck"]
+        DiagSlice["Diagnostics\nDiagnosticsEndpoints\n→ GET /diag\nMasked config values"]
+        UserImgSlice["UserImages\nUserImagesEndpoints\n→ GET/POST/DELETE /api/user-images"]
+        ImageSessionSlice["ImageSession\n(client-side state)"]
+    end
+
+    subgraph AppLayer["PoRedoImage.Application"]
+        direction TB
+        Orch["IImageAnalysisOrchestrator\nImageAnalysisOrchestrator\n• ProcessAsync(request, ct)"]
+    end
+
+    subgraph Domain["PoRedoImage.Domain"]
+        direction TB
+        Entities["Entities\n• UserImage\n• BulkPrompt"]
+        Interfaces["Interfaces\n• IVisionService\n• IGenerativeAiService\n• IImagen3Service\n• IMemeGeneratorService\n• IBulkPromptRepository\n• IUserImageRepository"]
+    end
+
+    subgraph Infra["PoRedoImage.Infrastructure"]
+        direction TB
+        Services["Services\n• AzureVisionService\n• AzureOpenAiService\n• GeminiImagen3Service\n• ImageSharpMemeGeneratorService"]
+        Repos["Repositories\n• BulkPromptRepository\n• UserImageRepository"]
+        Ext["InfrastructureServiceExtensions\n.AddInfrastructure()"]
+    end
+
+    subgraph Shared["PoRedoImage.Shared"]
+        DTOs["DTOs\n• ImageAnalysisRequest/Response\n• ProcessingMode enum\n• UserImageKind enum\n• BulkGenerateDtos\n• UserImageDtos"]
+    end
+
+    subgraph ClientProject["PoRedoImage.Client — WASM"]
+        direction TB
+        ClientPages["Pages/\n• Studio.razor\n• BulkGenerate.razor\n• ImageUploadPanel.razor\n• ImageRegenerationResultsPanel.razor\n• MemeResultsPanel.razor\n• UserImages.razor"]
+        Layout["Layout/\n• MainLayout.razor\n• NavMenu.razor"]
+    end
+
+    subgraph ServerComponents["PoRedoImage.Web/Components — SSR"]
+        direction TB
+        SSRPages["Pages/\n• Studio.razor (host)\n• BulkGenerate.razor (host)\n• Login.razor\n• Diag.razor\n• Error.razor · NotFound.razor"]
+        AppRazor["App.razor\nRoutes.razor\n_Imports.razor"]
+    end
+
+    ProgramCs --> FeatureSlices
+    ProgramCs --> AppLayer
+    FeatureSlices --> AppLayer
+    AppLayer --> Domain
+    Domain --> Infra
+    Infra --> Shared
+    AppLayer --> Shared
+    FeatureSlices --> Shared
+    ClientProject --> Shared
+    ServerComponents --> ClientProject
+
+    style ProgramCs fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style AuthSlice fill:#d4512b,stroke:#a83a1f,color:#fff
+    style ImageSlice fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style BulkSlice fill:#1a73e8,stroke:#1259b5,color:#fff
+    style DiagSlice fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style UserImgSlice fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style ImageSessionSlice fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Orch fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style Entities fill:#f2c811,stroke:#c9a000,color:#000
+    style Interfaces fill:#f2c811,stroke:#c9a000,color:#000
+    style Services fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style Repos fill:#f2c811,stroke:#c9a000,color:#000
+    style Ext fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style DTOs fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style ClientPages fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Layout fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style SSRPages fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style AppRazor fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style WebProject fill:#1a1a2e,stroke:#512bd4,color:#fff
+    style FeatureSlices fill:#1a2e1a,stroke:#10a37f,color:#fff
+    style AppLayer fill:#1a1a2e,stroke:#7b2fb5,color:#fff
+    style Domain fill:#2e2a1a,stroke:#f2c811,color:#fff
+    style Infra fill:#1a2e1a,stroke:#10a37f,color:#fff
+    style Shared fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style ClientProject fill:#16213e,stroke:#512bd4,color:#fff
+    style ServerComponents fill:#16213e,stroke:#512bd4,color:#fff

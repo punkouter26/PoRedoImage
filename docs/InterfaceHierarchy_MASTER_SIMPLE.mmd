@@ -1,0 +1,22 @@
+flowchart TB
+    App["App.razor\nRouter"] --> Layout["MainLayout\n+ NavMenu"]
+    Layout --> Studio["Studio Page\n(SSR + WASM)"]
+    Layout --> Bulk["BulkGenerate Page\n(SSR + WASM)"]
+    Layout --> Images["UserImages Page"]
+    Layout --> Diag["Diag Page"]
+    Studio --> UploadPanel["ImageUploadPanel"]
+    Studio --> ResultPanels["RegenPanel · MemePanel"]
+    Bulk --> UploadPanel
+    Bulk --> BulkGrid["BulkResultsGrid"]
+    ResultPanels & BulkGrid --> ProgressBar["ProcessingProgressBar"]
+
+    style App fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Layout fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Studio fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style Bulk fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style Images fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style Diag fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style UploadPanel fill:#1a73e8,stroke:#1259b5,color:#fff
+    style ResultPanels fill:#1a73e8,stroke:#1259b5,color:#fff
+    style BulkGrid fill:#1a73e8,stroke:#1259b5,color:#fff
+    style ProgressBar fill:#1a73e8,stroke:#1259b5,color:#fff

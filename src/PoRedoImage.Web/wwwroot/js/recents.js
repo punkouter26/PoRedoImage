@@ -34,3 +34,20 @@ window.recentsManager = (function () {
         }
     };
 })();
+
+// bulkStateManager — persists bulk-generate results across Blazor SignalR circuit reconnections.
+window.bulkStateManager = (function () {
+    const KEY = 'poRedoImage_bulkState';
+
+    return {
+        save: function (json) {
+            try { localStorage.setItem(KEY, json); } catch { /* quota exceeded — non-fatal */ }
+        },
+        load: function () {
+            return localStorage.getItem(KEY); // returns null if not set
+        },
+        clear: function () {
+            try { localStorage.removeItem(KEY); } catch {}
+        }
+    };
+})();

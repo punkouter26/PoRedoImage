@@ -1,5 +1,5 @@
 using Azure.Security.KeyVault.Secrets;
-using PoRedoImage.Web.Features.Diagnostics;
+using PoRedoImage.Web.Configuration;
 
 namespace PoRedoImage.Tests.Unit.Features;
 

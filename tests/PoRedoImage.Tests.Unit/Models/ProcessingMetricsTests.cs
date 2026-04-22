@@ -1,4 +1,4 @@
-using PoRedoImage.Web.Models;
+using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Unit.Models;
 
@@ -8,7 +8,7 @@ public class ProcessingMetricsTests
     public void TotalProcessingTimeMs_SumsAllTimes()
     {
         // Arrange
-        var metrics = new ProcessingMetrics
+        var metrics = new ProcessingMetricsDto
         {
             ImageAnalysisTimeMs = 100,
             DescriptionGenerationTimeMs = 200,
@@ -26,7 +26,7 @@ public class ProcessingMetricsTests
     public void TotalProcessingTimeMs_ZeroWhenAllZero()
     {
         // Arrange
-        var metrics = new ProcessingMetrics();
+        var metrics = new ProcessingMetricsDto();
 
         // Act & Assert
         Assert.Equal(0, metrics.TotalProcessingTimeMs);

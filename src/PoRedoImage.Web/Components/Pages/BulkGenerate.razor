@@ -1,13 +1,13 @@
 @page "/bulk-generate"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject IGenerativeAiService OpenAI
-@inject IImagen3Service Imagen3
-@inject IBulkPromptStorageService PromptStorage
+@inject IBulkPromptRepository PromptStorage
+@inject HttpClient Http
 @inject IJSRuntime JSRuntime
 @inject ILogger<BulkGenerate> Logger
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ImageSessionService SessionService
+@inject NotificationService NotificationService
 
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
@@ -18,36 +18,18 @@
             <div>
                 <h1 class="feature-page-title">Bulk Generate</h1>
                 <p class="feature-page-desc">Upload a photo and generate 10 artistic variations. Use <code>&lt;PERSON&gt;</code> in prompts — AI replaces it with a description of your image.
-                    @if (Imagen3.IsConfigured)
-                    {
-                        <span class="badge bg-success ms-2">Gemini 2.0 Flash (img2img)</span>
-                    }
+                    <span class="badge bg-success ms-2">Gemini 2.0 Flash (img2img)</span>
                 </p>
             </div>
         </div>
     </div>
-
-    @if (!string.IsNullOrEmpty(_errorMessage))
-    {
-        <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
-            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-            <span>@_errorMessage</span>
-        </div>
-    }
-
-    @if (!string.IsNullOrEmpty(_successMessage))
-    {
-        <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
-            <i class="bi bi-check-circle-fill flex-shrink-0"></i>
-            <span>@_successMessage</span>
-        </div>
-    }
 
     <div class="row g-4">
         @* Left: Upload + Action Button *@
         <div class="col-lg-4 col-xl-3">
             @if (!_isGenerating)
             {
+                <MyImagesGallery @ref="_gallery" OnImageSelected="ApplyGalleryImage" />
                 <ImageUploadPanel
                     ShowDescriptionLength="false"
                     ShowProcessButton="false"
@@ -68,7 +50,6 @@
 
             @if (!_isGenerating)
             {
-                <RecentImages OnImageSelected="ApplyRecentImage" />
                 <button class="btn-generate-all w-100 mt-3"
                         @onclick="StartGeneration"
                         disabled="@(string.IsNullOrEmpty(_imagePreviewUrl) || _activePromptCount == 0)">
@@ -140,20 +121,22 @@
 @code {
     private IBrowserFile? _selectedFile;
     private byte[]? _imageBytes;
+    private string _imageContentType = "image/jpeg";
     private string? _imagePreviewUrl;
     private string? _uploadError;
-    private string? _errorMessage;
-    private string? _successMessage;
     private string[] _prompts = DefaultPrompts.All.ToArray();
     private int _activePromptCount => _prompts.Count(p => !string.IsNullOrWhiteSpace(p));
     private List<BulkGenerateImageResult> _results = [];
     private int _completedCount;
     private bool _isGenerating;
     private bool _isSaving;
-    private bool _promptsExpanded;
+    private bool _promptsExpanded = false;
     private HashSet<int> _favorites = [];
     private string? _userId;
+    private MyImagesGallery? _gallery;
     private CancellationTokenSource? _cts;
+
+    private sealed record BulkSavedState(BulkGenerateImageResult[] Results);
 
     protected override async Task OnInitializedAsync()
     {
@@ -179,6 +162,32 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Restore bulk generation results from localStorage after circuit reconnect or tab reopen
+        if (firstRender && _results.Count == 0)
+        {
+            try
+            {
+                var savedJson = await JSRuntime.InvokeAsync<string?>("bulkStateManager.load");
+                if (!string.IsNullOrEmpty(savedJson))
+                {
+                    var state = System.Text.Json.JsonSerializer.Deserialize<BulkSavedState>(
+                        savedJson,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (state?.Results?.Length > 0)
+                    {
+                        _results = [.. state.Results];
+                        _completedCount = _results.Count(r => r.Status == BulkGenerateStatus.Complete);
+                        NotificationService.Notify(NotificationSeverity.Info, "Session Restored", $"Restored {_completedCount} result(s) from previous session.", duration: 4000);
+                        StateHasChanged();
+                    }
+                }
+            }
+            catch { /* non-critical — ignore restore errors */ }
+        }
+    }
+
     private async Task LoadFile(InputFileChangeEventArgs e)
     {
         _selectedFile = e.File;
@@ -192,10 +201,11 @@
         if (error is not null) { _uploadError = error; _selectedFile = null; return; }
 
         _imageBytes = result!.Bytes;
+        _imageContentType = result.ContentType;
         _imagePreviewUrl = result.PreviewUrl;
-        _successMessage = null;
         SessionService.SetImage(result!.PreviewUrl, result.ContentType, _selectedFile!.Name, result.Bytes);
-        _ = JSRuntime.InvokeVoidAsync("recentsManager.save", result!.PreviewUrl, _selectedFile!.Name).AsTask();
+        if (_userId is not null && result.Bytes is not null)
+            _ = AutoSaveOriginalAsync(result.Bytes, result.ContentType, _selectedFile!.Name);
         StateHasChanged();
     }
 
@@ -203,10 +213,10 @@
     {
         if (_imageBytes is null || _imagePreviewUrl is null) return;
 
+        // Clear any previously saved session state before starting a new batch
+        await JSRuntime.InvokeVoidAsync("bulkStateManager.clear");
         _cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         _isGenerating = true;
-        _errorMessage = null;
-        _successMessage = null;
         _completedCount = 0;
 
         var activePrompts = _prompts
@@ -225,9 +235,12 @@
 
         try
         {
-            // Use GPT-4o vision to get a detailed physical description of the person
-            // (bald, age, glasses, skin tone, etc.) — far more accurate than Azure CV caption
-            var description = await OpenAI.DescribePersonAsync(_imageBytes);
+            // Use GPT-4o vision via API to get a detailed physical description of the person
+            var descResp = await Http.PostAsJsonAsync("/api/bulk-generate/describe",
+                new BulkDescribeRequest(Convert.ToBase64String(_imageBytes), _imageContentType));
+            descResp.EnsureSuccessStatusCode();
+            var descResult = await descResp.Content.ReadFromJsonAsync<BulkDescribeResponse>();
+            var description = descResult?.Description ?? string.Empty;
             Logger.LogInformation("Bulk Generate: Vision description acquired: {Description}", description);
 
             // Generate each variation sequentially
@@ -243,17 +256,20 @@
                     var rawPrompt = activePrompts[i].prompt;
                     var finalPrompt = rawPrompt.Replace(DefaultPrompts.PersonToken, description, StringComparison.Ordinal);
 
-                    if (!Imagen3.IsConfigured)
-                        throw new InvalidOperationException("Gemini image generation is not configured. Please set Google:ApiKey to use Bulk Generate.");
-
-                    // True image-to-image: Gemini 2.0 Flash uses the uploaded photo as subject reference
-                    var (imgData, imgCt, _) = await Imagen3.GenerateImageAsync(
-                        finalPrompt, _imageBytes, _cts!.Token);
+                    // True image-to-image via API: Gemini 2.0 Flash uses the uploaded photo as subject reference
+                    var varResp = await Http.PostAsJsonAsync("/api/bulk-generate/variation",
+                        new BulkVariationRequest(Convert.ToBase64String(_imageBytes), _imageContentType, finalPrompt));
+                    if (!varResp.IsSuccessStatusCode)
+                        throw new InvalidOperationException($"Variation API returned {varResp.StatusCode}");
+                    var varResult = await varResp.Content.ReadFromJsonAsync<BulkVariationResponse>();
 
                     _results[i].Status = BulkGenerateStatus.Complete;
                     _results[i].Prompt = rawPrompt;
-                    _results[i].ImageUrl = $"data:{imgCt};base64,{Convert.ToBase64String(imgData)}";
+                    _results[i].ImageUrl = $"data:{varResult!.ContentType};base64,{varResult.ImageData}";
                     _completedCount++;
+                    // Fire-and-forget: save variation to gallery
+                    if (_userId is not null)
+                        _ = AutoSaveVariationAsync(varResult.ImageData, varResult.ContentType);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -263,23 +279,26 @@
                 }
 
                 StateHasChanged();
+                // Persist results to localStorage so they survive circuit disconnection
+                _ = JSRuntime.InvokeVoidAsync("bulkStateManager.save",
+                    System.Text.Json.JsonSerializer.Serialize(new { Results = _results })).AsTask();
             }
 
             if (!_cts.Token.IsCancellationRequested)
             {
                 if (_completedCount > 0)
-                    _successMessage = $"Completed {_completedCount} of {activePrompts.Count} variation{(activePrompts.Count == 1 ? "" : "s")}!";
+                    NotificationService.Notify(NotificationSeverity.Success, "Done!", $"Completed {_completedCount} of {activePrompts.Count} variation{(activePrompts.Count == 1 ? "" : "s")}!", duration: 5000);
                 else
-                    _errorMessage = "All generations failed. Check the error messages on each card for details.";
+                    NotificationService.Notify(NotificationSeverity.Error, "All Failed", "All generations failed. Check each card for details.", duration: 7000);
             }
         }
         catch (OperationCanceledException)
         {
-            _errorMessage = "Generation was cancelled.";
+            NotificationService.Notify(NotificationSeverity.Warning, "Cancelled", "Generation was cancelled.", duration: 4000);
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Error during generation: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error during generation: {ex.Message}", duration: 7000);
             Logger.LogError(ex, "Bulk Generate failed");
         }
         finally
@@ -294,6 +313,19 @@
     private void CancelGeneration()
     {
         _cts?.Cancel();
+    }
+
+    private void ApplyGalleryImage(MyImagesGallery.GalleryItem item)
+    {
+        _selectedFile = null;
+        _imagePreviewUrl = SessionService.PreviewUrl;
+        _imageBytes = SessionService.Bytes;
+        _imageContentType = item.ContentType;
+        _uploadError = null;
+        _results = [];
+        _completedCount = 0;
+        _favorites = [];
+        StateHasChanged();
     }
 
     private void ApplyRecentImage(RecentImages.RecentItem item)
@@ -315,6 +347,27 @@
         StateHasChanged();
     }
 
+    private async Task AutoSaveOriginalAsync(byte[] bytes, string contentType, string fileName)
+    {
+        try
+        {
+            await Http.PostAsJsonAsync("/api/user-images/original",
+                new SaveOriginalRequest(Convert.ToBase64String(bytes), contentType, fileName));
+            if (_gallery is not null) await InvokeAsync(_gallery.LoadAsync);
+        }
+        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save original failed"); }
+    }
+
+    private async Task AutoSaveVariationAsync(string imageData, string contentType)
+    {
+        try
+        {
+            await Http.PostAsJsonAsync("/api/user-images/result",
+                new SaveResultRequest(imageData, contentType, UserImageKind.BulkVariation));
+        }
+        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save variation failed"); }
+    }
+
     private void ToggleFavorite(int index)
     {
         if (!_favorites.Add(index))
@@ -332,20 +385,24 @@
     {
         if (_userId is null)
         {
-            _errorMessage = "Unable to save: no user ID found. Please sign out and sign back in.";
+            NotificationService.Notify(NotificationSeverity.Error, "Not Signed In", "Unable to save: no user ID found. Please sign out and sign back in.", duration: 6000);
             return;
         }
         _isSaving = true;
-        _successMessage = null;
-        _errorMessage = null;
         try
         {
-            await PromptStorage.SavePromptsAsync(_userId, _prompts);
-            _successMessage = "Prompts saved!";
+            var prompt = new PoRedoImage.Domain.Entities.BulkPrompt
+            {
+                RowKey = _userId,
+                Name = _userId,
+                PromptText = System.Text.Json.JsonSerializer.Serialize(_prompts)
+            };
+            await PromptStorage.SaveAsync(prompt);
+            NotificationService.Notify(NotificationSeverity.Success, "Saved", "Prompts saved successfully!", duration: 3000);
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Failed to save prompts: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Save Failed", $"Failed to save prompts: {ex.Message}", duration: 6000);
             Logger.LogError(ex, "Failed to save bulk prompts");
         }
         finally
@@ -358,25 +415,29 @@
     {
         if (_userId is null)
         {
-            _errorMessage = "Unable to load: no user ID found. Please sign out and sign back in.";
+            NotificationService.Notify(NotificationSeverity.Error, "Not Signed In", "Unable to load: no user ID found. Please sign out and sign back in.", duration: 6000);
             return;
         }
         try
         {
-            var saved = await PromptStorage.LoadPromptsAsync(_userId);
-            if (saved is not null)
+            var stored = await PromptStorage.GetByRowKeyAsync(_userId);
+            if (stored is not null)
             {
-                _prompts = saved;
-                _successMessage = "Prompts loaded!";
+                var saved = !string.IsNullOrWhiteSpace(stored.PromptText)
+                    ? System.Text.Json.JsonSerializer.Deserialize<string[]>(stored.PromptText)
+                    : null;
+                if (saved is not null)
+                {
+                    _prompts = saved;
+                    NotificationService.Notify(NotificationSeverity.Success, "Loaded", "Prompts loaded from your account.", duration: 3000);
+                    return;
+                }
             }
-            else
-            {
-                _successMessage = "No saved prompts found for your account.";
-            }
+            NotificationService.Notify(NotificationSeverity.Info, "No Saved Prompts", "No saved prompts found for your account.", duration: 4000);
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Failed to load prompts: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Load Failed", $"Failed to load prompts: {ex.Message}", duration: 6000);
             Logger.LogError(ex, "Failed to load bulk prompts");
         }
     }

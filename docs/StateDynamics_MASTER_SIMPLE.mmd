@@ -1,0 +1,8 @@
+stateDiagram-v2
+    [*] --> Uploaded
+    Uploaded --> Analyzing
+    Analyzing --> Regenerated : "Success"
+    Analyzing --> Failed : "Error"
+    Regenerated --> Saved : "User saves"
+    Saved --> [*]
+    Failed --> [*]

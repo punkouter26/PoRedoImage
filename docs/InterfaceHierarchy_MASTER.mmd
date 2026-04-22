@@ -1,0 +1,74 @@
+flowchart TB
+    subgraph AppRazor["App.razor — Root"]
+        Router["Router\n(Routes.razor)\nRoute detection + fallback"]
+    end
+
+    subgraph Layouts["Layout Layer"]
+        MainLayout["MainLayout.razor\n• NavMenu + top bar\n• RadzenNotification\n• Theme provider"]
+        NavMenu["NavMenu.razor\n• / Studio\n• /bulk-generate Bulk Generate\n• /user-images My Images\n• /diag Diagnostics\n• Login/Logout state"]
+    end
+
+    subgraph SSRPages["Server Pages (PoRedoImage.Web/Components/Pages)"]
+        StudioSSR["Studio.razor (SSR host)\nRoute: /\n• Embeds Client Studio component\n• Auth context injected"]
+        BulkSSR["BulkGenerate.razor (SSR host)\nRoute: /bulk-generate\n• Embeds Client BulkGenerate"]
+        LoginPage["Login.razor\nRoute: /login\n• Dev login form\n• 'Sign in with Microsoft' button"]
+        DiagPage["Diag.razor\nRoute: /diag\n• JSON config dump\n• Masked sensitive values\n• Health summary"]
+        ErrorPage["Error.razor\nRoute: /error · fallback"]
+        NotFoundPage["NotFound.razor\nRoute: *"]
+    end
+
+    subgraph ClientComponents["WASM Client (PoRedoImage.Client/Pages)"]
+        StudioClient["Studio.razor (Interactive)\n• ImageUploadPanel\n• Mode selector\n• ProcessingProgressBar\n• Results panels"]
+        BulkClient["BulkGenerate.razor (Interactive)\n• Photo upload\n• 10 prompt editors\n• BulkResultsGrid\n• ProcessingProgressBar"]
+        UserImagesClient["UserImages.razor\n• Gallery grid\n• Delete + download"]
+    end
+
+    subgraph CompUI["Shared UI Components"]
+        UploadPanel["ImageUploadPanel.razor\n• File picker\n• Drag-drop zone\n• Clipboard paste\n• Preview thumbnail"]
+        RegenPanel["ImageRegenerationResultsPanel.razor\n• Before/After split\n• Tags + confidence badges\n• Description text\n• Save button"]
+        MemePanel["MemeResultsPanel.razor\n• Meme image\n• Caption overlay\n• Download button"]
+        ProgressBar["ProcessingProgressBar.razor\n• Step indicator\n• Elapsed time\n• Slot fill for bulk"]
+    end
+
+    subgraph StateManagement["State & API Binding"]
+        AppState["Blazor Component State\nCascadingParameter / @inject\nRadzen NotificationService\nImageSession (Scoped)"]
+        HttpClient["HttpClient (DI)\nIHttpClientFactory\n→ /api/* calls"]
+    end
+
+    Router --> Layouts
+    Layouts --> SSRPages
+    SSRPages --> ClientComponents
+    ClientComponents --> CompUI
+    ClientComponents --> StateManagement
+
+    StudioClient --> UploadPanel
+    StudioClient --> RegenPanel
+    StudioClient --> MemePanel
+    StudioClient --> ProgressBar
+    BulkClient --> UploadPanel
+    BulkClient --> ProgressBar
+
+    style Router fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style MainLayout fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style NavMenu fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style StudioSSR fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style BulkSSR fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style LoginPage fill:#d4512b,stroke:#a83a1f,color:#fff
+    style DiagPage fill:#10a37f,stroke:#0a7a5f,color:#fff
+    style ErrorPage fill:#d4512b,stroke:#a83a1f,color:#fff
+    style NotFoundPage fill:#d4512b,stroke:#a83a1f,color:#fff
+    style StudioClient fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style BulkClient fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style UserImagesClient fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style UploadPanel fill:#1a73e8,stroke:#1259b5,color:#fff
+    style RegenPanel fill:#1a73e8,stroke:#1259b5,color:#fff
+    style MemePanel fill:#1a73e8,stroke:#1259b5,color:#fff
+    style ProgressBar fill:#1a73e8,stroke:#1259b5,color:#fff
+    style AppState fill:#f2c811,stroke:#c9a000,color:#000
+    style HttpClient fill:#f2c811,stroke:#c9a000,color:#000
+    style AppRazor fill:#1a1a2e,stroke:#512bd4,color:#fff
+    style Layouts fill:#1a1a2e,stroke:#512bd4,color:#fff
+    style SSRPages fill:#16213e,stroke:#7b2fb5,color:#fff
+    style ClientComponents fill:#16213e,stroke:#4a9eff,color:#fff
+    style CompUI fill:#1a1a2e,stroke:#1a73e8,color:#fff
+    style StateManagement fill:#2e2a1a,stroke:#f2c811,color:#fff

@@ -46,17 +46,29 @@
 </div>
 
 <style>
+    .login-page {
+        background: radial-gradient(ellipse 90% 80% at 50% -10%, rgba(5,39,103,0.18), transparent);
+    }
     .login-card {
-        background: var(--bs-body-bg, #161b22);
-        border: 1px solid #30363d;
-        border-radius: 12px;
+        background: #0f172a;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
         padding: 2rem 2.25rem;
         width: 100%;
         max-width: 400px;
-        box-shadow: 0 8px 32px rgba(0,0,0,.35);
+        box-shadow: 0 16px 48px rgba(0,0,0,.55);
+        position: relative;
+        overflow: hidden;
     }
-    .login-title { font-size: 1.4rem; font-weight: 700; margin: 0; }
-    .login-subtitle { font-size: .85rem; color: #8b949e; margin-top: .3rem; }
+    .login-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #052767, #3a0647, #052767);
+    }
+    .login-title { font-size: 1.4rem; font-weight: 700; margin: 0; color: #f1f5f9; }
+    .login-subtitle { font-size: .85rem; color: #94a3b8; margin-top: .3rem; }
 
     .btn-ms-signin {
         display: flex;

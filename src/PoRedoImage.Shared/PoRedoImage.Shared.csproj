@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PoRedoImage.Domain\PoRedoImage.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

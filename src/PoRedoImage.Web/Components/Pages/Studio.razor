@@ -1,0 +1,128 @@
+@page "/"
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@inject ImageSessionService SessionService
+@inject NavigationManager Nav
+
+<PageTitle>PoRedoImage — Studio</PageTitle>
+
+<div class="studio-page">
+
+    @* ── Hero ──────────────────────────────────────────────────────── *@
+    <div class="studio-hero">
+        <div class="studio-hero__icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+        </div>
+        <div>
+            <h1 class="studio-hero__title">AI Image Studio</h1>
+            <p class="studio-hero__sub">Upload a photo, then choose how to transform it.</p>
+        </div>
+    </div>
+
+    @* ── My Images gallery (auth users only) ───────────────────────── *@
+    <AuthorizeView>
+        <Authorized>
+            <div class="studio-gallery-row">
+                <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGallerySelect" />
+            </div>
+        </Authorized>
+    </AuthorizeView>
+
+    @* ── Upload zone + feature cards ──────────────────────────────── *@
+    <div class="studio-body">
+        <div class="studio-upload-col">
+            <ImageUploadPanel
+                ShowDescriptionLength="false"
+                ShowProcessButton="false"
+                ImagePreviewUrl="@_previewUrl"
+                ErrorMessage="@_error"
+                CanProcess="false"
+                OnFileChange="LoadFile" />
+        </div>
+
+        <div class="studio-features-col">
+            <div class="studio-feature-grid">
+                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/image-regeneration">
+                    <span class="studio-feature-card__icon">🎨</span>
+                    <div>
+                        <div class="studio-feature-card__title">Regeneration</div>
+                        <p class="studio-feature-card__desc">AI recreates your photo as a brand-new artistic version using DALL-E 3.</p>
+                    </div>
+                    <span class="studio-feature-card__cta">
+                        @(_hasImage ? "Process now →" : "Try it →")
+                    </span>
+                </a>
+
+                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/meme-generation">
+                    <span class="studio-feature-card__icon">😂</span>
+                    <div>
+                        <div class="studio-feature-card__title">Meme</div>
+                        <p class="studio-feature-card__desc">AI writes a witty caption and overlays it on your image.</p>
+                    </div>
+                    <span class="studio-feature-card__cta">
+                        @(_hasImage ? "Process now →" : "Try it →")
+                    </span>
+                </a>
+
+                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/bulk-generate">
+                    <span class="studio-feature-card__icon">🖼️</span>
+                    <div>
+                        <div class="studio-feature-card__title">Bulk Generate</div>
+                        <p class="studio-feature-card__desc">Generate up to 10 artistic variations at once via Gemini 2.0 Flash.</p>
+                    </div>
+                    <span class="studio-feature-card__cta">
+                        @(_hasImage ? "Process now →" : "Try it →")
+                    </span>
+                </a>
+            </div>
+
+            @if (_hasImage)
+            {
+                <p class="studio-ready-hint">
+                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                    Image ready — click any transformation above to start.
+                </p>
+            }
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private string? _previewUrl;
+    private string? _error;
+    private bool _hasImage => SessionService.HasImage;
+    private MyImagesGallery? _gallery;
+
+    protected override void OnInitialized()
+    {
+        _previewUrl = SessionService.PreviewUrl;
+        SessionService.OnChange += OnSessionChanged;
+    }
+
+    private void OnSessionChanged()
+    {
+        _previewUrl = SessionService.PreviewUrl;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadFile(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        var (result, error) = await ImageLoadHelper.LoadAsync(e.File);
+        if (error is not null) { _error = error; return; }
+        _previewUrl = result!.PreviewUrl;
+        SessionService.SetImage(result.PreviewUrl, result.ContentType, e.File.Name, result.Bytes);
+        StateHasChanged();
+    }
+
+    private void HandleGallerySelect(MyImagesGallery.GalleryItem item)
+    {
+        _previewUrl = SessionService.PreviewUrl;
+        StateHasChanged();
+    }
+
+    public void Dispose() => SessionService.OnChange -= OnSessionChanged;
+}

@@ -1,7 +1,7 @@
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Security.KeyVault.Secrets;
 
-namespace PoRedoImage.Web.Features.Diagnostics;
+namespace PoRedoImage.Web.Configuration;
 
 /// <summary>
 /// Maps Key Vault secret names to .NET configuration keys.

@@ -1,0 +1,121 @@
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject ImageSessionService SessionService
+@inject ILogger<MyImagesGallery> Logger
+
+@if (_loading)
+{
+    <div class="gallery-bar gallery-bar--loading">
+        <span class="gallery-bar__label"><i class="bi bi-images me-1"></i><span class="d-none d-sm-inline">My Images</span></span>
+        <div class="gallery-bar__scroll">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="gallery-thumb gallery-thumb--skeleton shimmer-anim"></div>
+            }
+        </div>
+    </div>
+}
+else if (_images.Count > 0)
+{
+    <div class="gallery-bar">
+        <span class="gallery-bar__label" title="Your saved originals and results">
+            <i class="bi bi-images me-1"></i><span class="d-none d-sm-inline">My Images</span>
+            <span class="gallery-bar__count">@_images.Count</span>
+        </span>
+        <div class="gallery-bar__scroll" role="list" aria-label="Your saved images">
+            @foreach (var img in _images)
+            {
+                <button class="gallery-thumb @KindClass(img.Kind)"
+                        title="@img.FileName (@img.Kind.ToString())"
+                        @onclick="@(() => SelectImage(img))"
+                        role="listitem">
+                    <img src="@img.ImageUrl" alt="@img.FileName" loading="lazy" />
+                    <span class="gallery-thumb__badge">@KindIcon(img.Kind)</span>
+                </button>
+            }
+        </div>
+        <button class="gallery-bar__refresh" @onclick="LoadAsync" title="Refresh gallery">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<GalleryItem> OnImageSelected { get; set; }
+
+    private List<GalleryItem> _images = [];
+    private bool _loading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await LoadAsync();
+    }
+
+    public async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var httpResponse = await Http.GetAsync("/api/user-images");
+            var contentType = httpResponse.Content.Headers.ContentType?.MediaType;
+            if (!httpResponse.IsSuccessStatusCode || contentType != "application/json")
+            {
+                _images = [];
+                return;
+            }
+            var result = await httpResponse.Content.ReadFromJsonAsync<List<GalleryItem>>();
+            _images = result ?? [];
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load user image gallery");
+            _images = [];
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectImage(GalleryItem item)
+    {
+        try
+        {
+            var bytes = await Http.GetByteArrayAsync(item.ImageUrl);
+            SessionService.SetImage(null, item.ContentType, item.FileName, bytes);
+            await OnImageSelected.InvokeAsync(item);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load gallery image {Id}", item.Id);
+        }
+    }
+
+    private static string KindClass(UserImageKind kind) => kind switch
+    {
+        UserImageKind.Regeneration => "gallery-thumb--regen",
+        UserImageKind.Meme => "gallery-thumb--meme",
+        UserImageKind.BulkVariation => "gallery-thumb--bulk",
+        _ => "gallery-thumb--original"
+    };
+
+    private static string KindIcon(UserImageKind kind) => kind switch
+    {
+        UserImageKind.Regeneration => "🎨",
+        UserImageKind.Meme => "😂",
+        UserImageKind.BulkVariation => "🖼️",
+        _ => "📷"
+    };
+
+    public sealed record GalleryItem(
+        string Id,
+        string FileName,
+        string ContentType,
+        UserImageKind Kind,
+        System.DateTimeOffset CreatedAt,
+        long SizeBytes,
+        string ImageUrl);
+}

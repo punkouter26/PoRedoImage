@@ -1,0 +1,17 @@
+flowchart TD
+    NewUser["New User"] --> Login["Login\n/login"]
+    Login -->|"Dev"| DevLogin["Dev Login"]
+    Login -->|"Prod"| OIDC["Microsoft Entra OIDC"]
+    DevLogin & OIDC --> Studio["Studio Home"]
+    Studio --> Upload["Upload Image"]
+    Upload --> Result["AI Result\n🎉 Aha! Moment"]
+    Result --> Gallery["Save to Gallery"]
+
+    style NewUser fill:#4a9eff,stroke:#2a7fd4,color:#fff
+    style Login fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style DevLogin fill:#238636,stroke:#196228,color:#fff
+    style OIDC fill:#0078d4,stroke:#005fa3,color:#fff
+    style Studio fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Upload fill:#512bd4,stroke:#3a1fa8,color:#fff
+    style Result fill:#f2c811,stroke:#c9a000,color:#000
+    style Gallery fill:#512bd4,stroke:#3a1fa8,color:#fff

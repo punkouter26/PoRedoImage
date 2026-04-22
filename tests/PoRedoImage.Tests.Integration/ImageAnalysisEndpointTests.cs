@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using PoRedoImage.Domain.Interfaces;
-using PoRedoImage.Web.Models;
+using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Integration;
 

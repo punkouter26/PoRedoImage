@@ -1,11 +1,5 @@
 namespace PoRedoImage.Shared.DTOs;
 
-public class BulkGenerateRequest
-{
-    public List<string> Prompts { get; set; } = [];
-    public int Count { get; set; } = 1;
-}
-
 public class BulkGenerateImageResult
 {
     public int Index { get; set; }
@@ -30,3 +24,9 @@ public class BulkPromptDto
     public string PromptText { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+public record BulkDescribeRequest(string ImageData, string ContentType);
+public record BulkDescribeResponse(string Description);
+
+public record BulkVariationRequest(string ImageData, string ContentType, string Prompt);
+public record BulkVariationResponse(string ImageData, string ContentType);

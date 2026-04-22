@@ -1,16 +1,16 @@
-using PoRedoImage.Web.Models;
+using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Unit.Models;
 
 /// <summary>
-/// Unit tests for ImageAnalysisResult DTO defaults
+/// Unit tests for ImageAnalysisResponse DTO defaults
 /// </summary>
 public class ImageAnalysisResultTests
 {
     [Fact]
     public void Constructor_DefaultValues_AreCorrect()
     {
-        var result = new ImageAnalysisResult();
+        var result = new ImageAnalysisResponse();
 
         Assert.Equal(string.Empty, result.Description);
         Assert.Empty(result.Tags);

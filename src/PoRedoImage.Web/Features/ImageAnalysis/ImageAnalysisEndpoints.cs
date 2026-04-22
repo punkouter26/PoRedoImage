@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PoRedoImage.Application.Services;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Web.Features;
 using System.ClientModel;
 
 namespace PoRedoImage.Web.Features.ImageAnalysis;
@@ -23,7 +24,8 @@ public static class ImageAnalysisEndpoints
             .Produces<ImageAnalysisResponse>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
             .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
-            .RequireRateLimiting("ai-endpoints");
+            .RequireRateLimiting("ai-endpoints")
+            .AddEndpointFilter<ValidationFilter<ImageAnalysisRequest>>();
 
         group.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Service = "ImageAnalysis" }))
             .WithName("ImageAnalysisHealth")

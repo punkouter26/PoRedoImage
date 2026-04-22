@@ -14,13 +14,16 @@ namespace PoRedoImage.Infrastructure.Services;
 public sealed class AzureVisionService : IVisionService
 {
     private readonly ILogger<AzureVisionService> _logger;
+    private readonly IConfiguration _configuration;
     private readonly ImageAnalysisClient? _client;
+    private readonly AzureKeyCredential? _credential;
     private readonly float _minTagConfidence;
     private readonly string? _configurationError;
 
     public AzureVisionService(IConfiguration configuration, ILogger<AzureVisionService> logger)
     {
         _logger = logger;
+        _configuration = configuration;
 
         var endpoint = configuration["ComputerVision:Endpoint"];
         var key = configuration["ComputerVision:ApiKey"] ?? configuration["ComputerVision:Key"];
@@ -33,7 +36,8 @@ public sealed class AzureVisionService : IVisionService
             return;
         }
 
-        _client = new ImageAnalysisClient(new Uri(endpoint), new AzureKeyCredential(key));
+        _credential = new AzureKeyCredential(key);
+        _client = new ImageAnalysisClient(new Uri(endpoint), _credential);
         _logger.LogInformation("Azure Vision Service initialized with endpoint: {Endpoint}", endpoint);
     }
 
@@ -46,6 +50,11 @@ public sealed class AzureVisionService : IVisionService
         ArgumentNullException.ThrowIfNull(imageData);
         if (imageData.Length == 0)
             throw new ArgumentException("Image data cannot be empty", nameof(imageData));
+
+        // Re-read key from IConfiguration to pick up Key Vault rotated secrets (singleton lifetime)
+        var currentKey = _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
+        if (!string.IsNullOrWhiteSpace(currentKey) && _credential is not null)
+            _credential.Update(currentKey);
 
         _logger.LogInformation("Analyzing image via Azure Computer Vision. Size={Size} bytes", imageData.Length);
         var start = Stopwatch.GetTimestamp();

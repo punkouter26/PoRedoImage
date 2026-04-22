@@ -1,0 +1,82 @@
+flowchart TD
+    subgraph AuthErrors["Authentication & Access Errors"]
+        NotAuth["Unauthenticated request\nto protected page"]
+        --> RedirectLogin["Redirect → /login\n401 or cookie missing"]
+        RedirectLogin --> LoginAttempt{"Login attempt"}
+        LoginAttempt -->|"OIDC failure / timeout"| OIDCFail["OIDC error page\nDisplay error description\nfrom callback params"]
+        LoginAttempt -->|"Dev login without email"| DevEmpty["Redirect → /login\n(no cookie set)"]
+        LoginAttempt -->|"Invalid returnUrl"| SanitizeRedirect["returnUrl sanitized\nfallback → /\n(open-redirect prevention)"]
+    end
+
+    subgraph ValidationErrors["Input Validation Errors"]
+        BadBase64["Non-base64 image data"]
+        --> Base64Fail["HTTP 400\n'Invalid base64 image data'"]
+
+        BadMagic["Invalid image magic bytes\nnot JPEG FF D8 FF\nnot PNG 89 50 4E 47"]
+        --> MagicFail["HTTP 400\n'Not a valid JPEG or PNG'"]
+
+        BadDescLen["DescriptionLength < 200\nor > 500"]
+        --> DescFail["HTTP 400\n'DescriptionLength must be 200-500'"]
+
+        BadPrompts["Prompts array ≠ 10 items\nor item > 2000 chars"]
+        --> PromptFail["HTTP 400\n'Exactly 10 prompts required'"]
+    end
+
+    subgraph RateLimiting["Rate Limiting"]
+        TooManyReqs["User exceeds\n10 req/min on /api/images\nor /api/bulk-generate"]
+        --> HTTP429["HTTP 429 Too Many Requests\nRetry-After header\nUI shows cooldown timer"]
+    end
+
+    subgraph ContentPolicy["AI Content Policy Violations"]
+        PolicyViolation["Azure OpenAI / Gemini\ncontent_policy_violation\nin response"]
+        --> HTTP422["HTTP 422\n'Image blocked by content filters'\nUser prompt: try different image"]
+    end
+
+    subgraph AIErrors["AI Service Failures"]
+        CVDown["Computer Vision\ntimeout / service unavailable"]
+        --> CVFail["HTTP 500\n'Processing Error'\nLog: LogError with trace"]
+
+        GeminiDown["Gemini endpoint\nnot configured / quota exceeded"]
+        --> GeminiFail["HTTP 400\n'Imagen3 service not configured'\nor HTTP 500 on quota"]
+
+        OpenAIDown["Azure OpenAI\ndeployment throttle / outage"]
+        --> OpenAIFail["HTTP 500\nRetry-after propagated\nto client"]
+    end
+
+    subgraph StorageErrors["Storage Errors"]
+        TableFail["Azure Table Storage\nconnection failure"]
+        --> TableErr["Health check → Degraded\n/health returns 503\nBulkPrompts save silently fails"]
+    end
+
+    style NotAuth fill:#d4512b,stroke:#a83a1f,color:#fff
+    style RedirectLogin fill:#7b2fb5,stroke:#5a1f8a,color:#fff
+    style LoginAttempt fill:#d4512b,stroke:#a83a1f,color:#fff
+    style OIDCFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style DevEmpty fill:#d4512b,stroke:#a83a1f,color:#fff
+    style SanitizeRedirect fill:#f2c811,stroke:#c9a000,color:#000
+    style BadBase64 fill:#d4512b,stroke:#a83a1f,color:#fff
+    style Base64Fail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style BadMagic fill:#d4512b,stroke:#a83a1f,color:#fff
+    style MagicFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style BadDescLen fill:#d4512b,stroke:#a83a1f,color:#fff
+    style DescFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style BadPrompts fill:#d4512b,stroke:#a83a1f,color:#fff
+    style PromptFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style TooManyReqs fill:#d4512b,stroke:#a83a1f,color:#fff
+    style HTTP429 fill:#d4512b,stroke:#a83a1f,color:#fff
+    style PolicyViolation fill:#d4512b,stroke:#a83a1f,color:#fff
+    style HTTP422 fill:#d4512b,stroke:#a83a1f,color:#fff
+    style CVDown fill:#d4512b,stroke:#a83a1f,color:#fff
+    style CVFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style GeminiDown fill:#d4512b,stroke:#a83a1f,color:#fff
+    style GeminiFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style OpenAIDown fill:#d4512b,stroke:#a83a1f,color:#fff
+    style OpenAIFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style TableFail fill:#d4512b,stroke:#a83a1f,color:#fff
+    style TableErr fill:#d4512b,stroke:#a83a1f,color:#fff
+    style AuthErrors fill:#2e1a1a,stroke:#d4512b,color:#fff
+    style ValidationErrors fill:#2e1a1a,stroke:#d4512b,color:#fff
+    style RateLimiting fill:#2e1a1a,stroke:#d4512b,color:#fff
+    style ContentPolicy fill:#2e1a1a,stroke:#d4512b,color:#fff
+    style AIErrors fill:#2e1a1a,stroke:#d4512b,color:#fff
+    style StorageErrors fill:#2e1a1a,stroke:#d4512b,color:#fff

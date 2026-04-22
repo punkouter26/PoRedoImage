@@ -1,0 +1,55 @@
+stateDiagram-v2
+    [*] --> Uploaded : "User uploads image\n(base64 POST)"
+
+    state "UserImage Lifecycle" as ImageLifecycle {
+        Uploaded --> Analyzing : "POST /api/images/analyze\n[magic bytes valid]"
+        Uploaded --> Rejected : "Invalid JPEG/PNG bytes\n[magic bytes guard]"
+
+        Analyzing --> AnalysisFailed : "CV timeout / HTTP 500"
+        Analyzing --> Analyzed : "Tags + confidence returned"
+
+        Analyzed --> Enhancing : "Mode=ImageRegeneration\nOpenAI EnhanceDescriptionAsync"
+        Analyzed --> GeneratingMeme : "Mode=MemeGeneration\nOpenAI GenerateMemeCaptionAsync"
+
+        Enhancing --> EnhanceFailed : "OpenAI quota / outage"
+        Enhancing --> Enhanced : "Enhanced description ready"
+
+        Enhanced --> Regenerating : "Gemini RegenerateImageAsync\n(image-to-image)"
+        Regenerating --> ContentBlocked : "content_policy_violation\nHTTP 422"
+        Regenerating --> Regenerated : "New image bytes returned"
+
+        GeneratingMeme --> MemeFailed : "OpenAI failure"
+        GeneratingMeme --> MemeOverlaying : "top + bottom caption ready"
+        MemeOverlaying --> MemeGenerated : "SkiaSharp text overlay applied"
+
+        Regenerated --> Saveable : "User clicks Save"
+        MemeGenerated --> Saveable
+
+        Saveable --> Saved : "POST /api/user-images/save-result\nTable Storage upsert"
+        Saved --> [*] : "Gallery entry created\nKind=Regeneration|Meme"
+
+        Rejected --> [*]
+        AnalysisFailed --> [*]
+        EnhanceFailed --> [*]
+        ContentBlocked --> [*]
+        MemeFailed --> [*]
+    }
+
+    state "BulkVariation Lifecycle" as BulkLifecycle {
+        [*] --> PromptLoaded : "GET /api/bulk-generate/prompts\nor use defaults"
+        PromptLoaded --> Described : "POST /api/bulk-generate/describe\nGPT-4.1-nano vision"
+        Described --> GeneratingVariations : "POST /api/bulk-generate/variation\n×10 parallel"
+        GeneratingVariations --> VariationComplete : "Gemini returns bytes"
+        GeneratingVariations --> VariationFailed : "Gemini not configured\nor quota exceeded"
+        VariationComplete --> BulkSaved : "Optional: save individual"
+        BulkSaved --> [*]
+        VariationFailed --> [*]
+    }
+
+    state "BulkPrompt Lifecycle" as PromptLifecycle {
+        [*] --> Default : "App loads 10 default prompts"
+        Default --> PendingSave : "User edits prompts"
+        PendingSave --> Persisted : "POST /api/bulk-generate/prompts\nTable Storage PartitionKey=prompts\nRowKey=userId"
+        Persisted --> Default : "User resets to defaults"
+        Persisted --> [*]
+    }

@@ -51,9 +51,20 @@ public static class AuthServiceExtensions
                 options.Scope.Add("email");
                 options.GetClaimsFromUserInfoEndpoint = true;
                 options.TokenValidationParameters.NameClaimType = "name";
-                // The 'common' endpoint returns per-user tenant IDs in the issuer claim.
-                // Disable strict issuer validation for personal + multi-tenant accounts.
-                options.TokenValidationParameters.ValidateIssuer = false;
+                // AzureAd:AllowedTenantIds (comma-separated) restricts access to specific tenants.
+                // When absent, issuer validation is disabled to support personal + multi-tenant accounts.
+                var allowedTenants = configuration["AzureAd:AllowedTenantIds"]?
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (allowedTenants?.Length > 0)
+                {
+                    options.TokenValidationParameters.ValidIssuers = allowedTenants
+                        .Select(t => $"https://login.microsoftonline.com/{t}/v2.0")
+                        .ToArray();
+                }
+                else
+                {
+                    options.TokenValidationParameters.ValidateIssuer = false;
+                }
             });
         }
 
