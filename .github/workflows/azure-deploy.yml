@@ -53,12 +53,14 @@ jobs:
     - name: Deploy to Azure App Service
       run: |
         cd ./publish && zip -r ../app.zip . && cd ..
+        # Synchronous deploy (no --async): waits until the platform confirms the
+        # deployment slot is ready before proceeding. This avoids the race where
+        # an explicit restart fires while the app is still initialising.
         az webapp deploy \
           --name ${{ env.AZURE_APP_NAME }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
           --src-path ./app.zip \
-          --type zip \
-          --async true
+          --type zip
 
     - name: Set startup command
       run: |
@@ -66,9 +68,6 @@ jobs:
           --name ${{ env.AZURE_APP_NAME }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
           --startup-file "dotnet /home/site/wwwroot/PoRedoImage.Web.dll"
-
-    - name: Restart app
-      run: az webapp restart --name ${{ env.AZURE_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
 
     - name: Smoke Test – /health
       run: |
