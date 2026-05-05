@@ -3,6 +3,8 @@ name: Deploy to Azure
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
@@ -17,6 +19,8 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     environment:
       name: production
       url: https://poredoimage-web.azurewebsites.net
@@ -46,12 +50,25 @@ jobs:
     - name: Publish
       run: dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj --configuration Release --output ./publish
 
+    - name: Verify formatting
+      run: dotnet format PoRedoImage.sln --verify-no-changes --verbosity minimal
+
+    - name: Run unit tests
+      run: dotnet test tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj --configuration Release --logger "trx;LogFileName=unit-tests.trx"
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: "**/*.trx"
+
     - name: Azure Login (OIDC)
       uses: azure/login@v2.3.0
       with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
     - name: Deploy to Azure App Service
       run: |
