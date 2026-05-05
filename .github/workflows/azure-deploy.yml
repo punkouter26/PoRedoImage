@@ -17,6 +17,9 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://poredoimage-web.azurewebsites.net
     permissions:
       id-token: write
       contents: read
