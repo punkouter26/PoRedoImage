@@ -1,19 +1,10 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+@* Client WASM layout — minimal passthrough.
+   The full app shell (header, nav, footer) is rendered by the SSR host
+   (PoRedoImage.Web Components/Layout/MainLayout.razor). *@
+<article class="content px-4 py-4">
+    @Body
+</article>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
-
-@* Radzen overlay services — must be placed in the root layout *@
 <RadzenComponents />

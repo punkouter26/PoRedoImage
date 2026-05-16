@@ -21,10 +21,12 @@ public static class AuthEndpoints
             {
                 if (!string.IsNullOrWhiteSpace(email))
                 {
-                    // Normalise ANON — anything hitting anon@anon.local becomes the canonical ANON account
+                    // Normalise ANON — anything hitting anon@anon.local becomes a unique ANON account.
+                    // Random suffix ensures each ANON session is distinct in logs and DB (e.g. ANON463443).
                     var isAnon = string.Equals(email, "anon@anon.local", StringComparison.OrdinalIgnoreCase);
-                    var userId = isAnon ? "anon|ANON" : $"dev|{email}";
-                    var displayName = isAnon ? "ANON" : email;
+                    var anonSuffix = Random.Shared.Next(100000, 999999).ToString();
+                    var userId = isAnon ? $"anon|ANON{anonSuffix}" : $"dev|{email}";
+                    var displayName = isAnon ? $"ANON{anonSuffix}" : email;
 
                     var claims = new List<Claim>
                     {
