@@ -23,6 +23,20 @@ playwright-report/
 test-results/
 tests/playwright/test-results/
 
+# Generated documentation HTML viewers (source of truth is .mmd files)
+docs/*.html
+
+# Test results / coverage output
+TestResults/
+
+# Stray binary files at repository root (e.g. sample test images)
+/*.jpeg
+/*.jpg
+/*.png
+/*.bmp
+/*.gif
+/*.tiff
+
 # User-specific files
 *.rsuser
 *.suo
