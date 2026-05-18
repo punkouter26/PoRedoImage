@@ -1,0 +1,8 @@
+name: poredoimage
+metadata:
+  template: poredoimage-appservice
+services:
+  web:
+    project: ./src/PoRedoImage.Web
+    language: dotnet
+    host: appservice

@@ -35,7 +35,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ─── Azure Key Vault ────────────────────────────────────────────────
 // Load FIRST so ApplicationInsights:ConnectionString is available when Serilog is configured.
 // Secrets mapped via KeyVaultSecretNameMapping.
-var keyVaultEndpoint = builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
+var keyVaultEndpoint = builder.Configuration["KeyVault:Uri"] ?? builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
 if (!string.IsNullOrEmpty(keyVaultEndpoint))
 {
     try
