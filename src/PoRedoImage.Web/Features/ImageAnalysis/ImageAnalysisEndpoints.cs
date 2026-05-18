@@ -3,6 +3,7 @@ using PoRedoImage.Application.Services;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Web.Features;
 using System.ClientModel;
+using Azure;
 
 namespace PoRedoImage.Web.Features.ImageAnalysis;
 
@@ -26,10 +27,6 @@ public static class ImageAnalysisEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
             .RequireRateLimiting("ai-endpoints")
             .AddEndpointFilter<ValidationFilter<ImageAnalysisRequest>>();
-
-        group.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Service = "ImageAnalysis" }))
-            .WithName("ImageAnalysisHealth")
-            .WithSummary("Check image analysis service health");
     }
 
     private static async Task<IResult> AnalyzeImageAsync(
@@ -68,10 +65,31 @@ public static class ImageAnalysisEndpoints
                 detail: "The image was blocked by content safety filters. Please try a different image.",
                 statusCode: 422, title: "Content Policy Violation");
         }
+        catch (ClientResultException ex) when (ex.Status == 401 || ex.Status == 403)
+        {
+            logger.LogWarning(ex, "AI service authentication failed (OpenAI) HTTP {Status}", ex.Status);
+            return Results.Problem(
+                detail: "AI service is not authorised — the API key or endpoint may be incorrect. Please check your configuration.",
+                statusCode: 503, title: "Service Unavailable");
+        }
+        catch (RequestFailedException ex) when (ex.Status == 401 || ex.Status == 403)
+        {
+            logger.LogWarning(ex, "AI service authentication failed (Azure SDK) HTTP {Status}", ex.Status);
+            return Results.Problem(
+                detail: "AI service is not authorised — the API key or endpoint may be incorrect. Please check your configuration.",
+                statusCode: 503, title: "Service Unavailable");
+        }
+        catch (RequestFailedException ex) when (ex.Status == 400)
+        {
+            logger.LogWarning(ex, "Azure AI service returned 400 Bad Request: {Error}", ex.ErrorCode);
+            return Results.Problem(
+                detail: $"The AI service rejected the request: {ex.ErrorCode ?? "InvalidRequest"}. This may be a region limitation — try a different image or contact support.",
+                statusCode: 422, title: "AI Service Error");
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error processing image analysis request");
-            return Results.Problem(detail: ex.Message, statusCode: 500, title: "Processing Error");
+            return Results.Problem(detail: "An error occurred while processing your image. Please try again.", statusCode: 500, title: "Processing Error");
         }
     }
 

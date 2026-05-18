@@ -59,20 +59,48 @@ public sealed class AzureVisionService : IVisionService
         _logger.LogInformation("Analyzing image via Azure Computer Vision. Size={Size} bytes", imageData.Length);
         var start = Stopwatch.GetTimestamp();
 
-        var visualFeatures = VisualFeatures.Caption | VisualFeatures.Tags;
-        var response = await _client!.AnalyzeAsync(
-            BinaryData.FromBytes(imageData), visualFeatures,
-            new ImageAnalysisOptions { Language = "en", GenderNeutralCaption = true }, ct);
+        // Try with Caption first. Caption is only available in certain Azure regions (e.g. eastus, westeurope).
+        // If the endpoint's region doesn't support it, fall back to Tags-only and build a synthetic description.
+        try
+        {
+            var response = await _client!.AnalyzeAsync(
+                BinaryData.FromBytes(imageData),
+                VisualFeatures.Caption | VisualFeatures.Tags,
+                new ImageAnalysisOptions { Language = "en", GenderNeutralCaption = true }, ct);
 
-        var description = response.Value.Caption?.Text ?? "No description available";
-        var confidence = response.Value.Caption?.Confidence ?? 0;
-        var tags = response.Value.Tags?.Values
-            .Where(t => t.Confidence >= _minTagConfidence)
-            .Select(t => t.Name)
-            .ToList() ?? [];
+            var description = response.Value.Caption?.Text ?? "No description available";
+            var confidence = response.Value.Caption?.Confidence ?? 0;
+            var tags = response.Value.Tags?.Values
+                .Where(t => t.Confidence >= _minTagConfidence)
+                .Select(t => t.Name)
+                .ToList() ?? [];
 
-        var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Vision analysis complete in {Elapsed}ms", elapsed);
-        return (description, tags.AsReadOnly(), confidence, elapsed);
+            var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+            _logger.LogInformation("Vision analysis complete in {Elapsed}ms (with caption)", elapsed);
+            return (description, tags.AsReadOnly(), confidence, elapsed);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 400 && ex.Message.Contains("Caption"))
+        {
+            _logger.LogWarning("Caption not supported in this region — retrying with Tags only");
+
+            var response = await _client!.AnalyzeAsync(
+                BinaryData.FromBytes(imageData),
+                VisualFeatures.Tags,
+                new ImageAnalysisOptions { Language = "en" }, ct);
+
+            var tags = response.Value.Tags?.Values
+                .Where(t => t.Confidence >= _minTagConfidence)
+                .Select(t => t.Name)
+                .ToList() ?? [];
+
+            // Build a minimal description from top tags for downstream GPT enhancement
+            var description = tags.Count > 0
+                ? $"A photo showing {string.Join(", ", tags.Take(8))}"
+                : "No description available";
+
+            var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+            _logger.LogInformation("Vision analysis complete in {Elapsed}ms (tags-only fallback)", elapsed);
+            return (description, tags.AsReadOnly(), 0, elapsed);
+        }
     }
 }

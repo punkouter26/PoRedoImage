@@ -1,6 +1,7 @@
 @implements IDisposable
 @inject ImageSessionService SessionService
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 @if (SessionService.HasImage)
 {
@@ -40,6 +41,43 @@
         ("bulk-generate",      "bi-collection", "Bulk"),
     ];
 
-    protected override void OnInitialized() => SessionService.OnChange += StateHasChanged;
-    public void Dispose()              => SessionService.OnChange -= StateHasChanged;
+    protected override void OnInitialized() => SessionService.OnChange += OnSessionChanged;
+    public void Dispose()              => SessionService.OnChange -= OnSessionChanged;
+
+    private void OnSessionChanged()
+    {
+        StateHasChanged();
+        _ = PersistSessionAsync();
+    }
+
+    private async Task PersistSessionAsync()
+    {
+        try
+        {
+            if (SessionService.HasImage)
+                await JSRuntime.InvokeVoidAsync("imageSession.save",
+                    SessionService.PreviewUrl, SessionService.FileName, SessionService.ContentType);
+            else
+                await JSRuntime.InvokeVoidAsync("imageSession.clear");
+        }
+        catch { /* sessionStorage unavailable — non-critical */ }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || SessionService.HasImage) return;
+        try
+        {
+            // Restore active image from sessionStorage after a full-page navigation (new circuit)
+            var stored = await JSRuntime.InvokeAsync<ImageSessionState?>("imageSession.load");
+            if (stored is { DataUrl: not null, FileName: not null, ContentType: not null })
+            {
+                SessionService.SetImage(stored.DataUrl, stored.ContentType, stored.FileName);
+                StateHasChanged();
+            }
+        }
+        catch { /* non-critical */ }
+    }
+
+    private sealed record ImageSessionState(string? DataUrl, string? FileName, string? ContentType);
 }

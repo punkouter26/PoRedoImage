@@ -13,7 +13,7 @@ namespace PoRedoImage.Infrastructure.Services;
 /// Azure OpenAI implementation of IGenerativeAiService.
 /// Adapter pattern (GoF): adapts Azure OpenAI SDK to the domain interface.
 /// </summary>
-public sealed class AzureOpenAiService : IGenerativeAiService
+public sealed class AzureOpenAiService : IGenerativeAiService, IBulkDescribeService
 {
     private readonly ILogger<AzureOpenAiService> _logger;
     private readonly IConfiguration _configuration;
@@ -73,16 +73,12 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         return (new AzureOpenAIClient(new Uri(endpoint), cred), cred);
     }
 
-    private void RefreshChatCredential()
+    private void RefreshCredentials()
     {
-        var key = _configuration["OpenAI:Key"];
-        if (!string.IsNullOrWhiteSpace(key)) _chatKeyCredential?.Update(key);
-    }
-
-    private void RefreshImageCredential()
-    {
-        var key = _configuration["OpenAI:ImageKey"] ?? _configuration["OpenAI:Key"];
-        if (!string.IsNullOrWhiteSpace(key)) _imageKeyCredential?.Update(key);
+        var chatKey = _configuration["OpenAI:Key"];
+        if (!string.IsNullOrWhiteSpace(chatKey)) _chatKeyCredential?.Update(chatKey);
+        var imageKey = _configuration["OpenAI:ImageKey"] ?? chatKey;
+        if (!string.IsNullOrWhiteSpace(imageKey)) _imageKeyCredential?.Update(imageKey);
     }
 
     public async Task<(string EnhancedDescription, int TokensUsed, long ElapsedMs)>
@@ -93,7 +89,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         ArgumentNullException.ThrowIfNull(tags);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(targetLength, 0);
 
-        RefreshChatCredential();
+        RefreshCredentials();
         _logger.LogInformation("Enhancing description. TargetLength={Length}", targetLength);
         var start = Stopwatch.GetTimestamp();
 
@@ -133,7 +129,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
 
-        RefreshImageCredential();
+        RefreshCredentials();
         _logger.LogInformation("Generating image with DALL-E");
         var start = Stopwatch.GetTimestamp();
 
@@ -157,7 +153,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentNullException.ThrowIfNull(tags);
 
-        RefreshChatCredential();
+        RefreshCredentials();
         _logger.LogInformation("Generating meme caption from {Count} tags", tags.Count);
         var start = Stopwatch.GetTimestamp();
 
@@ -206,7 +202,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
     {
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
 
-        RefreshChatCredential();
+        RefreshCredentials();
         _logger.LogInformation("Describing person via GPT-4o vision. Size={Size} bytes", imageData.Length);
         var start = Stopwatch.GetTimestamp();
 

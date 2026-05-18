@@ -1,14 +1,8 @@
 @page "/meme-generation"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@using Microsoft.AspNetCore.Components.Forms
-@using PoRedoImage.Web.Models
-@inject HttpClient Http
+@inherits FeaturePageBase
 @inject IJSRuntime JSRuntime
-@inject ILogger<MemeGeneration> Logger
-@inject ImageSessionService SessionService
-@inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Meme Generation — PoRedoImage</PageTitle>
 
@@ -63,62 +57,11 @@
 </div>
 
 @code {
-    private IBrowserFile? selectedFile;
-    private string? imagePreviewUrl;
-    private string? errorMessage;
-    private bool isProcessing;
-    private bool isComplete;
-    private bool canProcessImage => (selectedFile != null || imagePreviewUrl != null) && string.IsNullOrEmpty(errorMessage);
-    private int progressPercentage;
-    private string progressMessage = string.Empty;
     private ImageAnalysisResponse? analysisResult;
-    private MyImagesGallery? _gallery;
-    private string? _userId;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnGalleryImageSelected()
     {
-        if (SessionService.HasImage)
-            imagePreviewUrl = SessionService.PreviewUrl;
-        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
-        _userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-    }
-
-    private async Task LoadFile(InputFileChangeEventArgs e)
-    {
-        selectedFile = e.File;
-        errorMessage = null;
-        imagePreviewUrl = null;
-
-        var (result, error) = await ImageLoadHelper.LoadAsync(selectedFile);
-        if (error is not null) { errorMessage = error; selectedFile = null; return; }
-
-        imagePreviewUrl = result!.PreviewUrl;
-        SessionService.SetImage(result!.PreviewUrl, result.ContentType, selectedFile.Name, result.Bytes);
-        if (_userId is not null && result.Bytes is not null)
-            _ = AutoSaveOriginalAsync(result.Bytes, result.ContentType, selectedFile.Name);
-        StateHasChanged();
-        Logger.LogInformation("Image loaded: {Name}, {KB:F1} KB", selectedFile.Name, selectedFile.Size / 1024.0);
-    }
-
-    private void HandleGalleryImage(MyImagesGallery.GalleryItem item)
-    {
-        selectedFile = null;
-        imagePreviewUrl = SessionService.PreviewUrl;
         analysisResult = null;
-        isComplete = false;
-        errorMessage = null;
-        StateHasChanged();
-    }
-
-    private async Task AutoSaveOriginalAsync(byte[] bytes, string contentType, string fileName)
-    {
-        try
-        {
-            await Http.PostAsJsonAsync("/api/user-images/original",
-                new SaveOriginalRequest(Convert.ToBase64String(bytes), contentType, fileName));
-            if (_gallery is not null) await _gallery.LoadAsync();
-        }
-        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save original failed"); }
     }
 
     private async Task AutoSaveMemeAsync(string memeBase64, string contentType)
@@ -183,10 +126,8 @@
                 else
                 {
                     analysisResult = await httpResponse.Content.ReadFromJsonAsync<ImageAnalysisResponse>();
-
                     if (analysisResult == null)
                         throw new InvalidOperationException("No response received from API.");
-
                     if (_userId is not null && !string.IsNullOrEmpty(analysisResult.MemeImageData))
                         _ = AutoSaveMemeAsync(analysisResult.MemeImageData, "image/png");
                 }
@@ -207,9 +148,7 @@
                 progressMessage = string.IsNullOrEmpty(errorMessage) ? "Meme generated!" : "Generation failed.";
                 isProcessing = false;
                 isComplete = string.IsNullOrEmpty(errorMessage);
-                if (!string.IsNullOrEmpty(errorMessage))
-                    NotificationService.Notify(NotificationSeverity.Error, "Generation Failed", errorMessage, duration: 6000);
-                else
+                if (string.IsNullOrEmpty(errorMessage))
                     NotificationService.Notify(NotificationSeverity.Success, "Meme Ready!", "Your meme has been generated.", duration: 4000);
                 try { StateHasChanged(); } catch (ObjectDisposedException) { }
             }
@@ -242,7 +181,6 @@
     private void StartOver()
     {
         selectedFile = null;
-        // Keep imagePreviewUrl from session so user can quickly re-generate a meme
         errorMessage = null;
         isProcessing = false;
         isComplete = false;

@@ -54,6 +54,16 @@ if (!string.IsNullOrEmpty(keyVaultEndpoint))
             });
 
         Log.Information("Key Vault configuration loaded from {Endpoint}", keyVaultEndpoint);
+
+        // In Development, Key Vault would override appsettings.Development.json values (KV is the last
+        // provider added). Pin Azurite back so local storage works regardless of what KV provides.
+        if (builder.Environment.IsDevelopment())
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Storage:ConnectionString"] = "UseDevelopmentStorage=true"
+            });
+        }
     }
     catch (Exception ex)
     {
@@ -204,10 +214,8 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseHttpsRedirection();
 
-// Correlation ID must precede request logging so {CorrelationId} is in scope
-app.UseMiddleware<CorrelationIdMiddleware>();
-// UserId and SessionId pushed into Serilog LogContext for every request
-app.UseMiddleware<UserContextMiddleware>();
+// Pushes CorrelationId, UserId, and SessionId into Serilog LogContext for every request
+app.UseMiddleware<RequestContextMiddleware>();
 
 // Structured request logging: one entry per request with timing and status
 app.UseSerilogRequestLogging(opts =>
