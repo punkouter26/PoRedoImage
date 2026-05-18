@@ -1,14 +1,8 @@
 @page "/image-regeneration"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@using Microsoft.AspNetCore.Components.Forms
-@using PoRedoImage.Web.Models
-@inject HttpClient Http
+@inherits FeaturePageBase
 @inject IJSRuntime JSRuntime
-@inject ILogger<ImageRegeneration> Logger
-@inject ImageSessionService SessionService
-@inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Image Regeneration — PoRedoImage</PageTitle>
 
@@ -68,69 +62,16 @@
 </div>
 
 @code {
-    private IBrowserFile? selectedFile;
-    private string? imagePreviewUrl;
     private string? regeneratedImageUrl;
     private string? imageDescription;
-    private string? errorMessage;
-    private bool isProcessing;
-    private bool isComplete;
     private bool _sideBySideGenerating;
-    private bool canProcessImage => (selectedFile != null || imagePreviewUrl != null) && string.IsNullOrEmpty(errorMessage);
-    private int progressPercentage;
-    private string progressMessage = string.Empty;
     private int descriptionLength = 350;
     private ImageAnalysisResponse? analysisResult;
-    private MyImagesGallery? _gallery;
-    private string? _userId;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnGalleryImageSelected()
     {
-        if (SessionService.HasImage)
-            imagePreviewUrl = SessionService.PreviewUrl;
-        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
-        _userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-    }
-
-    private async Task LoadFile(InputFileChangeEventArgs e)
-    {
-        selectedFile = e.File;
-        errorMessage = null;
-        imagePreviewUrl = null;
-
-        var (result, error) = await ImageLoadHelper.LoadAsync(selectedFile);
-        if (error is not null) { errorMessage = error; selectedFile = null; return; }
-
-        imagePreviewUrl = result!.PreviewUrl;
-        SessionService.SetImage(result!.PreviewUrl, result.ContentType, selectedFile.Name, result.Bytes);
-        // Fire-and-forget: save original to gallery
-        if (_userId is not null && result.Bytes is not null)
-            _ = AutoSaveOriginalAsync(result.Bytes, result.ContentType, selectedFile.Name);
-        StateHasChanged();
-        Logger.LogInformation("Image loaded: {Name}, {KB:F1} KB", selectedFile.Name, selectedFile.Size / 1024.0);
-    }
-
-    private void HandleGalleryImage(MyImagesGallery.GalleryItem item)
-    {
-        selectedFile = null;
-        imagePreviewUrl = SessionService.PreviewUrl;
         regeneratedImageUrl = null;
         analysisResult = null;
-        isComplete = false;
-        errorMessage = null;
-        StateHasChanged();
-    }
-
-    private async Task AutoSaveOriginalAsync(byte[] bytes, string contentType, string fileName)
-    {
-        try
-        {
-            var base64 = Convert.ToBase64String(bytes);
-            await Http.PostAsJsonAsync("/api/user-images/original",
-                new SaveOriginalRequest(base64, contentType, fileName));
-            if (_gallery is not null) await _gallery.LoadAsync();
-        }
-        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save original failed"); }
     }
 
     private async Task AutoSaveResultAsync(byte[] bytes, string contentType)
@@ -205,7 +146,6 @@
                         ? $"data:{analysisResult.RegeneratedImageContentType};base64,{analysisResult.RegeneratedImageData}"
                         : null;
 
-                    // Auto-save result to gallery
                     if (_userId is not null && !string.IsNullOrEmpty(analysisResult.RegeneratedImageData))
                         _ = AutoSaveResultAsync(
                             Convert.FromBase64String(analysisResult.RegeneratedImageData),
@@ -228,9 +168,7 @@
                 progressMessage = string.IsNullOrEmpty(errorMessage) ? "Processing complete!" : "Processing failed.";
                 isProcessing = false;
                 isComplete = string.IsNullOrEmpty(errorMessage);
-                if (!string.IsNullOrEmpty(errorMessage))
-                    NotificationService.Notify(NotificationSeverity.Error, "Processing Failed", errorMessage, duration: 6000);
-                else
+                if (string.IsNullOrEmpty(errorMessage))
                     NotificationService.Notify(NotificationSeverity.Success, "Done!", "Your regenerated image is ready.", duration: 4000);
                 try { StateHasChanged(); } catch (ObjectDisposedException) { }
             }
@@ -286,7 +224,6 @@
     private void StartOver()
     {
         selectedFile = null;
-        // Keep imagePreviewUrl from session so user can immediately re-process the same image
         regeneratedImageUrl = null;
         imageDescription = null;
         errorMessage = null;

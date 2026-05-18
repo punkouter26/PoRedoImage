@@ -14,19 +14,19 @@ public class KeyVaultSecretNameMapping : KeyVaultSecretManager
 {
     private static readonly Dictionary<string, string> SecretMappings = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["PoRedoImage-ComputerVision-ApiKey"]             = "ComputerVision:ApiKey",
-        ["PoRedoImage-ComputerVision-Endpoint"]           = "ComputerVision:Endpoint",
-        ["PoRedoImage-OpenAI-ApiKey"]                     = "OpenAI:Key",
-        ["PoRedoImage-OpenAI-Endpoint"]                   = "OpenAI:Endpoint",
-        ["PoRedoImage-OpenAI-DeploymentName"]             = "OpenAI:ChatCompletionsDeployment",
-        ["PoRedoImage-OpenAI-ImageEndpoint"]              = "OpenAI:ImageEndpoint",
-        ["PoRedoImage-OpenAI-ImageKey"]                   = "OpenAI:ImageKey",
+        ["PoRedoImage-ComputerVision-ApiKey"] = "ComputerVision:ApiKey",
+        ["PoRedoImage-ComputerVision-Endpoint"] = "ComputerVision:Endpoint",
+        ["PoRedoImage-OpenAI-ApiKey"] = "OpenAI:Key",
+        ["PoRedoImage-OpenAI-Endpoint"] = "OpenAI:Endpoint",
+        ["PoRedoImage-OpenAI-DeploymentName"] = "OpenAI:ChatCompletionsDeployment",
+        ["PoRedoImage-OpenAI-ImageEndpoint"] = "OpenAI:ImageEndpoint",
+        ["PoRedoImage-OpenAI-ImageKey"] = "OpenAI:ImageKey",
         ["PoRedoImage-ApplicationInsights-ConnectionString"] = "ApplicationInsights:ConnectionString",
-        ["PoRedoImage-StorageConnectionString"]           = "Storage:ConnectionString",
-        ["PoRedoImage-AzureAd-ClientId"]                  = "AzureAd:ClientId",
-        ["PoRedoImage-AzureAd-ClientSecret"]              = "AzureAd:ClientSecret",
-        ["PoRedoImage-Google-ApiKey"]                     = "Google:ApiKey",
-        ["PoRedoImage-Google-Imagen3Model"]               = "Google:Imagen3Model"
+        ["PoRedoImage-StorageConnectionString"] = "Storage:ConnectionString",
+        ["PoRedoImage-AzureAd-ClientId"] = "AzureAd:ClientId",
+        ["PoRedoImage-AzureAd-ClientSecret"] = "AzureAd:ClientSecret",
+        ["PoRedoImage-Google-ApiKey"] = "Google:ApiKey",
+        ["PoRedoImage-Google-Imagen3Model"] = "Google:Imagen3Model"
     };
 
     public static IReadOnlyCollection<string> RequiredSecretNames => SecretMappings.Keys;

@@ -44,14 +44,8 @@ jobs:
         key: nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
         restore-keys: nuget-
 
-    - name: Install fonts (Linux requirement for image processing)
-      run: sudo apt-get install -y fonts-liberation
-
-    - name: Publish
-      run: dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj --configuration Release --output ./publish
-
     - name: Verify formatting
-      run: dotnet format PoRedoImage.sln --verify-no-changes --verbosity minimal
+      run: dotnet format PoRedoImage.slnx --verify-no-changes --verbosity minimal
 
     - name: Run unit tests
       run: dotnet test tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj --configuration Release --logger "trx;LogFileName=unit-tests.trx"
@@ -62,6 +56,12 @@ jobs:
       with:
         name: test-results
         path: "**/*.trx"
+
+    - name: Install fonts (Linux requirement for image processing)
+      run: sudo apt-get install -y fonts-liberation
+
+    - name: Publish
+      run: dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj --configuration Release --output ./publish
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2.3.0

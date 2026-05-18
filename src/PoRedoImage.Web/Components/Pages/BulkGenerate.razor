@@ -130,7 +130,7 @@
     private int _completedCount;
     private bool _isGenerating;
     private bool _isSaving;
-    private bool _promptsExpanded = false;
+    private bool _promptsExpanded = true;
     private HashSet<int> _favorites = [];
     private string? _userId;
     private MyImagesGallery? _gallery;
@@ -241,7 +241,18 @@
             descResp.EnsureSuccessStatusCode();
             var descResult = await descResp.Content.ReadFromJsonAsync<BulkDescribeResponse>();
             var description = descResult?.Description ?? string.Empty;
-            Logger.LogInformation("Bulk Generate: Vision description acquired: {Description}", description);
+
+            if (string.IsNullOrEmpty(description))
+            {
+                Logger.LogWarning("Bulk Generate: person description unavailable — proceeding without <PERSON> substitution");
+                NotificationService.Notify(NotificationSeverity.Warning, "Limited Mode",
+                    "Person description is unavailable — generating with original prompts (AI key may need updating).",
+                    duration: 7000);
+            }
+            else
+            {
+                Logger.LogInformation("Bulk Generate: Vision description acquired: {Description}", description);
+            }
 
             // Generate each variation sequentially
             for (int i = 0; i < _results.Count; i++)
@@ -254,7 +265,9 @@
                 try
                 {
                     var rawPrompt = activePrompts[i].prompt;
-                    var finalPrompt = rawPrompt.Replace(DefaultPrompts.PersonToken, description, StringComparison.Ordinal);
+                    var finalPrompt = string.IsNullOrEmpty(description)
+                        ? rawPrompt
+                        : rawPrompt.Replace(DefaultPrompts.PersonToken, description, StringComparison.Ordinal);
 
                     // True image-to-image via API: Gemini 2.0 Flash uses the uploaded photo as subject reference
                     var varResp = await Http.PostAsJsonAsync("/api/bulk-generate/variation",
@@ -325,25 +338,6 @@
         _results = [];
         _completedCount = 0;
         _favorites = [];
-        StateHasChanged();
-    }
-
-    private void ApplyRecentImage(RecentImages.RecentItem item)
-    {
-        _selectedFile = null;
-        _imagePreviewUrl = item.StoredUrl;
-        _uploadError = null;
-        _results = [];
-        _completedCount = 0;
-        _favorites = [];
-        try
-        {
-            var idx = item.StoredUrl.IndexOf(',');
-            if (idx >= 0) _imageBytes = Convert.FromBase64String(item.StoredUrl[(idx + 1)..]);
-        }
-        catch { _imageBytes = null; }
-        if (_imageBytes is not null)
-            SessionService.SetImage(item.StoredUrl, "image/jpeg", item.FileName, _imageBytes);
         StateHasChanged();
     }
 

@@ -51,3 +51,28 @@ window.bulkStateManager = (function () {
         }
     };
 })();
+
+// imageSession — persists the active image across Blazor circuit reconnects (full-page navigations).
+// Uses sessionStorage so the image is cleared when the browser tab closes.
+window.imageSession = (function () {
+    const KEY = 'poRedoImage_activeImage';
+
+    return {
+        save: function (dataUrl, fileName, contentType) {
+            try {
+                sessionStorage.setItem(KEY, JSON.stringify({ dataUrl, fileName, contentType }));
+            } catch { /* quota exceeded (large image) — ignore */ }
+        },
+        load: function () {
+            try {
+                const raw = sessionStorage.getItem(KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch {
+                return null;
+            }
+        },
+        clear: function () {
+            try { sessionStorage.removeItem(KEY); } catch {}
+        }
+    };
+})();

@@ -19,6 +19,7 @@ public static class InfrastructureServiceExtensions
         // Domain service implementations (Singleton: clients own long-lived HTTP/SDK resources)
         services.AddSingleton<IVisionService, AzureVisionService>();
         services.AddSingleton<IGenerativeAiService, AzureOpenAiService>();
+        services.AddSingleton<IBulkDescribeService>(sp => (IBulkDescribeService)sp.GetRequiredService<IGenerativeAiService>());
         services.AddSingleton<IImagen3Service, GeminiImagen3Service>();
 
         // Scoped services

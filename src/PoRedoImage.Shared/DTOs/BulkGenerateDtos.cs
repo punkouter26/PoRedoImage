@@ -17,14 +17,6 @@ public enum BulkGenerateStatus
     Failed
 }
 
-public class BulkPromptDto
-{
-    public string RowKey { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string PromptText { get; set; } = string.Empty;
-    public DateTimeOffset CreatedAt { get; set; }
-}
-
 public record BulkDescribeRequest(string ImageData, string ContentType);
 public record BulkDescribeResponse(string Description);
 

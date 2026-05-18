@@ -3,6 +3,7 @@ using System.Text.Json;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
+using Microsoft.Extensions.Logging;
 
 namespace PoRedoImage.Web.Features.BulkGenerate;
 
@@ -55,7 +56,9 @@ public static class BulkGenerateEndpoints
 
         // Describe the primary person in the uploaded image using GPT-4o vision.
         // Called once per generation batch; result is reused across all variation prompts.
-        aiGroup.MapPost("/describe", async (BulkDescribeRequest request, IGenerativeAiService aiService) =>
+        // Falls back gracefully to an empty description if the AI service is unavailable,
+        // so Gemini image-to-image can still run using the raw <PERSON> token.
+        aiGroup.MapPost("/describe", async (BulkDescribeRequest request, IBulkDescribeService describeService, ILoggerFactory loggerFactory) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");
@@ -64,8 +67,18 @@ public static class BulkGenerateEndpoints
             try { imageBytes = Convert.FromBase64String(request.ImageData); }
             catch { return Results.BadRequest("ImageData must be valid base64."); }
 
-            var description = await aiService.DescribePersonAsync(imageBytes);
-            return Results.Ok(new BulkDescribeResponse(description));
+            try
+            {
+                var description = await describeService.DescribePersonAsync(imageBytes);
+                return Results.Ok(new BulkDescribeResponse(description));
+            }
+            catch (Exception ex)
+            {
+                // Return empty description so Gemini img2img can still run with raw prompts
+                var logger = loggerFactory.CreateLogger("BulkGenerateEndpoints");
+                logger.LogWarning(ex, "DescribePersonAsync failed — falling back to empty description");
+                return Results.Ok(new BulkDescribeResponse(string.Empty));
+            }
         })
         .WithName("DescribePerson")
         .WithSummary("Describe the primary person in an image for use in art-style prompts");
