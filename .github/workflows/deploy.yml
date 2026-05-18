@@ -17,16 +17,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  deploy:
+  # ── Build & Test ─────────────────────────────────────────────────────────────
+  # Runs on every push and pull request to catch regressions early.
+  build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
-    environment:
-      name: production
-      url: https://poredoimage-web.azurewebsites.net
-    permissions:
-      id-token: write
-      contents: read
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@v4
@@ -47,6 +42,9 @@ jobs:
     - name: Verify formatting
       run: dotnet format PoRedoImage.slnx --verify-no-changes --verbosity minimal
 
+    - name: Install fonts (Linux requirement for image processing)
+      run: sudo apt-get install -y fonts-liberation
+
     - name: Run unit tests
       run: dotnet test tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj --configuration Release --logger "trx;LogFileName=unit-tests.trx"
 
@@ -57,11 +55,36 @@ jobs:
         name: test-results
         path: "**/*.trx"
 
-    - name: Install fonts (Linux requirement for image processing)
-      run: sudo apt-get install -y fonts-liberation
-
     - name: Publish
       run: dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj --configuration Release --output ./publish
+
+    - name: Upload publish artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: publish
+        path: ./publish
+        retention-days: 1
+
+  # ── Deploy ───────────────────────────────────────────────────────────────────
+  # Runs only on master pushes and manual dispatches, after build-and-test passes.
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build-and-test
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+      url: https://poredoimage-web.azurewebsites.net
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - name: Download publish artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: publish
+        path: ./publish
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2.3.0
@@ -73,21 +96,11 @@ jobs:
     - name: Deploy to Azure App Service
       run: |
         cd ./publish && zip -r ../app.zip . && cd ..
-        # Synchronous deploy (no --async): waits until the platform confirms the
-        # deployment slot is ready before proceeding. This avoids the race where
-        # an explicit restart fires while the app is still initialising.
         az webapp deploy \
           --name ${{ env.AZURE_APP_NAME }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
           --src-path ./app.zip \
           --type zip
-
-    - name: Set startup command
-      run: |
-        az webapp config set \
-          --name ${{ env.AZURE_APP_NAME }} \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --startup-file "dotnet /home/site/wwwroot/PoRedoImage.Web.dll"
 
     - name: Smoke Test – /health
       run: |
