@@ -1,8 +1,23 @@
 @inherits LayoutComponentBase
 @inject ImageSessionService SessionService
 @inject IWebHostEnvironment Env
+@inject IConfiguration Configuration
+
+@{
+    // Show the MOCK DATA banner whenever real AI calls are disabled via feature flag.
+    // This makes it immediately visible during E2E tests or manual mock-mode runs.
+    var useRealAi = Configuration.GetValue<bool>("FeatureFlags:UseRealAiInDev", defaultValue: true);
+    var isMockMode = !useRealAi;
+}
 
 <header class="app-header">
+    @if (isMockMode)
+    {
+        <div class="mock-banner" role="alert" aria-live="polite">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            USING MOCK DATA — AI responses are simulated
+        </div>
+    }
     <nav class="app-nav container-fluid">
         <a class="app-nav__brand" href="/">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" class="me-2">

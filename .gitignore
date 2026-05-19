@@ -25,6 +25,8 @@ tests/playwright/test-results/
 
 # Generated documentation HTML viewers (source of truth is .mmd files)
 docs/*.html
+# AI/skill-generated codebase docs (auto-generated, regenerate on demand)
+docs/codebase/
 
 # Test results / coverage output
 TestResults/
@@ -449,8 +451,14 @@ TestResults/
 playwright-report/
 playwright/.auth/
 
-# App logs (Kudu/deployment)
+# App logs (Kudu/deployment) — never commit Azure/Kudu log directories
 app-logs/
+poredoimage-logs*/
+*-logs/
+*-logs2/
+
+# LLM-generated docs (auto-generated, not source of truth)
+LLMDOCS/
 
 # Environment variable files (never commit secrets)
 .env

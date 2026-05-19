@@ -8,6 +8,19 @@
     box-shadow: 0 2px 24px rgba(0,0,0,0.5);
 }
 
+/* ── Mock Data Banner ────────────────────────────────────── */
+.mock-banner {
+    background: #7c2d12;
+    color: #fed7aa;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.35rem 1rem;
+    border-bottom: 1px solid #ea580c;
+}
+
 /* Reset Radzen a-element interference inside the header */
 .app-header a,
 .app-header a:link,

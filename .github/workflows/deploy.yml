@@ -12,7 +12,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AZURE_RESOURCE_GROUP: 'PoRedoImage'
   AZURE_APP_NAME: 'poredoimage-web'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -94,13 +93,10 @@ jobs:
         subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
     - name: Deploy to Azure App Service
-      run: |
-        cd ./publish && zip -r ../app.zip . && cd ..
-        az webapp deploy \
-          --name ${{ env.AZURE_APP_NAME }} \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --src-path ./app.zip \
-          --type zip
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_APP_NAME }}
+        package: ./publish
 
     - name: Smoke Test – /health
       run: |

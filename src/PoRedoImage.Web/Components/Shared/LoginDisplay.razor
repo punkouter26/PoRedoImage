@@ -3,8 +3,10 @@
         @{
             var name = context.User.Identity?.Name ?? string.Empty;
             // ANON users have a name like "ANON463443" — display "ANON LOGGED IN" per spec.
+            // Regular users display their email address.
             var isAnon = name.StartsWith("ANON", StringComparison.OrdinalIgnoreCase);
-            var displayLabel = isAnon ? "Guest" : name;
+            var email = context.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? name;
+            var displayLabel = isAnon ? "ANON LOGGED IN" : email;
         }
         <div class="d-flex align-items-center gap-2 ms-3">
             <span class="app-nav__user text-truncate" style="max-width:200px" title="@displayLabel">
