@@ -73,6 +73,16 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
           name: 'ASPNETCORE_ENVIRONMENT'
           value: 'Production'
         }
+        {
+          // Tell App Service which port .NET listens on — speeds up warmup probe
+          name: 'WEBSITES_PORT'
+          value: '8080'
+        }
+        {
+          // Allow up to 10 minutes for cold starts (F1 with cert updates can be slow)
+          name: 'WEBSITE_CONTAINER_START_TIME_LIMIT'
+          value: '600'
+        }
       ]
     }
   }
