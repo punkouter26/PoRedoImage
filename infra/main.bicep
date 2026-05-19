@@ -60,7 +60,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
-      alwaysOn: false // Free/shared tier does not support alwaysOn
+      alwaysOn: true // B2 Basic tier supports Always On — prevents cold-start crashes
       appCommandLine: 'dotnet /home/site/wwwroot/PoRedoImage.Web.dll'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
