@@ -17,6 +17,9 @@ param appServiceName string = 'poredoimage-web'
 @description('Storage account name (must be globally unique)')
 param storageAccountName string = 'stporedoimage26'
 
+@description('Storage account location — should match the App Service plan region to avoid cross-region latency')
+param storageLocation string = 'westus2'
+
 @description('App Service Plan resource ID (shared plan in PoShared)')
 param appServicePlanId string = '/subscriptions/bbb8dfbe-9169-432f-9b7a-fbf861b51037/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poshared-linux'
 
@@ -27,7 +30,7 @@ param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
 // Standard_LRS is the lowest-cost tier for Table Storage.
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
-  location: location
+  location: storageLocation
   kind: 'StorageV2'
   sku: {
     name: 'Standard_LRS'

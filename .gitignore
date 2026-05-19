@@ -448,6 +448,22 @@ response.json
 test-person.jpg
 app-logs.zip
 TestResults/
+
+# Playwright stored auth state (may contain session tokens / cookies)
+tests/playwright/.auth/
+
+# Environment variable files (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# macOS metadata
+.DS_Store
+
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 playwright-report/
 playwright/.auth/
 
