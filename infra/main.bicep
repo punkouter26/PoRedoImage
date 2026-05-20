@@ -17,6 +17,9 @@ param appServiceName string = 'poredoimage-web'
 @description('Storage account name (must be globally unique)')
 param storageAccountName string = 'stporedoimage26'
 
+@description('Storage account location — should match the App Service plan region to avoid cross-region latency')
+param storageLocation string = 'westus2'
+
 @description('App Service Plan resource ID (shared plan in PoShared)')
 param appServicePlanId string = '/subscriptions/bbb8dfbe-9169-432f-9b7a-fbf861b51037/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poshared-linux'
 
@@ -27,7 +30,7 @@ param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
 // Standard_LRS is the lowest-cost tier for Table Storage.
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
-  location: location
+  location: storageLocation
   kind: 'StorageV2'
   sku: {
     name: 'Standard_LRS'
@@ -60,7 +63,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
-      alwaysOn: false // Free/shared tier does not support alwaysOn
+      alwaysOn: true // B2 Basic tier supports Always On — prevents cold-start crashes
       appCommandLine: 'dotnet /home/site/wwwroot/PoRedoImage.Web.dll'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
@@ -72,6 +75,16 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         {
           name: 'ASPNETCORE_ENVIRONMENT'
           value: 'Production'
+        }
+        {
+          // Tell App Service which port .NET listens on — speeds up warmup probe
+          name: 'WEBSITES_PORT'
+          value: '8080'
+        }
+        {
+          // Allow up to 10 minutes for cold starts (F1 with cert updates can be slow)
+          name: 'WEBSITE_CONTAINER_START_TIME_LIMIT'
+          value: '600'
         }
       ]
     }

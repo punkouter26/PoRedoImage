@@ -13,7 +13,8 @@
             "serverReadyAction": {
                 "action": "openExternally",
                 "pattern": "\\bNow listening on:\\s+https?://\\S+",
-                "uriFormat": "http://localhost:5000"
+                "uriFormat": "http://localhost:5000",
+                "openedBrowser": "msedge"
             },
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development",

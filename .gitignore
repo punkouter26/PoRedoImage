@@ -25,6 +25,8 @@ tests/playwright/test-results/
 
 # Generated documentation HTML viewers (source of truth is .mmd files)
 docs/*.html
+# AI/skill-generated codebase docs (auto-generated, regenerate on demand)
+docs/codebase/
 
 # Test results / coverage output
 TestResults/
@@ -446,11 +448,33 @@ response.json
 test-person.jpg
 app-logs.zip
 TestResults/
+
+# Playwright stored auth state (may contain session tokens / cookies)
+tests/playwright/.auth/
+
+# Environment variable files (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# macOS metadata
+.DS_Store
+
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 playwright-report/
 playwright/.auth/
 
-# App logs (Kudu/deployment)
+# App logs (Kudu/deployment) — never commit Azure/Kudu log directories
 app-logs/
+poredoimage-logs*/
+*-logs/
+*-logs2/
+
+# LLM-generated docs (auto-generated, not source of truth)
+LLMDOCS/
 
 # Environment variable files (never commit secrets)
 .env
