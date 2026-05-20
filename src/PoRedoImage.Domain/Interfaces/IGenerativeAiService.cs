@@ -10,4 +10,6 @@ public interface IGenerativeAiService
 
     Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)>
         GenerateMemeCaptionAsync(IReadOnlyList<string> tags, CancellationToken ct = default);
+
+    Task<string> DescribePersonAsync(byte[] imageData, CancellationToken ct = default);
 }

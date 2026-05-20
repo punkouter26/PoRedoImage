@@ -20,13 +20,15 @@ public sealed class AzureVisionService : IVisionService
     private readonly float _minTagConfidence;
     private readonly string? _configurationError;
 
+    private string? CurrentKey => _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
+
     public AzureVisionService(IConfiguration configuration, ILogger<AzureVisionService> logger)
     {
         _logger = logger;
         _configuration = configuration;
 
         var endpoint = configuration["ComputerVision:Endpoint"];
-        var key = configuration["ComputerVision:ApiKey"] ?? configuration["ComputerVision:Key"];
+        var key = CurrentKey;
         _minTagConfidence = configuration.GetValue<float>("ComputerVision:MinTagConfidence", 0.6f);
 
         if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(key))
@@ -52,9 +54,8 @@ public sealed class AzureVisionService : IVisionService
             throw new ArgumentException("Image data cannot be empty", nameof(imageData));
 
         // Re-read key from IConfiguration to pick up Key Vault rotated secrets (singleton lifetime)
-        var currentKey = _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
-        if (!string.IsNullOrWhiteSpace(currentKey) && _credential is not null)
-            _credential.Update(currentKey);
+        if (!string.IsNullOrWhiteSpace(CurrentKey) && _credential is not null)
+            _credential.Update(CurrentKey);
 
         _logger.LogInformation("Analyzing image via Azure Computer Vision. Size={Size} bytes", imageData.Length);
         var start = Stopwatch.GetTimestamp();

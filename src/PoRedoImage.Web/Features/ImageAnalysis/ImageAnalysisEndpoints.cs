@@ -27,6 +27,27 @@ public static class ImageAnalysisEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
             .RequireRateLimiting("ai-endpoints")
             .AddEndpointFilter<ValidationFilter<ImageAnalysisRequest>>();
+
+        group.MapGet("/health", (IConfiguration config) =>
+        {
+            var cvHealthy = !string.IsNullOrEmpty(config["ComputerVision:Endpoint"])
+                            && !string.IsNullOrEmpty(config["ComputerVision:ApiKey"]);
+            var oaiHealthy = !string.IsNullOrEmpty(config["OpenAI:Endpoint"])
+                             && !string.IsNullOrEmpty(config["OpenAI:Key"]);
+            var status = cvHealthy && oaiHealthy ? "Healthy" : "Degraded";
+            return Results.Ok(new
+            {
+                status,
+                services = new
+                {
+                    computerVision = cvHealthy ? "Healthy" : "Degraded",
+                    openAI = oaiHealthy ? "Healthy" : "Degraded"
+                }
+            });
+        })
+        .WithName("ImageAnalysisHealth")
+        .WithSummary("Configuration readiness check for AI image services")
+        .Produces(StatusCodes.Status200OK);
     }
 
     private static async Task<IResult> AnalyzeImageAsync(

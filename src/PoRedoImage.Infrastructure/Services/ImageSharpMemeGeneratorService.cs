@@ -20,7 +20,7 @@ public sealed class ImageSharpMemeGeneratorService : IMemeGeneratorService
 
     public ImageSharpMemeGeneratorService(ILogger<ImageSharpMemeGeneratorService> logger) => _logger = logger;
 
-    public Task<(byte[] ImageData, string ContentType)>
+    public async Task<(byte[] ImageData, string ContentType)>
         GenerateMemeAsync(byte[] sourceImage, string topText, string bottomText, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(sourceImage);
@@ -28,22 +28,23 @@ public sealed class ImageSharpMemeGeneratorService : IMemeGeneratorService
 
         _logger.LogInformation("Generating meme. Top='{Top}', Bottom='{Bottom}'", topText, bottomText);
 
-        using var image = Image.Load<Rgba32>(sourceImage);
-
-        image.Mutate(ctx =>
+        var result = await Task.Run(() =>
         {
-            if (!string.IsNullOrWhiteSpace(topText))
-                DrawMemeText(ctx, topText.ToUpperInvariant(), image.Width, image.Height, isTop: true);
-            if (!string.IsNullOrWhiteSpace(bottomText))
-                DrawMemeText(ctx, bottomText.ToUpperInvariant(), image.Width, image.Height, isTop: false);
-        });
-
-        using var outputStream = new MemoryStream();
-        image.Save(outputStream, new PngEncoder());
-        var result = outputStream.ToArray();
+            using var image = Image.Load<Rgba32>(sourceImage);
+            image.Mutate(ctx =>
+            {
+                if (!string.IsNullOrWhiteSpace(topText))
+                    DrawMemeText(ctx, topText.ToUpperInvariant(), image.Width, image.Height, isTop: true);
+                if (!string.IsNullOrWhiteSpace(bottomText))
+                    DrawMemeText(ctx, bottomText.ToUpperInvariant(), image.Width, image.Height, isTop: false);
+            });
+            using var outputStream = new MemoryStream();
+            image.Save(outputStream, new PngEncoder());
+            return outputStream.ToArray();
+        }, ct);
 
         _logger.LogInformation("Meme generated. Size={Size} bytes", result.Length);
-        return Task.FromResult<(byte[], string)>((result, "image/png"));
+        return (result, "image/png");
     }
 
     private static void DrawMemeText(IImageProcessingContext ctx, string text, int imageWidth, int imageHeight, bool isTop)

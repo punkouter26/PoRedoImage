@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
@@ -14,20 +15,26 @@ namespace PoRedoImage.Tests.Integration;
 public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     public const string SchemeName = "Test";
-    public const string UserId = "test-user-integration-001";
+    public const string DefaultUserId = "test-user-integration-001";
     public const string UserEmail = "test@example.com";
     public const string UserName = "Test User";
+
+    private readonly string _userId;
 
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder) : base(options, logger, encoder) { }
+        UrlEncoder encoder,
+        IConfiguration configuration) : base(options, logger, encoder)
+    {
+        _userId = configuration["TestAuth:UserId"] ?? DefaultUserId;
+    }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, UserId),
+            new Claim(ClaimTypes.NameIdentifier, _userId),
             new Claim(ClaimTypes.Name, UserName),
             new Claim(ClaimTypes.Email, UserEmail),
         };

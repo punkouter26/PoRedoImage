@@ -1,0 +1,78 @@
+@* ── Shared split-compare + actions base for both result panels ─────── *@
+<div class="split-compare-wrapper mb-4">
+    <div class="split-compare">
+        <div class="split-compare__side">
+            <span class="split-compare__label">Original</span>
+            <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
+                 onload="this.classList.add('loaded')" />
+        </div>
+        <div class="split-compare__divider">
+            <div class="split-compare__divider-line"></div>
+            <div class="split-compare__divider-pill"><i class="bi @DividerIcon"></i></div>
+        </div>
+        <div class="split-compare__side">
+            <span class="split-compare__label">@RightLabel</span>
+            @RightSide
+        </div>
+    </div>
+</div>
+
+@if (CaptionContent != null)
+{
+    @CaptionContent
+}
+
+<div class="results-actions mb-4">
+    @PrimaryAction
+    <button class="btn-result-secondary" @onclick="OnStartOver">
+        <i class="bi bi-arrow-repeat me-1"></i>Try Again
+    </button>
+    <a class="btn-result-crosslink" href="@CrossLink1Href">
+        <i class="bi @CrossLink1Icon me-1"></i>@CrossLink1Label
+    </a>
+    <a class="btn-result-crosslink" href="/bulk-generate">
+        <i class="bi bi-collection me-1"></i>Bulk Variations
+    </a>
+</div>
+
+<div class="results-more mb-4">
+    <button class="results-more__toggle" @onclick="@(() => _showMore = !_showMore)">
+        <i class="bi bi-three-dots me-1"></i>More options
+        <i class="bi @(_showMore ? "bi-chevron-up" : "bi-chevron-down") ms-1"></i>
+    </button>
+    @if (_showMore)
+    {
+        <div class="results-more__panel d-flex gap-2 flex-wrap mt-2">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="OnDownloadOriginal">
+                <i class="bi bi-download me-1"></i>Download Original
+            </button>
+            @if (AdditionalMoreOptions != null)
+            {
+                @AdditionalMoreOptions
+            }
+        </div>
+    }
+</div>
+
+@if (FooterContent != null)
+{
+    @FooterContent
+}
+
+@code {
+    [Parameter] public string? ImagePreviewUrl { get; set; }
+    [Parameter, EditorRequired] public string RightLabel { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string DividerIcon { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public RenderFragment RightSide { get; set; } = default!;
+    [Parameter] public RenderFragment? CaptionContent { get; set; }
+    [Parameter, EditorRequired] public RenderFragment PrimaryAction { get; set; } = default!;
+    [Parameter, EditorRequired] public string CrossLink1Href { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string CrossLink1Icon { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string CrossLink1Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public EventCallback OnDownloadOriginal { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnStartOver { get; set; }
+    [Parameter] public RenderFragment? AdditionalMoreOptions { get; set; }
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+
+    private bool _showMore;
+}

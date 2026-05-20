@@ -8,6 +8,12 @@ namespace PoRedoImage.Tests.Integration;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    /// <summary>
+    /// The user ID injected into TestAuthHandler via configuration.
+    /// Override per-test-class to achieve storage isolation between test runs.
+    /// </summary>
+    public string TestUserId { get; init; } = TestAuthHandler.DefaultUserId;
+
     protected override IHost CreateHost(IHostBuilder builder)
     {
         // Set environment to Development to skip Key Vault configuration
@@ -19,6 +25,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["AZURE_KEY_VAULT_ENDPOINT"] = "",
+                ["TestAuth:UserId"] = TestUserId,
                 ["ComputerVision:Endpoint"] = "https://test.cognitiveservices.azure.com/",
                 ["ComputerVision:ApiKey"] = "test-key",
                 ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",

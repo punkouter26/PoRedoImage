@@ -58,7 +58,7 @@ public static class BulkGenerateEndpoints
         // Called once per generation batch; result is reused across all variation prompts.
         // Falls back gracefully to an empty description if the AI service is unavailable,
         // so Gemini image-to-image can still run using the raw <PERSON> token.
-        aiGroup.MapPost("/describe", async (BulkDescribeRequest request, IBulkDescribeService describeService, ILoggerFactory loggerFactory) =>
+        aiGroup.MapPost("/describe", async (BulkDescribeRequest request, IGenerativeAiService describeService, ILoggerFactory loggerFactory) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");

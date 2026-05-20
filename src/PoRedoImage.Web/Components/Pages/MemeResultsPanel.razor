@@ -1,82 +1,52 @@
-@* ── Split-screen comparison view ──────────────────────────────────── *@
-<div class="split-compare-wrapper mb-4">
-    <div class="split-compare">
-        <div class="split-compare__side">
-            <span class="split-compare__label">Original</span>
-            <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
-                 onload="this.classList.add('loaded')" />
-        </div>
-        <div class="split-compare__divider">
-            <div class="split-compare__divider-line"></div>
-            <div class="split-compare__divider-pill"><i class="bi bi-emoji-laughing"></i></div>
-        </div>
-        <div class="split-compare__side">
-            <span class="split-compare__label">Meme</span>
-            @if (!string.IsNullOrEmpty(AnalysisResult?.MemeImageData))
-            {
-                var memeUrl = $"data:image/png;base64,{AnalysisResult.MemeImageData}";
-                <img src="@memeUrl" class="split-compare__img" alt="Meme"
-                     onload="this.classList.add('loaded')" />
-            }
-            else
-            {
-                <div class="split-compare__unavailable">Meme not available</div>
-            }
-        </div>
-    </div>
-</div>
-
-@* ── Caption reveal ────────────────────────────────────────────────── *@
-@if (!string.IsNullOrEmpty(AnalysisResult?.MemeCaption))
-{
-    <div class="meme-caption-reveal mb-4">
-        @foreach (var line in AnalysisResult.MemeCaption.Split('\n'))
+@* ── Meme result — delegates shared structure to ResultsPanel ────────── *@
+<ResultsPanel ImagePreviewUrl="@ImagePreviewUrl"
+              RightLabel="Meme"
+              DividerIcon="bi-emoji-laughing"
+              OnDownloadOriginal="OnDownloadOriginal"
+              OnStartOver="OnStartOver"
+              CrossLink1Href="/image-regeneration"
+              CrossLink1Icon="bi-palette2"
+              CrossLink1Label="Regenerate Instead">
+    <RightSide>
+        @if (!string.IsNullOrEmpty(AnalysisResult?.MemeImageData))
         {
-            <h3 class="meme-caption-line fw-bold text-uppercase">@line</h3>
+            var memeUrl = $"data:image/png;base64,{AnalysisResult.MemeImageData}";
+            <img src="@memeUrl" class="split-compare__img" alt="Meme"
+                 onload="this.classList.add('loaded')" />
         }
-    </div>
-}
-
-@* ── Primary actions ───────────────────────────────────────────────── *@
-<div class="results-actions mb-4">
-    @if (!string.IsNullOrEmpty(AnalysisResult?.MemeImageData))
-    {
-        <button class="btn-result-primary" @onclick="OnDownloadMeme">
-            <i class="bi bi-download me-2"></i>Save &amp; Download Meme
-        </button>
-    }
-    <button class="btn-result-secondary" @onclick="OnStartOver">
-        <i class="bi bi-arrow-repeat me-1"></i>Try Again
-    </button>
-    <a class="btn-result-crosslink" href="/image-regeneration">
-        <i class="bi bi-palette2 me-1"></i>Regenerate Instead
-    </a>
-    <a class="btn-result-crosslink" href="/bulk-generate">
-        <i class="bi bi-collection me-1"></i>Bulk Variations
-    </a>
-</div>
-
-@* ── More options ──────────────────────────────────────────────────── *@
-<div class="results-more mb-4">
-    <button class="results-more__toggle" @onclick="@(() => _showMore = !_showMore)">
-        <i class="bi bi-three-dots me-1"></i>More options
-        <i class="bi @(_showMore ? "bi-chevron-up" : "bi-chevron-down") ms-1"></i>
-    </button>
-    @if (_showMore)
-    {
-        <div class="results-more__panel d-flex gap-2 flex-wrap mt-2">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="OnDownloadOriginal">
-                <i class="bi bi-download me-1"></i>Download Original
+        else
+        {
+            <div class="split-compare__unavailable">Meme not available</div>
+        }
+    </RightSide>
+    <CaptionContent>
+        @if (!string.IsNullOrEmpty(AnalysisResult?.MemeCaption))
+        {
+            <div class="meme-caption-reveal mb-4">
+                @foreach (var line in AnalysisResult.MemeCaption.Split('\n'))
+                {
+                    <h3 class="meme-caption-line fw-bold text-uppercase">@line</h3>
+                }
+            </div>
+        }
+    </CaptionContent>
+    <PrimaryAction>
+        @if (!string.IsNullOrEmpty(AnalysisResult?.MemeImageData))
+        {
+            <button class="btn-result-primary" @onclick="OnDownloadMeme">
+                <i class="bi bi-download me-2"></i>Save &amp; Download Meme
             </button>
-            @if (AnalysisResult?.Metrics != null)
-            {
-                <span class="btn btn-outline-secondary btn-sm disabled">
-                    <i class="bi bi-clock me-1"></i>@((AnalysisResult.Metrics.TotalProcessingTimeMs / 1000.0).ToString("F1"))s
-                </span>
-            }
-        </div>
-    }
-</div>
+        }
+    </PrimaryAction>
+    <AdditionalMoreOptions>
+        @if (AnalysisResult?.Metrics != null)
+        {
+            <span class="btn btn-outline-secondary btn-sm disabled">
+                <i class="bi bi-clock me-1"></i>@((AnalysisResult.Metrics.TotalProcessingTimeMs / 1000.0).ToString("F1"))s
+            </span>
+        }
+    </AdditionalMoreOptions>
+</ResultsPanel>
 
 @code {
     [Parameter] public string? ImagePreviewUrl { get; set; }
@@ -84,7 +54,5 @@
     [Parameter] public EventCallback OnDownloadOriginal { get; set; }
     [Parameter] public EventCallback OnDownloadMeme { get; set; }
     [Parameter] public EventCallback OnStartOver { get; set; }
-
-    private bool _showMore;
 }
 

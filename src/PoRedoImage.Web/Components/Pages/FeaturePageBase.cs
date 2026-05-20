@@ -36,6 +36,13 @@ public abstract class FeaturePageBase : ComponentBase
 
     protected bool canProcessImage => selectedFile != null || imagePreviewUrl != null;
 
+    /// <summary>Strips the <c>data:...;base64,</c> prefix from a preview URL, returning raw base64.</summary>
+    protected static string ExtractBase64(string previewUrl)
+    {
+        var idx = previewUrl.IndexOf(";base64,", StringComparison.OrdinalIgnoreCase);
+        return idx >= 0 ? previewUrl[(idx + 8)..] : previewUrl;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         if (SessionService.HasImage)

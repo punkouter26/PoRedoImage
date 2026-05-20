@@ -22,16 +22,7 @@ public static class AuthServiceExtensions
                 {
                     options.LoginPath = "/login";
                     options.AccessDeniedPath = "/login";
-                    options.Events.OnRedirectToLogin = ctx =>
-                    {
-                        if (ctx.Request.Path.StartsWithSegments("/api"))
-                        {
-                            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                            return Task.CompletedTask;
-                        }
-                        ctx.Response.Redirect(ctx.RedirectUri);
-                        return Task.CompletedTask;
-                    };
+                    options.Events.OnRedirectToLogin = ApiAwareRedirectToLogin;
                 });
         }
         else
@@ -46,16 +37,7 @@ public static class AuthServiceExtensions
             {
                 options.LoginPath = "/login";
                 options.AccessDeniedPath = "/access-denied";
-                options.Events.OnRedirectToLogin = ctx =>
-                {
-                    if (ctx.Request.Path.StartsWithSegments("/api"))
-                    {
-                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        return Task.CompletedTask;
-                    }
-                    ctx.Response.Redirect(ctx.RedirectUri);
-                    return Task.CompletedTask;
-                };
+                options.Events.OnRedirectToLogin = ApiAwareRedirectToLogin;
             })
             .AddOpenIdConnect(options =>
             {
@@ -91,5 +73,21 @@ public static class AuthServiceExtensions
         services.AddAuthorization();
         services.AddCascadingAuthenticationState();
         return services;
+    }
+
+    /// <summary>
+    /// Returns 401 for /api/ requests so that API clients receive a proper
+    /// unauthorized status code. Non-API paths get the normal login redirect.
+    /// </summary>
+    private static Task ApiAwareRedirectToLogin(
+        Microsoft.AspNetCore.Authentication.RedirectContext<CookieAuthenticationOptions> ctx)
+    {
+        if (ctx.Request.Path.StartsWithSegments("/api"))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+        ctx.Response.Redirect(ctx.RedirectUri);
+        return Task.CompletedTask;
     }
 }

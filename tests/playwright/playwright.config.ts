@@ -8,8 +8,8 @@ export default defineConfig({
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: 'http://localhost:5000',
-    // Headed in dev, headless in CI
-    headless: !!process.env['CI'],
+    // Headed in dev, headless in CI or when HEADLESS env var is set
+    headless: !!process.env['CI'] || !!process.env['HEADLESS'],
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',

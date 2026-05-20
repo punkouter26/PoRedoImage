@@ -1,115 +1,68 @@
-@* ── Split-screen comparison view ──────────────────────────────────── *@
-<div class="split-compare-wrapper mb-4">
-    <div class="split-compare">
-        <div class="split-compare__side">
-            <span class="split-compare__label">Original</span>
-            <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
-                 onload="this.classList.add('loaded')" />
-        </div>
-        <div class="split-compare__divider">
-            <div class="split-compare__divider-line"></div>
-            <div class="split-compare__divider-pill"><i class="bi bi-arrows-expand-vertical"></i></div>
-        </div>
-        <div class="split-compare__side">
-            <span class="split-compare__label">AI Regenerated</span>
-            @if (RegeneratedImageUrl != null)
-            {
-                <img src="@RegeneratedImageUrl" class="split-compare__img" alt="Regenerated"
-                     onload="this.classList.add('loaded')"
-                     onerror="this.onerror=null; this.src='images/image-error.png'; this.classList.add('error');" />
-            }
-            else
-            {
-                <div class="split-compare__unavailable">Image not available</div>
-            }
-        </div>
-    </div>
-</div>
-
-@* ── Primary actions ───────────────────────────────────────────────── *@
-<div class="results-actions mb-4">
-    @if (RegeneratedImageUrl != null)
-    {
-        <button class="btn-result-primary" @onclick="OnDownloadRegenerated">
-            <i class="bi bi-download me-2"></i>Save &amp; Download Result
-        </button>
-    }
-    <button class="btn-result-secondary" @onclick="OnStartOver">
-        <i class="bi bi-arrow-repeat me-1"></i>Try Again
-    </button>
-    <a class="btn-result-crosslink" href="/meme-generation">
-        <i class="bi bi-emoji-laughing me-1"></i>Try as Meme
-    </a>
-    <a class="btn-result-crosslink" href="/bulk-generate">
-        <i class="bi bi-collection me-1"></i>Bulk Variations
-    </a>
-</div>
-
-@* ── More options (progressive disclosure) ────────────────────────── *@
-<div class="results-more mb-4">
-    <button class="results-more__toggle" @onclick="@(() => _showMore = !_showMore)">
-        <i class="bi bi-three-dots me-1"></i>More options
-        <i class="bi @(_showMore ? "bi-chevron-up" : "bi-chevron-down") ms-1"></i>
-    </button>
-    @if (_showMore)
-    {
-        <div class="results-more__panel d-flex gap-2 flex-wrap mt-2">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="OnDownloadOriginal">
-                <i class="bi bi-download me-1"></i>Download Original
-            </button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="OnDownloadSideBySide" disabled="@SideBySideGenerating">
-                @if (SideBySideGenerating)
-                {
-                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                    <text>Generating…</text>
-                }
-                else
-                {
-                    <i class="bi bi-layout-split me-1"></i>
-                    <text>Download Side-by-Side</text>
-                }
-            </button>
-        </div>
-    }
-</div>
-
-@* ── AI Description (collapsed by default) ────────────────────────── *@
-@if (!string.IsNullOrEmpty(ImageDescription))
-{
-    <div class="description-accordion mb-3">
-        <button class="description-accordion__toggle" @onclick="@(() => _descExpanded = !_descExpanded)">
-            <span><i class="bi bi-text-left me-1"></i>AI Description</span>
-            <span class="description-accordion__meta">
-                @(_wordCount) words
-                @if (AnalysisResult?.Metrics != null)
-                {
-                    <span class="description-accordion__time ms-2">@((AnalysisResult.Metrics.TotalProcessingTimeMs / 1000.0).ToString("F1"))s</span>
-                }
-                <i class="bi @(_descExpanded ? "bi-chevron-up" : "bi-chevron-down") ms-2"></i>
-            </span>
-        </button>
-        @if (_descExpanded)
+@* ── Image Regeneration result — delegates shared structure to ResultsPanel ── *@
+<ResultsPanel ImagePreviewUrl="@ImagePreviewUrl"
+              RightLabel="AI Regenerated"
+              DividerIcon="bi-arrows-expand-vertical"
+              OnDownloadOriginal="OnDownloadOriginal"
+              OnStartOver="OnStartOver"
+              CrossLink1Href="/meme-generation"
+              CrossLink1Icon="bi-emoji-laughing"
+              CrossLink1Label="Try as Meme">
+    <RightSide>
+        @if (RegeneratedImageUrl != null)
         {
-            <div class="description-accordion__body">
-                <p class="description-text">@((MarkupString)(System.Net.WebUtility.HtmlEncode(ImageDescription).Replace("\n", "<br />")))</p>
+            <img src="@RegeneratedImageUrl" class="split-compare__img" alt="Regenerated"
+                 onload="this.classList.add('loaded')"
+                 onerror="this.onerror=null; this.src='images/image-error.png'; this.classList.add('error');" />
+        }
+        else
+        {
+            <div class="split-compare__unavailable">Image not available</div>
+        }
+    </RightSide>
+    <PrimaryAction>
+        @if (RegeneratedImageUrl != null)
+        {
+            <button class="btn-result-primary" @onclick="OnDownloadRegenerated">
+                <i class="bi bi-download me-2"></i>Save &amp; Download Result
+            </button>
+        }
+    </PrimaryAction>
+    <FooterContent>
+        @if (!string.IsNullOrEmpty(ImageDescription))
+        {
+            <div class="description-accordion mb-3">
+                <button class="description-accordion__toggle" @onclick="@(() => _descExpanded = !_descExpanded)">
+                    <span><i class="bi bi-text-left me-1"></i>AI Description</span>
+                    <span class="description-accordion__meta">
+                        @(_wordCount) words
+                        @if (AnalysisResult?.Metrics != null)
+                        {
+                            <span class="description-accordion__time ms-2">@((AnalysisResult.Metrics.TotalProcessingTimeMs / 1000.0).ToString("F1"))s</span>
+                        }
+                        <i class="bi @(_descExpanded ? "bi-chevron-up" : "bi-chevron-down") ms-2"></i>
+                    </span>
+                </button>
+                @if (_descExpanded)
+                {
+                    <div class="description-accordion__body">
+                        <p class="description-text">@((MarkupString)(System.Net.WebUtility.HtmlEncode(ImageDescription).Replace("\n", "<br />")))</p>
+                    </div>
+                }
             </div>
         }
-    </div>
-}
+    </FooterContent>
+</ResultsPanel>
 
 @code {
     [Parameter] public string? ImagePreviewUrl { get; set; }
     [Parameter] public string? RegeneratedImageUrl { get; set; }
     [Parameter] public ImageAnalysisResponse? AnalysisResult { get; set; }
     [Parameter] public string? ImageDescription { get; set; }
-    [Parameter] public bool SideBySideGenerating { get; set; }
     [Parameter] public EventCallback OnDownloadOriginal { get; set; }
     [Parameter] public EventCallback OnDownloadRegenerated { get; set; }
-    [Parameter] public EventCallback OnDownloadSideBySide { get; set; }
     [Parameter] public EventCallback OnStartOver { get; set; }
 
     private bool _descExpanded;
-    private bool _showMore;
 
     private int _wordCount => string.IsNullOrEmpty(ImageDescription) ? 0 : ImageDescription.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 }

@@ -216,7 +216,12 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseStatusCodePagesWithReExecute("/not-found");
+// Only apply the "pretty error page" re-execute for browser (non-API) paths.
+// API requests must keep their original 4xx/5xx status codes so clients
+// don't receive a 302 redirect to the login page instead of a real 401.
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/api"),
+    branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
 app.UseHttpsRedirection();
 
 // Pushes CorrelationId, UserId, and SessionId into Serilog LogContext for every request

@@ -95,10 +95,7 @@
             progressMessage = "Preparing image for analysis...";
             StateHasChanged();
 
-            var base64Data = imagePreviewUrl;
-            var base64Index = imagePreviewUrl.IndexOf(";base64,", StringComparison.OrdinalIgnoreCase);
-            if (base64Index >= 0)
-                base64Data = imagePreviewUrl[(base64Index + 8)..];
+            var base64Data = ExtractBase64(imagePreviewUrl);
 
             var request = new ImageAnalysisRequest
             {

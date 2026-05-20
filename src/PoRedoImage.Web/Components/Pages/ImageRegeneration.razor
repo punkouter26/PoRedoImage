@@ -53,10 +53,8 @@
             RegeneratedImageUrl="@regeneratedImageUrl"
             AnalysisResult="@analysisResult"
             ImageDescription="@imageDescription"
-            SideBySideGenerating="@_sideBySideGenerating"
             OnDownloadOriginal="DownloadOriginal"
             OnDownloadRegenerated="DownloadRegenerated"
-            OnDownloadSideBySide="DownloadSideBySide"
             OnStartOver="StartOver" />
     }
 </div>
@@ -64,7 +62,6 @@
 @code {
     private string? regeneratedImageUrl;
     private string? imageDescription;
-    private bool _sideBySideGenerating;
     private int descriptionLength = 350;
     private ImageAnalysisResponse? analysisResult;
 
@@ -99,10 +96,7 @@
             progressMessage = "Preparing image for analysis...";
             StateHasChanged();
 
-            var base64Data = imagePreviewUrl;
-            var base64Index = imagePreviewUrl.IndexOf(";base64,", StringComparison.OrdinalIgnoreCase);
-            if (base64Index >= 0)
-                base64Data = imagePreviewUrl[(base64Index + 8)..];
+            var base64Data = ExtractBase64(imagePreviewUrl);
 
             var request = new ImageAnalysisRequest
             {
@@ -197,30 +191,6 @@
         else Logger.LogInformation("Regenerated image download initiated");
     }
 
-    private async Task DownloadSideBySide()
-    {
-        if (imagePreviewUrl == null || regeneratedImageUrl == null) return;
-        _sideBySideGenerating = true;
-        StateHasChanged();
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("createSideBySideComparison",
-                imagePreviewUrl, regeneratedImageUrl,
-                "comparison-" + (selectedFile?.Name ?? "image.png"));
-            Logger.LogInformation("Side-by-side comparison download initiated");
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error creating comparison image: {ex.Message}";
-            Logger.LogError(ex, "Error creating comparison image");
-        }
-        finally
-        {
-            _sideBySideGenerating = false;
-            StateHasChanged();
-        }
-    }
-
     private void StartOver()
     {
         selectedFile = null;
@@ -229,7 +199,6 @@
         errorMessage = null;
         isProcessing = false;
         isComplete = false;
-        _sideBySideGenerating = false;
         progressPercentage = 0;
         progressMessage = string.Empty;
         analysisResult = null;

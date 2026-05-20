@@ -13,7 +13,7 @@ namespace PoRedoImage.Infrastructure.Services;
 /// Azure OpenAI implementation of IGenerativeAiService.
 /// Adapter pattern (GoF): adapts Azure OpenAI SDK to the domain interface.
 /// </summary>
-public sealed class AzureOpenAiService : IGenerativeAiService, IBulkDescribeService
+public sealed class AzureOpenAiService : IGenerativeAiService
 {
     private readonly ILogger<AzureOpenAiService> _logger;
     private readonly IConfiguration _configuration;

@@ -6,16 +6,28 @@ namespace PoRedoImage.Tests.Integration;
 
 /// <summary>
 /// Integration tests for /api/bulk-generate endpoints.
-/// All requests are authenticated as TestAuthHandler.UserId via the test auth scheme.
-/// Table Storage is not configured — storage service no-ops gracefully.
+/// Each test class instance creates a fresh factory with a unique user ID (Guid)
+/// so no test shares Table Storage state with another — even when Azurite is live.
 /// </summary>
-public class BulkGenerateEndpointTests : IClassFixture<CustomWebApplicationFactory>
+public class BulkGenerateEndpointTests : IDisposable
 {
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public BulkGenerateEndpointTests(CustomWebApplicationFactory factory)
+    public BulkGenerateEndpointTests()
     {
-        _client = factory.CreateClient();
+        _factory = new CustomWebApplicationFactory
+        {
+            // Unique per test instance — guarantees empty storage slate
+            TestUserId = $"test-bulk-{Guid.NewGuid():N}"
+        };
+        _client = _factory.CreateClient();
+    }
+
+    public void Dispose()
+    {
+        _client.Dispose();
+        _factory.Dispose();
     }
 
     // ─── GET /api/bulk-generate/prompts ─────────────────────────────
