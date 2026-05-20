@@ -22,6 +22,16 @@ public static class AuthServiceExtensions
                 {
                     options.LoginPath = "/login";
                     options.AccessDeniedPath = "/login";
+                    options.Events.OnRedirectToLogin = ctx =>
+                    {
+                        if (ctx.Request.Path.StartsWithSegments("/api"))
+                        {
+                            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                            return Task.CompletedTask;
+                        }
+                        ctx.Response.Redirect(ctx.RedirectUri);
+                        return Task.CompletedTask;
+                    };
                 });
         }
         else
@@ -36,6 +46,16 @@ public static class AuthServiceExtensions
             {
                 options.LoginPath = "/login";
                 options.AccessDeniedPath = "/access-denied";
+                options.Events.OnRedirectToLogin = ctx =>
+                {
+                    if (ctx.Request.Path.StartsWithSegments("/api"))
+                    {
+                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return Task.CompletedTask;
+                    }
+                    ctx.Response.Redirect(ctx.RedirectUri);
+                    return Task.CompletedTask;
+                };
             })
             .AddOpenIdConnect(options =>
             {

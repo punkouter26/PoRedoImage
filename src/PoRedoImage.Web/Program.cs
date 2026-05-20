@@ -274,6 +274,10 @@ app.MapDiagnosticsEndpoints();
 app.MapBulkGenerateEndpoints();
 app.MapUserImageEndpoints();
 
+// Redirect /favicon.ico → /favicon.png so browsers don't get a 404.
+app.MapGet("/favicon.ico", () => Results.Redirect("/favicon.png", permanent: true))
+    .ExcludeFromDescription();
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

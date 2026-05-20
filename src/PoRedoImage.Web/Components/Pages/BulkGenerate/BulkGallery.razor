@@ -2,7 +2,15 @@
 @using PoRedoImage.Web.Models
 
 <div>
-    @if (Results.Count > 0)
+    @if (Results.Count == 0)
+    {
+        <div class="bulk-empty-state">
+            <i class="bi bi-images bulk-empty-state__icon"></i>
+            <h3 class="bulk-empty-state__title">Ready to generate variations</h3>
+            <p class="bulk-empty-state__hint">Upload an image and click <strong>Generate</strong> to create up to 10 artistic variations using AI.</p>
+        </div>
+    }
+    else
     {
         <div class="mb-3">
             <div class="bulk-progress-header">
