@@ -4,7 +4,7 @@ This folder contains developer utility scripts for the PoRedoImage project.
 
 | Script | Type | Purpose |
 |--------|------|---------|
-| _(none yet)_ | — | Add scripts here as needed |
+| `setup.ps1` | PowerShell | One-command machine setup: Winget installs, Docker/Azurite init, package restore |
 
 ## Conventions
 
@@ -12,11 +12,24 @@ This folder contains developer utility scripts for the PoRedoImage project.
 - Python scripts (`.py`) for data processing or cross-platform utilities.
 - Each script must have a comment block at the top explaining its purpose, prerequisites, and usage.
 
+## Quick Start (New Machine)
+
+```powershell
+# Clone the repo, then run from the repo root:
+.\SCRIPTS\setup.ps1
+```
+
+This will:
+1. Install .NET 10 SDK, Docker Desktop, Git, and Node.js via **Winget**
+2. Start **Azurite** (Azure Storage emulator) via Docker Compose
+3. Restore all NuGet packages
+4. Install Playwright browsers for E2E tests
+
+After setup, press **F5** in VS Code to build and launch the app.
+
 ## Common Tasks
 
-### Local Development Setup
-
-Start Azurite (Azure Storage emulator) via Docker Compose before running the app locally:
+### Start Azurite only
 
 ```powershell
 docker compose -f ../docker-compose.azurite.yml up -d
@@ -31,3 +44,4 @@ dotnet test ../PoRedoImage.slnx --collect:"XPlat Code Coverage" --results-direct
 # E2E tests (requires the app to be running on http://localhost:5000)
 npx playwright test --config=../tests/playwright/playwright.config.ts
 ```
+

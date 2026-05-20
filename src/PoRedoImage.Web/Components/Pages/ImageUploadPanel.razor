@@ -3,6 +3,37 @@
 
 <div class="upload-panel" @onkeydown="HandleKeyDown" tabindex="0" role="region" aria-label="Image upload">
 
+    @* ── Description Length Presets (Image Regeneration only) ─────── *@
+    @* Placed above the drop zone so the user can choose detail level   *@
+    @* before uploading — it is a prerequisite choice, not a follow-up. *@
+    @if (ShowDescriptionLength)
+    {
+        <div class="preset-section mb-4">
+            <span class="preset-section__label"><i class="bi bi-sliders me-1"></i>AI Detail Level</span>
+            <div class="preset-group__buttons">
+                <button type="button"
+                        class="preset-btn @(DescriptionLength <= 220 ? "preset-btn--active" : "")"
+                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(200))">
+                    <span class="preset-btn__name">Quick</span>
+                    <span class="preset-btn__words">~200 words</span>
+                </button>
+                <button type="button"
+                        class="preset-btn @(DescriptionLength > 220 && DescriptionLength <= 420 ? "preset-btn--active" : "")"
+                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(350))">
+                    <span class="preset-btn__name">Standard</span>
+                    <span class="preset-btn__words">~350 words</span>
+                    <span class="preset-btn__badge">Recommended</span>
+                </button>
+                <button type="button"
+                        class="preset-btn @(DescriptionLength > 420 ? "preset-btn--active" : "")"
+                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(500))">
+                    <span class="preset-btn__name">Detailed</span>
+                    <span class="preset-btn__words">~500 words</span>
+                </button>
+            </div>
+        </div>
+    }
+
     @* ── Drop Zone ──────────────────────────────────────────────────── *@
     <div class="drop-zone @(_isDragging ? "drop-zone--active" : "") @(ImagePreviewUrl != null ? "drop-zone--has-image" : "")"
          @ondragover:preventDefault
@@ -48,35 +79,6 @@
         <div class="alert alert-danger d-flex align-items-center gap-2 mt-3">
             <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
             <span>@ErrorMessage</span>
-        </div>
-    }
-
-    @* ── Description Length Presets (Image Regeneration only) ─────── *@
-    @if (ShowDescriptionLength)
-    {
-        <div class="preset-section mt-4">
-            <span class="preset-section__label"><i class="bi bi-sliders me-1"></i>AI Detail Level</span>
-            <div class="preset-group__buttons">
-                <button type="button"
-                        class="preset-btn @(DescriptionLength <= 220 ? "preset-btn--active" : "")"
-                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(200))">
-                    <span class="preset-btn__name">Quick</span>
-                    <span class="preset-btn__words">~200 words</span>
-                </button>
-                <button type="button"
-                        class="preset-btn @(DescriptionLength > 220 && DescriptionLength <= 420 ? "preset-btn--active" : "")"
-                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(350))">
-                    <span class="preset-btn__name">Standard</span>
-                    <span class="preset-btn__words">~350 words</span>
-                    <span class="preset-btn__badge">Recommended</span>
-                </button>
-                <button type="button"
-                        class="preset-btn @(DescriptionLength > 420 ? "preset-btn--active" : "")"
-                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(500))">
-                    <span class="preset-btn__name">Detailed</span>
-                    <span class="preset-btn__words">~500 words</span>
-                </button>
-            </div>
         </div>
     }
 

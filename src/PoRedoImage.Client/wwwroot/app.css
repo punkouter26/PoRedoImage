@@ -56,6 +56,15 @@
     background: transparent !important;
 }
 
+/* #1 fix: .app-nav__user is rendered by LoginDisplay (child component),
+   so it must live in the global sheet — scoped MainLayout.razor.css does not reach it.
+   #64748b was ~1.6:1 contrast on #0f172a; #94a3b8 is ~4.7:1 (WCAG AA). */
+.app-nav__user {
+    color: #94a3b8 !important;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
 
 /* ── Base ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -877,6 +886,24 @@ code { color: #c026d3; }
     display: flex;
     flex-direction: column;
 }
+
+/* "How it works" step flow shown on feature page headers (#5) */
+.feature-how-it-works {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.feature-how-it-works__step {
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    color: #a5b4fc;
+    white-space: nowrap;
+}
+.feature-how-it-works__arrow { color: #475569; font-size: 0.75rem; }
 
 .btn-back {
     display: inline-flex;
@@ -1872,7 +1899,25 @@ code { color: #c026d3; }
 .studio-hero { padding: 2rem 0 1rem; text-align: center; }
 .studio-hero h1 { font-size: 2rem; font-weight: 700; }
 .studio-hero p { color: #9ca3af; }
-.studio-feature-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+
+/* Two-column layout: upload left, feature cards right */
+.studio-body {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    margin-top: 1.5rem;
+}
+.studio-upload-col { flex: 0 0 360px; min-width: 0; }
+.studio-features-col { flex: 1; min-width: 0; }
+@media (max-width: 900px) {
+    .studio-body { flex-direction: column; }
+    .studio-upload-col { flex: none; width: 100%; }
+}
+
+.studio-feature-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+@media (max-width: 900px) {
+    .studio-feature-cards { grid-template-columns: 1fr; }
+}
 .studio-feature-card {
     background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
     border-radius: 14px; padding: 1.25rem 1.25rem 1rem; cursor: pointer;
@@ -1881,6 +1926,8 @@ code { color: #c026d3; }
 }
 .studio-feature-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,.22); color: inherit; }
 .studio-feature-card.card-active { border-color: var(--color-primary,#6366f1); }
+/* "ready" state: image is loaded — highlight cards in green */
+.studio-feature-card--ready { border-color: #22c55e; }
 .studio-feature-card__icon { font-size: 1.6rem; }
 .studio-feature-card__title { font-weight: 700; font-size: 1rem; }
 .studio-feature-card__desc { font-size: .82rem; color: #9ca3af; flex: 1; }

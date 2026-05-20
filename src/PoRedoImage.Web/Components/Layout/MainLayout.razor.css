@@ -8,7 +8,30 @@
     box-shadow: 0 2px 24px rgba(0,0,0,0.5);
 }
 
-/* Reset Radzen a-element interference inside the header */
+/* ── Mock Data Warning Banner (§7 Mock Visibility) ─────── */
+.mock-data-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #b45309;
+    color: #fef3c7;
+    font-size: clamp(0.7rem, 2vw, 0.85rem);
+    padding: 0.3rem 1rem;
+    letter-spacing: 0.03em;
+    text-align: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.mock-data-banner__details {
+    opacity: 0.85;
+    font-weight: 400;
+    font-size: 0.8em;
+}
+
+/* Reset Radzen a-element interference inside the header.
+   NOTE: color is intentionally omitted here so that app.css
+   nav colour tokens (.app-nav__brand, .app-nav__link) are honoured. */
 .app-header a,
 .app-header a:link,
 .app-header a:visited,
@@ -16,7 +39,6 @@
     background: transparent !important;
     box-shadow: none !important;
     text-decoration: none !important;
-    color: inherit !important;
 }
 
 .app-nav {
@@ -84,7 +106,9 @@
 }
 
 .app-nav__user {
-    color: #64748b;
+    /* #64748b was too dark on #0f172a nav (contrast ~1.6:1).
+       #94a3b8 (slate-400) gives ~4.7:1 — passes WCAG AA. */
+    color: #94a3b8;
     font-size: 0.85rem;
     font-weight: 500;
 }
@@ -135,6 +159,19 @@
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+}
+
+/* ── Mobile nav (#3): collapse text labels below 640 px ─── */
+@media (max-width: 639px) {
+    .app-nav {
+        padding: 0 0.75rem;
+        height: 56px;
+    }
+    /* Hide the user badge text and show only the icon at narrow widths.
+       The person-circle icon still communicates "logged in" to the user. */
+    .app-nav__user {
+        display: none;
+    }
 }
 
 /* Blazor error bar */

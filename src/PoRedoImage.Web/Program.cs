@@ -196,6 +196,11 @@ builder.Services.AddScoped(sp =>
 // DI registration follows Dependency Inversion Principle (SOLID-D)
 builder.Services.AddPoRedoImageInfrastructure();
 
+// ─── Mock data detection ─────────────────────────────────────────────
+// Collects all IMockable registrations so the UI can display "USING MOCK DATA" when active.
+// When no mocks are registered this resolves to an empty enumerable — zero overhead.
+builder.Services.AddSingleton<PoRedoImage.Web.Components.Shared.MockDataDetector>();
+
 // Scoped: persists the active uploaded image across feature pages for the lifetime of the circuit
 builder.Services.AddScoped<PoRedoImage.Web.Components.Shared.ImageSessionService>();
 
