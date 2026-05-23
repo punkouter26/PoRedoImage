@@ -30,6 +30,9 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
 
+try
+{
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Azure Key Vault ────────────────────────────────────────────────
@@ -290,6 +293,16 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly);
 
 app.Run();
+
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "PoRedoImage terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 // Make Program class accessible to integration tests
 public partial class Program { }

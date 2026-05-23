@@ -1,4 +1,4 @@
-name: Deploy to Azure
+name: CI/CD — Build, Test & Deploy
 
 on:
   push:
@@ -7,114 +7,85 @@ on:
     branches: [master]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
+  id-token: write
 
 env:
-  AZURE_APP_NAME: 'poredoimage-web'
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOTNET_VERSION: '10.0.x'
+  AZURE_WEBAPP_NAME: poredoimage-web
+  AZURE_RESOURCE_GROUP: PoRedoImage
+  SOLUTION_PATH: PoRedoImage.slnx
+  API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
+  UNIT_TEST_PATH: tests/PoRedoImage.Tests.Unit
+
+concurrency:
+  group: deploy-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # ── Build & Test ─────────────────────────────────────────────────────────────
-  # Runs on every push and pull request to catch regressions early.
   build-and-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-
-    - uses: actions/setup-dotnet@v4
-      with:
-        global-json-file: global.json
-
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
-        restore-keys: nuget-
-
-    - name: Verify formatting
-      run: dotnet format PoRedoImage.slnx --verify-no-changes --verbosity minimal
-
-    - name: Install fonts (Linux requirement for image processing)
-      run: sudo apt-get install -y fonts-liberation
-
-    - name: Run unit tests
-      run: dotnet test tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj --configuration Release --logger "trx;LogFileName=unit-tests.trx"
-
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: "**/*.trx"
-
-    - name: Publish
-      run: dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj --configuration Release --output ./publish
-
-    - name: Upload publish artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: publish
-        path: ./publish
-        retention-days: 1
-
-  # ── Deploy ───────────────────────────────────────────────────────────────────
-  # Runs only on master pushes and manual dispatches, after build-and-test passes.
-  deploy:
+    name: Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: dotnet restore ${{ env.SOLUTION_PATH }}
+      - run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -c Release
+      - run: dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity minimal
+      - run: dotnet test ${{ env.UNIT_TEST_PATH }} -c Release --no-build --logger trx --results-directory TestResults
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: TestResults/*.trx
+      - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webapp
+          path: publish
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
     needs: build-and-test
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    timeout-minutes: 20
     environment:
       name: production
       url: https://poredoimage-web.azurewebsites.net
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
-    - name: Download publish artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: publish
-        path: ./publish
-
-    - name: Azure Login (OIDC)
-      uses: azure/login@v2.3.0
-      with:
-        client-id: ${{ vars.AZURE_CLIENT_ID }}
-        tenant-id: ${{ vars.AZURE_TENANT_ID }}
-        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-    - name: Deploy to Azure App Service
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: ${{ env.AZURE_APP_NAME }}
-        package: ./publish
-
-    - name: Smoke Test – /health
-      run: |
-        echo "Waiting for app to come online (polling /alive)..."
-        sleep 30
-        for i in $(seq 1 30); do
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/alive 2>/dev/null) || STATUS="000"
-          echo "Attempt $i: /alive HTTP $STATUS"
-          [ "$STATUS" = "200" ] && break
-          sleep 10
-        done
-        if [ "$STATUS" != "200" ]; then
-          echo "::warning::App did not return 200 on /alive within 5 minutes — cold start may still be in progress"
-        else
-          echo "App is online. Checking /health (all services)..."
-          HEALTH=$(curl -s --max-time 60 https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/health 2>/dev/null) || HEALTH="{}"
-          echo "$HEALTH"
-          HSTATUS=$(echo "$HEALTH" | grep -o '"status":"[^"]*"' | head -1 | grep -c '"Healthy"' || echo "0")
-          [ "$HSTATUS" = "0" ] && echo "::warning::Health endpoint not fully healthy (non-fatal)" || true
-        fi
-        echo "Deploy step complete!"
+      - uses: actions/download-artifact@v4
+        with:
+          name: webapp
+          path: publish
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: cd publish && zip -r ../webapp.zip . && cd ..
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
+          package: webapp.zip
+      - name: Verify deployment (health check)
+        run: |
+          sleep 20
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health" --max-time 30 || echo "000")
+            echo "Health check attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then echo "Deployment verified."; exit 0; fi
+            sleep 15
+          done
+          echo "WARNING: Health check did not return 200 after 5 attempts."
