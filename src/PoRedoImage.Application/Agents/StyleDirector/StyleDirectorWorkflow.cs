@@ -43,7 +43,7 @@ public sealed class StyleDirectorWorkflow
     /// strongly-typed pipeline state without <c>dynamic</c> casts — each agent has
     /// a different I/O type. The generic runner remains in the codebase for future
     /// migration to MAF, which carries that state natively.
-/// </summary>
+    /// </summary>
     public async Task<WorkflowResult<StyleDirectorResult>> RunAsync(
         VisionAnalystInput input,
         CancellationToken ct = default)

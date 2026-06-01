@@ -97,6 +97,31 @@
             </button>
         </div>
     }
+
+    @* Mobile sticky bottom CTA *@
+    <div class="mobile-sticky-cta">
+        @if (!_isGenerating && !string.IsNullOrEmpty(_imagePreviewUrl) && _activePromptCount > 0)
+        {
+            <button class="mobile-sticky-cta__btn mobile-sticky-cta__btn--primary"
+                    @onclick="StartGeneration">
+                <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString())
+            </button>
+        }
+        @if (_isGenerating)
+        {
+            <button class="mobile-sticky-cta__btn mobile-sticky-cta__btn--secondary"
+                    @onclick="CancelGeneration">
+                <i class="bi bi-stop-circle me-1"></i>Cancel
+            </button>
+        }
+        @if (!_isGenerating && _favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
+        {
+            <button class="mobile-sticky-cta__btn mobile-sticky-cta__btn--secondary"
+                    @onclick="DownloadFavorites">
+                <i class="bi bi-heart-fill me-1"></i>Save Favorites
+            </button>
+        }
+    </div>
 </div>
 
 @code {

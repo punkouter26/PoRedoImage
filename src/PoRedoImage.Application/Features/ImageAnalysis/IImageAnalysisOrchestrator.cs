@@ -1,6 +1,6 @@
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Services;
+namespace PoRedoImage.Application.Features.ImageAnalysis;
 
 /// <summary>
 /// Orchestrates the image analysis pipeline (Analyze → Enhance → Generate).

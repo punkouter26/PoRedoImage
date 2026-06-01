@@ -2,16 +2,25 @@
 @using Radzen.Blazor
 
 <div class="prompt-drawer-wrapper">
-    <RadzenButton Icon="list_ul" Text="@(_isExpanded ? "Hide Prompts" : "Show Prompts")"
-                  Click="ToggleDrawer"
-                  ButtonStyle="ButtonStyle.Primary"
-                  Variant="Variant.Flat"
-                  class="prompt-drawer__toggle" />
+    @* Progressive disclosure: icon-only toggle when collapsed *@
+    <div class="prompt-drawer__toggle-wrapper">
+        <RadzenButton Icon="@(_isExpanded ? "x" : "list_ul")" 
+                      Text="@(_isExpanded ? "" : "")"
+                      Click="ToggleDrawer"
+                      ButtonStyle="ButtonStyle.Secondary"
+                      Variant="Variant.Flat"
+                      class="@("prompt-drawer__toggle" + (_isExpanded ? " prompt-drawer__toggle--active" : ""))" 
+                      title="@(_isExpanded ? "Close prompts" : "Show prompts")" />
+        @if (!_isExpanded && _activePromptCount > 0)
+        {
+            <RadzenBadge BadgeStyle="BadgeStyle.Primary" class="prompt-drawer__badge">@_activePromptCount</RadzenBadge>
+        }
+    </div>
 
     <RadzenSidebar @ref="_sidebar"
                   @bind-Visible="_isExpanded"
                   Width="400px"
-                  class="prompt-drawer">
+                  class="prompt-drawer glass-panel">
         <div class="prompt-drawer__header">
             <h3 class="prompt-drawer__title">
                 <i class="bi bi-list-ul me-2"></i>Art Style Prompts
@@ -39,7 +48,7 @@
 
         <div class="prompt-drawer__hint">
             <i class="bi bi-info-circle-fill me-1"></i>
-            Use <code>&lt;PERSON&gt;</code> — replaced with AI description of your uploaded image
+            <span class="d-none d-md-inline">Use </span><code>&lt;PERSON&gt;</code><span class="d-none d-md-inline"> — replaced with AI description</span>
         </div>
 
         <div class="prompt-drawer__list">

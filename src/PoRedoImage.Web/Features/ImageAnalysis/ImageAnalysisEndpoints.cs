@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using PoRedoImage.Application.Services;
+using PoRedoImage.Application.Features.ImageAnalysis;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Web.Features;
 using System.ClientModel;

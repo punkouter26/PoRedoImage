@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Services;
+namespace PoRedoImage.Application.Features.ImageAnalysis;
 
 public sealed class ImageAnalysisOrchestrator(
     IVisionService visionService,

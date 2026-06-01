@@ -40,42 +40,42 @@ public static class CaptionPersonaExtensions
     /// <summary>Human-readable name shown in the UI.</summary>
     public static string DisplayName(this CaptionPersona p) => p switch
     {
-        CaptionPersona.GenZ       => "Gen-Z",
-        CaptionPersona.Corporate  => "Corporate",
-        CaptionPersona.Absurdist  => "Absurdist",
-        CaptionPersona.DadJoke    => "Dad Joke",
-        CaptionPersona.Sarcastic  => "Sarcastic",
-        CaptionPersona.Wholesome  => "Wholesome",
-        CaptionPersona.TechBro    => "Tech Bro",
-        CaptionPersona.Surreal    => "Surreal",
+        CaptionPersona.GenZ => "Gen-Z",
+        CaptionPersona.Corporate => "Corporate",
+        CaptionPersona.Absurdist => "Absurdist",
+        CaptionPersona.DadJoke => "Dad Joke",
+        CaptionPersona.Sarcastic => "Sarcastic",
+        CaptionPersona.Wholesome => "Wholesome",
+        CaptionPersona.TechBro => "Tech Bro",
+        CaptionPersona.Surreal => "Surreal",
         _ => p.ToString()
     };
 
     /// <summary>Bootstrap-icons class — used by the UI to render a tiny chip per persona.</summary>
     public static string IconClass(this CaptionPersona p) => p switch
     {
-        CaptionPersona.GenZ       => "bi-phone",
-        CaptionPersona.Corporate  => "bi-briefcase",
-        CaptionPersona.Absurdist  => "bi-emoji-dizzy",
-        CaptionPersona.DadJoke    => "bi-emoji-laughing",
-        CaptionPersona.Sarcastic  => "bi-emoji-neutral",
-        CaptionPersona.Wholesome  => "bi-heart",
-        CaptionPersona.TechBro    => "bi-cpu",
-        CaptionPersona.Surreal    => "bi-stars",
+        CaptionPersona.GenZ => "bi-phone",
+        CaptionPersona.Corporate => "bi-briefcase",
+        CaptionPersona.Absurdist => "bi-emoji-dizzy",
+        CaptionPersona.DadJoke => "bi-emoji-laughing",
+        CaptionPersona.Sarcastic => "bi-emoji-neutral",
+        CaptionPersona.Wholesome => "bi-heart",
+        CaptionPersona.TechBro => "bi-cpu",
+        CaptionPersona.Surreal => "bi-stars",
         _ => "bi-chat-dots"
     };
 
     /// <summary>System prompt that primes the model for this persona.</summary>
     public static string SystemPrompt(this CaptionPersona p) => p switch
     {
-        CaptionPersona.GenZ       => "You are a Gen-Z TikTok caption writer. Lowercase, slang, short. 'no cap', 'slay', 'ate', 'lowkey', 'bestie' energy. Under 8 words.",
-        CaptionPersona.Corporate  => "You write LinkedIn-safe 'corporate' meme captions. Jargon, buzzwords, hashtag energy. Under 8 words.",
-        CaptionPersona.Absurdist  => "You write absurdist meme captions — surreal, nonsense, unexpectedly philosophical. Under 8 words.",
-        CaptionPersona.DadJoke    => "You write pun-heavy dad-joke meme captions. Groan-worthy but charming. Under 8 words.",
-        CaptionPersona.Sarcastic  => "You write dry, raised-eyebrow sarcastic captions. Devastatingly understated. Under 8 words.",
-        CaptionPersona.Wholesome  => "You write kind, supportive meme captions that make people feel good. Under 8 words.",
-        CaptionPersona.TechBro    => "You write tech-bro / startup caption humor. 'Disrupting', '10x engineer', 'pivot'. Under 8 words.",
-        CaptionPersona.Surreal    => "You write deep-fried internet absurdism — random, layered, the kind of thing that gets 50k likes. Under 8 words.",
+        CaptionPersona.GenZ => "You are a Gen-Z TikTok caption writer. Lowercase, slang, short. 'no cap', 'slay', 'ate', 'lowkey', 'bestie' energy. Under 8 words.",
+        CaptionPersona.Corporate => "You write LinkedIn-safe 'corporate' meme captions. Jargon, buzzwords, hashtag energy. Under 8 words.",
+        CaptionPersona.Absurdist => "You write absurdist meme captions — surreal, nonsense, unexpectedly philosophical. Under 8 words.",
+        CaptionPersona.DadJoke => "You write pun-heavy dad-joke meme captions. Groan-worthy but charming. Under 8 words.",
+        CaptionPersona.Sarcastic => "You write dry, raised-eyebrow sarcastic captions. Devastatingly understated. Under 8 words.",
+        CaptionPersona.Wholesome => "You write kind, supportive meme captions that make people feel good. Under 8 words.",
+        CaptionPersona.TechBro => "You write tech-bro / startup caption humor. 'Disrupting', '10x engineer', 'pivot'. Under 8 words.",
+        CaptionPersona.Surreal => "You write deep-fried internet absurdism — random, layered, the kind of thing that gets 50k likes. Under 8 words.",
         _ => "You write a funny meme caption. Under 8 words."
     };
 }

@@ -1904,6 +1904,14 @@ code { color: #c026d3; }
 .btn-dl-modal:hover { opacity: 0.9; }
 
 /* ── Feature Card glassmorphism enhancement ───────────────────────────── */
+.feature-card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
 .feature-card::after {
     content: '';
     position: absolute;
@@ -1913,8 +1921,22 @@ code { color: #c026d3; }
     border-radius: 16px;
 }
 
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+    border-color: rgba(91,154,255,0.4);
+}
+
 .feature-card:hover::after {
     background: linear-gradient(145deg, rgba(255,255,255,0.07) 0%, transparent 70%);
+}
+
+/* Dark mode glass variant */
+@media (prefers-color-scheme: dark) {
+    .feature-card {
+        background: var(--glass-bg-dark);
+        border: 1px solid var(--glass-border);
+    }
 }
 
 /* ── Mobile responsive additions ──────────────────────────────────────── */
@@ -2425,4 +2447,67 @@ code { color: #c026d3; }
 
 .prompt-drawer__reset {
     margin-top: 0.45rem;
+}
+
+/* ── Mobile Sticky Bottom CTA ─────────────────────────────── */
+@media (max-width: 768px) {
+    .mobile-sticky-cta {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border-top: 1px solid var(--glass-border);
+        padding: 0.75rem 1rem;
+        z-index: 9998;
+        display: flex;
+        gap: 0.5rem;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+        animation: slideUpFade 0.3s ease;
+    }
+
+    .mobile-sticky-cta__btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        padding: 0.65rem 1rem;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.15s, transform 0.1s;
+        font-family: inherit;
+    }
+
+    .mobile-sticky-cta__btn--primary {
+        background: linear-gradient(135deg, #2563eb, #7c3aed);
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(37,99,235,0.35);
+    }
+
+    .mobile-sticky-cta__btn--secondary {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.2);
+        color: #fff;
+    }
+
+    .mobile-sticky-cta__btn:active {
+        transform: scale(0.98);
+    }
+
+    /* Add padding to main content to account for sticky bar */
+    .app-main {
+        padding-bottom: 4rem;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-sticky-cta {
+        display: none !important;
+    }
 }

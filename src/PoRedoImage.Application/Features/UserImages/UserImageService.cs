@@ -3,7 +3,7 @@ using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Services;
+namespace PoRedoImage.Application.Features.UserImages;
 
 public sealed class UserImageService(
     IUserImageRepository repository,

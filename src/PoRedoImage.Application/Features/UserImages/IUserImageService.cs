@@ -1,7 +1,7 @@
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Services;
+namespace PoRedoImage.Application.Features.UserImages;
 
 /// <summary>
 /// Application service for the user image gallery.

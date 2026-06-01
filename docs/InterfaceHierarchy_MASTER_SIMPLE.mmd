@@ -1,7 +1,7 @@
 flowchart TB
     App["App.razor\nRouter"] --> Layout["MainLayout\n+ NavMenu"]
-    Layout --> Studio["Studio Page\n(SSR + WASM)"]
-    Layout --> Bulk["BulkGenerate Page\n(SSR + WASM)"]
+    Layout --> Studio["Studio Page\n(WASM + InteractiveServer)"]
+    Layout --> Bulk["BulkGenerate Page\n(WASM + InteractiveServer)"]
     Layout --> Images["UserImages Page"]
     Layout --> Diag["Diag Page"]
     Studio --> UploadPanel["ImageUploadPanel"]

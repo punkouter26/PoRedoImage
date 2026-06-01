@@ -1,5 +1,5 @@
 flowchart LR
-    User["👤 User"] -->|"HTTPS"| App["Blazor Web App\nAzure App Service"]
+    User["👤 User"] -->|"HTTPS"| App["Blazor WASM + InteractiveServer\nAzure App Service"]
     App -->|"AI Calls"| AI["AI Services\nCV · OpenAI · Gemini"]
     App -->|"Persist"| Data["Table Storage\n+ Key Vault"]
     App -->|"Telemetry"| Ops["Application Insights"]

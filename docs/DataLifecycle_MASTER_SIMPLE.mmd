@@ -3,7 +3,7 @@ flowchart LR
     Validate --> CV["Computer Vision\ntags + confidence"]
     CV --> OpenAI["OpenAI\nenhance / caption"]
     OpenAI --> Gemini["Gemini\nregenerate image"]
-    Gemini --> Render["Blazor\nrender result"]
+    Gemini --> Render["Blazor WASM\nrender result"]
     Render --> Storage["Table Storage\n(optional save)"]
 
     style Upload fill:#512bd4,stroke:#3a1fa8,color:#fff

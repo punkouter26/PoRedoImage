@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using PoRedoImage.Application.Services;
+using PoRedoImage.Application.Features.UserImages;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Shared.DTOs;
 

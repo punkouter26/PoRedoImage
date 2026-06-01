@@ -39,300 +39,300 @@ Log.Logger = new LoggerConfiguration()
 try
 {
 
-var builder = WebApplication.CreateBuilder(args);
+    var builder = WebApplication.CreateBuilder(args);
 
-// ─── BOMB-2: Bound request body size (Po2Logic mitigation) ──────────────────
-// Default Kestrel limit is 30 MB. We allow 25 MB for image uploads (matches the
-// 20 MB client-side cap + JSON envelope overhead). Prevents 50 MB base64 payloads
-// from OOM-killing the ACA pod.
-const int MaxRequestBodyBytes = 25 * 1024 * 1024;
-builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxRequestBodyBytes);
-builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = MaxRequestBodyBytes);
+    // ─── BOMB-2: Bound request body size (Po2Logic mitigation) ──────────────────
+    // Default Kestrel limit is 30 MB. We allow 25 MB for image uploads (matches the
+    // 20 MB client-side cap + JSON envelope overhead). Prevents 50 MB base64 payloads
+    // from OOM-killing the ACA pod.
+    const int MaxRequestBodyBytes = 25 * 1024 * 1024;
+    builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxRequestBodyBytes);
+    builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = MaxRequestBodyBytes);
 
-// ─── Azure Key Vault ────────────────────────────────────────────────
-// Load FIRST so ApplicationInsights:ConnectionString is available when Serilog is configured.
-// Secrets mapped via KeyVaultSecretNameMapping.
-var keyVaultEndpoint = builder.Configuration["KeyVault:Uri"] ?? builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
-if (!string.IsNullOrEmpty(keyVaultEndpoint))
-{
-    try
+    // ─── Azure Key Vault ────────────────────────────────────────────────
+    // Load FIRST so ApplicationInsights:ConnectionString is available when Serilog is configured.
+    // Secrets mapped via KeyVaultSecretNameMapping.
+    var keyVaultEndpoint = builder.Configuration["KeyVault:Uri"] ?? builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
+    if (!string.IsNullOrEmpty(keyVaultEndpoint))
     {
-        var credential = new DefaultAzureCredential();
-        var secretManager = new KeyVaultSecretNameMapping();
-
-        // ReloadInterval: re-fetch secrets every 30 minutes for secret rotation without restart.
-        builder.Configuration.AddAzureKeyVault(
-            new Uri(keyVaultEndpoint),
-            credential,
-            new AzureKeyVaultConfigurationOptions
-            {
-                Manager = secretManager,
-                ReloadInterval = TimeSpan.FromMinutes(30)
-            });
-
-        Log.Information("Key Vault configuration loaded from {Endpoint}", keyVaultEndpoint);
-
-        // In Development, Key Vault would override appsettings.Development.json values (KV is the last
-        // provider added). Pin Azurite back so local storage works regardless of what KV provides.
-        if (builder.Environment.IsDevelopment())
+        try
         {
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            var credential = new DefaultAzureCredential();
+            var secretManager = new KeyVaultSecretNameMapping();
+
+            // ReloadInterval: re-fetch secrets every 30 minutes for secret rotation without restart.
+            builder.Configuration.AddAzureKeyVault(
+                new Uri(keyVaultEndpoint),
+                credential,
+                new AzureKeyVaultConfigurationOptions
+                {
+                    Manager = secretManager,
+                    ReloadInterval = TimeSpan.FromMinutes(30)
+                });
+
+            Log.Information("Key Vault configuration loaded from {Endpoint}", keyVaultEndpoint);
+
+            // In Development, Key Vault would override appsettings.Development.json values (KV is the last
+            // provider added). Pin Azurite back so local storage works regardless of what KV provides.
+            if (builder.Environment.IsDevelopment())
             {
-                ["Storage:ConnectionString"] = "UseDevelopmentStorage=true"
-            });
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Storage:ConnectionString"] = "UseDevelopmentStorage=true"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex,
+                "Key Vault at {Endpoint} is unreachable or missing required secrets; secrets may not be loaded. "
+                + "Application Insights and other Key Vault-dependent features may be unavailable.",
+                keyVaultEndpoint);
+
+            // In production fail-fast if key vault cannot be read, otherwise continue in Dev.
+            if (!builder.Environment.IsDevelopment())
+            {
+                Log.Fatal(ex, "Key Vault startup validation failed, terminating app startup.");
+                throw;
+            }
         }
     }
-    catch (Exception ex)
-    {
-        Log.Warning(ex,
-            "Key Vault at {Endpoint} is unreachable or missing required secrets; secrets may not be loaded. "
-            + "Application Insights and other Key Vault-dependent features may be unavailable.",
-            keyVaultEndpoint);
 
-        // In production fail-fast if key vault cannot be read, otherwise continue in Dev.
-        if (!builder.Environment.IsDevelopment())
-        {
-            Log.Fatal(ex, "Key Vault startup validation failed, terminating app startup.");
-            throw;
-        }
+    // ─── Serilog ────────────────────────────────────────────────────────
+    // Structured logging: Console in Development, Application Insights in Production
+    var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+
+    // In Azure App Service with Run-From-Package (OneDeploy), /home/site/wwwroot/ is read-only.
+    // Use /home/LogFiles/Application/ (writable) in production; use relative path in development.
+    // On Azure Container Apps (ACA) the file system is ephemeral and only stdout is collected —
+    // fall back to console-only there. Detected via the presence of the CONTAINER_APP_NAME env var.
+    var isContainerApps = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CONTAINER_APP_NAME"));
+    var logFilePath = builder.Environment.IsDevelopment()
+        ? "logs/poredoimage-.log"
+        : isContainerApps
+            ? null  // stdout-only in ACA — no file sink
+            : "/home/LogFiles/Application/poredoimage-.log";
+
+    Log.Logger = new LoggerConfiguration()
+        .MinimumLevel.Information()
+        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+        .MinimumLevel.Override("System", LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "PoRedoImage")
+        .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
+        .Enrich.WithMachineName()
+        .WriteTo.Console(outputTemplate:
+            "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
+        .WriteTo.Conditional(_ => !string.IsNullOrEmpty(logFilePath), sink => sink
+            .File(
+                path: logFilePath!,
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 7,
+                outputTemplate:
+                    "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}"))
+        .WriteTo.Conditional(_ => !string.IsNullOrEmpty(appInsightsConnectionString),
+            sink => sink.ApplicationInsights(appInsightsConnectionString!, TelemetryConverter.Traces))
+        .CreateLogger();
+
+    builder.Host.UseSerilog();
+
+    // ─── OpenTelemetry → Azure Monitor ─────────────────────────────────
+    // Exports traces & metrics directly to Application Insights; no separate OTLP collector needed.
+    // When connection string is absent (local dev / test), instrumentation is still active but
+    // telemetry is not exported anywhere — zero cost, zero failures.
+    var otelBuilder = builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource
+            .AddService("PoRedoImage", serviceVersion: "1.0.0"))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation())
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation());
+
+    var appInsightsCs = builder.Configuration["ApplicationInsights:ConnectionString"];
+    if (!string.IsNullOrWhiteSpace(appInsightsCs))
+    {
+        otelBuilder.UseAzureMonitor(options => options.ConnectionString = appInsightsCs);
     }
-}
 
-// ─── Serilog ────────────────────────────────────────────────────────
-// Structured logging: Console in Development, Application Insights in Production
-var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+    // ─── Core services ──────────────────────────────────────────────────
+    builder.Services.AddRazorComponents()
+        .AddInteractiveServerComponents()
+        .AddInteractiveWebAssemblyComponents();
 
-// In Azure App Service with Run-From-Package (OneDeploy), /home/site/wwwroot/ is read-only.
-// Use /home/LogFiles/Application/ (writable) in production; use relative path in development.
-// On Azure Container Apps (ACA) the file system is ephemeral and only stdout is collected —
-// fall back to console-only there. Detected via the presence of the CONTAINER_APP_NAME env var.
-var isContainerApps = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CONTAINER_APP_NAME"));
-var logFilePath = builder.Environment.IsDevelopment()
-    ? "logs/poredoimage-.log"
-    : isContainerApps
-        ? null  // stdout-only in ACA — no file sink
-        : "/home/LogFiles/Application/poredoimage-.log";
+    // Register Radzen services on the server so SSR pre-rendering can resolve
+    // Radzen-injected properties on Client WASM components (e.g. NotificationService).
+    builder.Services.AddRadzenComponents();
 
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
-    .MinimumLevel.Override("System", LogEventLevel.Warning)
-    .Enrich.FromLogContext()
-    .Enrich.WithProperty("Application", "PoRedoImage")
-    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
-    .Enrich.WithMachineName()
-    .WriteTo.Console(outputTemplate:
-        "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
-    .WriteTo.Conditional(_ => !string.IsNullOrEmpty(logFilePath), sink => sink
-        .File(
-            path: logFilePath!,
-            rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: 7,
-            outputTemplate:
-                "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}"))
-    .WriteTo.Conditional(_ => !string.IsNullOrEmpty(appInsightsConnectionString),
-        sink => sink.ApplicationInsights(appInsightsConnectionString!, TelemetryConverter.Traces))
-    .CreateLogger();
+    builder.Services.AddOpenApi();
 
-builder.Host.UseSerilog();
+    // ─── Strongly-typed options (Po2Logic R3) ──────────────────────────────────
+    // Options-pattern binding with IValidateOptions<T> gives us hot-reloadable config
+    // (Key Vault rotates every 30 min) AND startup-time validation for required fields.
+    builder.Services.AddOptions<OpenAiOptions>()
+        .Bind(builder.Configuration.GetSection(OpenAiOptions.SectionName))
+        .ValidateOnStart();
+    builder.Services.AddSingleton<IValidateOptions<OpenAiOptions>, OpenAiOptionsValidator>();
 
-// ─── OpenTelemetry → Azure Monitor ─────────────────────────────────
-// Exports traces & metrics directly to Application Insights; no separate OTLP collector needed.
-// When connection string is absent (local dev / test), instrumentation is still active but
-// telemetry is not exported anywhere — zero cost, zero failures.
-var otelBuilder = builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource
-        .AddService("PoRedoImage", serviceVersion: "1.0.0"))
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation())
-    .WithMetrics(metrics => metrics
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddRuntimeInstrumentation());
+    builder.Services.AddOptions<StorageOptions>()
+        .Bind(builder.Configuration.GetSection(StorageOptions.SectionName))
+        .ValidateOnStart();
+    builder.Services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
 
-var appInsightsCs = builder.Configuration["ApplicationInsights:ConnectionString"];
-if (!string.IsNullOrWhiteSpace(appInsightsCs))
-{
-    otelBuilder.UseAzureMonitor(options => options.ConnectionString = appInsightsCs);
-}
+    // Fail-fast secret validator (Po2Logic F7)
+    builder.Services.AddHostedService<StartupSecretValidator>();
 
-// ─── Core services ──────────────────────────────────────────────────
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
-    .AddInteractiveWebAssemblyComponents();
+    // HTTP client factory (used by health checks)
+    builder.Services.AddHttpClient();
 
-// Register Radzen services on the server so SSR pre-rendering can resolve
-// Radzen-injected properties on Client WASM components (e.g. NotificationService).
-builder.Services.AddRadzenComponents();
+    // ─── Idempotency (Po2Logic R5 / F6) ─────────────────────────────────────────
+    // IMemoryCache backs the de-dup; IEndpointFilter applied to Write endpoints via
+    // [IdempotencyRequired] marker attribute. 24h TTL prevents replays across days.
+    builder.Services.AddMemoryCache();
+    builder.Services.AddScoped<IdempotencyKeyFilter>();
 
-builder.Services.AddOpenApi();
-
-// ─── Strongly-typed options (Po2Logic R3) ──────────────────────────────────
-// Options-pattern binding with IValidateOptions<T> gives us hot-reloadable config
-// (Key Vault rotates every 30 min) AND startup-time validation for required fields.
-builder.Services.AddOptions<OpenAiOptions>()
-    .Bind(builder.Configuration.GetSection(OpenAiOptions.SectionName))
-    .ValidateOnStart();
-builder.Services.AddSingleton<IValidateOptions<OpenAiOptions>, OpenAiOptionsValidator>();
-
-builder.Services.AddOptions<StorageOptions>()
-    .Bind(builder.Configuration.GetSection(StorageOptions.SectionName))
-    .ValidateOnStart();
-builder.Services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
-
-// Fail-fast secret validator (Po2Logic F7)
-builder.Services.AddHostedService<StartupSecretValidator>();
-
-// HTTP client factory (used by health checks)
-builder.Services.AddHttpClient();
-
-// ─── Idempotency (Po2Logic R5 / F6) ─────────────────────────────────────────
-// IMemoryCache backs the de-dup; IEndpointFilter applied to Write endpoints via
-// [IdempotencyRequired] marker attribute. 24h TTL prevents replays across days.
-builder.Services.AddMemoryCache();
-builder.Services.AddScoped<IdempotencyKeyFilter>();
-
-// ─── Rate limiting ──────────────────────────────────────────────────
-// Protect costly AI endpoints: 10 requests/minute per authenticated user (falls back to IP).
-// Returns HTTP 429 when the limit is exceeded.
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    // Partition by user ID so one user's bulk batch cannot starve other users on the same IP
-    options.AddPolicy("ai-endpoints", context =>
+    // ─── Rate limiting ──────────────────────────────────────────────────
+    // Protect costly AI endpoints: 10 requests/minute per authenticated user (falls back to IP).
+    // Returns HTTP 429 when the limit is exceeded.
+    builder.Services.AddRateLimiter(options =>
     {
-        var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-            ?? context.Connection.RemoteIpAddress?.ToString()
-            ?? "anonymous";
-        return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        // Partition by user ID so one user's bulk batch cannot starve other users on the same IP
+        options.AddPolicy("ai-endpoints", context =>
         {
-            PermitLimit = 10,
-            Window = TimeSpan.FromMinutes(1),
-            SegmentsPerWindow = 6,
-            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 2
+            var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "anonymous";
+            return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 2
+            });
         });
     });
-});
 
-// ─── Health checks ──────────────────────────────────────────────────
-// Named checks verify connectivity to Computer Vision and OpenAI endpoints
-builder.Services.AddHealthChecks()
-    .AddCheck<KeyVaultHealthCheck>("key-vault", tags: ["ready"])
-    .AddCheck<ComputerVisionHealthCheck>("computer-vision", tags: ["ready"])
-    .AddCheck<OpenAIHealthCheck>("openai", tags: ["ready"])
-    .AddCheck<BulkPromptStorageHealthCheck>("table-storage", tags: ["ready"])
-    .AddCheck<Imagen3HealthCheck>("imagen3", tags: ["ready"]);
+    // ─── Health checks ──────────────────────────────────────────────────
+    // Named checks verify connectivity to Computer Vision and OpenAI endpoints
+    builder.Services.AddHealthChecks()
+        .AddCheck<KeyVaultHealthCheck>("key-vault", tags: ["ready"])
+        .AddCheck<ComputerVisionHealthCheck>("computer-vision", tags: ["ready"])
+        .AddCheck<OpenAIHealthCheck>("openai", tags: ["ready"])
+        .AddCheck<BulkPromptStorageHealthCheck>("table-storage", tags: ["ready"])
+        .AddCheck<Imagen3HealthCheck>("imagen3", tags: ["ready"]);
 
-// ─── HTTP client ────────────────────────────────────────────────────
-builder.Services.AddScoped(sp =>
-{
-    var nav = sp.GetRequiredService<NavigationManager>();
-    return new HttpClient
+    // ─── HTTP client ────────────────────────────────────────────────────
+    builder.Services.AddScoped(sp =>
     {
-        Timeout = TimeSpan.FromMinutes(4),
-        BaseAddress = new Uri(nav.BaseUri)
-    };
-});
-
-// ─── Feature services (Onion Architecture — Infrastructure layer wires all services) ──
-// DI registration follows Dependency Inversion Principle (SOLID-D)
-builder.Services.AddPoRedoImageInfrastructure();
-
-// Scoped: persists the active uploaded image across feature pages for the lifetime of the circuit
-builder.Services.AddScoped<PoRedoImage.Web.Components.Shared.ImageSessionService>();
-
-// ─── Authentication & Authorization ─────────────────────────────────
-builder.Services.AddPoRedoImageAuth(builder.Configuration, builder.Environment);
-
-var app = builder.Build();
-
-// ─── Middleware pipeline ────────────────────────────────────────────
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
-}
-
-// Only apply the "pretty error page" re-execute for browser (non-API) paths.
-// API requests must keep their original 4xx/5xx status codes so clients
-// don't receive a 302 redirect to the login page instead of a real 401.
-app.UseWhen(
-    ctx => !ctx.Request.Path.StartsWithSegments("/api"),
-    branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
-app.UseHttpsRedirection();
-
-// Pushes CorrelationId, UserId, and SessionId into Serilog LogContext for every request
-app.UseMiddleware<RequestContextMiddleware>();
-
-// Structured request logging: one entry per request with timing and status
-app.UseSerilogRequestLogging(opts =>
-{
-    opts.MessageTemplate =
-        "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
-    opts.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-    {
-        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
-        diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
-        diagnosticContext.Set("CorrelationId",
-            httpContext.Response.Headers["X-Correlation-ID"].FirstOrDefault() ?? string.Empty);
-    };
-});
-
-app.UseRateLimiter();
-app.UseAntiforgery();
-app.UseAuthentication();
-app.UseAuthorization();
-
-// OpenAPI + Scalar API documentation
-app.MapOpenApi();
-app.MapScalarApiReference();
-
-// Health check endpoints
-app.MapHealthChecks("/health", new HealthCheckOptions
-{
-    ResponseWriter = async (context, report) =>
-    {
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new
+        var nav = sp.GetRequiredService<NavigationManager>();
+        return new HttpClient
         {
-            Status = report.Status.ToString(),
-            Duration = report.TotalDuration.TotalMilliseconds,
-            Entries = report.Entries.Select(e => new
-            {
-                e.Key,
-                Status = e.Value.Status.ToString(),
-                Duration = e.Value.Duration.TotalMilliseconds,
-                e.Value.Description
-            })
-        });
+            Timeout = TimeSpan.FromMinutes(4),
+            BaseAddress = new Uri(nav.BaseUri)
+        };
+    });
+
+    // ─── Feature services (Onion Architecture — Infrastructure layer wires all services) ──
+    // DI registration follows Dependency Inversion Principle (SOLID-D)
+    builder.Services.AddPoRedoImageInfrastructure();
+
+    // Scoped: persists the active uploaded image across feature pages for the lifetime of the circuit
+    builder.Services.AddScoped<PoRedoImage.Web.Components.Shared.ImageSessionService>();
+
+    // ─── Authentication & Authorization ─────────────────────────────────
+    builder.Services.AddPoRedoImageAuth(builder.Configuration, builder.Environment);
+
+    var app = builder.Build();
+
+    // ─── Middleware pipeline ────────────────────────────────────────────
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseExceptionHandler("/Error", createScopeForErrors: true);
+        app.UseHsts();
     }
-});
-app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false });
 
-// Minimal API endpoints (Vertical Slice)
-app.MapAuthEndpoints();
-app.MapImageAnalysisEndpoints();
-app.MapDiagnosticsEndpoints();
-app.MapBulkGenerateEndpoints();
-app.MapUserImageEndpoints();
-app.MapMemeTemplateEndpoints();
-app.MapCaptionBattleEndpoints();
-app.MapStyleDirectorEndpoints();
+    // Only apply the "pretty error page" re-execute for browser (non-API) paths.
+    // API requests must keep their original 4xx/5xx status codes so clients
+    // don't receive a 302 redirect to the login page instead of a real 401.
+    app.UseWhen(
+        ctx => !ctx.Request.Path.StartsWithSegments("/api"),
+        branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
+    app.UseHttpsRedirection();
 
-// Redirect /favicon.ico → /favicon.png so browsers don't get a 404.
-app.MapGet("/favicon.ico", () => Results.Redirect("/favicon.png", permanent: true))
-    .ExcludeFromDescription();
+    // Pushes CorrelationId, UserId, and SessionId into Serilog LogContext for every request
+    app.UseMiddleware<RequestContextMiddleware>();
 
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
-    .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly);
+    // Structured request logging: one entry per request with timing and status
+    app.UseSerilogRequestLogging(opts =>
+    {
+        opts.MessageTemplate =
+            "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+        opts.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+        {
+            diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
+            diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+            diagnosticContext.Set("CorrelationId",
+                httpContext.Response.Headers["X-Correlation-ID"].FirstOrDefault() ?? string.Empty);
+        };
+    });
 
-app.Run();
+    app.UseRateLimiter();
+    app.UseAntiforgery();
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // OpenAPI + Scalar API documentation
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+
+    // Health check endpoints
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                Status = report.Status.ToString(),
+                Duration = report.TotalDuration.TotalMilliseconds,
+                Entries = report.Entries.Select(e => new
+                {
+                    e.Key,
+                    Status = e.Value.Status.ToString(),
+                    Duration = e.Value.Duration.TotalMilliseconds,
+                    e.Value.Description
+                })
+            });
+        }
+    });
+    app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false });
+
+    // Minimal API endpoints (Vertical Slice)
+    app.MapAuthEndpoints();
+    app.MapImageAnalysisEndpoints();
+    app.MapDiagnosticsEndpoints();
+    app.MapBulkGenerateEndpoints();
+    app.MapUserImageEndpoints();
+    app.MapMemeTemplateEndpoints();
+    app.MapCaptionBattleEndpoints();
+    app.MapStyleDirectorEndpoints();
+
+    // Redirect /favicon.ico → /favicon.png so browsers don't get a 404.
+    app.MapGet("/favicon.ico", () => Results.Redirect("/favicon.png", permanent: true))
+        .ExcludeFromDescription();
+
+    app.MapStaticAssets();
+    app.MapRazorComponents<App>()
+        .AddInteractiveServerRenderMode()
+        .AddInteractiveWebAssemblyRenderMode()
+        .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly);
+
+    app.Run();
 
 }
 catch (Exception ex) when (ex is not HostAbortedException)
