@@ -17,12 +17,6 @@ namespace PoRedoImage.Web.Features.CaptionBattle;
 /// </remarks>
 public static class CaptionBattleEndpoints
 {
-    // Process-local vote tallies. Per persona, per user (when authenticated) — keyed by user id,
-    // "anon" for guest sessions. Resets on process restart; that is acceptable for the
-    // lightweight "humor profile" affordance, which is meant to feel like a session reward,
-    // not a permanent profile.
-    private static readonly Dictionary<string, Dictionary<string, int>> _votesByUser = new();
-
     public static IEndpointRouteBuilder MapCaptionBattleEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/caption-battle")
@@ -71,34 +65,6 @@ public static class CaptionBattleEndpoints
         .Produces<CaptionBattleResultDto>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status400BadRequest)
         .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
-
-        group.MapPost("/vote", (
-            CaptionVoteRequest request,
-            HttpContext context) =>
-        {
-            if (string.IsNullOrWhiteSpace(request.Persona))
-                return Results.BadRequest("Persona is required.");
-            if (!Enum.TryParse<CaptionPersona>(request.Persona, ignoreCase: true, out _))
-                return Results.BadRequest($"Unknown persona '{request.Persona}'.");
-
-            var userKey = context.User.Identity?.IsAuthenticated == true
-                ? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anon"
-                : "anon";
-
-            lock (_votesByUser)
-            {
-                if (!_votesByUser.TryGetValue(userKey, out var tally))
-                {
-                    tally = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                    _votesByUser[userKey] = tally;
-                }
-                tally[request.Persona] = tally.GetValueOrDefault(request.Persona) + 1;
-            }
-
-            return Results.NoContent();
-        })
-        .WithName("RecordCaptionVote")
-        .WithSummary("Record the user's winning persona for the lightweight humor-profile tally");
 
         return app;
     }

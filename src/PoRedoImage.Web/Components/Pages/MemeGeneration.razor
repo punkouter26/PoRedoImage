@@ -327,22 +327,12 @@
         }
     }
 
-    private async Task VoteForCaption(CaptionCandidateDto candidate)
+    private void VoteForCaption(CaptionCandidateDto candidate)
     {
         if (!Enum.TryParse<CaptionPersona>(candidate.Persona, ignoreCase: true, out var persona))
             return;
 
         _winningPersona = persona;
-        try
-        {
-            await Http.PostAsJsonAsync("/api/caption-battle/vote",
-                new CaptionVoteRequest(ImageId: string.Empty, Persona: candidate.Persona));
-        }
-        catch (Exception ex)
-        {
-            // Vote failure is non-critical — keep the in-session winner visible.
-            Logger.LogWarning(ex, "Failed to record caption vote");
-        }
         StateHasChanged();
     }
 

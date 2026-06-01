@@ -23,10 +23,6 @@ public record CaptionBattleRequest(
     IReadOnlyList<string> Tags,
     IReadOnlyList<string>? Personas);
 
-public record CaptionVoteRequest(
-    string ImageId,
-    string Persona);
-
 public static class CaptionBattleMappingExtensions
 {
     public static CaptionCandidateDto ToDto(this CaptionCandidate c) => new(

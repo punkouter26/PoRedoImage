@@ -20,8 +20,11 @@ param storageAccountName string = 'stporedoimage26'
 @description('Storage account location — should match the App Service plan region to avoid cross-region latency')
 param storageLocation string = 'westus2'
 
+@description('Azure subscription ID hosting the shared PoShared App Service Plan')
+param subscriptionId string = subscription().subscriptionId
+
 @description('App Service Plan resource ID (shared plan in PoShared)')
-param appServicePlanId string = '/subscriptions/bbb8dfbe-9169-432f-9b7a-fbf861b51037/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poshared-linux'
+param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poshared-linux'
 
 @description('Key Vault endpoint in the PoShared resource group')
 param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
@@ -101,4 +104,4 @@ output webAppDefaultHostName string = webApp.properties.defaultHostName
 // NOTE: Key Vault role assignment (Key Vault Secrets User) is applied post-deploy via:
 //   az role assignment create --role "Key Vault Secrets User" \
 //     --assignee <webAppPrincipalId> \
-//     --scope /subscriptions/bbb8dfbe-9169-432f-9b7a-fbf861b51037/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared
+//     --scope /subscriptions/${subscriptionId}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared

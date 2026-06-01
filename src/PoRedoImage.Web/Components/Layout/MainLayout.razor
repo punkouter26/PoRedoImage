@@ -1,19 +1,7 @@
 @inherits LayoutComponentBase
 @inject IWebHostEnvironment Env
-@inject MockDataDetector MockDetector
 
 <header class="app-header">
-    @if (MockDetector.IsUsingMockData)
-    {
-        <div class="mock-data-banner" role="alert" aria-live="polite">
-            <i class="bi bi-exclamation-triangle-fill me-1"></i>
-            <strong>USING MOCK DATA</strong>
-            @if (MockDetector.MockDescriptions.Count > 0)
-            {
-                <span class="ms-2 mock-data-banner__details">(@string.Join(", ", MockDetector.MockDescriptions))</span>
-            }
-        </div>
-    }
     <nav class="app-nav container-fluid">
         <a class="app-nav__brand" href="/">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" class="me-2">

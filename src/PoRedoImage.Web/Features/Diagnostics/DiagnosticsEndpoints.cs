@@ -61,9 +61,6 @@ public static partial class DiagnosticsEndpoints
                 ["OpenAI:Endpoint"] = MaskValue(configuration["OpenAI:Endpoint"]),
                 ["OpenAI:Key"] = MaskValue(configuration["OpenAI:Key"]),
                 ["OpenAI:ChatCompletionsDeployment"] = configuration["OpenAI:ChatCompletionsDeployment"],
-                ["OpenAI:ImageGenerationDeployment"] = configuration["OpenAI:ImageGenerationDeployment"],
-                ["OpenAI:ImageEndpoint"] = MaskValue(configuration["OpenAI:ImageEndpoint"]),
-                ["OpenAI:ImageKey"] = MaskValue(configuration["OpenAI:ImageKey"]),
                 ["ApplicationInsights:ConnectionString"] = MaskValue(configuration["ApplicationInsights:ConnectionString"]),
                 ["Storage:ConnectionString"] = MaskValue(configuration["Storage:ConnectionString"])
             }
