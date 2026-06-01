@@ -230,4 +230,49 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         _logger.LogInformation("Person described in {Elapsed}ms: {Description}", elapsed, description);
         return description;
     }
+
+    /// <remarks>
+    /// Idea #5 — Meme Caption Battle. The caller supplies a persona system prompt
+    /// (e.g., "Gen-Z TikTok energy"); the model returns a single short caption. Multiple
+    /// calls with different system prompts run in parallel from <see cref="CaptionBattleService"/>.
+    /// We strip surrounding quotes and ensure the caption is single-line for layout sanity.
+    /// </remarks>
+    public async Task<(string Caption, int TokensUsed, long ElapsedMs)>
+        GenerateCaptionAsync(IReadOnlyList<string> tags, string systemPrompt, CancellationToken ct = default)
+    {
+        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
+
+        ArgumentNullException.ThrowIfNull(tags);
+        ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
+
+        RefreshCredentials();
+        _logger.LogInformation("Generating persona caption. Tags={Count}, PromptLen={Len}", tags.Count, systemPrompt.Length);
+        var start = Stopwatch.GetTimestamp();
+
+        var userPrompt = tags.Count > 0
+            ? $"Image elements: {string.Join(", ", tags)}.\n\nWrite ONE meme caption. No quotes, no setup, just the punchline. Maximum 8 words. ONE LINE."
+            : "Write ONE meme caption. No quotes, no setup, just the punchline. Maximum 8 words. ONE LINE.";
+
+        var response = await _chatClient.CompleteChatAsync(
+            new List<ChatMessage>
+            {
+                new SystemChatMessage(systemPrompt),
+                new UserChatMessage(userPrompt)
+            },
+            new ChatCompletionOptions { MaxOutputTokenCount = 40, Temperature = 0.95f },
+            ct);
+
+        if (response.Value.Content.Count == 0)
+            throw new InvalidOperationException("OpenAI returned an empty response for persona caption.");
+
+        var raw = response.Value.Content[0].Text.Trim();
+        // Strip surrounding quotes and trim to a single line.
+        var caption = raw.Trim('"', '\'', '“', '”', '‘', '’').Replace('\n', ' ').Trim();
+        if (caption.Length > 100) caption = caption[..100].TrimEnd() + "…";
+
+        var tokens = response.Value.Usage.TotalTokenCount;
+        var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        _logger.LogInformation("Persona caption generated in {Elapsed}ms. Caption='{Caption}'", elapsed, caption);
+        return (caption, tokens, elapsed);
+    }
 }

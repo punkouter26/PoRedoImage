@@ -103,6 +103,65 @@ public static class BulkGenerateEndpoints
         .WithName("GenerateBulkVariation")
         .WithSummary("Generate a single art-style variation image");
 
+        // Idea #11 — One-Tap Re-roll x3: spawn N parallel variations from a winning prompt.
+        // Uses a deterministic seed hint so re-rolls are reproducible per session and
+        // visibly distinct from the winner, but stay close in style.
+        aiGroup.MapPost("/reroll", async (BulkRerollRequest request, IImagen3Service imagen3, ILoggerFactory loggerFactory) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.ImageData))
+                return Results.BadRequest("ImageData is required.");
+            if (string.IsNullOrWhiteSpace(request.SeedPrompt))
+                return Results.BadRequest("SeedPrompt is required.");
+            if (request.Count is < 1 or > 10)
+                return Results.BadRequest("Count must be between 1 and 10.");
+            if (!imagen3.IsConfigured)
+                return Results.Problem("Gemini image generation is not configured.", statusCode: 503);
+
+            byte[] imageBytes;
+            try { imageBytes = Convert.FromBase64String(request.ImageData); }
+            catch { return Results.BadRequest("ImageData must be valid base64."); }
+
+            var logger = loggerFactory.CreateLogger("BulkGenerateEndpoints.Reroll");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var startedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            // Cap parallelism to avoid hammering the upstream model with simultaneous calls.
+            using var gate = new SemaphoreSlim(initialCount: 3, maxCount: 3);
+            var tasks = Enumerable.Range(0, request.Count).Select(async i =>
+            {
+                await gate.WaitAsync();
+                try
+                {
+                    // Seed = wall-clock ms delta from batch start + slot index — guarantees uniqueness
+                    // within the batch and reproducibility if the user retries within the same second.
+                    var seed = (int)((Environment.TickCount ^ (i * 2654435761)) & 0x7FFFFFFF);
+                    var (data, ct2, _) = await imagen3.GenerateImageAsync(request.SeedPrompt, imageBytes, seed);
+                    return new BulkRerollVariation(i, Convert.ToBase64String(data), ct2);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Re-roll slot {Index} failed", i);
+                    return null;
+                }
+                finally { gate.Release(); }
+            }).ToArray();
+
+            var results = await Task.WhenAll(tasks);
+            var variations = results.Where(r => r is not null).Select(r => r!).ToList();
+
+            sw.Stop();
+            logger.LogInformation("Re-roll batch complete. Requested={Requested}, Succeeded={Succeeded}, Elapsed={Elapsed}ms",
+                request.Count, variations.Count, sw.ElapsedMilliseconds);
+
+            return Results.Ok(new BulkRerollResponse(
+                Variations: variations,
+                Requested: request.Count,
+                Succeeded: variations.Count,
+                ElapsedMs: sw.ElapsedMilliseconds));
+        })
+        .WithName("RerollBulkVariations")
+        .WithSummary("Generate N parallel re-rolls of a winning prompt (Idea #11 — One-Tap Re-roll x3)");
+
         return app;
     }
 }

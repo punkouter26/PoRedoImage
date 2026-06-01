@@ -14,8 +14,11 @@ using PoRedoImage.Web.Components;
 using PoRedoImage.Web.Configuration;
 using PoRedoImage.Web.Features.Auth;
 using PoRedoImage.Web.Features.BulkGenerate;
+using PoRedoImage.Web.Features.CaptionBattle;
 using PoRedoImage.Web.Features.Diagnostics;
 using PoRedoImage.Web.Features.ImageAnalysis;
+using PoRedoImage.Web.Features.MemeTemplates;
+using PoRedoImage.Web.Features.StyleDirector;
 using PoRedoImage.Web.Features.UserImages;
 using Radzen;
 using Serilog;
@@ -281,6 +284,9 @@ app.MapImageAnalysisEndpoints();
 app.MapDiagnosticsEndpoints();
 app.MapBulkGenerateEndpoints();
 app.MapUserImageEndpoints();
+app.MapMemeTemplateEndpoints();
+app.MapCaptionBattleEndpoints();
+app.MapStyleDirectorEndpoints();
 
 // Redirect /favicon.ico → /favicon.png so browsers don't get a 404.
 app.MapGet("/favicon.ico", () => Results.Redirect("/favicon.png", permanent: true))

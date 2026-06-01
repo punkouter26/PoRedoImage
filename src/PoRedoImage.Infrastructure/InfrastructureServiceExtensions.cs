@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using PoRedoImage.Application.Agents;
+using PoRedoImage.Application.Agents.StyleDirector;
 using PoRedoImage.Application.Services;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Repositories;
@@ -23,6 +25,7 @@ public static class InfrastructureServiceExtensions
 
         // Scoped services
         services.AddScoped<IMemeGeneratorService, ImageSharpMemeGeneratorService>();
+        services.AddSingleton<IMemeTemplateService, MemeTemplateService>();
 
         // Repository: Singleton — TableClient is thread-safe; avoids redundant CreateIfNotExists calls per-request
         services.AddSingleton<IBulkPromptRepository, AzureTableBulkPromptRepository>();
@@ -33,6 +36,18 @@ public static class InfrastructureServiceExtensions
 
         // Application layer orchestrator
         services.AddScoped<IImageAnalysisOrchestrator, ImageAnalysisOrchestrator>();
+
+        // Idea #5 — Meme Caption Battle: persona-fanned-out caption generation.
+        services.AddSingleton<ICaptionBattleService, CaptionBattleService>();
+
+        // Idea #1 — Agentic Style Director: 4-agent sequential workflow.
+        // Registered as transient so per-request scoped DI services (logger) flow correctly.
+        services.AddTransient<SequentialAgentWorkflow>();
+        services.AddTransient<VisionAnalystAgent>();
+        services.AddTransient<StyleStrategistAgent>();
+        services.AddTransient<PromptRefinerAgent>();
+        services.AddTransient<CriticAgent>();
+        services.AddTransient<StyleDirectorWorkflow>();
 
         // Named HttpClient for Gemini with standard resilience: retry, timeout, circuit-breaker
         services.AddHttpClient("GeminiApi")

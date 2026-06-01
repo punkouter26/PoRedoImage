@@ -73,11 +73,14 @@
         @* Right: Gallery *@
         <div class="col-lg-8 col-xl-9">
             <BulkGallery
+                @ref="_bulkGallery"
                 Results="@_results"
                 CompletedCount="@_completedCount"
                 Favorites="@_favorites"
                 OnDownloadImage="DownloadImage"
-                OnToggleFavorite="ToggleFavorite" />
+                OnToggleFavorite="ToggleFavorite"
+                OnReroll="RerollFromSlot"
+                OnAcceptReroll="AcceptReroll" />
         </div>
     </div>
 
@@ -134,6 +137,7 @@
     private HashSet<int> _favorites = [];
     private string? _userId;
     private MyImagesGallery? _gallery;
+    private BulkGallery? _bulkGallery;
     private CancellationTokenSource? _cts;
 
     private sealed record BulkSavedState(BulkGenerateImageResult[] Results);
@@ -441,5 +445,82 @@
         var result = _results.ElementAtOrDefault(index);
         if (result?.ImageUrl is null) return;
         await JSRuntime.InvokeAsync<bool>("downloadImage", result.ImageUrl, $"bulk-variation-{index + 1}.png");
+    }
+
+    // ─── Idea #11 — One-Tap Re-roll x3 ───────────────────────────────
+    // A user can click "Re-roll × 3" on any completed slot. The page posts the winning
+    // prompt + source image to /api/bulk-generate/reroll, which returns 3 fresh variations
+    // (each with a different seed nudge). The user picks one to "accept" — the original slot
+    // is replaced with the chosen variation and saved to the gallery like any other result.
+    private async Task RerollAsync(int index)
+    {
+        var source = _results.ElementAtOrDefault(index);
+        if (source?.Status != BulkGenerateStatus.Complete || _imageBytes is null) return;
+        if (_bulkGallery is null) return;
+
+        _bulkGallery.BeginReroll(index);
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("/api/bulk-generate/reroll",
+                new BulkRerollRequest(
+                    ImageData: Convert.ToBase64String(_imageBytes),
+                    ContentType: _imageContentType,
+                    SeedPrompt: source.Prompt ?? string.Empty,
+                    Count: 3));
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var problem = await resp.Content.ReadAsStringAsync();
+                NotificationService.Notify(NotificationSeverity.Error, "Re-roll Failed",
+                    $"Server returned {(int)resp.StatusCode}: {problem}", duration: 6000);
+                return;
+            }
+
+            var payload = await resp.Content.ReadFromJsonAsync<BulkRerollResponse>();
+            if (payload is null || payload.Variations.Count == 0)
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Re-roll",
+                    "No re-rolls were returned. The model may be busy — try again in a moment.", duration: 5000);
+                return;
+            }
+
+            _bulkGallery.EndReroll(index, payload.Variations);
+            NotificationService.Notify(NotificationSeverity.Success, "Re-roll Ready",
+                $"{payload.Succeeded} of {payload.Requested} variations ready in {payload.ElapsedMs}ms.",
+                duration: 4000);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Re-roll failed for slot {Index}", index);
+            NotificationService.Notify(NotificationSeverity.Error, "Re-roll Failed", ex.Message, duration: 6000);
+        }
+        finally
+        {
+            try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+        }
+    }
+
+    // EventCallback target wired to <BulkGallery OnReroll="...">
+    private Task RerollFromSlot(int index) => RerollAsync(index);
+
+    // User accepted a re-roll variation: swap it into the source slot and auto-save.
+    private async Task AcceptReroll((int SourceIndex, BulkRerollVariation Variation) payload)
+    {
+        var (sourceIndex, variation) = payload;
+        if (sourceIndex < 0 || sourceIndex >= _results.Count) return;
+        if (variation is null || string.IsNullOrEmpty(variation.ImageData)) return;
+
+        _results[sourceIndex].ImageUrl = $"data:{variation.ContentType};base64,{variation.ImageData}";
+        _results[sourceIndex].Status = BulkGenerateStatus.Complete;
+        _results[sourceIndex].ErrorMessage = null;
+
+        // Fire-and-forget auto-save the accepted variation, mirroring bulk generation behaviour.
+        if (_userId is not null)
+            _ = AutoSaveVariationAsync(variation.ImageData, variation.ContentType);
+
+        NotificationService.Notify(NotificationSeverity.Success, "Variation Replaced",
+            $"Slot #{sourceIndex + 1} now shows the re-rolled image.", duration: 3500);
+
+        try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
     }
 }

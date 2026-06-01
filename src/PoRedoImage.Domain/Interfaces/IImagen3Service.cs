@@ -12,5 +12,13 @@ public interface IImagen3Service
     Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
         GenerateImageAsync(string prompt, byte[] imageBytes, CancellationToken ct = default);
 
+    /// <summary>
+    /// Generates a single image-to-image variation, optionally with a deterministic seed
+    /// offset so parallel re-rolls produce different outputs.
+    /// </summary>
+    /// <param name="seed">Non-negative integer; passed to the upstream model as a seed hint.</param>
+    Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
+        GenerateImageAsync(string prompt, byte[] imageBytes, int seed, CancellationToken ct = default);
+
     bool IsConfigured { get; }
 }

@@ -90,6 +90,20 @@
                                         @onclick="@(() => OnDownloadImage.InvokeAsync(result.Index))">
                                     <i class="bi bi-download me-1"></i>Save
                                 </button>
+                                <button class="btn-reroll-slot"
+                                        @onclick="@(() => OnReroll.InvokeAsync(result.Index))"
+                                        disabled="@IsRerolling(result.Index)"
+                                        title="Generate 3 fresh variations from this prompt (Idea #11)">
+                                    @if (IsRerolling(result.Index))
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Re-rolling…</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-arrow-repeat me-1"></i><span>Re-roll × 3</span>
+                                    }
+                                </button>
                             </div>
                         }
                     </div>
@@ -105,6 +119,29 @@
         OnClose="@(() => _modalResult = null)"
         OnToggleFavorite="@(idx => OnToggleFavorite.InvokeAsync(idx))"
         OnDownload="@(async idx => { await OnDownloadImage.InvokeAsync(idx); _modalResult = null; })" />
+
+    @* Idea #11 — One-Tap Re-roll panel. Shows the 3 fresh variations from the last re-roll. *@
+    @if (_rerollVariations.Count > 0)
+    {
+        <div class="bulk-reroll-panel mt-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <strong><i class="bi bi-arrow-repeat me-1"></i>Re-roll results for slot #@(_rerollSourceIndex + 1)</strong>
+                <button class="btn btn-sm btn-link" @onclick="@(() => _rerollVariations = [])">Close</button>
+            </div>
+            <div class="bulk-reroll-grid">
+                @foreach (var r in _rerollVariations)
+                {
+                    <div class="bulk-reroll-cell">
+                        <img src="@($"data:{r.ContentType};base64,{r.ImageData}")" alt="Re-roll #@(r.Index + 1)" />
+                        <button class="btn btn-sm btn-primary mt-1 w-100"
+                                @onclick="@(() => AcceptReroll(r))">
+                            <i class="bi bi-check2 me-1"></i>Use this
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -113,6 +150,43 @@
     [Parameter] public HashSet<int> Favorites { get; set; } = [];
     [Parameter] public EventCallback<int> OnDownloadImage { get; set; }
     [Parameter] public EventCallback<int> OnToggleFavorite { get; set; }
+    [Parameter] public EventCallback<int> OnReroll { get; set; }
+    [Parameter] public EventCallback<(int SourceIndex, BulkRerollVariation Variation)> OnAcceptReroll { get; set; }
 
     private BulkGenerateImageResult? _modalResult;
+    private readonly HashSet<int> _rerollingIndices = [];
+    private List<BulkRerollVariation> _rerollVariations = [];
+    private int _rerollSourceIndex = -1;
+
+    private bool IsRerolling(int index) => _rerollingIndices.Contains(index);
+
+    public void BeginReroll(int index)
+    {
+        _rerollingIndices.Add(index);
+        StateHasChanged();
+    }
+
+    public void EndReroll(int index, IReadOnlyList<BulkRerollVariation> variations)
+    {
+        _rerollingIndices.Remove(index);
+        _rerollVariations = variations.ToList();
+        _rerollSourceIndex = index;
+        StateHasChanged();
+    }
+
+    public void ClearRerollPanel()
+    {
+        _rerollVariations = [];
+        _rerollSourceIndex = -1;
+        StateHasChanged();
+    }
+
+    private async Task AcceptReroll(BulkRerollVariation variation)
+    {
+        if (_rerollSourceIndex < 0) return;
+        await OnAcceptReroll.InvokeAsync((_rerollSourceIndex, variation));
+        _rerollVariations = [];
+        _rerollSourceIndex = -1;
+        StateHasChanged();
+    }
 }

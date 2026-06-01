@@ -79,6 +79,15 @@ public static class ImageAnalysisEndpoints
             logger.LogWarning(ex, "Invalid base64 image data");
             return Results.Problem(detail: "Invalid base64 image data", statusCode: 400, title: "Invalid Input");
         }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("Gemini declined", StringComparison.OrdinalIgnoreCase))
+        {
+            // Surface the upstream model refusal as a 422 so the client can show a specific
+            // "try a different image" message instead of a generic 500.
+            logger.LogWarning(ex, "Gemini refused to generate an image");
+            return Results.Problem(
+                detail: "The image-generation model declined this request. Please try a different image or prompt.",
+                statusCode: 422, title: "Generation Declined");
+        }
         catch (ClientResultException ex) when (ex.Message.Contains("content_policy_violation"))
         {
             logger.LogWarning(ex, "Image generation blocked by content policy");

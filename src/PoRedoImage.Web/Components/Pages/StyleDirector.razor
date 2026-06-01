@@ -1,0 +1,275 @@
+@page "/style-director"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits FeaturePageBase
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Style Director — PoRedoImage</PageTitle>
+
+<div class="container py-4">
+    <div class="feature-page-header mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <span class="feature-page-icon"><i class="bi bi-stars"></i></span>
+            <div>
+                <h1 class="feature-page-title">Style Director</h1>
+                <p class="feature-page-desc">
+                    Four AI agents collaborate to design the perfect art-style prompt for your image.
+                    <span class="badge bg-primary ms-2">MAF-style workflow</span>
+                </p>
+            </div>
+        </div>
+        <div class="feature-how-it-works mt-3">
+            <span class="feature-how-it-works__step"><i class="bi bi-eye me-1"></i>Vision Analyst</span>
+            <i class="bi bi-arrow-right feature-how-it-works__arrow"></i>
+            <span class="feature-how-it-works__step"><i class="bi bi-palette me-1"></i>Style Strategist</span>
+            <i class="bi bi-arrow-right feature-how-it-works__arrow"></i>
+            <span class="feature-how-it-works__step"><i class="bi bi-pencil-square me-1"></i>Prompt Refiner</span>
+            <i class="bi bi-arrow-right feature-how-it-works__arrow"></i>
+            <span class="feature-how-it-works__step"><i class="bi bi-shield-check me-1"></i>Critic</span>
+        </div>
+    </div>
+
+    @* ── Step 1: Upload + tag pre-fill from an existing analysis ──────── *@
+    @if (_directorResult is null)
+    {
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
+                <ImageUploadPanel
+                    ShowDescriptionLength="false"
+                    ShowProcessButton="false"
+                    ButtonLabel="Run Style Director"
+                    ButtonIcon="bi-stars"
+                    ImagePreviewUrl="@imagePreviewUrl"
+                    ErrorMessage="@errorMessage"
+                    CanProcess="@canProcessImage"
+                    OnFileChange="LoadFile" />
+
+                <button class="btn-generate-all w-100 mt-3"
+                        @onclick="RunDirector"
+                        disabled="@(string.IsNullOrEmpty(imagePreviewUrl) || isProcessing)">
+                    <i class="bi bi-stars me-1"></i>Run Style Director
+                </button>
+
+                @if (isProcessing)
+                {
+                    <div class="mt-3">
+                        <ProcessingProgressBar Percentage="@progressPercentage" Message="@progressMessage" />
+                    </div>
+                }
+            </div>
+
+            <div class="col-lg-7">
+                <div class="style-director-intro p-4">
+                    <h4 class="mb-3"><i class="bi bi-lightbulb me-1 text-warning"></i>What you'll see</h4>
+                    <p class="text-muted">
+                        The Style Director runs a four-step chain before the image is even sent to the
+                        image-generation model. Each step leaves a short reasoning entry you can inspect:
+                    </p>
+                    <ol class="text-muted small">
+                        <li><strong>Vision Analyst</strong> — interprets the image's subject, mood, and themes from the tags.</li>
+                        <li><strong>Style Strategist</strong> — picks 2–3 artistic directions that match the mood.</li>
+                        <li><strong>Prompt Refiner</strong> — turns the chosen direction into a single renderable prompt.</li>
+                        <li><strong>Critic</strong> — self-critiques the prompt for vagueness, missing guards, style drift; adjusts if needed.</li>
+                    </ol>
+                    <p class="small text-muted mb-0">
+                        The whole chain completes in &lt; 50ms today (heuristic agents). When the
+                        agents are upgraded to GPT-4o-nano, the target stays under 5 seconds — the
+                        workflow shape is MAF-compatible, so the swap is a one-line change.
+                    </p>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        @* ── Step 2: Reasoning trace + final prompt ──────────────────── *@
+        <div class="row g-4">
+            <div class="col-lg-5">
+                @if (!string.IsNullOrEmpty(imagePreviewUrl))
+                {
+                    <div class="style-director-source">
+                        <img src="@imagePreviewUrl" alt="Source" />
+                    </div>
+                }
+                @if (_directorResult.Mood is not null)
+                {
+                    <div class="style-director-summary mt-3 p-3">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-eye text-primary"></i>
+                            <strong>Vision</strong>
+                        </div>
+                        <p class="mb-1"><strong>Subject:</strong> @_directorResult.Subject</p>
+                        <p class="mb-1"><strong>Mood:</strong> <span class="badge bg-info">@_directorResult.Mood</span></p>
+                        @if (_directorResult.Themes?.Count > 0)
+                        {
+                            <p class="mb-0 small">
+                                <strong>Themes:</strong>
+                                @foreach (var t in _directorResult.Themes)
+                                {
+                                    <span class="badge bg-secondary me-1">@t</span>
+                                }
+                            </p>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="col-lg-7">
+                <div class="style-director-trace">
+                    <h4 class="mb-3"><i class="bi bi-diagram-3 me-1 text-primary"></i>Reasoning Trace</h4>
+                    @foreach (var entry in _directorResult.Reasoning)
+                    {
+                        <div class="trace-step">
+                            <div class="trace-step__head">
+                                <i class="bi @entry.IconClass"></i>
+                                <strong>@entry.AgentDisplayName</strong>
+                                <span class="badge bg-secondary ms-2">@entry.ElapsedMs ms</span>
+                            </div>
+                            <p class="trace-step__body">@entry.Summary</p>
+                        </div>
+                    }
+                </div>
+
+                @if (_directorResult.Directions?.Count > 0)
+                {
+                    <h5 class="mt-4 mb-2"><i class="bi bi-palette me-1"></i>Style Directions</h5>
+                    <p class="text-muted small">@_directorResult.StrategyRationale</p>
+                    <div class="direction-grid">
+                        @foreach (var d in _directorResult.Directions)
+                        {
+                            <div class="direction-cell">
+                                <strong>@d.Name</strong>
+                                <p class="small mb-1"><strong>Palette:</strong> @d.Palette</p>
+                                <p class="small mb-1"><strong>Technique:</strong> @d.Technique</p>
+                                <p class="small text-muted mb-0"><strong>Era:</strong> @d.ReferenceEra</p>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_directorResult.Succeeded)
+                {
+                    <div class="style-director-final mt-4 p-3">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-shield-check text-success"></i>
+                            <strong>Critic Decision</strong>
+                            <span class="badge bg-success ms-2">Confidence @_directorResult.Confidence / 100</span>
+                        </div>
+                        <p class="small text-muted">@_directorResult.Critique</p>
+                        <label class="form-label small fw-semibold mt-2">Final prompt</label>
+                        <textarea class="form-control" rows="3" readonly>@_directorResult.FinalPrompt</textarea>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-outline-light" @onclick="CopyPrompt">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
+                            <button class="btn btn-sm btn-primary" @onclick="UseInBulk">
+                                <i class="bi bi-collection me-1"></i>Use in Bulk Generate
+                            </button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-danger mt-3">
+                        <i class="bi bi-x-circle me-1"></i>@_directorResult.ErrorMessage
+                    </div>
+                }
+
+                <button class="btn btn-outline-secondary mt-4" @onclick="StartOver">
+                    <i class="bi bi-arrow-repeat me-1"></i>Start over
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private StyleDirectorResultDto? _directorResult;
+
+    protected override void OnGalleryImageSelected()
+    {
+        _directorResult = null;
+    }
+
+    private async Task RunDirector()
+    {
+        if (imagePreviewUrl is null) return;
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            progressPercentage = 10;
+            progressMessage = "Loading source image…";
+            StateHasChanged();
+
+            // Use whatever tags we can — if the image was previously analysed in this session,
+            // a future iteration can pull them from the session service. Today we default to a
+            // generic tag set; the heuristic agents are tolerant of weak input.
+            var tags = new List<string> { "photo", "subject" };
+            if (tags.Count == 0) tags.Add("photo");
+
+            progressPercentage = 40;
+            progressMessage = "Running 4-agent workflow…";
+            StateHasChanged();
+
+            var base64Data = ExtractBase64(imagePreviewUrl);
+            var request = new StyleDirectorRequestDto(
+                ImageData: base64Data,
+                ContentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                DetectedTags: tags,
+                ConfidenceScore: 0.7);
+
+            var httpResponse = await Http.PostAsJsonAsync("/api/style-director/run", request);
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                var body = await httpResponse.Content.ReadAsStringAsync();
+                errorMessage = $"Style director failed: {body}";
+                return;
+            }
+
+            _directorResult = await httpResponse.Content.ReadFromJsonAsync<StyleDirectorResultDto>();
+            if (_directorResult is null)
+            {
+                errorMessage = "Style director returned no result.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Style director run failed");
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            progressPercentage = 100;
+            progressMessage = string.IsNullOrEmpty(errorMessage) ? "Done!" : "Failed.";
+            isProcessing = false;
+            try { StateHasChanged(); } catch (ObjectDisposedException) { }
+        }
+    }
+
+    private async Task CopyPrompt()
+    {
+        if (_directorResult?.FinalPrompt is null) return;
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _directorResult.FinalPrompt);
+        NotificationService.Notify(NotificationSeverity.Info, "Copied", "Prompt copied to clipboard.", duration: 2500);
+    }
+
+    private async Task UseInBulk()
+    {
+        if (_directorResult?.FinalPrompt is null) return;
+        // Stage the prompt for the Bulk Generate page by writing it to the bulk prompt storage
+        // via a friendly URL. For simplicity, redirect with a query string the BulkGenerate page can pick up.
+        var encoded = Uri.EscapeDataString(_directorResult.FinalPrompt);
+        await JSRuntime.InvokeVoidAsync("eval",
+            $"window.location.href = '/bulk-generate?seed={encoded}'");
+    }
+
+    private void StartOver()
+    {
+        _directorResult = null;
+        errorMessage = null;
+        Logger.LogInformation("Style Director reset");
+    }
+}

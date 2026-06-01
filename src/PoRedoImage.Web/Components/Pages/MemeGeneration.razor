@@ -31,14 +31,80 @@
                 <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
                 <ImageUploadPanel
                     ShowDescriptionLength="false"
-                    ButtonLabel="Generate Meme"
-                    ButtonIcon="bi-emoji-laughing"
+                    ButtonLabel="@(_useTemplate ? "Render Template" : "Generate Meme")"
+                    ButtonIcon="@(_useTemplate ? "bi-grid-3x3-gap" : "bi-emoji-laughing")"
                     DescriptionLength="350"
                     ImagePreviewUrl="@imagePreviewUrl"
                     ErrorMessage="@errorMessage"
                     CanProcess="@canProcessImage"
                     OnFileChange="LoadFile"
                     OnProcessClicked="ProcessImage" />
+
+                @* ── Idea #17 — Meme Template Library toggle ────────────── *@
+                <div class="meme-template-card mt-3 p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-grid-3x3-gap-fill"></i>
+                        <strong>Template Library</strong>
+                        <div class="form-check form-switch ms-auto">
+                            <input class="form-check-input" type="checkbox" id="tplToggle"
+                                   checked="@_useTemplate" @onchange="OnTemplateToggleChanged" />
+                            <label class="form-check-label small" for="tplToggle">
+                                @(_useTemplate ? "On" : "Off")
+                            </label>
+                        </div>
+                    </div>
+                    @if (_useTemplate)
+                    {
+                        @if (_templates is null)
+                        {
+                            <div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Loading templates…</div>
+                        }
+                        else
+                        {
+                            <div class="meme-template-grid">
+                                @foreach (var t in _templates)
+                                {
+                                    var isSelected = _selectedTemplateId == t.Id;
+                                    <button class="meme-template-tile @(isSelected ? "meme-template-tile--selected" : "")"
+                                            @onclick="@(() => SelectTemplate(t.Id))"
+                                            title="@t.Description">
+                                        <span class="meme-template-tile__name">@t.Name</span>
+                                        <span class="meme-template-tile__cat">@t.Category · @t.RequiredZoneCount zone@(t.RequiredZoneCount == 1 ? "" : "s")</span>
+                                    </button>
+                                }
+                            </div>
+
+                            @if (_selectedTemplate is not null)
+                            {
+                                <div class="meme-template-zones mt-3">
+                                    <p class="small text-muted mb-2">
+                                        <i class="bi bi-info-circle me-1"></i>@_selectedTemplate.Description
+                                    </p>
+                                    @for (var i = 0; i < _selectedTemplate.RequiredZoneCount; i++)
+                                    {
+                                        var zone = _selectedTemplate.Zones[i];
+                                        <div class="mb-2">
+                                            <label class="form-label small fw-semibold">@zone.Label</label>
+                                            <input class="form-control form-control-sm"
+                                                   placeholder="Type the text for this zone…"
+                                                   maxlength="120"
+                                                   value="@(_zoneTexts.Count > i ? _zoneTexts[i] : string.Empty)"
+                                                   @onchange="@(e => UpdateZoneText(i, e.Value?.ToString() ?? string.Empty))" />
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    }
+                    else
+                    {
+                        <p class="small text-muted mb-0">
+                            <i class="bi bi-lightbulb me-1"></i>
+                            AI will write a witty caption automatically. Toggle on to pick from
+                            20 classic formats instead.
+                        </p>
+                    }
+                </div>
             </div>
         </div>
     }
@@ -60,11 +126,225 @@
             OnDownloadOriginal="DownloadOriginal"
             OnDownloadMeme="DownloadMeme"
             OnStartOver="StartOver" />
+
+        @* ── Idea #5 — Meme Caption Battle (post-analysis) ──────── *@
+        <div class="row justify-content-center mt-4">
+            <div class="col-lg-9 col-md-11">
+                <div class="caption-battle-card p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-trophy-fill text-warning"></i>
+                        <strong>Caption Battle</strong>
+                        <span class="badge bg-secondary ms-1">8 personas</span>
+                        @if (_battleResult is not null)
+                        {
+                            <span class="badge bg-success ms-1">@_battleResult.Succeeded / @_battleResult.Requested ready</span>
+                        }
+                        <div class="ms-auto">
+                            @if (_battleResult is null)
+                            {
+                                <button class="btn btn-sm btn-primary"
+                                        @onclick="StartCaptionBattle"
+                                        disabled="@(string.IsNullOrEmpty(imagePreviewUrl) || analysisResult?.Tags is null || analysisResult.Tags.Count == 0)">
+                                    <i class="bi bi-play-fill me-1"></i>Start Battle
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-light" @onclick="StartCaptionBattle">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Re-run
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @if (_battleBusy)
+                    {
+                        <div class="d-flex align-items-center gap-2 text-muted small">
+                            <span class="spinner-border spinner-border-sm"></span>
+                            <span>Fanning out 8 personas in parallel — this usually takes 3–6 seconds.</span>
+                        </div>
+                    }
+                    else if (_battleResult is null)
+                    {
+                        <p class="small text-muted mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Run a battle to see the same image captioned in 8 different voices
+                            (Gen-Z, Corporate, Absurdist, Dad Joke, Sarcastic, Wholesome, Tech Bro, Surreal).
+                            Vote for the winner to teach the system your humor.
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="caption-battle-grid">
+                            @foreach (var c in _battleResult.Candidates)
+                            {
+                                var isWinner = _winningPersona.HasValue &&
+                                    string.Equals(_winningPersona.Value.ToString(), c.Persona, StringComparison.OrdinalIgnoreCase);
+                                <div class="caption-battle-cell @(c.Succeeded ? "" : "caption-battle-cell--failed") @(isWinner ? "caption-battle-cell--winner" : "")">
+                                    <div class="caption-battle-cell__head">
+                                        <i class="bi @c.IconClass"></i>
+                                        <span class="caption-battle-cell__persona">@c.PersonaDisplayName</span>
+                                        @if (isWinner)
+                                        {
+                                            <i class="bi bi-trophy-fill text-warning ms-auto" title="Your pick"></i>
+                                        }
+                                    </div>
+                                    @if (c.Succeeded)
+                                    {
+                                        <p class="caption-battle-cell__text">"@c.Caption"</p>
+                                        <button class="btn btn-sm btn-outline-success w-100"
+                                                @onclick="@(() => VoteForCaption(c))">
+                                            <i class="bi bi-hand-thumbs-up me-1"></i>Pick this
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <p class="caption-battle-cell__text text-muted">
+                                            <i>skipped — @(c.ErrorMessage ?? "unknown")</i>
+                                        </p>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @if (_winningPersona is not null)
+                        {
+                            <div class="caption-battle-summary mt-3 small text-muted">
+                                <i class="bi bi-hand-thumbs-up-fill text-success me-1"></i>
+                                You picked <strong>@_winningPersona.ToString()</strong>. We'll lean
+                                toward this voice next time you run a battle.
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
     }
 </div>
 
 @code {
     private ImageAnalysisResponse? analysisResult;
+
+    // ── Idea #17 — Meme Template Library state ─────────────────────
+    private bool _useTemplate;
+    private IReadOnlyList<MemeTemplateDto>? _templates;
+    private MemeTemplateDto? _selectedTemplate;
+    private string? _selectedTemplateId;
+    private List<string> _zoneTexts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        // Eager-load the catalog so toggling the switch is instant.
+        _ = LoadTemplatesAsync();
+    }
+
+    private async Task LoadTemplatesAsync()
+    {
+        try
+        {
+            _templates = await Http.GetFromJsonAsync<IReadOnlyList<MemeTemplateDto>>("/api/meme-templates");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load meme templates");
+            _templates = [];
+        }
+        StateHasChanged();
+    }
+
+    private void OnTemplateToggleChanged(ChangeEventArgs e)
+    {
+        _useTemplate = e.Value is bool b && b;
+        if (_useTemplate && _templates is null)
+            _ = LoadTemplatesAsync();
+    }
+
+    private void SelectTemplate(string id)
+    {
+        _selectedTemplateId = id;
+        _selectedTemplate = _templates?.FirstOrDefault(t => t.Id == id);
+        if (_selectedTemplate is not null)
+        {
+            // Reset the per-zone text inputs whenever a new template is picked.
+            _zoneTexts = _selectedTemplate.Zones.Select(z => string.Empty).ToList();
+        }
+    }
+
+    private void UpdateZoneText(int index, string value)
+    {
+        while (_zoneTexts.Count <= index) _zoneTexts.Add(string.Empty);
+        _zoneTexts[index] = value;
+    }
+
+    // ── Idea #5 — Meme Caption Battle state ────────────────────────
+    private CaptionBattleResultDto? _battleResult;
+    private bool _battleBusy;
+    private CaptionPersona? _winningPersona;
+
+    private async Task StartCaptionBattle()
+    {
+        if (analysisResult?.Tags is null || analysisResult.Tags.Count == 0) return;
+
+        _battleBusy = true;
+        _battleResult = null;
+        _winningPersona = null;
+        StateHasChanged();
+
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("/api/caption-battle/run",
+                new CaptionBattleRequest(Tags: analysisResult.Tags, Personas: null));
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync();
+                NotificationService.Notify(NotificationSeverity.Error, "Battle Failed",
+                    $"Server returned {(int)resp.StatusCode}: {body}", duration: 6000);
+                return;
+            }
+            _battleResult = await resp.Content.ReadFromJsonAsync<CaptionBattleResultDto>();
+            if (_battleResult is { Succeeded: 0 })
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Battle Empty",
+                    "All 8 personas returned no captions. Check that OpenAI is configured.", duration: 6000);
+            }
+            else if (_battleResult is not null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Battle Complete",
+                    $"{_battleResult.Succeeded} of {_battleResult.Requested} captions ready in {_battleResult.ElapsedMs}ms.",
+                    duration: 4000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Caption battle failed");
+            NotificationService.Notify(NotificationSeverity.Error, "Battle Failed", ex.Message, duration: 6000);
+        }
+        finally
+        {
+            _battleBusy = false;
+            try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+        }
+    }
+
+    private async Task VoteForCaption(CaptionCandidateDto candidate)
+    {
+        if (!Enum.TryParse<CaptionPersona>(candidate.Persona, ignoreCase: true, out var persona))
+            return;
+
+        _winningPersona = persona;
+        try
+        {
+            await Http.PostAsJsonAsync("/api/caption-battle/vote",
+                new CaptionVoteRequest(ImageId: string.Empty, Persona: candidate.Persona));
+        }
+        catch (Exception ex)
+        {
+            // Vote failure is non-critical — keep the in-session winner visible.
+            Logger.LogWarning(ex, "Failed to record caption vote");
+        }
+        StateHasChanged();
+    }
 
     protected override void OnGalleryImageSelected()
     {
@@ -86,6 +366,13 @@
     private async Task ProcessImage()
     {
         if (imagePreviewUrl == null) return;
+
+        // ── Idea #17 — Template branch (no AI, runs locally) ──────
+        if (_useTemplate)
+        {
+            await ProcessTemplateAsync();
+            return;
+        }
 
         try
         {
@@ -165,6 +452,91 @@
         }
     }
 
+    /// <summary>
+    /// Idea #17 — Renders a meme from a selected template + user-provided zone texts.
+    /// Pure local render — no AI cost, no rate-limit, near-instant. Reuses the
+    /// existing <see cref="ImageAnalysisResponse"/> shape so the result panel renders
+    /// the template-rendered output identically to the AI-meme output.
+    /// </summary>
+    private async Task ProcessTemplateAsync()
+    {
+        if (_selectedTemplate is null)
+        {
+            errorMessage = "Pick a template first.";
+            return;
+        }
+        if (_zoneTexts.All(string.IsNullOrWhiteSpace))
+        {
+            errorMessage = "Fill in at least one text zone before rendering.";
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            progressPercentage = 40;
+            progressMessage = $"Rendering '{_selectedTemplate.Name}'…";
+            StateHasChanged();
+
+            var base64Data = ExtractBase64(imagePreviewUrl!);
+            var request = new MemeTemplateRenderRequest(
+                ImageData: base64Data,
+                ContentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                TemplateId: _selectedTemplate.Id,
+                ZoneTexts: _zoneTexts);
+
+            var response = await Http.PostAsJsonAsync("/api/meme-templates/render", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Template render failed: {body}";
+                return;
+            }
+
+            var rendered = await response.Content.ReadFromJsonAsync<MemeTemplateRenderResponse>();
+            if (rendered is null || string.IsNullOrEmpty(rendered.ImageData))
+            {
+                errorMessage = "Template render returned no image.";
+                return;
+            }
+
+            // Map into the existing ImageAnalysisResponse so the result panel shows it.
+            analysisResult = new ImageAnalysisResponse
+            {
+                MemeImageData = rendered.ImageData,
+                MemeCaption = string.Join(" / ",
+                    _zoneTexts.Where(t => !string.IsNullOrWhiteSpace(t))),
+                RegeneratedImageContentType = rendered.ContentType,
+                Metrics = new ProcessingMetricsDto
+                {
+                    ImageAnalysisTimeMs = 0,
+                    DescriptionGenerationTimeMs = 0,
+                    ImageRegenerationTimeMs = rendered.ElapsedMs
+                }
+            };
+
+            if (_userId is not null)
+                _ = AutoSaveMemeAsync(rendered.ImageData, rendered.ContentType);
+
+            NotificationService.Notify(NotificationSeverity.Success, "Template Ready!",
+                $"'{_selectedTemplate.Name}' rendered in {rendered.ElapsedMs}ms.", duration: 3500);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Template render failed");
+            errorMessage = $"Template render failed: {ex.Message}";
+        }
+        finally
+        {
+            progressPercentage = 100;
+            progressMessage = string.IsNullOrEmpty(errorMessage) ? "Done!" : "Failed.";
+            isProcessing = false;
+            isComplete = string.IsNullOrEmpty(errorMessage);
+            try { StateHasChanged(); } catch (ObjectDisposedException) { }
+        }
+    }
+
     private async Task DownloadOriginal()
     {
         if (imagePreviewUrl == null) return;
@@ -191,6 +563,10 @@
         progressPercentage = 0;
         progressMessage = string.Empty;
         analysisResult = null;
+        // Reset Idea #5 battle state
+        _battleResult = null;
+        _battleBusy = false;
+        _winningPersona = null;
         Logger.LogInformation("Meme Generation reset");
     }
 }
