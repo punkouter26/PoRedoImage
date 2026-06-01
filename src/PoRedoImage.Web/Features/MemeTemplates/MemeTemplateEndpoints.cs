@@ -57,9 +57,10 @@ public static class MemeTemplateEndpoints
             if (template is null)
                 return Results.NotFound($"Template '{request.TemplateId}' not found.");
 
-            byte[] imageBytes;
-            try { imageBytes = Convert.FromBase64String(request.ImageData); }
-            catch { return Results.BadRequest("ImageData must be valid base64."); }
+            ImageBytes imageBytes;
+            try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+            catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
+            var imageBytesArray = imageBytes.Bytes.ToArray();
 
             // The interface accepts up to RequiredZoneCount; pad with empty strings
             // so a single-line template can be rendered without the client knowing details.
@@ -69,7 +70,7 @@ public static class MemeTemplateEndpoints
             try
             {
                 var sw = Stopwatch.StartNew();
-                var (data, contentType) = await templates.RenderAsync(imageBytes, template, padded, ct);
+                var (data, contentType) = await templates.RenderAsync(imageBytesArray, template, padded, ct);
                 sw.Stop();
                 logger.LogInformation("Meme template rendered. Template={Template}, Zones={Zones}, Elapsed={Elapsed}ms",
                     template.Id, padded.Count, sw.ElapsedMilliseconds);

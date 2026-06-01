@@ -67,17 +67,16 @@ public static class ImageAnalysisEndpoints
 
         try
         {
-            var imageBytes = Convert.FromBase64String(request.ImageData);
-            if (!IsValidImageBytes(imageBytes))
-                return Results.Problem(detail: "The uploaded file is not a valid JPEG or PNG image.", statusCode: 400, title: "Invalid Image");
-
+            var image = ImageBytes.FromBase64(request.ImageData, request.ContentType);
+            var imageBytes = image.Bytes.ToArray();
             var result = await orchestrator.ProcessAsync(request, ct);
             return Results.Ok(result);
         }
-        catch (FormatException ex)
+        catch (ImageValidationException ex)
         {
-            logger.LogWarning(ex, "Invalid base64 image data");
-            return Results.Problem(detail: "Invalid base64 image data", statusCode: 400, title: "Invalid Input");
+            // Po2Logic F10 — magic-byte check now also accepts GIF, WebP, BMP; HEIC hint included.
+            logger.LogWarning(ex, "Image validation failed: {Message}", ex.Message);
+            return Results.Problem(detail: ex.Message, statusCode: 400, title: "Invalid Image");
         }
         catch (InvalidOperationException ex) when (ex.Message.StartsWith("Gemini declined", StringComparison.OrdinalIgnoreCase))
         {
@@ -122,11 +121,6 @@ public static class ImageAnalysisEndpoints
             return Results.Problem(detail: "An error occurred while processing your image. Please try again.", statusCode: 500, title: "Processing Error");
         }
     }
-
-    /// <summary>Validates JPEG (FF D8 FF) or PNG (89 50 4E 47) magic bytes.</summary>
-    private static bool IsValidImageBytes(byte[] bytes) =>
-        (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) ||
-        (bytes.Length >= 4 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47);
 }
 
 

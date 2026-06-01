@@ -12,17 +12,11 @@
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
 <div class="container py-4">
-    <div class="feature-page-header mb-4">
-        <div class="d-flex align-items-center gap-3">
-            <span class="feature-page-icon"><i class="bi bi-images"></i></span>
-            <div>
-                <h1 class="feature-page-title">Bulk Generate</h1>
-                <p class="feature-page-desc">Upload a photo and generate 10 artistic variations. Use <code>&lt;PERSON&gt;</code> in prompts — AI replaces it with a description of your image.
-                    <span class="badge bg-success ms-2">Gemini 2.0 Flash (img2img)</span>
-                </p>
-            </div>
-        </div>
-    </div>
+    <FeatureLayout 
+        IconClass="bi-images"
+        Title="Bulk Generate"
+        Description="Upload a photo and generate 10 artistic variations. Use &lt;PERSON&gt; in prompts — AI replaces it with a description of your image."
+        ModelBadge="Gemini 2.0 Flash (img2img)" />
 
     <div class="row g-4">
         @* Left: Upload + Action Button *@
@@ -84,29 +78,13 @@
         </div>
     </div>
 
-    @* Full-width collapsible Prompt Editor *@
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="prompt-accordion">
-                <button class="prompt-accordion__toggle" @onclick="@(() => _promptsExpanded = !_promptsExpanded)">
-                    <span>
-                        <i class="bi bi-list-ul me-2"></i>Art Style Prompts
-                        <span class="prompt-accordion__badge ms-2">@_activePromptCount active</span>
-                    </span>
-                    <i class="bi @(_promptsExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
-                </button>
-                @if (_promptsExpanded)
-                {
-                    <BulkPromptEditor
-                        Prompts="@_prompts"
-                        IsSaving="@_isSaving"
-                        OnPromptsChanged="@(p => { _prompts = p; StateHasChanged(); })"
-                        OnSaveRequested="SavePrompts"
-                        OnLoadRequested="LoadPrompts" />
-                }
-            </div>
-        </div>
-    </div>
+    @* Prompt Drawer (Radzen Drawer) *@
+    <PromptDrawer
+        Prompts="@_prompts"
+        IsSaving="@_isSaving"
+        OnPromptsChanged="@(p => { _prompts = p; StateHasChanged(); })"
+        OnSaveRequested="SavePrompts"
+        OnLoadRequested="LoadPrompts" />
 
     @* Sticky processing pill *@
     @if (_isGenerating)
@@ -133,7 +111,6 @@
     private int _completedCount;
     private bool _isGenerating;
     private bool _isSaving;
-    private bool _promptsExpanded = true;
     private HashSet<int> _favorites = [];
     private string? _userId;
     private MyImagesGallery? _gallery;
@@ -269,9 +246,12 @@
                 try
                 {
                     var rawPrompt = activePrompts[i].prompt;
-                    var finalPrompt = string.IsNullOrEmpty(description)
+                    // BOMB-3 mitigation: length-cap the vision description before string substitution
+                    // to prevent token-quota drain + reflected XSS via GPT-4o vision content.
+                    var safeDescription = SanitizeDescription(description);
+                    var finalPrompt = string.IsNullOrEmpty(safeDescription)
                         ? rawPrompt
-                        : rawPrompt.Replace(DefaultPrompts.PersonToken, description, StringComparison.Ordinal);
+                        : rawPrompt.Replace(DefaultPrompts.PersonToken, safeDescription, StringComparison.Ordinal);
 
                     // True image-to-image via API: Gemini 2.0 Flash uses the uploaded photo as subject reference
                     var varResp = await Http.PostAsJsonAsync("/api/bulk-generate/variation",
@@ -522,5 +502,31 @@
             $"Slot #{sourceIndex + 1} now shows the re-rolled image.", duration: 3500);
 
         try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+    }
+
+    /// <summary>
+    /// BOMB-3 mitigation: caps the GPT-4o vision description to 200 chars and strips
+    /// HTML/markdown so it can be safely substituted into a prompt template without
+    /// token-quota drain or reflected-XSS risk (Po2Logic audit).
+    /// </summary>
+    private static string? SanitizeDescription(string? description)
+    {
+        if (string.IsNullOrEmpty(description)) return null;
+        // 1. Length cap (200 chars — ~50 tokens, plenty for "young woman with brown hair, blue eyes")
+        const int MaxLen = 200;
+        var trimmed = description.Length > MaxLen ? description[..MaxLen] : description;
+        // 2. Collapse newlines (descriptions are noun-phrase only — newlines are suspicious)
+        trimmed = trimmed.Replace('\n', ' ').Replace('\r', ' ');
+        // 3. Strip angle brackets and HTML tags — defense-in-depth even though we trust GPT-4o
+        var span = trimmed.AsSpan();
+        var buf = new System.Text.StringBuilder(span.Length);
+        var inTag = false;
+        foreach (var ch in span)
+        {
+            if (ch == '<') { inTag = true; continue; }
+            if (ch == '>') { inTag = false; continue; }
+            if (!inTag) buf.Append(ch);
+        }
+        return buf.ToString().Trim();
     }
 }

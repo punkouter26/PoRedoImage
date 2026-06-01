@@ -27,12 +27,13 @@ public static class StyleDirectorEndpoints
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");
 
-            byte[] imageBytes;
-            try { imageBytes = Convert.FromBase64String(request.ImageData); }
-            catch { return Results.BadRequest("ImageData must be valid base64."); }
+            ImageBytes imageBytes;
+            try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+            catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
+            var imageBytesArray = imageBytes.Bytes.ToArray();
 
             var input = new VisionAnalystInput(
-                ImageBytes: imageBytes,
+                ImageBytes: imageBytesArray,
                 DetectedTags: request.DetectedTags ?? [],
                 ConfidenceScore: request.ConfidenceScore);
 

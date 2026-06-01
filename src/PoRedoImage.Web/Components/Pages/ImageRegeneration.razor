@@ -7,15 +7,11 @@
 <PageTitle>Image Regeneration — PoRedoImage</PageTitle>
 
 <div class="container py-4">
-    <div class="feature-page-header mb-4">
-        <div class="d-flex align-items-center gap-3">
-            <span class="feature-page-icon"><i class="bi bi-palette2"></i></span>
-            <div>
-                <h1 class="feature-page-title">Image Regeneration</h1>
-                <p class="feature-page-desc">Upload a photo and AI will create a brand-new artistic version using DALL-E 3.</p>
-            </div>
-        </div>
-    </div>
+    <FeatureLayout 
+        IconClass="bi-palette2"
+        Title="Image Regeneration"
+        Description="Upload a photo and AI will create a brand-new artistic version using DALL-E 3."
+        ModelBadge="DALL-E 3" />
 
     @if (!isProcessing && !isComplete)
     {

@@ -5,12 +5,12 @@
 
 @if (_loading)
 {
-    <div class="gallery-bar gallery-bar--loading">
+    <div class="gallery-bar gallery-bar--loading" aria-busy="true">
         <span class="gallery-bar__label"><i class="bi bi-images me-1"></i><span class="d-none d-sm-inline">My Images</span></span>
-        <div class="gallery-bar__scroll">
+        <div class="gallery-bar__scroll" role="list" aria-label="Loading gallery">
             @for (int i = 0; i < 4; i++)
             {
-                <div class="gallery-thumb gallery-thumb--skeleton shimmer-anim"></div>
+                <div class="gallery-thumb gallery-thumb--skeleton shimmer-anim" aria-label="Loading..."></div>
             }
         </div>
     </div>
@@ -22,7 +22,7 @@ else if (_images.Count > 0)
             <i class="bi bi-images me-1"></i><span class="d-none d-sm-inline">My Images</span>
             <span class="gallery-bar__count">@_images.Count</span>
         </span>
-        <div class="gallery-bar__scroll" role="list" aria-label="Your saved images">
+        <div class="gallery-bar__scroll" role="list" aria-label="Your saved images" aria-busy="false">
             @foreach (var img in _images)
             {
                 <button class="gallery-thumb @KindClass(img.Kind)"
@@ -30,11 +30,27 @@ else if (_images.Count > 0)
                         @onclick="@(() => SelectImage(img))"
                         role="listitem">
                     <img src="@img.ImageUrl" alt="@img.FileName" loading="lazy" />
-                    <span class="gallery-thumb__badge">@KindIcon(img.Kind)</span>
+                    <span class="gallery-thumb__badge" aria-label="@img.Kind">@KindIcon(img.Kind)</span>
                 </button>
             }
         </div>
-        <button class="gallery-bar__refresh" @onclick="LoadAsync" title="Refresh gallery">
+        <button class="gallery-bar__refresh" @onclick="LoadAsync" title="Refresh gallery" aria-label="Refresh gallery">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+}
+else
+{
+    // F8 mitigation: explicit empty state so the bar doesn't disappear silently.
+    // Most common cause: user signed in but Storage:ConnectionString is unset, or new user.
+    <div class="gallery-bar gallery-bar--empty" role="status">
+        <span class="gallery-bar__label"><i class="bi bi-images me-1"></i><span class="d-none d-sm-inline">My Images</span></span>
+        <div class="gallery-bar__empty-hint">
+            <i class="bi bi-cloud-arrow-up me-1"></i>
+            <span class="d-none d-sm-inline">No images yet — upload one to get started.</span>
+            <span class="d-sm-none">No images yet.</span>
+        </div>
+        <button class="gallery-bar__refresh" @onclick="LoadAsync" title="Refresh gallery" aria-label="Refresh gallery">
             <i class="bi bi-arrow-clockwise"></i>
         </button>
     </div>

@@ -2,7 +2,9 @@ using Azure.Identity;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using System.Threading.RateLimiting;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenTelemetry;
@@ -16,6 +18,7 @@ using PoRedoImage.Web.Features.Auth;
 using PoRedoImage.Web.Features.BulkGenerate;
 using PoRedoImage.Web.Features.CaptionBattle;
 using PoRedoImage.Web.Features.Diagnostics;
+using PoRedoImage.Web.Features.Idempotency;
 using PoRedoImage.Web.Features.ImageAnalysis;
 using PoRedoImage.Web.Features.MemeTemplates;
 using PoRedoImage.Web.Features.StyleDirector;
@@ -37,6 +40,14 @@ try
 {
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── BOMB-2: Bound request body size (Po2Logic mitigation) ──────────────────
+// Default Kestrel limit is 30 MB. We allow 25 MB for image uploads (matches the
+// 20 MB client-side cap + JSON envelope overhead). Prevents 50 MB base64 payloads
+// from OOM-killing the ACA pod.
+const int MaxRequestBodyBytes = 25 * 1024 * 1024;
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxRequestBodyBytes);
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = MaxRequestBodyBytes);
 
 // ─── Azure Key Vault ────────────────────────────────────────────────
 // Load FIRST so ApplicationInsights:ConnectionString is available when Serilog is configured.
@@ -93,9 +104,14 @@ var appInsightsConnectionString = builder.Configuration["ApplicationInsights:Con
 
 // In Azure App Service with Run-From-Package (OneDeploy), /home/site/wwwroot/ is read-only.
 // Use /home/LogFiles/Application/ (writable) in production; use relative path in development.
+// On Azure Container Apps (ACA) the file system is ephemeral and only stdout is collected —
+// fall back to console-only there. Detected via the presence of the CONTAINER_APP_NAME env var.
+var isContainerApps = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CONTAINER_APP_NAME"));
 var logFilePath = builder.Environment.IsDevelopment()
     ? "logs/poredoimage-.log"
-    : "/home/LogFiles/Application/poredoimage-.log";
+    : isContainerApps
+        ? null  // stdout-only in ACA — no file sink
+        : "/home/LogFiles/Application/poredoimage-.log";
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -108,12 +124,13 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.WithMachineName()
     .WriteTo.Console(outputTemplate:
         "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
-    .WriteTo.File(
-        path: logFilePath,
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 7,
-        outputTemplate:
-            "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.Conditional(_ => !string.IsNullOrEmpty(logFilePath), sink => sink
+        .File(
+            path: logFilePath!,
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 7,
+            outputTemplate:
+                "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}"))
     .WriteTo.Conditional(_ => !string.IsNullOrEmpty(appInsightsConnectionString),
         sink => sink.ApplicationInsights(appInsightsConnectionString!, TelemetryConverter.Traces))
     .CreateLogger();
@@ -152,8 +169,30 @@ builder.Services.AddRadzenComponents();
 
 builder.Services.AddOpenApi();
 
+// ─── Strongly-typed options (Po2Logic R3) ──────────────────────────────────
+// Options-pattern binding with IValidateOptions<T> gives us hot-reloadable config
+// (Key Vault rotates every 30 min) AND startup-time validation for required fields.
+builder.Services.AddOptions<OpenAiOptions>()
+    .Bind(builder.Configuration.GetSection(OpenAiOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<OpenAiOptions>, OpenAiOptionsValidator>();
+
+builder.Services.AddOptions<StorageOptions>()
+    .Bind(builder.Configuration.GetSection(StorageOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
+
+// Fail-fast secret validator (Po2Logic F7)
+builder.Services.AddHostedService<StartupSecretValidator>();
+
 // HTTP client factory (used by health checks)
 builder.Services.AddHttpClient();
+
+// ─── Idempotency (Po2Logic R5 / F6) ─────────────────────────────────────────
+// IMemoryCache backs the de-dup; IEndpointFilter applied to Write endpoints via
+// [IdempotencyRequired] marker attribute. 24h TTL prevents replays across days.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IdempotencyKeyFilter>();
 
 // ─── Rate limiting ──────────────────────────────────────────────────
 // Protect costly AI endpoints: 10 requests/minute per authenticated user (falls back to IP).

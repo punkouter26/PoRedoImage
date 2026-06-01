@@ -19,7 +19,8 @@ public static class UserImageEndpoints
     {
         var group = app.MapGroup("/api/user-images")
             .WithTags("UserImages")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter>();
 
         group.MapGet("/", ListImagesAsync)
             .WithName("ListUserImages")
@@ -66,11 +67,11 @@ public static class UserImageEndpoints
         if (string.IsNullOrWhiteSpace(request.ImageData))
             return Results.BadRequest("ImageData is required.");
 
-        byte[] bytes;
-        try { bytes = Convert.FromBase64String(request.ImageData); }
-        catch { return Results.BadRequest("ImageData must be valid base64."); }
+        ImageBytes image;
+        try { image = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+        catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-        var result = await service.SaveOriginalAsync(userId, bytes, request.ContentType, request.FileName, ct);
+        var result = await service.SaveOriginalAsync(userId, image.Bytes.ToArray(), image.ContentType, request.FileName, ct);
         return Results.Ok(result);
     }
 
@@ -86,11 +87,11 @@ public static class UserImageEndpoints
         if (string.IsNullOrWhiteSpace(request.ImageData))
             return Results.BadRequest("ImageData is required.");
 
-        byte[] bytes;
-        try { bytes = Convert.FromBase64String(request.ImageData); }
-        catch { return Results.BadRequest("ImageData must be valid base64."); }
+        ImageBytes image;
+        try { image = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+        catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-        var result = await service.SaveResultAsync(userId, bytes, request.ContentType, request.Kind, ct);
+        var result = await service.SaveResultAsync(userId, image.Bytes.ToArray(), image.ContentType, request.Kind, ct);
         return Results.Ok(result);
     }
 

@@ -16,6 +16,10 @@ public static class BulkGenerateEndpoints
             .WithTags("BulkGenerate")
             .RequireAuthorization();
 
+        // Add Idempotency-Key filter to the auth group so duplicate POST /prompts are de-duped
+        // (Po2Logic F6 — no Idempotency-Key on Write endpoints).
+        authGroup.AddEndpointFilter<PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter>();
+
         authGroup.MapGet("/prompts", async (HttpContext context, IBulkPromptRepository storage) =>
         {
             var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -63,13 +67,13 @@ public static class BulkGenerateEndpoints
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");
 
-            byte[] imageBytes;
-            try { imageBytes = Convert.FromBase64String(request.ImageData); }
-            catch { return Results.BadRequest("ImageData must be valid base64."); }
+            ImageBytes imageBytes;
+            try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+            catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
             try
             {
-                var description = await describeService.DescribePersonAsync(imageBytes);
+                var description = await describeService.DescribePersonAsync(imageBytes.Bytes.ToArray());
                 return Results.Ok(new BulkDescribeResponse(description));
             }
             catch (Exception ex)
@@ -93,11 +97,11 @@ public static class BulkGenerateEndpoints
             if (!imagen3.IsConfigured)
                 return Results.Problem("Gemini image generation is not configured.", statusCode: 503);
 
-            byte[] imageBytes;
-            try { imageBytes = Convert.FromBase64String(request.ImageData); }
-            catch { return Results.BadRequest("ImageData must be valid base64."); }
+            ImageBytes imageBytes;
+            try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+            catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-            var (imgData, imgCt, _) = await imagen3.GenerateImageAsync(request.Prompt, imageBytes);
+            var (imgData, imgCt, _) = await imagen3.GenerateImageAsync(request.Prompt, imageBytes.Bytes.ToArray());
             return Results.Ok(new BulkVariationResponse(Convert.ToBase64String(imgData), imgCt));
         })
         .WithName("GenerateBulkVariation")
@@ -117,9 +121,11 @@ public static class BulkGenerateEndpoints
             if (!imagen3.IsConfigured)
                 return Results.Problem("Gemini image generation is not configured.", statusCode: 503);
 
-            byte[] imageBytes;
-            try { imageBytes = Convert.FromBase64String(request.ImageData); }
-            catch { return Results.BadRequest("ImageData must be valid base64."); }
+            ImageBytes imageBytes;
+            try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+            catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
+
+            var rerollImageBytes = imageBytes.Bytes.ToArray();
 
             var logger = loggerFactory.CreateLogger("BulkGenerateEndpoints.Reroll");
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -135,7 +141,7 @@ public static class BulkGenerateEndpoints
                     // Seed = wall-clock ms delta from batch start + slot index — guarantees uniqueness
                     // within the batch and reproducibility if the user retries within the same second.
                     var seed = (int)((Environment.TickCount ^ (i * 2654435761)) & 0x7FFFFFFF);
-                    var (data, ct2, _) = await imagen3.GenerateImageAsync(request.SeedPrompt, imageBytes, seed);
+                    var (data, ct2, _) = await imagen3.GenerateImageAsync(request.SeedPrompt, rerollImageBytes, seed);
                     return new BulkRerollVariation(i, Convert.ToBase64String(data), ct2);
                 }
                 catch (Exception ex)

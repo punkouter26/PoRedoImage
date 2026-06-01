@@ -1,0 +1,123 @@
+@using Radzen
+@using Radzen.Blazor
+
+<div class="prompt-drawer-wrapper">
+    <RadzenButton Icon="list_ul" Text="@(_isExpanded ? "Hide Prompts" : "Show Prompts")"
+                  Click="ToggleDrawer"
+                  ButtonStyle="ButtonStyle.Primary"
+                  Variant="Variant.Flat"
+                  class="prompt-drawer__toggle" />
+
+    <RadzenSidebar @ref="_sidebar"
+                  @bind-Visible="_isExpanded"
+                  Width="400px"
+                  class="prompt-drawer">
+        <div class="prompt-drawer__header">
+            <h3 class="prompt-drawer__title">
+                <i class="bi bi-list-ul me-2"></i>Art Style Prompts
+            </h3>
+            <RadzenBadge BadgeStyle="BadgeStyle.Primary">@_activePromptCount active</RadzenBadge>
+        </div>
+
+        <div class="prompt-drawer__actions">
+            <RadzenButton Icon="eraser" Text="Clear"
+                          Click="ResetDefaults"
+                          ButtonStyle="ButtonStyle.Secondary"
+                          Size="ButtonSize.Small"
+                          Disabled="@IsSaving" />
+            <RadzenButton Icon="cloud_download" Text="Load"
+                          Click="() => OnLoadRequested.InvokeAsync()"
+                          ButtonStyle="ButtonStyle.Secondary"
+                          Size="ButtonSize.Small"
+                          Disabled="@IsSaving" />
+            <RadzenButton Icon="cloud_upload" Text="Save"
+                          Click="() => OnSaveRequested.InvokeAsync()"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small"
+                          Disabled="@IsSaving" />
+        </div>
+
+        <div class="prompt-drawer__hint">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            Use <code>&lt;PERSON&gt;</code> — replaced with AI description of your uploaded image
+        </div>
+
+        <div class="prompt-drawer__list">
+            @for (int i = 0; i < _localPrompts.Length; i++)
+            {
+                var idx = i;
+                <div class="prompt-drawer__item" @key="@($"{_resetKey}-{idx}")">
+                    <span class="prompt-drawer__num">#@(idx + 1)</span>
+                    <textarea class="prompt-drawer__textarea"
+                              rows="2"
+                              value="@_localPrompts[idx]"
+                              @oninput="@(e => UpdatePrompt(idx, e.Value?.ToString() ?? string.Empty))"
+                              placeholder="@(idx < DefaultPrompts.All.Length ? DefaultPrompts.All[idx][..Math.Min(60, DefaultPrompts.All[idx].Length)] + "…" : "Enter an art style prompt…")" />
+                    @if (idx < DefaultPrompts.All.Length
+                        && !string.IsNullOrWhiteSpace(_localPrompts[idx])
+                        && _localPrompts[idx] != DefaultPrompts.All[idx])
+                    {
+                        <RadzenButton Icon="arrow_counterclockwise"
+                                      Click="@(() => ResetRow(idx))"
+                                      ButtonStyle="ButtonStyle.Secondary"
+                                      Variant="Variant.Flat"
+                                      Size="ButtonSize.Small"
+                                      class="prompt-drawer__reset"
+                                      title="Reset to default" />
+                    }
+                </div>
+            }
+        </div>
+    </RadzenSidebar>
+</div>
+
+@code {
+    [Parameter] public string[] Prompts { get; set; } = DefaultPrompts.All;
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public EventCallback<string[]> OnPromptsChanged { get; set; }
+    [Parameter] public EventCallback OnSaveRequested { get; set; }
+    [Parameter] public EventCallback OnLoadRequested { get; set; }
+
+    private RadzenSidebar? _sidebar;
+    private bool _isExpanded;
+    private string[] _localPrompts = DefaultPrompts.All.ToArray();
+    private int _resetKey = 0;
+    private int _activePromptCount => _localPrompts.Count(p => !string.IsNullOrWhiteSpace(p));
+
+    protected override void OnParametersSet()
+    {
+        if (Prompts is not null && !Prompts.SequenceEqual(_localPrompts))
+            _localPrompts = Prompts.ToArray();
+    }
+
+    private void ToggleDrawer()
+    {
+        _isExpanded = !_isExpanded;
+    }
+
+    private async Task UpdatePrompt(int index, string value)
+    {
+        _localPrompts[index] = value;
+        await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+    }
+
+    private async Task ResetDefaults()
+    {
+        _localPrompts = new string[_localPrompts.Length];
+        for (int i = 0; i < _localPrompts.Length; i++) _localPrompts[i] = string.Empty;
+        _resetKey++;
+        await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+        StateHasChanged();
+    }
+
+    private async Task ResetRow(int index)
+    {
+        if (index < DefaultPrompts.All.Length)
+        {
+            _localPrompts[index] = DefaultPrompts.All[index];
+            _resetKey++;
+            await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+            StateHasChanged();
+        }
+    }
+}
