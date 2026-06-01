@@ -3,6 +3,7 @@
 @attribute [AllowAnonymous]
 @inject ImageSessionService SessionService
 @inject NavigationManager Nav
+@inject IWebHostEnvironment Env
 
 <PageTitle>PoRedoImage — Studio</PageTitle>
 
@@ -18,6 +19,10 @@
         <div>
             <h1 class="studio-hero__title">AI Image Studio</h1>
             <p class="studio-hero__sub">Upload a photo, then choose how to transform it.</p>
+        </div>
+        @* AI Model Selector — Rule 14 *@
+        <div class="studio-hero__model-selector">
+            <AiModelSelector OnModelSelected="@HandleModelSelected" />
         </div>
     </div>
 
@@ -95,6 +100,14 @@
     private string? _error;
     private bool _hasImage => SessionService.HasImage;
     private MyImagesGallery? _gallery;
+
+    // AI Model selection — Rule 14
+    private void HandleModelSelected(string? modelId)
+    {
+        // Selected model is persisted via session; for now just log selection.
+        // Future: propagate to feature pages via session service.
+        System.Console.WriteLine("[ModelSelect] AI Model changed to: {0}", modelId ?? "(none)");
+    }
 
     protected override void OnInitialized()
     {

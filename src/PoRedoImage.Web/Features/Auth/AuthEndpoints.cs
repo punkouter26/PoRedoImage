@@ -16,17 +16,39 @@ public static class AuthEndpoints
         if (app.Environment.IsDevelopment())
         {
             // Dev-only sign-in action: /dev-login?email=X signs in and redirects.
-            // anon@anon.local is the reserved ANON identity for one-click bypass and E2E tests.
-            app.MapGet("/dev-login", async (string? email, string? returnUrl, HttpContext context) =>
+            // guest@guest.local is the reserved GUEST identity for one-click bypass and E2E tests.
+            // guestId=GUEST12345678 restores a specific GUEST identity from LocalStorage persistence.
+            app.MapGet("/dev-login", async (string? email, string? guestId, string? returnUrl, HttpContext context) =>
             {
+                // Restore specific GUEST identity from LocalStorage (browser refresh / E2E test resume)
+                if (!string.IsNullOrWhiteSpace(guestId) && guestId.StartsWith("GUEST", StringComparison.OrdinalIgnoreCase))
+                {
+                    var userId = $"guest|{guestId}";
+                    var claims = new List<Claim>
+                    {
+                        new(ClaimTypes.NameIdentifier, userId),
+                        new(ClaimTypes.Name, guestId),
+                        new(ClaimTypes.Email, "guest@guest.local"),
+                    };
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    await context.SignInAsync(
+                        CookieAuthenticationDefaults.AuthenticationScheme,
+                        new ClaimsPrincipal(identity));
+                    var destination = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
+                    if (!Uri.IsWellFormedUriString(destination, UriKind.Relative))
+                        destination = "/";
+                    context.Response.Redirect(destination);
+                    return;
+                }
+
                 if (!string.IsNullOrWhiteSpace(email))
                 {
-                    // Normalise ANON — anything hitting anon@anon.local becomes a unique ANON account.
-                    // Random suffix ensures each ANON session is distinct in logs and DB (e.g. ANON463443).
-                    var isAnon = string.Equals(email, "anon@anon.local", StringComparison.OrdinalIgnoreCase);
-                    var anonSuffix = Random.Shared.Next(100000, 999999).ToString();
-                    var userId = isAnon ? $"anon|ANON{anonSuffix}" : $"dev|{email}";
-                    var displayName = isAnon ? $"ANON{anonSuffix}" : email;
+                    // Normalise GUEST — anything hitting guest@guest.local becomes a unique GUEST account.
+                    // Random suffix ensures each GUEST session is distinct in logs and DB (e.g. GUEST463443).
+                    var isGuest = string.Equals(email, "guest@guest.local", StringComparison.OrdinalIgnoreCase);
+                    var guestSuffix = Random.Shared.Next(10000000, 99999999).ToString();
+                    var userId = isGuest ? $"guest|GUEST{guestSuffix}" : $"dev|{email}";
+                    var displayName = isGuest ? $"GUEST{guestSuffix}" : email;
 
                     var claims = new List<Claim>
                     {
@@ -42,6 +64,14 @@ public static class AuthEndpoints
                     var destination = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
                     if (!Uri.IsWellFormedUriString(destination, UriKind.Relative))
                         destination = "/";
+
+                    // Append guest ID to URL for LocalStorage persistence on the client side
+                    if (isGuest)
+                    {
+                        var separator = destination.Contains('?') ? '&' : '?';
+                        destination = $"{destination}{separator}guestId={displayName}";
+                    }
+
                     context.Response.Redirect(destination);
                 }
                 else

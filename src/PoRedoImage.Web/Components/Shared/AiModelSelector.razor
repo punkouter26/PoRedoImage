@@ -1,0 +1,80 @@
+@using PoRedoImage.Web.Models
+@inject IWebHostEnvironment Env
+
+@* AI Model Selector — Rule 14
+   Dropdown of AI models split by category: Remote, Web Browser, Ollama.
+   Persists selection in user session for the lifetime of the circuit. *@
+<div class="model-selector">
+    <label class="model-selector__label" for="ai-model-select">
+        <i class="bi bi-cpu me-1"></i>AI Model
+    </label>
+    <div class="model-selector__dropdown-wrapper">
+        <RadzenDropDown Name="ai-model-select"
+                    Data="@_filteredModels"
+                    TextProperty="@nameof(AiModelInfo.DisplayName)"
+                    ValueProperty="@nameof(AiModelInfo.ModelId)"
+                    TValue="string"
+                    @bind-Value="@_selectedModelId"
+                    Change="@(args => HandleModelChange(args?.ToString()))"
+                    Placeholder="Select AI model…" />
+    </div>
+    @if (_selectedModel != null && !string.IsNullOrEmpty(_selectedModel.Description))
+    {
+        <div class="model-selector__hint">@_selectedModel.Description</div>
+    }
+</div>
+
+<style>
+    .model-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 220px;
+    }
+    .model-selector__label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .model-selector__dropdown-wrapper {
+        position: relative;
+    }
+    .model-selector__hint {
+        font-size: 0.7rem;
+        color: #64748b;
+        line-height: 1.3;
+        padding-left: 0.15rem;
+    }
+</style>
+
+@code {
+    [Parameter] public EventCallback<string> OnModelSelected { get; set; }
+
+    private string? _selectedModelId;
+    private AiModelInfo? _selectedModel;
+    private List<AiModelInfo> _filteredModels = new();
+
+    protected override void OnInitialized()
+    {
+        // Filter models based on environment — Ollama models are dev-only
+        var isDev = Env.IsDevelopment();
+
+        _filteredModels = AiModelCatalog.All
+            .Where(m => !m.IsDevOnly || isDev)
+            .ToList();
+    }
+
+    private async Task HandleModelChange(string? modelId)
+    {
+        _selectedModel = AiModelCatalog.Find(modelId);
+        if (OnModelSelected.HasDelegate)
+        {
+            await OnModelSelected.InvokeAsync(modelId);
+        }
+    }
+}
