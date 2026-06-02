@@ -1,11 +1,5 @@
----
-project: PoRedoImage
-tier: 3
-type: registry
-diagram: flowchart
-last_updated: 2026-06-01
----
-
+%% PoRedoImage - Tier 3 Registry Diagram
+%% Data Lineage: Ingress → Validate → Transform → Persist → Egress
 flowchart LR
     subgraph INGRESS["Ingress"]
         U1["👤 Upload\n(base64 image)"]
