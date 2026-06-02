@@ -1,0 +1,83 @@
+---
+project: PoRedoImage
+tier: 3
+type: registry
+diagram: flowchart
+last_updated: 2026-06-01
+---
+
+flowchart LR
+    subgraph INGRESS["Ingress"]
+        U1["👤 Upload\n(base64 image)"]
+        KB["Azure Key Vault\n(secrets)"]
+        CFG["appsettings.json\n(config)"]
+    end
+
+    subgraph VALIDATE["Validation Layer"]
+        MAGIC["Magic-byte Check\nJPEG·PNG·GIF·WebP·BMP"]
+        SIZE["Size Check\n≤ 25 MB"]
+        CT["Content-Type\nValidation"]
+    end
+
+    subgraph TRANSFORM["AI Transformation Pipeline"]
+        direction TB
+        CV["Azure CV\nAnalyzeAsync\n(description, tags, confidence)"]
+        OAI["OpenAI GPT-4.1-nano\nEnhanceDescriptionAsync\n(enhanced prompt)"]
+        GEM["Gemini Imagen3\nGenerateAsync\n(img2img)"]
+        MEME["SkiaSharp Overlay\nGenerateMemeAsync\n(top/bottom text)"]
+        AGENT["4-Agent StyleDirector\nVision→Strategy→Refine→Critic"]
+    end
+
+    subgraph ENRICH["Enrichment"]
+        PROMPT["Prompt Injection\n<PERSON> token replacement"]
+        SEED["Seed Generation\nDeterministic per batch"]
+        PARALLEL["Parallel Fan-out\nSemaphoreSlim(3)"]
+    end
+
+    subgraph PERSIST["Persistence Layer"]
+        BS["Azure Blob Storage\n(raw image bytes)"]
+        TS["Azure Table Storage\n(UserImage entity)"]
+        BP["Azure Table Storage\n(BulkPrompt entity)"]
+    end
+
+    subgraph EGRESS["UI Egress"]
+        WASM["Blazor WASM\n(Client State)"]
+        SIGNALR["SignalR\n(Live Updates)"]
+        GALLERY["MyImagesGallery\n(Bento Box Grid)"]
+        RESULT["ResultsPanel\n(Tabbed View)"]
+    end
+
+    U1 --> MAGIC
+    MAGIC --> SIZE
+    SIZE --> CT
+    CT -->|"Mode=Regen"| CV
+    CT -->|"Mode=Meme"| CV
+    CT -->|"Bulk"| PROMPT
+    CV -->|"description"| OAI
+    CV -->|"tags"| OAI
+    OAI -->|"enhanced"| GEM
+    OAI -->|"caption"| MEME
+    PROMPT --> GEM
+    GEM -->|"seed"| SEED
+    GEM -->|"parallel"| PARALLEL
+    PARALLEL -->|"imgData"| BS
+    BS -->|"metadata"| TS
+    TS -->|"query"| WASM
+    PARALLEL -->|"status"| SIGNALR
+    SIGNALR --> GALLERY
+    WASM --> RESULT
+    KB -->|"reload 30m"| TRANSFORM
+    CFG -->|"fallback"| TRANSFORM
+
+    classDef logic fill:#111,stroke:#89b4fa,color:#fff
+    classDef data fill:#eee,stroke:#f2c811,color:#000
+    classDef transform fill:#111,stroke:#10a37f,color:#fff
+    classDef persist fill:#eee,stroke:#f2c811,color:#000
+    classDef egress fill:#111,stroke:#a6e3a1,color:#fff
+
+    class U1 logic
+    class MAGIC,SIZE,CT logic
+    class CV,OAI,GEM,MEME,AGENT transform
+    class PROMPT,SEED,PARALLEL transform
+    class BS,TS,BP data
+    class WASM,SIGNALR,GALLERY,RESULT egress

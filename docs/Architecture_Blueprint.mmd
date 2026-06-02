@@ -1,0 +1,69 @@
+---
+project: PoRedoImage
+tier: 1
+type: architecture
+diagram: c4-context
+last_updated: 2026-06-01
+---
+
+flowchart TB
+    subgraph EDGE["Edge Layer"]
+        U1["👤 User\n(Browser)"]
+        CI["🔄 GitHub Actions\nOIDC Deploy"]
+    end
+
+    subgraph COMPUTE["Compute Layer — Azure Container Apps"]
+        direction TB
+        subgraph BLAZOR["Blazor Web App (.NET 10)"]
+            direction LR
+            SSR["SSR Pages\n(Razor Components)"]
+            WASM["WASM Client\n(Interactive)"]
+            API["Minimal API\n(MapGroup Endpoints)"]
+        end
+        MW["Middleware Pipeline"]
+    end
+
+    subgraph AI["AI Services"]
+        CV["Azure Computer Vision\ncv-poshared-eastus"]
+        OAI["Azure OpenAI\nGPT-4.1-nano\nopenai-poshared-eastus"]
+        GEM["Google Gemini\ngemini-2.5-flash-image"]
+    end
+
+    subgraph DATA["Data Layer"]
+        TS["Azure Table Storage\nstporedoimage26\n(Entities + Prompts)"]
+        BS["Azure Blob Storage\n(User Images)"]
+        KV["Azure Key Vault\nkv-poshared\n(30 min rotation)"]
+    end
+
+    subgraph OPS["Observability"]
+        AI_INSIGHTS["Application Insights\n(Traces + Metrics)"]
+        OTel["OpenTelemetry\nASP.NET Core + HTTP"]
+    end
+
+    U1 -->|"HTTPS"| MW
+    MW --> SSR
+    MW --> WASM
+    MW --> API
+    SSR -->|"SignalR"| WASM
+    API -->|"Analyze"| CV
+    API -->|"Enhance/Generate"| OAI
+    API -->|"Img2Img"| GEM
+    API -->|"Persist"| TS
+    API -->|"Store Images"| BS
+    API -->|"Secrets"| KV
+    API -->|"Logs"| OTel
+    OTel -->|"Export"| AI_INSIGHTS
+    CI -->|"OIDC Deploy"| COMPUTE
+    KV -->|"Reload 30m"| API
+
+    classDef edge fill:#111,stroke:#4a9eff,color:#fff
+    classDef compute fill:#111,stroke:#512bd4,color:#fff
+    classDef ai fill:#111,stroke:#10a37f,color:#fff
+    classDef data fill:#eee,stroke:#f2c811,color:#000
+    classDef ops fill:#111,stroke:#0078d4,color:#fff
+
+    class U1,CI edge
+    class SSR,WASM,API,MW compute
+    class CV,OAI,GEM ai
+    class TS,BS,KV data
+    class AI_INSIGHTS,OTel ops

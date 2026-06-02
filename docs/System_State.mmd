@@ -1,0 +1,72 @@
+---
+project: PoRedoImage
+tier: 2
+type: behavior
+diagram: stateDiagram-v2
+last_updated: 2026-06-01
+---
+
+stateDiagram-v2
+    state "UserImage Lifecycle" as UIL {
+        [*] --> Uploaded
+        Uploaded --> Validating : [if Magic_Bytes_OK]
+        Uploaded --> Rejected : [if Magic_Bytes_Invalid]
+        Validating --> Analyzing : Vision API Called
+        Validating --> Failed : [if CV_Unavailable]
+        Analyzing --> Enhancing : [if Mode_ImageRegen]
+        Analyzing --> Captioning : [if Mode_MemeGen]
+        Analyzing --> Failed : [if CV_Error]
+        Enhancing --> Generating : Gemini Prompt Ready
+        Enhancing --> Failed : [if OpenAI_Error]
+        Generating --> Complete : Image Received
+        Generating --> Failed : [if Gemini_Error]
+        Generating --> Declined : [if Content_Policy]
+        Captioning --> Overlaying : Caption Generated
+        Captioning --> Failed : [if OpenAI_Error]
+        Overlaying --> Complete : Meme Composited
+        Overlaying --> Failed : [if SkiaSharp_Error]
+        Complete --> Persisted : Saved to Blob
+        Complete --> Displayed : Sent to Client
+        Persisted --> Archived : Gallery Store
+        Failed --> [*]
+        Declined --> [*]
+        Rejected --> [*]
+        Displayed --> [*]
+        Archived --> [*]
+    }
+
+    state "BulkVariation Lifecycle" as BVL {
+        [*] --> Pending
+        Pending --> Describing : DescribePerson Called
+        Describing --> Processing : [if Describe_OK]
+        Describing --> Processing : [if Describe_Fails — Fallback Empty]
+        Processing --> Complete : Gemini Variation Received
+        Processing --> Failed : [if Gemini_Error]
+        Processing --> Throttled : [if Rate_Limit]
+        Complete --> [*]
+        Failed --> [*]
+        Throttled --> [*]
+    }
+
+    state "BulkPrompt Lifecycle" as BPL {
+        [*] --> Created
+        Created --> Stored : POST /prompts (10 prompts)
+        Stored --> Loaded : GET /prompts
+        Stored --> Updated : POST /prompts (overwrite)
+        Loaded --> Used : Bulk Generate Session
+        Used --> Stored : Session End
+    }
+
+    state "Session Lifecycle" as SL {
+        [*] --> Anonymous
+        Anonymous --> DevAuth : /dev-login (cookie)
+        Anonymous --> ProdAuth : /challenge-microsoft (OIDC)
+        DevAuth --> Authenticated : ClaimsPrincipal Created
+        ProdAuth --> Authenticated : Token Validated
+        Authenticated --> Active : Session Active
+        Active --> Active : Request Cycle
+        Active --> Expired : Timeout / Logout
+        Expired --> Anonymous : [*]
+        Authenticated --> Logout : /logout
+        Logout --> Anonymous : [*]
+    }
