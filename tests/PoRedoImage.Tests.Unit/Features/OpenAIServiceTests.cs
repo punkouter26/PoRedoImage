@@ -92,32 +92,6 @@ public class AzureOpenAiServiceTests
             service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, -1));
     }
 
-    // ─── GenerateImageAsync guard-clause tests ──────────────────────
-
-    [Fact]
-    public async Task GenerateImageAsync_NullDescription_ThrowsArgumentException()
-    {
-        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            service.GenerateImageAsync(null!));
-    }
-
-    [Fact]
-    public async Task GenerateImageAsync_EmptyDescription_ThrowsArgumentException()
-    {
-        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            service.GenerateImageAsync(""));
-    }
-
-    [Fact]
-    public async Task GenerateImageAsync_WhitespaceDescription_ThrowsArgumentException()
-    {
-        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            service.GenerateImageAsync("   "));
-    }
-
     // ─── GenerateMemeCaptionAsync guard-clause tests ────────────────
 
     [Fact]

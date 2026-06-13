@@ -41,25 +41,20 @@ public sealed class ImageAnalysisOrchestrator(
         }
         else
         {
-            // ImageRegeneration branch: enhance description → DALL-E or Imagen3
+            // ImageRegeneration branch: enhance description → Gemini image generation
             var (enhanced, tokens, enhanceMs) = await aiService.EnhanceDescriptionAsync(
                 description, tags, request.DescriptionLength, ct);
             metrics.DescriptionGenerationTimeMs = enhanceMs;
             metrics.DescriptionTokensUsed = tokens;
             response.Description = enhanced;
 
-            byte[] imgData;
-            string imgType;
-            long regenMs;
+            if (!imagen3Service.IsConfigured)
+            {
+                throw new InvalidOperationException(
+                    "Image generation is not configured. Set the Gemini API key (Google:ApiKey) via Key Vault or appsettings.");
+            }
 
-            if (imagen3Service.IsConfigured)
-            {
-                (imgData, imgType, regenMs) = await imagen3Service.GenerateAsync(enhanced, ct);
-            }
-            else
-            {
-                (imgData, imgType, regenMs) = await aiService.GenerateImageAsync(enhanced, ct);
-            }
+            var (imgData, imgType, regenMs) = await imagen3Service.GenerateAsync(enhanced, ct);
 
             metrics.ImageRegenerationTimeMs = regenMs;
             response.RegeneratedImageData = Convert.ToBase64String(imgData);

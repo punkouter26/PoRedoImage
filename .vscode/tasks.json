@@ -151,20 +151,6 @@
             "problemMatcher": []
         },
         {
-            "label": "test-coverage",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "test",
-                "${workspaceFolder}/PoRedoImage.slnx",
-                "--collect:\"XPlat Code Coverage\"",
-                "--results-directory",
-                "${workspaceFolder}/TestResults"
-            ],
-            "group": "test",
-            "problemMatcher": "$msCompile"
-        },
-        {
             "label": "test-e2e",
             "type": "shell",
             "command": "npx",
@@ -173,7 +159,7 @@
                 "test"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/tests/PoRedoImage.Tests.E2E"
+                "cwd": "${workspaceFolder}/tests/playwright"
             },
             "group": "test",
             "problemMatcher": []

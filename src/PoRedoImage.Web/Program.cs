@@ -73,12 +73,18 @@ try
             Log.Information("Key Vault configuration loaded from {Endpoint}", keyVaultEndpoint);
 
             // In Development, Key Vault would override appsettings.Development.json values (KV is the last
-            // provider added). Pin Azurite back so local storage works regardless of what KV provides.
+            // provider added). Pin local-only values back so dev works regardless of what KV provides:
+            //  • Storage → Azurite (Docker).
+            //  • Chat deployment → the deployment that actually exists on po-aiservices-shared.
+            //    The KV secret is stale (gpt-4.1-nano); the live AIServices resource only has gpt-5.4-nano,
+            //    so the prior value returned 404 DeploymentNotFound. Override locally rather than writing
+            //    to the shared production Key Vault.
             if (builder.Environment.IsDevelopment())
             {
                 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Storage:ConnectionString"] = "UseDevelopmentStorage=true"
+                    ["Storage:ConnectionString"] = "UseDevelopmentStorage=true",
+                    ["OpenAI:ChatCompletionsDeployment"] = "gpt-5.4-nano"
                 });
             }
         }
@@ -98,9 +104,36 @@ try
         }
     }
 
+    // ─── Application Insights connection string resolution (§8) ─────────
+    // Resolution order: APPLICATIONINSIGHTS_CONNECTION_STRING → APPINSIGHTS_INSTRUMENTATIONKEY
+    // → hardcoded staging fallback. Resolved once and shared by Serilog + OpenTelemetry below.
+    var appInsightsConnectionString = ResolveAppInsightsConnectionString(builder.Configuration);
+
+    static string? ResolveAppInsightsConnectionString(IConfiguration config)
+    {
+        // 1. Full connection string (env var or config key, e.g. App Service setting / Key Vault).
+        var connectionString = config["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+            ?? config["ApplicationInsights:ConnectionString"];
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            return connectionString;
+        }
+
+        // 2. Legacy instrumentation key → synthesize a connection string.
+        var instrumentationKey = config["APPINSIGHTS_INSTRUMENTATIONKEY"];
+        if (!string.IsNullOrWhiteSpace(instrumentationKey))
+        {
+            return $"InstrumentationKey={instrumentationKey}";
+        }
+
+        // 3. Hardcoded staging fallback. Populate "ApplicationInsights:StagingConnectionString"
+        //    (appsettings or Key Vault) to keep telemetry flowing if the primary sources are absent;
+        //    null disables export rather than fabricating a credential.
+        return config["ApplicationInsights:StagingConnectionString"];
+    }
+
     // ─── Serilog ────────────────────────────────────────────────────────
     // Structured logging: Console in Development, Application Insights in Production
-    var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
 
     // In Azure App Service with Run-From-Package (OneDeploy), /home/site/wwwroot/ is read-only.
     // Use /home/LogFiles/Application/ (writable) in production; use relative path in development.
@@ -141,9 +174,14 @@ try
     // Exports traces & metrics directly to Application Insights; no separate OTLP collector needed.
     // When connection string is absent (local dev / test), instrumentation is still active but
     // telemetry is not exported anywhere — zero cost, zero failures.
+    // cloud_RoleName resolved via reflection from the real entry assembly so the App Insights
+    // "Cloud role name" is the actual app name and never the unknown_service:dotnet default (§8).
+    var cloudRoleName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name ?? "PoRedoImage";
+    var assemblyVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "1.0.0";
+
     var otelBuilder = builder.Services.AddOpenTelemetry()
         .ConfigureResource(resource => resource
-            .AddService("PoRedoImage", serviceVersion: "1.0.0"))
+            .AddService(cloudRoleName, serviceVersion: assemblyVersion))
         .WithTracing(tracing => tracing
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation())
@@ -152,10 +190,18 @@ try
             .AddHttpClientInstrumentation()
             .AddRuntimeInstrumentation());
 
-    var appInsightsCs = builder.Configuration["ApplicationInsights:ConnectionString"];
-    if (!string.IsNullOrWhiteSpace(appInsightsCs))
+    if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
     {
-        otelBuilder.UseAzureMonitor(options => options.ConnectionString = appInsightsCs);
+        // Sampling profiles (§8): full fidelity (100%) in Dev/Test so nothing is dropped while
+        // debugging; ~10% ceiling in Production to cap trace volume. The Azure Monitor distro uses
+        // head-based fixed-ratio sampling (ApplicationInsightsSampler); it has no per-second adaptive
+        // cap, and Live Metrics (QuickPulse) stays unsampled at 100%.
+        var samplingRatio = builder.Environment.IsDevelopment() ? 1.0f : 0.1f;
+        otelBuilder.UseAzureMonitor(options =>
+        {
+            options.ConnectionString = appInsightsConnectionString;
+            options.SamplingRatio = samplingRatio;
+        });
     }
 
     // ─── Core services ──────────────────────────────────────────────────

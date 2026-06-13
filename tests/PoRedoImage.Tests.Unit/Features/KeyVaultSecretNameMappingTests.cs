@@ -20,8 +20,6 @@ public class KeyVaultSecretNameMappingTests
     [InlineData("PoRedoImage-OpenAI-ApiKey")]
     [InlineData("PoRedoImage-OpenAI-Endpoint")]
     [InlineData("PoRedoImage-OpenAI-DeploymentName")]
-    [InlineData("PoRedoImage-OpenAI-ImageEndpoint")]
-    [InlineData("PoRedoImage-OpenAI-ImageKey")]
     [InlineData("PoRedoImage-ApplicationInsights-ConnectionString")]
     [InlineData("PoRedoImage-StorageConnectionString")]
     public void Load_KnownSecret_ReturnsTrue(string secretName)
@@ -59,8 +57,6 @@ public class KeyVaultSecretNameMappingTests
     [InlineData("PoRedoImage-OpenAI-ApiKey", "OpenAI:Key")]
     [InlineData("PoRedoImage-OpenAI-Endpoint", "OpenAI:Endpoint")]
     [InlineData("PoRedoImage-OpenAI-DeploymentName", "OpenAI:ChatCompletionsDeployment")]
-    [InlineData("PoRedoImage-OpenAI-ImageEndpoint", "OpenAI:ImageEndpoint")]
-    [InlineData("PoRedoImage-OpenAI-ImageKey", "OpenAI:ImageKey")]
     [InlineData("PoRedoImage-ApplicationInsights-ConnectionString", "ApplicationInsights:ConnectionString")]
     [InlineData("PoRedoImage-StorageConnectionString", "Storage:ConnectionString")]
     public void GetKey_KnownSecret_ReturnsMappedConfigKey(string secretName, string expectedConfigKey)
@@ -89,8 +85,6 @@ public class KeyVaultSecretNameMappingTests
             "PoRedoImage-OpenAI-ApiKey",
             "PoRedoImage-OpenAI-Endpoint",
             "PoRedoImage-OpenAI-DeploymentName",
-            "PoRedoImage-OpenAI-ImageEndpoint",
-            "PoRedoImage-OpenAI-ImageKey",
             "PoRedoImage-ApplicationInsights-ConnectionString",
             "PoRedoImage-StorageConnectionString",
             "PoRedoImage-AzureAd-ClientId",

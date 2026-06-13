@@ -91,18 +91,21 @@ tests/
 
 ## AI Models (Rule 14)
 Three categories selectable from the Studio home page:
-1. **Remote** — Azure OpenAI models (gpt-4o, dall-e-3)
+1. **Remote** — Azure OpenAI (gpt-4o chat/vision) + Google Gemini (image generation)
 2. **Web Browser** — Models that run client-side via WebGPU/WebAssembly
 3. **Ollama** — Local models (dev only, requires Ollama running locally)
 
-## Available Skills (Copilot)
-See `.github/copilot-instructions.md` for detailed skill instructions:
+## Available Skills
+Installed globally under `~/.claude/skills/` (from github/awesome-copilot). Invoke with `/<skill-name>`:
+- `acquire-codebase-knowledge`
 - `architecture-blueprint-generator`
+- `folder-structure-blueprint-generator`
 - `dotnet-best-practices`
 - `dotnet-design-pattern-review`
 - `autoresearch`
 - `security-review`
 - `appinsights-instrumentation`
 - `azure-deployment-preflight`
+- `azure-resource-health-diagnose`
 - `create-readme`
 - `repo-story-time`

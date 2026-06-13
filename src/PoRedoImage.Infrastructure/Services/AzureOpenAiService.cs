@@ -4,7 +4,6 @@ using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
-using OpenAI.Images;
 using PoRedoImage.Domain.Interfaces;
 
 namespace PoRedoImage.Infrastructure.Services;
@@ -18,9 +17,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
     private readonly ILogger<AzureOpenAiService> _logger;
     private readonly IConfiguration _configuration;
     private readonly ChatClient _chatClient;
-    private readonly ImageClient _imageClient;
     private readonly Azure.AzureKeyCredential? _chatKeyCredential;
-    private readonly Azure.AzureKeyCredential? _imageKeyCredential;
     private readonly string? _configurationError;
 
     public AzureOpenAiService(IConfiguration configuration, ILogger<AzureOpenAiService> logger)
@@ -34,35 +31,18 @@ public sealed class AzureOpenAiService : IGenerativeAiService
             _configurationError = "OpenAI:Endpoint is not configured.";
             _logger.LogWarning("AzureOpenAI Service not configured: {Error}", _configurationError);
             _chatClient = null!;
-            _imageClient = null!;
             return;
         }
 
-        var imageEndpoint = configuration["OpenAI:ImageEndpoint"] ?? endpoint;
+        // Chat/text only — image generation is handled exclusively by Gemini (IImagen3Service).
         var chatDeployment = configuration["OpenAI:ChatCompletionsDeployment"] ?? "gpt-4o";
-        var imageDeployment = configuration["OpenAI:ImageGenerationDeployment"] ?? "dall-e-3";
         var apiKey = configuration["OpenAI:Key"];
-        var imageApiKey = configuration["OpenAI:ImageKey"] ?? apiKey;
 
-        if (string.Equals(endpoint, imageEndpoint, StringComparison.OrdinalIgnoreCase))
-        {
-            var (shared, cred) = BuildClientWithCredential(endpoint, apiKey);
-            _chatKeyCredential = cred;
-            _imageKeyCredential = cred;
-            _chatClient = shared.GetChatClient(chatDeployment);
-            _imageClient = shared.GetImageClient(imageDeployment);
-        }
-        else
-        {
-            var (chatClientObj, chatCred) = BuildClientWithCredential(endpoint, apiKey);
-            var (imgClientObj, imgCred) = BuildClientWithCredential(imageEndpoint, imageApiKey);
-            _chatKeyCredential = chatCred;
-            _imageKeyCredential = imgCred;
-            _chatClient = chatClientObj.GetChatClient(chatDeployment);
-            _imageClient = imgClientObj.GetImageClient(imageDeployment);
-        }
+        var (client, cred) = BuildClientWithCredential(endpoint, apiKey);
+        _chatKeyCredential = cred;
+        _chatClient = client.GetChatClient(chatDeployment);
 
-        _logger.LogInformation("AzureOpenAI Service initialized. Chat={Chat}, Image={Image}", chatDeployment, imageDeployment);
+        _logger.LogInformation("AzureOpenAI Service initialized. Chat={Chat}", chatDeployment);
     }
 
     private static (AzureOpenAIClient Client, Azure.AzureKeyCredential? Credential) BuildClientWithCredential(string endpoint, string? apiKey)
@@ -77,8 +57,6 @@ public sealed class AzureOpenAiService : IGenerativeAiService
     {
         var chatKey = _configuration["OpenAI:Key"];
         if (!string.IsNullOrWhiteSpace(chatKey)) _chatKeyCredential?.Update(chatKey);
-        var imageKey = _configuration["OpenAI:ImageKey"] ?? chatKey;
-        if (!string.IsNullOrWhiteSpace(imageKey)) _imageKeyCredential?.Update(imageKey);
     }
 
     public async Task<(string EnhancedDescription, int TokensUsed, long ElapsedMs)>
@@ -100,7 +78,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
             The image has been tagged with these elements: {string.Join(", ", tags)}
 
             Please enhance this description to be more detailed and comprehensive.
-            The enhanced description should be approximately {targetLength} words and suitable for image generation with DALL-E.
+            The enhanced description should be approximately {targetLength} words and suitable for image generation.
 
             Enhanced description:
             """;
@@ -111,8 +89,10 @@ public sealed class AzureOpenAiService : IGenerativeAiService
             new UserChatMessage(prompt)
         };
 
-        var response = await _chatClient.CompleteChatAsync(messages,
-            new ChatCompletionOptions { MaxOutputTokenCount = 800, Temperature = 0.7f }, ct);
+        // GPT-5-class deployments (e.g. gpt-5.4-nano) reject custom Temperature and reject the legacy
+        // max_tokens that Azure.AI.OpenAI 2.1.0 emits for MaxOutputTokenCount (they require
+        // max_completion_tokens). Sending neither keeps these short prompts compatible across models.
+        var response = await _chatClient.CompleteChatAsync(messages, cancellationToken: ct);
 
         if (response.Value.Content.Count == 0)
             throw new InvalidOperationException("OpenAI returned an empty response for description enhancement.");
@@ -121,30 +101,6 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         _logger.LogInformation("Description enhanced in {Elapsed}ms. Tokens={Tokens}", elapsed, tokens);
         return (enhanced, tokens, elapsed);
-    }
-
-    public async Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
-        GenerateImageAsync(string description, CancellationToken ct = default)
-    {
-        if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
-        ArgumentException.ThrowIfNullOrWhiteSpace(description);
-
-        RefreshCredentials();
-        _logger.LogInformation("Generating image with DALL-E");
-        var start = Stopwatch.GetTimestamp();
-
-        var options = new ImageGenerationOptions
-        {
-            Quality = GeneratedImageQuality.Standard,
-            Size = GeneratedImageSize.W1024xH1024,
-            ResponseFormat = GeneratedImageFormat.Bytes
-        };
-
-        var response = await _imageClient.GenerateImageAsync(description, options, ct);
-        var imageData = response.Value.ImageBytes.ToArray();
-        var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Image generated in {Elapsed}ms. Size={Size} bytes", elapsed, imageData.Length);
-        return (imageData, "image/png", elapsed);
     }
 
     public async Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)>
@@ -168,7 +124,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
 
         var response = await _chatClient.CompleteChatAsync(
             [new SystemChatMessage("You are a meme caption generator."), new UserChatMessage(prompt)],
-            new ChatCompletionOptions { MaxOutputTokenCount = 150 }, ct);
+            cancellationToken: ct);
 
         if (response.Value.Content.Count == 0)
             throw new InvalidOperationException("OpenAI returned an empty response for meme caption.");
@@ -220,8 +176,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
                 ChatMessageContentPart.CreateTextPart("Describe the main person in this photo as a short noun phrase for an art prompt."))
         };
 
-        var response = await _chatClient.CompleteChatAsync(messages,
-            new ChatCompletionOptions { MaxOutputTokenCount = 80 }, ct);
+        var response = await _chatClient.CompleteChatAsync(messages, cancellationToken: ct);
 
         if (response.Value.Content.Count == 0)
             throw new InvalidOperationException("OpenAI returned an empty response for person description.");
@@ -259,8 +214,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
                 new SystemChatMessage(systemPrompt),
                 new UserChatMessage(userPrompt)
             },
-            new ChatCompletionOptions { MaxOutputTokenCount = 40, Temperature = 0.95f },
-            ct);
+            cancellationToken: ct);
 
         if (response.Value.Content.Count == 0)
             throw new InvalidOperationException("OpenAI returned an empty response for persona caption.");

@@ -31,7 +31,7 @@ public sealed record AiModelInfo
 /// </summary>
 public enum AiModelCategory
 {
-    /// <summary>Azure OpenAI models (gpt-4o, dall-e-3, etc.)</summary>
+    /// <summary>Remote cloud models (Azure OpenAI gpt-4o, Google Gemini, etc.)</summary>
     Remote,
 
     /// <summary>Web browser AI models that run client-side via WebGPU/WebAssembly</summary>
@@ -52,10 +52,9 @@ public static class AiModelCatalog
     /// <summary>Returns all available AI models.</summary>
     public static IReadOnlyList<AiModelInfo> All { get; } = new List<AiModelInfo>
     {
-        // ── Remote (Azure OpenAI) ───────────────────────────────────────
+        // ── Remote (Azure OpenAI + Google) ──────────────────────────────
         new() { DisplayName = "GPT-4o", ModelId = "gpt-4o", Category = AiModelCategory.Remote, Description = "Azure OpenAI — Chat & image analysis" },
-        new() { DisplayName = "DALL-E 3", ModelId = "dall-e-3", Category = AiModelCategory.Remote, Description = "Azure OpenAI — Image generation" },
-        new() { DisplayName = "Gemini 2.0 Flash", ModelId = "gemini-2.0-flash-exp-image-generation", Category = AiModelCategory.Remote, Description = "Google Imagen 3 via Gemini API" },
+        new() { DisplayName = "Gemini 2.5 Flash Image", ModelId = "gemini-2.5-flash-image", Category = AiModelCategory.Remote, Description = "Google Gemini — Image generation" },
 
         // ── Web Browser ─────────────────────────────────────────────────
         new() { DisplayName = "WebNN Image Classifier", ModelId = "webnn-classifier", Category = AiModelCategory.WebBrowser, Description = "Client-side image classification via WebNN" },

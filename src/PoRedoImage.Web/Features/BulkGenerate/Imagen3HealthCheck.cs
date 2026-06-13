@@ -18,8 +18,8 @@ public class Imagen3HealthCheck : IHealthCheck
     {
         if (!_imagen3.IsConfigured)
         {
-            return Task.FromResult(HealthCheckResult.Degraded(
-                "Gemini image generation not configured (Google:ApiKey missing). BulkGenerate falls back to DALL-E 3."));
+            return Task.FromResult(HealthCheckResult.Unhealthy(
+                "Gemini image generation not configured (Google:ApiKey missing). Image generation is unavailable."));
         }
 
         return Task.FromResult(HealthCheckResult.Healthy("Gemini image generation configured (Google AI Studio REST API)."));

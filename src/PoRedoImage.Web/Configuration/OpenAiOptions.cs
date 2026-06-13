@@ -21,17 +21,11 @@ public sealed class OpenAiOptions
     [Required, Url]
     public string Endpoint { get; init; } = string.Empty;
 
-    public string? ImageEndpoint { get; init; }
-
     [Required]
     public string Key { get; init; } = string.Empty;
 
-    public string? ImageKey { get; init; }
-
     [Required]
     public string ChatCompletionsDeployment { get; init; } = "gpt-4o";
-
-    public string? ImageGenerationDeployment { get; init; } = "dall-e-3";
 }
 
 /// <summary>

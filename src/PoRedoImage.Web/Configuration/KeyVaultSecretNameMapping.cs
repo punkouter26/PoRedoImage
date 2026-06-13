@@ -19,8 +19,6 @@ public class KeyVaultSecretNameMapping : KeyVaultSecretManager
         ["PoRedoImage-OpenAI-ApiKey"] = "OpenAI:Key",
         ["PoRedoImage-OpenAI-Endpoint"] = "OpenAI:Endpoint",
         ["PoRedoImage-OpenAI-DeploymentName"] = "OpenAI:ChatCompletionsDeployment",
-        ["PoRedoImage-OpenAI-ImageEndpoint"] = "OpenAI:ImageEndpoint",
-        ["PoRedoImage-OpenAI-ImageKey"] = "OpenAI:ImageKey",
         ["PoRedoImage-ApplicationInsights-ConnectionString"] = "ApplicationInsights:ConnectionString",
         ["PoRedoImage-StorageConnectionString"] = "Storage:ConnectionString",
         ["PoRedoImage-AzureAd-ClientId"] = "AzureAd:ClientId",
