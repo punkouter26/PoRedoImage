@@ -29,6 +29,16 @@ param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups
 @description('Key Vault endpoint in the PoShared resource group')
 param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
 
+@description('Key Vault name in the PoShared resource group (used for Key Vault reference app settings)')
+param keyVaultName string = 'kv-poshared'
+
+// Builds an App Service Key Vault reference for a secret in the shared vault.
+// Resolved by the platform via the app's managed identity (which holds a get/list
+// access policy on the access-policy-mode vault), populating config directly. This
+// is the reliable secret path; the in-app AddAzureKeyVault provider is a fallback.
+func kvRef(vaultName string, secretName string) string =>
+  '@Microsoft.KeyVault(VaultName=${vaultName};SecretName=${secretName})'
+
 // ─── Storage Account (Table Storage) ────────────────────────────────────────
 // Standard_LRS is the lowest-cost tier for Table Storage.
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -89,6 +99,21 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
           name: 'WEBSITE_CONTAINER_START_TIME_LIMIT'
           value: '600'
         }
+        // ─── Secrets via Key Vault references ─────────────────────────────────
+        // Names use '__' which the .NET config provider maps to ':' (e.g.
+        // OpenAI__Endpoint → OpenAI:Endpoint). The startup secret validator
+        // fail-fasts in Production if OpenAI:* or Google:ApiKey are missing.
+        { name: 'OpenAI__Endpoint', value: kvRef(keyVaultName, 'PoRedoImage-OpenAI-Endpoint') }
+        { name: 'OpenAI__Key', value: kvRef(keyVaultName, 'PoRedoImage-OpenAI-ApiKey') }
+        { name: 'OpenAI__ChatCompletionsDeployment', value: kvRef(keyVaultName, 'PoRedoImage-OpenAI-DeploymentName') }
+        { name: 'Google__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-Google-ApiKey') }
+        { name: 'Google__Imagen3Model', value: kvRef(keyVaultName, 'PoRedoImage-Google-Imagen3Model') }
+        { name: 'ComputerVision__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-ApiKey') }
+        { name: 'ComputerVision__Endpoint', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-Endpoint') }
+        { name: 'ApplicationInsights__ConnectionString', value: kvRef(keyVaultName, 'PoRedoImage-ApplicationInsights-ConnectionString') }
+        { name: 'Storage__ConnectionString', value: kvRef(keyVaultName, 'PoRedoImage-StorageConnectionString') }
+        { name: 'AzureAd__ClientId', value: kvRef(keyVaultName, 'PoRedoImage-AzureAd-ClientId') }
+        { name: 'AzureAd__ClientSecret', value: kvRef(keyVaultName, 'PoRedoImage-AzureAd-ClientSecret') }
       ]
     }
   }
