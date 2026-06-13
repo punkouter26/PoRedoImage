@@ -32,6 +32,9 @@ param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
 @description('Key Vault name in the PoShared resource group (used for Key Vault reference app settings)')
 param keyVaultName string = 'kv-poshared'
 
+@description('Azure OpenAI chat deployment name — must match a live deployment on po-aiservices-shared')
+param openAiChatDeployment string = 'gpt-5.4-nano'
+
 // Builds an App Service Key Vault reference for a secret in the shared vault.
 // Resolved by the platform via the app's managed identity (which holds a get/list
 // access policy on the access-policy-mode vault), populating config directly. This
@@ -105,7 +108,10 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         // fail-fasts in Production if OpenAI:* or Google:ApiKey are missing.
         { name: 'OpenAI__Endpoint', value: kvRef(keyVaultName, 'PoRedoImage-OpenAI-Endpoint') }
         { name: 'OpenAI__Key', value: kvRef(keyVaultName, 'PoRedoImage-OpenAI-ApiKey') }
-        { name: 'OpenAI__ChatCompletionsDeployment', value: kvRef(keyVaultName, 'PoRedoImage-OpenAI-DeploymentName') }
+        // The chat deployment NAME is not a secret — a plain literal avoids Key Vault
+        // reference caching (a stale 'gpt-4.1-nano' returned 404 DeploymentNotFound).
+        // Must match a live deployment on po-aiservices-shared (currently gpt-5.4-nano).
+        { name: 'OpenAI__ChatCompletionsDeployment', value: openAiChatDeployment }
         { name: 'Google__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-Google-ApiKey') }
         { name: 'Google__Imagen3Model', value: kvRef(keyVaultName, 'PoRedoImage-Google-Imagen3Model') }
         { name: 'ComputerVision__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-ApiKey') }

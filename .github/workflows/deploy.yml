@@ -18,6 +18,11 @@ env:
   SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
   UNIT_TEST_PATH: tests/PoRedoImage.Tests.Unit
+  # Expected App Service Plan (Basic B2 in PoShared) — drift onto an F1 Free plan
+  # caused QuotaExceeded "Site Disabled" deploy failures. Asserted post-deploy.
+  EXPECTED_PLAN: asp-poshared-linux
+  # Run pre-June-16-2026 Node 20 actions on Node 24 ahead of the forced migration.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 concurrency:
   group: deploy-${{ github.repository }}-${{ github.ref }}
@@ -47,8 +52,12 @@ jobs:
         with:
           name: unit-test-results
           path: TestResults/*.trx
-      - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
-      - uses: actions/upload-artifact@v4
+      # Publish + artifact upload are only consumed by the deploy job (push /
+      # workflow_dispatch). Skip them on pull_request to cut PR CI time.
+      - if: github.event_name != 'pull_request'
+        run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
           name: webapp
           path: publish
@@ -66,6 +75,7 @@ jobs:
       name: production
       url: https://poredoimage-web.azurewebsites.net
     steps:
+      - uses: actions/checkout@v4 # needed for the infra/main.bicep what-if preflight
       - uses: actions/download-artifact@v4
         with:
           name: webapp
@@ -75,12 +85,34 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Infra drift preflight (what-if)
+        continue-on-error: true # informational — never block a deploy on what-if
+        run: |
+          az deployment group what-if \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --template-file infra/main.bicep \
+            --result-format ResourceIdOnly || echo "what-if unavailable; continuing."
       - run: cd publish && zip -r ../webapp.zip . && cd ..
       - uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           package: webapp.zip
+      - name: Verify App Service Plan binding & state
+        run: |
+          read -r STATE PLAN <<< "$(az webapp show \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --query "[state, reverse(split(appServicePlanId, '/'))[0]]" -o tsv | tr '\n' ' ')"
+          echo "State=$STATE  Plan=$PLAN  (expected plan: ${{ env.EXPECTED_PLAN }})"
+          if [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
+            echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. F1 Free plans hit QuotaExceeded and disable the site."
+            exit 1
+          fi
+          if [ "$STATE" != "Running" ]; then
+            echo "::error::App state is '$STATE', expected 'Running'."
+            exit 1
+          fi
       - name: Verify deployment (health check)
         run: |
           sleep 20
@@ -90,4 +122,5 @@ jobs:
             if [ "$STATUS" = "200" ]; then echo "Deployment verified."; exit 0; fi
             sleep 15
           done
-          echo "WARNING: Health check did not return 200 after 5 attempts."
+          echo "::error::Health check did not return 200 after 5 attempts."
+          exit 1

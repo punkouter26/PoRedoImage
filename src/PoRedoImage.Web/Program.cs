@@ -57,7 +57,22 @@ try
     {
         try
         {
-            var credential = new DefaultAzureCredential();
+            // In App Service only the managed identity matters. Excluding the dev/
+            // interactive probes (which can each add seconds while failing) keeps the
+            // cold-start token fast — a slow first token previously yielded an empty
+            // Key Vault load and crash-looped the container. Secrets are also bound
+            // as App Service Key Vault references (see infra/main.bicep) so config is
+            // populated even if this provider is slow; this is defence in depth.
+            var credential = builder.Environment.IsDevelopment()
+                ? new DefaultAzureCredential()
+                : new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                {
+                    ExcludeInteractiveBrowserCredential = true,
+                    ExcludeVisualStudioCredential = true,
+                    ExcludeAzureCliCredential = true,
+                    ExcludeAzurePowerShellCredential = true,
+                    ExcludeAzureDeveloperCliCredential = true,
+                });
             var secretManager = new KeyVaultSecretNameMapping();
 
             // ReloadInterval: re-fetch secrets every 30 minutes for secret rotation without restart.
