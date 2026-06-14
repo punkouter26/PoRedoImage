@@ -17,8 +17,8 @@ param appServiceName string = 'poredoimage-web'
 @description('Storage account name (must be globally unique)')
 param storageAccountName string = 'stporedoimage26'
 
-@description('Storage account location — should match the App Service plan region to avoid cross-region latency')
-param storageLocation string = 'westus2'
+@description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
+param storageLocation string = 'eastus'
 
 @description('Azure subscription ID hosting the shared PoShared App Service Plan')
 param subscriptionId string = subscription().subscriptionId

@@ -100,10 +100,10 @@ jobs:
           package: webapp.zip
       - name: Verify App Service Plan binding & state
         run: |
-          read -r STATE PLAN_ID <<< "$(az webapp show \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --query "[state, appServicePlanId]" -o tsv | tr '\n' ' ')"
+          # appServicePlanId is a CLI top-level alias — null inside an array
+          # projection — so query each field on its own.
+          STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
+          PLAN_ID=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query appServicePlanId -o tsv)
           PLAN=${PLAN_ID##*/} # plan name = last path segment of the resource id
           echo "State=$STATE  Plan=$PLAN  (expected plan: ${{ env.EXPECTED_PLAN }})"
           if [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
