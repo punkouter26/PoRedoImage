@@ -100,10 +100,11 @@ jobs:
           package: webapp.zip
       - name: Verify App Service Plan binding & state
         run: |
-          read -r STATE PLAN <<< "$(az webapp show \
+          read -r STATE PLAN_ID <<< "$(az webapp show \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --query "[state, reverse(split(appServicePlanId, '/'))[0]]" -o tsv | tr '\n' ' ')"
+            --query "[state, appServicePlanId]" -o tsv | tr '\n' ' ')"
+          PLAN=${PLAN_ID##*/} # plan name = last path segment of the resource id
           echo "State=$STATE  Plan=$PLAN  (expected plan: ${{ env.EXPECTED_PLAN }})"
           if [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
             echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. F1 Free plans hit QuotaExceeded and disable the site."
