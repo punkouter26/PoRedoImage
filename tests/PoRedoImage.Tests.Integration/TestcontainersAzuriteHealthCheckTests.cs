@@ -9,15 +9,16 @@ namespace PoRedoImage.Tests.Integration;
 /// </summary>
 public class TestcontainersAzuriteHealthCheckTests
 {
-    [Fact(Skip = "Requires Docker daemon; runs in CI with Docker agent only")]
+    [DockerFact]
     public async Task AzuriteContainer_CanStartAndListenOnExpectedPorts()
     {
+        // Random host ports (0) so the test never collides with a locally-running
+        // docker-compose Azurite on 10000-10002.
         await using var container = new ContainerBuilder()
             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
-            .WithName("poredoimage-azurite-test")
-            .WithPortBinding(10000, 10000)
-            .WithPortBinding(10001, 10001)
-            .WithPortBinding(10002, 10002)
+            .WithPortBinding(0, 10000)
+            .WithPortBinding(0, 10001)
+            .WithPortBinding(0, 10002)
             .WithCommand("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--loose")
             .WithCleanUp(true)
             .Build();

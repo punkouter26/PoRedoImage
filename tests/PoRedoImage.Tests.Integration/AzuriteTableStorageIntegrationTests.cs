@@ -39,7 +39,7 @@ public sealed class AzuriteTableStorageIntegrationTests : IAsyncLifetime
             await _container.DisposeAsync();
     }
 
-    [Fact(Skip = "Requires Docker daemon; tagged 'Docker' for selective CI runs")]
+    [DockerFact]
     public async Task SaveAndLoadPrompts_RoundTrip_Succeeds()
     {
         var serviceClient = new TableServiceClient(_connectionString);

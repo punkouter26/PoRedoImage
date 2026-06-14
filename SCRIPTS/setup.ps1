@@ -62,7 +62,7 @@ Write-Step "Starting Azurite via Docker Compose"
 if (Assert-CommandExists 'docker' 'Install Docker Desktop from https://www.docker.com/products/docker-desktop/') {
     Push-Location $Root
     try {
-        docker compose -f docker-compose.azurite.yml up -d
+        docker compose up -d
         Write-Host "  Azurite started on default ports (Blob: 10000, Queue: 10001, Table: 10002)" -ForegroundColor Green
     }
     finally {
@@ -83,15 +83,31 @@ if (Assert-CommandExists 'dotnet' 'Install .NET 10 SDK from https://dotnet.micro
 Write-Step "Installing Playwright browsers"
 
 if (Assert-CommandExists 'npx' 'Install Node.js LTS from https://nodejs.org/') {
-    $playwrightDir = Join-Path $Root 'tests/PoRedoImage.Tests.E2E'
+    $playwrightDir = Join-Path $Root 'tests/playwright'
     if (Test-Path $playwrightDir) {
         Push-Location $playwrightDir
         try {
+            npm install
             npx playwright install --with-deps chromium
         }
         finally {
             Pop-Location
         }
+    }
+}
+
+# ── 4b. Azure CLI auth check (Key Vault access) ──────────────────────
+Write-Step "Checking Azure CLI authentication"
+
+if (Assert-CommandExists 'az' 'Install Azure CLI from https://aka.ms/installazurecli') {
+    $account = az account show --query user.name -o tsv 2>$null
+    if ([string]::IsNullOrWhiteSpace($account)) {
+        Write-Warning "Not logged in to Azure CLI. Run 'az login' so the app can read secrets from Key Vault (kv-poshared)."
+    } else {
+        Write-Host "  Signed in as $account" -ForegroundColor Green
+        Write-Host "  Verifying Key Vault access (kv-poshared)..." -ForegroundColor Gray
+        az keyvault secret list --vault-name kv-poshared --query "length(@)" -o tsv 2>$null |
+            ForEach-Object { Write-Host "    Key Vault reachable — $_ secrets visible." -ForegroundColor Green }
     }
 }
 
@@ -109,6 +125,6 @@ if (Test-Path $devSettings) {
 # ── Done ─────────────────────────────────────────────────────────────
 Write-Host "`n✓ Setup complete. Next steps:" -ForegroundColor Green
 Write-Host "  1. Ensure Docker Desktop is running and Azurite container is healthy:" -ForegroundColor Gray
-Write-Host "       docker compose -f docker-compose.azurite.yml ps" -ForegroundColor DarkGray
+Write-Host "       docker compose ps" -ForegroundColor DarkGray
 Write-Host "  2. Open PoRedoImage.slnx in VS Code and press F5 to launch." -ForegroundColor Gray
-Write-Host "  3. Sign in as ANON on the login page for a zero-config dev session." -ForegroundColor Gray
+Write-Host "  3. Click 'Continue as GUEST' on the login page for a zero-config dev session." -ForegroundColor Gray
