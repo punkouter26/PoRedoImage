@@ -12,10 +12,10 @@ targetScope = 'resourceGroup'
 param location string = resourceGroup().location
 
 @description('App Service name')
-param appServiceName string = 'poredoimage-web'
+param appServiceName string = 'app-poredoimage-web-prod-wus2-001'
 
 @description('Storage account name (must be globally unique)')
-param storageAccountName string = 'stporedoimage26'
+param storageAccountName string = 'stporedoimageprodwus2001'
 
 @description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
 param storageLocation string = 'eastus'
@@ -24,10 +24,10 @@ param storageLocation string = 'eastus'
 param subscriptionId string = subscription().subscriptionId
 
 @description('App Service Plan resource ID (shared plan in PoShared)')
-param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poshared-linux'
+param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups/rg-platform-shared-prod-eus2/providers/Microsoft.Web/serverfarms/asp-platform-linux-b2-prod-wus2-001'
 
 @description('Key Vault endpoint in the PoShared resource group')
-param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
+param keyVaultEndpoint string = 'https://kv-platform-prod-eus2-00.vault.azure.net/'
 
 @description('Key Vault name in the PoShared resource group (used for Key Vault reference app settings)')
 param keyVaultName string = 'kv-poshared'
