@@ -43,6 +43,16 @@
     --motion-fast: 150ms;
     --motion-base: 250ms;
     --motion-slow: 350ms;
+
+    /* Spacing — bridges design-tokens.json to CSS. Without these every var(--spacing-*)
+       below resolves to initial and the browser silently renders with 0 padding/gap. */
+    --spacing-2xs: 0.125rem;
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
 }
 
 /* ── Global Nav Styles (must be here — child components bypass CSS isolation) ── */
@@ -539,9 +549,13 @@ a, .btn-link { color: var(--color-primary); }
 
 .shimmer-progress__bar {
     height: 100%;
+    width: 100%;
     background: var(--color-primary-grad);
     border-radius: 99px;
-    transition: width 0.6s ease;
+    transform: scaleX(var(--progress, 0));
+    transform-origin: left center;
+    transition: transform 0.6s var(--motion-ease-in-out);
+    will-change: transform;
 }
 
 .shimmer-progress__fill {
@@ -1054,104 +1068,7 @@ code { color: #c026d3; }
     object-fit: cover;
 }
 
-.prompt-editor {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.prompt-editor__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.6rem 0.85rem;
-    border-bottom: 1px solid #e2e8f0;
-    background: #f8fafc;
-}
-
-.prompt-editor__title {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #1e293b;
-    margin: 0;
-    white-space: nowrap;
-}
-
-.prompt-editor__actions {
-    display: flex;
-    gap: 0.35rem;
-    flex-shrink: 0;
-}
-
-/* Icon-only buttons on very narrow containers */
-.prompt-editor__actions .btn .d-action-label {
-    display: inline;
-}
-
-.prompt-editor__token-hint {
-    width: 100%;
-    font-size: 0.72rem;
-    color: #64748b;
-    padding: 0.25rem 0;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.prompt-editor__token-hint code {
-    background: #eff6ff;
-    color: #2563eb;
-    border: 1px solid #bfdbfe;
-    border-radius: 4px;
-    padding: 0.05rem 0.4rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-}
-
-.prompt-editor__list {
-    padding: 0.75rem;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 0.5rem;
-}
-
-.prompt-editor__item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.6rem;
-}
-
-.prompt-editor__num {
-    width: 1.5rem;
-    text-align: center;
-    color: #94a3b8;
-    font-size: 0.75rem;
-    padding-top: 0.5rem;
-    flex-shrink: 0;
-}
-
-.prompt-editor__textarea {
-    flex: 1;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    color: #1e293b;
-    font-size: 0.82rem;
-    padding: 0.45rem 0.7rem;
-    resize: vertical;
-    min-height: 56px;
-    transition: border-color 0.15s, background 0.15s;
-    line-height: 1.45;
-}
-
-.prompt-editor__textarea:focus {
-    outline: none;
-    border-color: #3b82f6;
-    background: #fff;
-}
+/* .prompt-editor* rules moved into BulkPromptEditor.razor.css (scoped). */
 
 .btn-generate-all {
     background: linear-gradient(135deg, #2563eb, #7c3aed);
@@ -1178,172 +1095,7 @@ code { color: #c026d3; }
     cursor: not-allowed;
 }
 
-.bulk-progress-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.85rem;
-    color: #475569;
-    margin-bottom: 0.4rem;
-}
-
-.bulk-progress-bar {
-    height: 6px;
-    background: #e2e8f0;
-    border-radius: 99px;
-    overflow: hidden;
-}
-
-.bulk-progress-bar__fill {
-    height: 100%;
-    background: linear-gradient(90deg, #2563eb, #7c3aed);
-    border-radius: 99px;
-    transition: width 0.4s ease;
-}
-
-.bulk-empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 3rem 2rem;
-    text-align: center;
-    color: #64748b;
-    background: #f8fafc;
-    border: 2px dashed #e2e8f0;
-    border-radius: 16px;
-    min-height: 260px;
-}
-
-.bulk-empty-state__icon {
-    font-size: 3rem;
-    color: #cbd5e1;
-    margin-bottom: 1rem;
-}
-
-.bulk-empty-state__title {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 0.5rem;
-}
-
-.bulk-empty-state__hint {
-    font-size: 0.9rem;
-    color: #64748b;
-    max-width: 380px;
-    margin: 0 auto;
-}
-
-.bulk-gallery {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 1rem;
-    margin-top: 0;
-}
-
-.bulk-slot {
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    transition: border-color var(--motion-base);
-    box-shadow: var(--shadow-sm);
-}
-
-.bulk-slot--complete { border-color: #93c5fd; }
-.bulk-slot--failed   { border-color: #fca5a5; }
-
-.bulk-slot__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: 0.78rem;
-    color: var(--color-muted);
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg);
-}
-
-.bulk-slot__num {
-    font-weight: 700;
-    color: #334155;
-}
-
-.bulk-slot__img-area {
-    aspect-ratio: 1/1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f1f5f9;
-    overflow: hidden;
-}
-
-.bulk-slot__img-area img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.bulk-slot__img-area--pending {
-    color: #94a3b8;
-    font-size: 0.8rem;
-}
-
-.bulk-slot__img-area--processing {
-    flex-direction: column;
-    gap: 0.5rem;
-    color: #64748b;
-    font-size: 0.78rem;
-}
-
-.bulk-slot__spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid #e2e8f0;
-    border-top-color: #3b82f6;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.bulk-slot__img-area--failed {
-    color: #ef4444;
-    font-size: 0.8rem;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-
-.bulk-slot__footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.4rem 0.75rem;
-    min-height: 2.2rem;
-}
-
-.bulk-slot__prompt-preview {
-    font-size: 0.72rem;
-    color: #94a3b8;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 75%;
-}
-
-.btn-dl-slot {
-    background: none;
-    border: 1px solid rgba(91,154,255,0.4);
-    border-radius: 6px;
-    color: #5b9aff;
-    font-size: 0.72rem;
-    padding: 0.2rem 0.55rem;
-    cursor: pointer;
-    transition: background 0.15s;
-    flex-shrink: 0;
-}
-
-.btn-dl-slot:hover { background: rgba(91,154,255,0.12); }
+/* Bulk gallery rules have moved into BulkGallery.razor.css (scoped). */
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 576px) {
@@ -1355,7 +1107,6 @@ code { color: #c026d3; }
     .diag-row { grid-template-columns: 1fr; gap: var(--spacing-xs); }
     .result-image { max-height: 200px; }
     .feature-selector { grid-template-columns: 1fr; }
-    .bulk-gallery { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 360px) {
@@ -1589,52 +1340,7 @@ code { color: #c026d3; }
     object-fit: cover;
 }
 
-/* ── Bulk Slot shimmer (pending state) ────────────────────────────────── */
-.bulk-slot__shimmer {
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-}
-
-/* Clickable image tile */
-.bulk-slot__img-clickable {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    cursor: pointer;
-    transition: opacity 0.15s;
-}
-
-.bulk-slot__img-clickable:hover { opacity: 0.88; }
-
-/* ── Bulk Slot actions (heart + download) ─────────────────────────────── */
-.bulk-slot__actions {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    flex-shrink: 0;
-}
-
-.btn-heart-slot {
-    background: none;
-    border: 1px solid rgba(239,68,68,0.3);
-    border-radius: 6px;
-    color: #f87171;
-    font-size: 0.75rem;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-    flex-shrink: 0;
-}
-
-.btn-heart-slot:hover,
-.btn-heart-slot--active {
-    background: rgba(239,68,68,0.1);
-    border-color: #ef4444;
+/* Bulk slot / shimmer / heart rules moved into BulkGallery.razor.css (scoped). */
     color: #ef4444;
 }
 
@@ -1673,29 +1379,7 @@ code { color: #c026d3; }
     font-weight: 700;
 }
 
-/* ── Per-row reset button in prompt editor ────────────────────────────── */
-.btn-reset-row {
-    background: none;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    color: #94a3b8;
-    font-size: 0.75rem;
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    margin-top: 0.45rem;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.btn-reset-row:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-    color: #475569;
-}
+/* .btn-reset-row moved into BulkPromptEditor.razor.css (scoped). */
 
 /* ── Download Favorites button ────────────────────────────────────────── */
 .btn-download-favs {
@@ -2105,59 +1789,7 @@ code { color: #c026d3; }
 @keyframes skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
 
-.bulk-reroll-panel {
-  background: rgba(81, 43, 212, 0.08);
-  border: 1px solid rgba(81, 43, 212, 0.3);
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.bulk-reroll-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.bulk-reroll-cell {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 10px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.bulk-reroll-cell img {
-  width: 100%;
-  height: 180px;
-  object-fit: cover;
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-.btn-reroll-slot {
-  background: rgba(81, 43, 212, 0.18);
-  border: 1px solid rgba(81, 43, 212, 0.4);
-  color: #cdb8ff;
-  font-size: 0.72rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease-in-out;
-  display: inline-flex;
-  align-items: center;
-}
-
-.btn-reroll-slot:hover:not(:disabled) {
-  background: rgba(81, 43, 212, 0.35);
-  border-color: rgba(81, 43, 212, 0.6);
-  color: #fff;
-}
-
-.btn-reroll-slot:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
+/* Bulk re-roll rules moved into BulkGallery.razor.css (scoped). */
 
 .meme-template-card {
   background: rgba(81, 43, 212, 0.08);
@@ -2500,8 +2132,10 @@ code { color: #c026d3; }
         transform: scale(0.98);
     }
 
-    /* Add padding to main content to account for sticky bar */
-    .app-main {
+    /* Reserve space for the sticky CTA only on pages that have it.
+       Previously this rule hit .app-main globally — leaking 4rem of
+       dead space into every page on mobile. */
+    .has-mobile-sticky-cta {
         padding-bottom: 4rem;
     }
 }

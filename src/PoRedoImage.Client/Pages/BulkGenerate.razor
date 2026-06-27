@@ -6,10 +6,11 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ImageSessionService SessionService
 @inject NotificationService NotificationService
+@inject AudioFeedbackService Audio
 
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
-<div class="container py-4">
+<div class="container py-4 has-mobile-sticky-cta">
     <FeatureLayout 
         IconClass="bi-images"
         Title="Bulk Generate"
@@ -146,6 +147,10 @@
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         _userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        // Cross-page state: record this as the last visited feature route so
+        // the Active Image Bar can deep-link back here.
+        SessionService.RecordFeatureVisit("/bulk-generate");
 
         if (SessionService.HasImage && _imagePreviewUrl is null)
         {
@@ -287,6 +292,7 @@
                     _results[i].Prompt = rawPrompt;
                     _results[i].ImageUrl = $"data:{varResult!.ContentType};base64,{varResult.ImageData}";
                     _completedCount++;
+                    _ = Audio.TickAsync();
                     // Fire-and-forget: save variation to gallery
                     if (_userId is not null)
                         _ = AutoSaveVariationAsync(varResult.ImageData, varResult.ContentType);
@@ -296,6 +302,7 @@
                     _results[i].Status = BulkGenerateStatus.Failed;
                     _results[i].ErrorMessage = ex.Message;
                     Logger.LogError(ex, "Failed to generate bulk image {Index}", i);
+                    _ = Audio.FailureAsync();
                 }
 
                 StateHasChanged();
@@ -310,6 +317,9 @@
                     NotificationService.Notify(NotificationSeverity.Success, "Done!", $"Completed {_completedCount} of {activePrompts.Count} variation{(activePrompts.Count == 1 ? "" : "s")}!", duration: 5000);
                 else
                     NotificationService.Notify(NotificationSeverity.Error, "All Failed", "All generations failed. Check each card for details.", duration: 7000);
+
+                // Audio cue: success arpeggio when at least one variation completed, otherwise failure.
+                _ = _completedCount > 0 ? Audio.SuccessAsync() : Audio.FailureAsync();
             }
         }
         catch (OperationCanceledException)

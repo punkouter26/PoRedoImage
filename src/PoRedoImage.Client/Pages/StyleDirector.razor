@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inherits FeaturePageBase
 @inject IJSRuntime JSRuntime
+@inject PoRedoImage.Client.Shared.AudioFeedbackService Audio
 
 <PageTitle>Style Director — PoRedoImage</PageTitle>
 
@@ -235,6 +236,10 @@
             progressMessage = string.IsNullOrEmpty(errorMessage) ? "Done!" : "Failed.";
             isProcessing = false;
             try { StateHasChanged(); } catch (ObjectDisposedException) { }
+            // Audio cue: success arpeggio if a result landed, otherwise failure thud.
+            _ = string.IsNullOrEmpty(errorMessage) && _directorResult is not null
+                ? Audio.SuccessAsync()
+                : Audio.FailureAsync();
         }
     }
 

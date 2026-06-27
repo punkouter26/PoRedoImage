@@ -26,9 +26,9 @@ public sealed class ComputerVisionHealthCheck : IHealthCheck
         var apiKey = _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
 
         if (string.IsNullOrEmpty(endpoint))
-            return HealthCheckResult.Unhealthy("ComputerVision:Endpoint is not configured");
+            return HealthCheckResult.Degraded("ComputerVision:Endpoint is not configured (expected in local dev without Azure secrets)");
         if (string.IsNullOrEmpty(apiKey))
-            return HealthCheckResult.Unhealthy("ComputerVision:ApiKey is not configured");
+            return HealthCheckResult.Degraded("ComputerVision:ApiKey is not configured (expected in local dev without Azure secrets)");
 
         try
         {

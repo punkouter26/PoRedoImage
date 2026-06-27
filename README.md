@@ -98,51 +98,9 @@ flowchart LR
 
 ## Documentation
 
-### Architecture & CI/CD
-| Diagram | Description |
-|---------|-------------|
-| [Architecture_MASTER.mmd](docs/Architecture_MASTER.mmd) | Hybrid C4 L1+L2 — Edge, Compute, Application, AI, Data, Ops, CI/CD |
-| [Architecture_MASTER_SIMPLE.mmd](docs/Architecture_MASTER_SIMPLE.mmd) | Stakeholder overview — 6-node summary |
-| [ReleasePipeline_MASTER.mmd](docs/ReleasePipeline_MASTER.mmd) | CI/CD — PR gate → CI → master → Azure deploy with smoke check |
-| [ReleasePipeline_MASTER_SIMPLE.mmd](docs/ReleasePipeline_MASTER_SIMPLE.mmd) | Pipeline summary — 5 nodes |
+### Architecture
 
-### User Usage & Behavioral Flowcharts
-| Diagram | Description |
-|---------|-------------|
-| [OnboardingJourney.mmd](docs/OnboardingJourney.mmd) | New user → login → first upload → Aha! moment |
-| [OnboardingJourney_SIMPLE.mmd](docs/OnboardingJourney_SIMPLE.mmd) | Stakeholder onboarding summary |
-| [PrimaryValueFlow.mmd](docs/PrimaryValueFlow.mmd) | Happy path: Bulk Generate — upload → describe → 10×parallel → live stream |
-| [PrimaryValueFlow_SIMPLE.mmd](docs/PrimaryValueFlow_SIMPLE.mmd) | 6-step value flow |
-| [ExceptionUserFlows.mmd](docs/ExceptionUserFlows.mmd) | Auth errors, validation failures, rate limits, content policy, AI outages |
-| [ExceptionUserFlows_SIMPLE.mmd](docs/ExceptionUserFlows_SIMPLE.mmd) | Error taxonomy overview |
-
-### Logic & State Dynamics
-| Diagram | Description |
-|---------|-------------|
-| [SystemFlow_MASTER.mmd](docs/SystemFlow_MASTER.mmd) | Full sequence — Key Vault startup · auth · image pipeline · bulk generate |
-| [SystemFlow_MASTER_SIMPLE.mmd](docs/SystemFlow_MASTER_SIMPLE.mmd) | 8-step sequence summary |
-| [StateDynamics_MASTER.mmd](docs/StateDynamics_MASTER.mmd) | stateDiagram-v2 — UserImage, BulkVariation, BulkPrompt lifecycles |
-| [StateDynamics_MASTER_SIMPLE.mmd](docs/StateDynamics_MASTER_SIMPLE.mmd) | Core image state machine |
-
-### Data & Security Schema
-| Diagram | Description |
-|---------|-------------|
-| [DataModel.mmd](docs/DataModel.mmd) | ERD — USER · USER_IMAGE · BULK_PROMPT + enums |
-| [DataModel_SIMPLE.mmd](docs/DataModel_SIMPLE.mmd) | Entity summary |
-| [AccessControl_MATRIX.mmd](docs/AccessControl_MATRIX.mmd) | Role → endpoint mapping: Anonymous · Dev · Prod · Admin |
-| [AccessControl_MATRIX_SIMPLE.mmd](docs/AccessControl_MATRIX_SIMPLE.mmd) | Access tier overview |
-| [DataLifecycle_MASTER.mmd](docs/DataLifecycle_MASTER.mmd) | Ingestion → magic-byte validate → CV → OpenAI → Gemini → Blazor render → persist |
-| [DataLifecycle_MASTER_SIMPLE.mmd](docs/DataLifecycle_MASTER_SIMPLE.mmd) | 7-step data pipeline |
-
-### Dependency & UI Hierarchy
-| Diagram | Description |
-|---------|-------------|
-| [SystemInteractionFlow.mmd](docs/SystemInteractionFlow.mmd) | Sequence — Blazor SignalR · parallel bulk slots · state sync · conflict resolution |
-| [SystemInteractionFlow_SIMPLE.mmd](docs/SystemInteractionFlow_SIMPLE.mmd) | 8-message interaction summary |
-| [ServiceMap_MASTER.mmd](docs/ServiceMap_MASTER.mmd) | Full project dependency graph — VSA slices · Application · Domain · Infra · Shared |
-| [ServiceMap_MASTER_SIMPLE.mmd](docs/ServiceMap_MASTER_SIMPLE.mmd) | 6-layer dependency summary |
-| [InterfaceHierarchy_MASTER.mmd](docs/InterfaceHierarchy_MASTER.mmd) | Frontend component tree — App → Layout → SSR → WASM → UI components → state |
-| [InterfaceHierarchy_MASTER_SIMPLE.mmd](docs/InterfaceHierarchy_MASTER_SIMPLE.mmd) | Component hierarchy overview |
+Live Mermaid diagrams live alongside their source in [`docs/`](docs/). See [docs/README.md](docs/README.md) for the full index of architecture, journey, state, data, and UI diagrams.
 
 ---
 
@@ -181,7 +139,7 @@ dotnet run --project src/PoRedoImage.Web
 ### 4. Test
 ```bash
 dotnet test PoRedoImage.slnx                                    # Unit + Integration
-cd tests/PoRedoImage.Tests.E2E && npx playwright test           # E2E
+dotnet test tests/PoRedoImage.Tests.E2E                          # E2E (C# Playwright + HTTP smoke)
 ```
 
 ---
@@ -246,7 +204,6 @@ All secrets load from `kv-poshared` via `AZURE_KEY_VAULT_ENDPOINT` app setting.
 
 ## Dev Guidelines
 
-See [.github/copilot-instructions.md](.github/copilot-instructions.md):
 - **Vertical Slice Architecture** — all feature files in `Features/{Name}/`
 - **Minimal APIs** — no MVC controllers; use `MapGroup` + static handler methods
 - **Nullable + warnings as errors** enforced via `Directory.Build.props`

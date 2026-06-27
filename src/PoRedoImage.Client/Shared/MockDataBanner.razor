@@ -1,0 +1,43 @@
+@namespace PoRedoImage.Client.Shared
+@implements IDisposable
+@inject IServiceProvider Services
+
+@if (_activeMocks.Count > 0)
+{
+    <div class="mock-data-banner" role="status" aria-live="polite">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <strong>USING MOCK DATA</strong>
+        <span class="mock-data-banner__details">— @string.Join(", ", _activeMocks)</span>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<string> _activeMocks = [];
+
+    protected override void OnInitialized()
+    {
+        _activeMocks = ResolveMockServices();
+    }
+
+    /// <summary>
+    /// Walks the DI container for every <see cref="PoRedoImage.Domain.Interfaces.IMockable"/>
+    /// registration and collects their <c>MockReason</c> strings. Resolved lazily on init so the
+    /// banner only spins up a single enumerator and never forces eager service construction.
+    /// </summary>
+    private IReadOnlyList<string> ResolveMockServices()
+    {
+        try
+        {
+            using var scope = Services.CreateScope();
+            var mocks = scope.ServiceProvider.GetServices<PoRedoImage.Domain.Interfaces.IMockable>();
+            return mocks.Select(m => m.MockReason).Where(r => !string.IsNullOrWhiteSpace(r)).ToArray();
+        }
+        catch
+        {
+            // DI may not be available during prerender or in unit-test render contexts — fail silent.
+            return [];
+        }
+    }
+
+    public void Dispose() { }
+}

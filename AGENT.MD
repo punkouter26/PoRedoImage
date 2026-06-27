@@ -62,7 +62,22 @@ tests/
 | `GET /alive` | Liveness probe |
 | `GET /api/diag` | Diagnostics with masked secrets |
 | `POST /api/images/analyze` | Image analysis |
-| `POST /api/bulk/generate` | Bulk generation |
+| `GET /api/bulk-generate/prompts` | Load saved bulk prompts |
+| `POST /api/bulk-generate/prompts` | Save bulk prompts |
+| `POST /api/bulk-generate/describe` | GPT-4o vision caption for an image |
+| `POST /api/bulk-generate/variation` | Single bulk variation |
+| `POST /api/bulk-generate/reroll` | Re-roll N variations from a winning prompt |
+| `POST /api/user-images/original` | Save original upload |
+| `POST /api/user-images/result` | Save generated result |
+| `GET /api/user-images` | List user's saved images |
+| `GET /api/meme-templates` | List meme templates |
+| `POST /api/meme-templates/render` | Render meme from template |
+| `POST /api/caption-battle/run` | Multi-persona caption battle |
+| `POST /api/style-director/run` | 4-agent style director |
+| `GET /dev-login?email=…` | Dev/Test sign-in (Development only) |
+| `GET /challenge-microsoft` | Microsoft OIDC challenge |
+| `GET /logout` | Sign out (both environments) |
+| `GET /scalar/v1` | Interactive API docs |
 
 ## Health & Diagnostics
 - `/health` — JSON response for automated pings

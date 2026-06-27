@@ -42,3 +42,11 @@ public sealed record AgentReasoningEntry(
     int? TokensUsed,
     DateTimeOffset Timestamp,
     Activity? Activity);
+
+/// <summary>Aggregate result of a multi-agent workflow run — output + the full reasoning trace.</summary>
+public sealed record WorkflowResult<TOut>(
+    bool Succeeded,
+    TOut Output,
+    IReadOnlyList<AgentReasoningEntry> Reasoning,
+    long ElapsedMs,
+    string? ErrorMessage);

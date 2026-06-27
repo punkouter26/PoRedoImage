@@ -52,21 +52,6 @@ public sealed class AzureTableBulkPromptRepository : IBulkPromptRepository
         }
     }
 
-    public async Task<IReadOnlyList<BulkPrompt>> GetAllAsync(CancellationToken ct = default)
-    {
-        if (_tableClient is null) return [];
-        await EnsureInitializedAsync(ct);
-
-        var results = new List<BulkPrompt>();
-        await foreach (var entity in _tableClient.QueryAsync<BulkPromptTableEntity>(
-            filter: $"PartitionKey eq 'prompts'", cancellationToken: ct))
-        {
-            results.Add(MapToDomain(entity));
-        }
-
-        return results.AsReadOnly();
-    }
-
     public async Task<BulkPrompt?> GetByRowKeyAsync(string rowKey, CancellationToken ct = default)
     {
         if (_tableClient is null) return null;

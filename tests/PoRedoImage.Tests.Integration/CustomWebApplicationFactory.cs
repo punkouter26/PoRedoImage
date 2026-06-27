@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+
 namespace PoRedoImage.Tests.Integration;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
@@ -19,9 +20,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Set environment to Development to skip Key Vault configuration
         builder.UseEnvironment("Development");
 
-        builder.ConfigureHostConfiguration(config =>
+        // ConfigureAppConfiguration runs AFTER the host builder loads appsettings.json +
+        // appsettings.{Environment}.json, so the in-memory overrides win on conflict. Earlier
+        // versions used ConfigureHostConfiguration (which runs first) — appsettings.json then
+        // overwrote our Storage:ConnectionString = "" with "UseDevelopmentStorage=true", causing
+        // EnsureInitializedAsync to try to connect to Azurite and 500.
+        builder.ConfigureAppConfiguration(config =>
         {
-            // Clear Key Vault endpoint to prevent Azure authentication attempts in CI
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["AZURE_KEY_VAULT_ENDPOINT"] = "",

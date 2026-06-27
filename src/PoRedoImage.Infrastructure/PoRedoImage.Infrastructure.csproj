@@ -13,6 +13,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="PoRedoImage.Tests.Unit" />
+    <InternalsVisibleTo Include="PoRedoImage.Tests.Integration" />
+    <InternalsVisibleTo Include="PoRedoImage.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Azure SDKs used by infrastructure implementations -->
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Azure.AI.Vision.ImageAnalysis" />

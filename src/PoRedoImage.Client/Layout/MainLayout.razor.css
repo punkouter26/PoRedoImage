@@ -160,17 +160,31 @@
     text-transform: uppercase;
 }
 
-/* ── Mobile nav (#3): collapse text labels below 640 px ─── */
+/* ── Mobile nav: collapse text labels below 640 px ─── */
 @media (max-width: 639px) {
     .app-nav {
         padding: 0 0.75rem;
         height: 56px;
+        gap: 0.5rem;
+    }
+    /* Tighten the brand — keep the icon, drop the "PoRedoImage" wordmark
+       below 480 px to claw back ~110 px of horizontal space. */
+    @media (max-width: 479px) {
+        .app-nav__brand-text { display: none; }
+    }
+    /* Pad nav-link items tighter at narrow widths. */
+    .app-nav__link {
+        padding: 0.4rem 0.55rem;
+        font-size: 0.82rem;
     }
     /* Hide the user badge text and show only the icon at narrow widths.
        The person-circle icon still communicates "logged in" to the user. */
     .app-nav__user {
         display: none;
     }
+    /* Remove the gutter margin that was pushing Sign-out off-screen. */
+    .d-flex.align-items-center.gap-2.ms-3,
+    .app-nav__link.ms-3 { margin-left: 0 !important; }
 }
 
 /* Blazor error bar */

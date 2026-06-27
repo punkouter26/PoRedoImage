@@ -16,7 +16,7 @@
         <div class="flex-grow-1">
             <div class="shimmer-status-label">@Message</div>
             <div class="shimmer-progress mt-2">
-                <div class="shimmer-progress__bar" style="width: @(Percentage)%;"></div>
+                <div class="shimmer-progress__bar" style="--progress: @((Percentage / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));"></div>
             </div>
         </div>
         <span class="shimmer-pct">@Percentage%</span>

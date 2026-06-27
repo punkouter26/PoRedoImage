@@ -38,11 +38,11 @@ public sealed class StyleDirectorWorkflow
     }
 
     /// <summary>
-    /// Runs the four agents in sequence. We execute them directly rather than via
-    /// the generic <see cref="SequentialAgentWorkflow"/> so we can preserve the
-    /// strongly-typed pipeline state without <c>dynamic</c> casts — each agent has
-    /// a different I/O type. The generic runner remains in the codebase for future
-    /// migration to MAF, which carries that state natively.
+    /// Runs the four agents in sequence. We execute them directly with explicit
+    /// typed hand-offs — each agent has a different I/O type and a generic runner
+    /// would require <c>dynamic</c> casts. The pipeline shape mirrors what a
+    /// Microsoft Agent Framework <c>SequentialWorkflow</c> would run, so swapping
+    /// any agent for an MAF-backed implementation is a one-line change.
     /// </summary>
     public async Task<WorkflowResult<StyleDirectorResult>> RunAsync(
         VisionAnalystInput input,

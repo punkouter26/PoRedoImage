@@ -1,93 +1,69 @@
 @using PoRedoImage.Client.Models
 @inject IWebAssemblyHostEnvironment Env
 
-@* AI Model Selector — Rule 14
-   Native grouped dropdown: models are grouped under Remote (Azure), Web Browser (Local),
-   and Ollama (Local Machine). Ollama appears in Development only. *@
+@* AI Model Selector — Rule 14.
+   RadzenDropDown with grouped items: Remote (Azure), Web Browser, Ollama (dev only).
+   Native Radzen keyboard nav (type-ahead, arrow keys) and ARIA combobox semantics. *@
 <div class="model-selector">
     <label class="model-selector__label" for="ai-model-select">
         <i class="bi bi-cpu me-1"></i>AI Model
     </label>
-    <div class="model-selector__dropdown-wrapper">
-        <select id="ai-model-select" class="model-selector__select form-select"
-                @bind="_selectedModelId" @bind:after="HandleModelChange">
-            @foreach (var group in _groups)
-            {
-                <optgroup label="@group.Category.Label()">
-                    @foreach (var m in group.Models)
-                    {
-                        <option value="@m.ModelId">@m.DisplayName</option>
-                    }
-                </optgroup>
+    <RadzenDropDown @bind-Value="_selectedModelId"
+                    Data="@_allModels"
+                    TextProperty="DisplayName"
+                    ValueProperty="ModelId"
+                    Change="@(async (object? v) => await HandleModelChange(v))"
+                    Placeholder="Select a model…"
+                    class="model-selector__select w-100"
+                    Name="ai-model-select">
+        <Template>
+            @{
+                var model = context as AiModelInfo;
+                if (model is null) { return; }
             }
-        </select>
-    </div>
+            <div class="model-selector__option">
+                <span class="model-selector__option-name">@model.DisplayName</span>
+                @if (!string.IsNullOrEmpty(model.Description))
+                {
+                    <span class="model-selector__option-desc">@model.Description</span>
+                }
+            </div>
+        </Template>
+    </RadzenDropDown>
     @if (_selectedModel is not null && !string.IsNullOrEmpty(_selectedModel.Description))
     {
         <div class="model-selector__hint">@_selectedModel.Description</div>
     }
 </div>
 
-<style>
-    .model-selector {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        min-width: 220px;
-    }
-    .model-selector__label {
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #94a3b8;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-    }
-    .model-selector__dropdown-wrapper {
-        position: relative;
-    }
-    .model-selector__select {
-        font-size: 0.9rem;
-    }
-    .model-selector__hint {
-        font-size: 0.7rem;
-        color: #64748b;
-        line-height: 1.3;
-        padding-left: 0.15rem;
-    }
-</style>
-
 @code {
     [Parameter] public EventCallback<string> OnModelSelected { get; set; }
 
     private string? _selectedModelId;
     private AiModelInfo? _selectedModel;
-    private List<(AiModelCategory Category, List<AiModelInfo> Models)> _groups = new();
+    private IReadOnlyList<AiModelInfo> _allModels = [];
 
     protected override void OnInitialized()
     {
         // Ollama (and any other dev-only models) are hidden outside Development.
         var isDev = Env.IsDevelopment();
-
-        _groups = AiModelCatalog.CategoryOrder
-            .Select(cat => (Category: cat,
-                Models: AiModelCatalog.All.Where(m => m.Category == cat && (!m.IsDevOnly || isDev)).ToList()))
-            .Where(g => g.Models.Count > 0)
+        _allModels = AiModelCatalog.All
+            .Where(m => !m.IsDevOnly || isDev)
             .ToList();
 
-        // Default to the first model in the first group (e.g. GPT-4o).
-        _selectedModel = _groups.FirstOrDefault().Models?.FirstOrDefault();
+        // Default to the first model (e.g. GPT-4o).
+        _selectedModel = _allModels.FirstOrDefault();
         _selectedModelId = _selectedModel?.ModelId;
     }
 
-    private async Task HandleModelChange()
+    private async Task HandleModelChange(object? value)
     {
-        _selectedModel = AiModelCatalog.Find(_selectedModelId);
+        var id = value as string;
+        _selectedModelId = id;
+        _selectedModel = AiModelCatalog.Find(id);
         if (OnModelSelected.HasDelegate)
         {
-            await OnModelSelected.InvokeAsync(_selectedModelId);
+            await OnModelSelected.InvokeAsync(id);
         }
     }
 }

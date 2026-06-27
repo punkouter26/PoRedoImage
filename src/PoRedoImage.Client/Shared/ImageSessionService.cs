@@ -33,7 +33,20 @@ public sealed class ImageSessionService
     public string? FileName { get; private set; }
     public bool HasImage => Bytes is not null;
 
-    /// <summary>Raised whenever the active image changes (set or cleared).</summary>
+    /// <summary>
+    /// Route of the most recent feature page the user worked on
+    /// (e.g. <c>/studio</c>, <c>/bulk-generate</c>, <c>/meme-generation</c>).
+    /// Used by <c>ActiveImageBar</c> to deep-link back into the originating flow.
+    /// </summary>
+    public string? LastVisitedFeatureRoute { get; private set; }
+
+    /// <summary>
+    /// Final prompt (style description, meme caption, bulk directive) most recently
+    /// submitted. Persisted so the user can return and re-roll without re-typing.
+    /// </summary>
+    public string? LastFinalPrompt { get; private set; }
+
+    /// <summary>Raised whenever the active image or cross-page state changes (set or cleared).</summary>
     public event Action? OnChange;
 
     /// <summary>
@@ -59,11 +72,24 @@ public sealed class ImageSessionService
         OnChange?.Invoke();
     }
 
+    /// <summary>
+    /// Records the route and final prompt of the most recently visited feature page.
+    /// Safe to call multiple times — the latest values win.
+    /// </summary>
+    public void RecordFeatureVisit(string route, string? finalPrompt = null)
+    {
+        LastVisitedFeatureRoute = route;
+        if (finalPrompt is not null) LastFinalPrompt = finalPrompt;
+        OnChange?.Invoke();
+    }
+
     public void Clear()
     {
         Bytes = null;
         ContentType = null;
         FileName = null;
+        LastVisitedFeatureRoute = null;
+        LastFinalPrompt = null;
         _cachedPreviewUrl = null;
         OnChange?.Invoke();
     }

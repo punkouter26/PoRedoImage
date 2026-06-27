@@ -26,9 +26,9 @@ public sealed class OpenAIHealthCheck : IHealthCheck
         var apiKey = _configuration["OpenAI:Key"];
 
         if (string.IsNullOrEmpty(endpoint))
-            return HealthCheckResult.Unhealthy("OpenAI:Endpoint is not configured");
+            return HealthCheckResult.Degraded("OpenAI:Endpoint is not configured (expected in local dev without Azure secrets)");
         if (string.IsNullOrEmpty(apiKey))
-            return HealthCheckResult.Unhealthy("OpenAI:Key is not configured");
+            return HealthCheckResult.Degraded("OpenAI:Key is not configured (expected in local dev without Azure secrets)");
 
         try
         {

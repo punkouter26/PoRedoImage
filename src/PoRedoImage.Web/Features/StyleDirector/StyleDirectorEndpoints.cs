@@ -1,6 +1,7 @@
 using PoRedoImage.Application.Agents;
 using PoRedoImage.Application.Agents.StyleDirector;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Shared.Imaging;
 
 namespace PoRedoImage.Web.Features.StyleDirector;
 

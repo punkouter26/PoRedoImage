@@ -3,6 +3,7 @@ using System.Text.Json;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Shared.Imaging;
 using Microsoft.Extensions.Logging;
 
 namespace PoRedoImage.Web.Features.BulkGenerate;

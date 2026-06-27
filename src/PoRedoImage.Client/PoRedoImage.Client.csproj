@@ -26,4 +26,9 @@
     <ProjectReference Include="..\PoRedoImage.Domain\PoRedoImage.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Slice / contract tests live in PoRedoImage.Tests.Unit and exercise Client types. -->
+    <InternalsVisibleTo Include="PoRedoImage.Tests.Unit" />
+  </ItemGroup>
+
 </Project>

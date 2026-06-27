@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading.RateLimiting;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenTelemetry;
@@ -12,6 +15,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using PoRedoImage.Infrastructure;
+using PoRedoImage.Shared.Json;
 using PoRedoImage.Web.Components;
 using PoRedoImage.Web.Configuration;
 using PoRedoImage.Web.Features.Auth;
@@ -232,6 +236,19 @@ try
     builder.Services.AddRadzenComponents();
 
     builder.Services.AddOpenApi();
+
+    // ─── JSON source-gen (PoNetCaching §7) ──────────────────────────────────────
+    // Wire the shared DTO JsonSerializerContext into the minimal-API serializer so
+    // request/response serialization is reflection-free and trim-safe. The default
+    // resolver stays first in the chain so anonymous types (e.g. health-check
+    // responses) and framework types fall back to reflection.
+    builder.Services.ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.TypeInfoResolver = JsonTypeInfoResolver.Combine(
+            new DefaultJsonTypeInfoResolver(),
+            new SharedJsonContext());
+        options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 
     // ─── Strongly-typed options (Po2Logic R3) ──────────────────────────────────
     // Options-pattern binding with IValidateOptions<T> gives us hot-reloadable config

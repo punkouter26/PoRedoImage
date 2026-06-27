@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Shared.Imaging;
 
 namespace PoRedoImage.Web.Features.MemeTemplates;
 

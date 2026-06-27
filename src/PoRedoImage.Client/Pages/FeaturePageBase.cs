@@ -21,6 +21,7 @@ public abstract class FeaturePageBase : ComponentBase
     [Inject] protected AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
     [Inject] protected ILoggerFactory LoggerFactory { get; set; } = default!;
     [Inject] protected NotificationService NotificationService { get; set; } = default!;
+    [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
 
     private ILogger? _logger;
     protected ILogger Logger => _logger ??= LoggerFactory.CreateLogger(GetType());
@@ -50,6 +51,13 @@ public abstract class FeaturePageBase : ComponentBase
             imagePreviewUrl = SessionService.PreviewUrl;
         var auth = await AuthStateProvider.GetAuthenticationStateAsync();
         _userId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        // Cross-page state (#4): record that this page is being entered.
+        // The route is what the Active Image Bar uses to deep-link back, so
+        // it must be the page's canonical @page URL — NOT a relative href.
+        var route = NavigationManager.Uri;
+        var path = new Uri(route).AbsolutePath;
+        SessionService.RecordFeatureVisit(path);
     }
 
     protected async Task LoadFile(InputFileChangeEventArgs e)

@@ -1,0 +1,128 @@
+/* Scoped CSS for BulkPromptEditor.razor — Blazor appends a per-component
+   attribute selector to every rule, so selectors here only match elements
+   inside this component's render tree. */
+
+.prompt-editor {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.prompt-editor__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+}
+
+.prompt-editor__title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+    white-space: nowrap;
+}
+
+.prompt-editor__actions {
+    display: flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.prompt-editor__actions .btn .d-action-label { display: inline; }
+
+.prompt-editor__token-hint {
+    width: 100%;
+    font-size: 0.72rem;
+    color: var(--color-muted);
+    padding: 0.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.prompt-editor__token-hint code {
+    background: #eff6ff;
+    color: var(--color-primary, #2563eb);
+    border: 1px solid #bfdbfe;
+    border-radius: 4px;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.prompt-editor__list {
+    padding: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: var(--spacing-xs);
+}
+
+.prompt-editor__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+}
+
+.prompt-editor__num {
+    width: 1.5rem;
+    text-align: center;
+    color: var(--color-muted-strong, #94a3b8);
+    font-size: 0.75rem;
+    padding-top: 0.5rem;
+    flex-shrink: 0;
+}
+
+.prompt-editor__textarea {
+    flex: 1;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text);
+    font-size: 0.82rem;
+    padding: 0.45rem 0.7rem;
+    resize: vertical;
+    min-height: 56px;
+    transition: border-color 0.15s, background 0.15s;
+    line-height: 1.45;
+}
+
+.prompt-editor__textarea:focus {
+    outline: none;
+    border-color: var(--color-primary, #3b82f6);
+    background: var(--color-surface);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.btn-reset-row {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-muted-strong, #94a3b8);
+    font-size: 0.75rem;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 0.45rem;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-reset-row:hover {
+    background: var(--color-bg);
+    border-color: var(--color-muted-strong, #94a3b8);
+    color: var(--color-text);
+}
+
+.btn-reset-row:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}

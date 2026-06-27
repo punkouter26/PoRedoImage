@@ -9,7 +9,6 @@ namespace PoRedoImage.Domain.Interfaces;
 /// </summary>
 public interface IBulkPromptRepository
 {
-    Task<IReadOnlyList<BulkPrompt>> GetAllAsync(CancellationToken ct = default);
     Task<BulkPrompt?> GetByRowKeyAsync(string rowKey, CancellationToken ct = default);
     Task SaveAsync(BulkPrompt prompt, CancellationToken ct = default);
     Task DeleteAsync(string rowKey, CancellationToken ct = default);

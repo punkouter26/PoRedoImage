@@ -1,11 +1,12 @@
 @namespace PoRedoImage.Client.Pages
 @using PoRedoImage.Client.Models
+@using Microsoft.AspNetCore.Components.Web.Virtualization
 
-<div>
+<div role="region" aria-label="Bulk generation gallery">
     @if (Results.Count == 0)
     {
-        <div class="bulk-empty-state">
-            <i class="bi bi-images bulk-empty-state__icon"></i>
+        <div class="bulk-empty-state" role="status">
+            <i class="bi bi-images bulk-empty-state__icon" aria-hidden="true"></i>
             <h3 class="bulk-empty-state__title">Ready to generate variations</h3>
             <p class="bulk-empty-state__hint">Upload an image and click <strong>Generate</strong> to create up to 10 artistic variations using AI.</p>
         </div>
@@ -14,19 +15,21 @@
     {
         <div class="mb-3">
             <div class="bulk-progress-header">
-                <span>Generated @CompletedCount of @Results.Count images</span>
-                <span>@(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)%</span>
+                <span id="bulk-progress-label">Generated @CompletedCount of @Results.Count images</span>
+                <span aria-hidden="true">@(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)%</span>
             </div>
-            <div class="bulk-progress-bar">
+            <div class="bulk-progress-bar" role="progressbar"
+                 aria-labelledby="bulk-progress-label"
+                 aria-valuenow="@(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)"
+                 aria-valuemin="0" aria-valuemax="100">
                 <div class="bulk-progress-bar__fill"
-                     style="width: @(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)%">
+                     style="--progress: @(Results.Count > 0 ? (CompletedCount / (double)Results.Count).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "0")">
                 </div>
             </div>
         </div>
 
-        <div class="bulk-gallery">
-            @foreach (var result in Results)
-            {
+        <div class="bulk-gallery" aria-live="polite" aria-busy="@(CompletedCount < Results.Count)">
+            <Virtualize Items="Results.AsReadOnly()" Context="result" ItemSize="280" OverscanCount="3">
                 <div class="bulk-slot bulk-slot--@result.Status.ToString().ToLower()">
                     <div class="bulk-slot__header">
                         <span class="bulk-slot__num">#@(result.Index + 1)</span>
@@ -37,15 +40,15 @@
                                 break;
                             case BulkGenerateStatus.Processing:
                                 <span class="text-info">
-                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                    Processing…
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    <span>Processing…</span>
                                 </span>
                                 break;
                             case BulkGenerateStatus.Complete:
-                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Done</span>
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Done</span>
                                 break;
                             case BulkGenerateStatus.Failed:
-                                <span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>Failed</span>
+                                <span class="text-danger"><i class="bi bi-x-circle-fill me-1" aria-hidden="true"></i>Failed</span>
                                 break;
                         }
                     </div>
@@ -54,22 +57,26 @@
                         @switch (result.Status)
                         {
                             case BulkGenerateStatus.Pending:
-                                <div class="bulk-slot__shimmer shimmer-anim"></div>
+                                <div class="bulk-slot__shimmer shimmer-anim" aria-label="Awaiting generation"></div>
                                 break;
                             case BulkGenerateStatus.Processing:
                                 <div class="bulk-slot__img-area--processing">
-                                    <div class="bulk-slot__spinner"></div>
+                                    <div class="bulk-slot__spinner" role="status" aria-label="Generating"></div>
                                     <span>Generating…</span>
                                 </div>
                                 break;
                             case BulkGenerateStatus.Complete when result.ImageUrl is not null:
                                 <img src="@result.ImageUrl" alt="Generated variation @(result.Index + 1)" loading="lazy"
                                      class="bulk-slot__img-clickable"
-                                     @onclick="@(() => _modalResult = result)" />
+                                     tabindex="0"
+                                     role="button"
+                                     aria-label="View variation @(result.Index + 1) at full size"
+                                     @onclick="@(() => _modalResult = result)"
+                                     @onkeydown="@(e => HandleSlotKey(e, result))" />
                                 break;
                             case BulkGenerateStatus.Failed:
-                                <div class="bulk-slot__img-area--failed">
-                                    <i class="bi bi-exclamation-triangle fs-4"></i>
+                                <div class="bulk-slot__img-area--failed" role="alert">
+                                    <i class="bi bi-exclamation-triangle fs-4" aria-hidden="true"></i>
                                     <span>@(result.ErrorMessage ?? "Generation failed")</span>
                                 </div>
                                 break;
@@ -82,33 +89,37 @@
                         {
                             <div class="bulk-slot__actions">
                                 <button class="btn-heart-slot @(Favorites.Contains(result.Index) ? "btn-heart-slot--active" : "")"
+                                        aria-pressed="@Favorites.Contains(result.Index)"
+                                        aria-label="@(Favorites.Contains(result.Index) ? "Remove from favorites" : "Save to favorites")"
                                         @onclick="@(() => OnToggleFavorite.InvokeAsync(result.Index))"
                                         title="@(Favorites.Contains(result.Index) ? "Remove" : "Save to favorites")">
-                                    <i class="bi @(Favorites.Contains(result.Index) ? "bi-heart-fill" : "bi-heart")"></i>
+                                    <i class="bi @(Favorites.Contains(result.Index) ? "bi-heart-fill" : "bi-heart")" aria-hidden="true"></i>
                                 </button>
                                 <button class="btn-dl-slot"
+                                        aria-label="Download variation @(result.Index + 1)"
                                         @onclick="@(() => OnDownloadImage.InvokeAsync(result.Index))">
-                                    <i class="bi bi-download me-1"></i>Save
+                                    <i class="bi bi-download me-1" aria-hidden="true"></i>Save
                                 </button>
                                 <button class="btn-reroll-slot"
+                                        aria-label="Re-roll variation @(result.Index + 1)"
                                         @onclick="@(() => OnReroll.InvokeAsync(result.Index))"
                                         disabled="@IsRerolling(result.Index)"
                                         title="Generate 3 fresh variations from this prompt (Idea #11)">
                                     @if (IsRerolling(result.Index))
                                     {
-                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                                         <span>Re-rolling…</span>
                                     }
                                     else
                                     {
-                                        <i class="bi bi-arrow-repeat me-1"></i><span>Re-roll × 3</span>
+                                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i><span>Re-roll × 3</span>
                                     }
                                 </button>
                             </div>
                         }
                     </div>
                 </div>
-            }
+            </Virtualize>
         </div>
     }
 
@@ -159,6 +170,17 @@
     private int _rerollSourceIndex = -1;
 
     private bool IsRerolling(int index) => _rerollingIndices.Contains(index);
+
+    /// <summary>Keyboard handler so the clickable image tile is keyboard-activatable (WCAG 2.1.1).</summary>
+    private void HandleSlotKey(KeyboardEventArgs e, BulkGenerateImageResult result)
+    {
+        if (e is null) return;
+        if (e.Key is "Enter" or " " or "Spacebar")
+        {
+            _modalResult = result;
+            StateHasChanged();
+        }
+    }
 
     public void BeginReroll(int index)
     {

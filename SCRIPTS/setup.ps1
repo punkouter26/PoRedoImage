@@ -79,22 +79,13 @@ if (Assert-CommandExists 'dotnet' 'Install .NET 10 SDK from https://dotnet.micro
     dotnet restore "$Root/PoRedoImage.slnx"
 }
 
-# ── 4. Install Playwright browsers (E2E tests) ───────────────────────
-Write-Step "Installing Playwright browsers"
-
-if (Assert-CommandExists 'npx' 'Install Node.js LTS from https://nodejs.org/') {
-    $playwrightDir = Join-Path $Root 'tests/playwright'
-    if (Test-Path $playwrightDir) {
-        Push-Location $playwrightDir
-        try {
-            npm install
-            npx playwright install --with-deps chromium
-        }
-        finally {
-            Pop-Location
-        }
-    }
-}
+# ── 4. Playwright browsers (C# E2E suite) ───────────────────────────
+# The C# Playwright SDK is restored with the test project; the browser installer
+# (`playwright.ps1`) is emitted under tests/PoRedoImage.Tests.E2E/bin/<config>/<tfm>/ on first
+# build. Install once after first build:
+#   pwsh tests/PoRedoImage.Tests.E2E/bin/Release/net10.0/playwright.ps1 install
+# We don't run it here because it must happen after `dotnet build` of the test project,
+# which is the user's first `dotnet test` invocation rather than a setup-time step.
 
 # ── 4b. Azure CLI auth check (Key Vault access) ──────────────────────
 Write-Step "Checking Azure CLI authentication"

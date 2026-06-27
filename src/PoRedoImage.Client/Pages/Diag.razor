@@ -51,15 +51,15 @@
                     <span class="badge @(diag.Health.Status == "Healthy" ? "bg-success" : "bg-danger")">@diag.Health.Status</span>
                 </div>
                 <div class="card-body p-0">
-                    <table class="table table-sm table-hover mb-0 diag-config-table"><tbody>
-                        @foreach (var kv in diag.Health.Entries)
-                        {
-                            <tr>
-                                <td class="ps-3 text-muted" style="width:40%;font-size:0.8rem">@kv.Key</td>
-                                <td style="font-size:0.8rem;font-family:monospace">@kv.Value.Status @(kv.Value.Description is not null ? "— " + kv.Value.Description : "")</td>
-                            </tr>
-                        }
-                    </tbody></table>
+                    <RadzenDataGrid Data="@_healthRows" TItem="HealthRow" AllowSorting="true" AllowFiltering="true"
+                                    AllowPaging="false" PageSize="20" Density="Density.Compact"
+                                    class="diag-config-table">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="HealthRow" Property="Key" Title="Check" Width="40%" />
+                            <RadzenDataGridColumn TItem="HealthRow" Property="StatusBadge" Title="Status" Width="14%" />
+                            <RadzenDataGridColumn TItem="HealthRow" Property="Description" Title="Detail" />
+                        </Columns>
+                    </RadzenDataGrid>
                 </div>
             </div>
         }
@@ -72,18 +72,14 @@
                     <span class="badge bg-secondary">@diag.Configuration.Count entries</span>
                 </div>
                 <div class="card-body p-0">
-                    <table class="table table-sm table-hover mb-0 diag-config-table">
-                        <thead class="table-light"><tr><th class="ps-3" style="width:40%">Key</th><th>Value</th></tr></thead>
-                        <tbody>
-                            @foreach (var kv in diag.Configuration)
-                            {
-                                <tr>
-                                    <td class="ps-3 text-muted" style="word-break:break-all;font-size:0.8rem">@kv.Key</td>
-                                    <td style="word-break:break-all;font-size:0.8rem;font-family:monospace">@(kv.Value ?? "(null)")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                    <RadzenDataGrid Data="@_configRows" TItem="ConfigRow" AllowSorting="true" AllowFiltering="true"
+                                    AllowPaging="false" PageSize="20" Density="Density.Compact"
+                                    class="diag-config-table">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="ConfigRow" Property="Key" Title="Key" Width="40%" />
+                            <RadzenDataGridColumn TItem="ConfigRow" Property="Value" Title="Value" />
+                        </Columns>
+                    </RadzenDataGrid>
                 </div>
             </div>
         }
@@ -94,6 +90,8 @@
     private DiagPayload? diag;
     private string? errorMessage;
     private bool isLoading = true;
+    private IReadOnlyList<HealthRow> _healthRows = [];
+    private IReadOnlyList<ConfigRow> _configRows = [];
 
     protected override async Task OnInitializedAsync() => await LoadDiagnostics();
 
@@ -105,6 +103,7 @@
             errorMessage = null;
             StateHasChanged();
             diag = await Http.GetFromJsonAsync<DiagPayload>("/api/diag");
+            ProjectRows();
         }
         catch (Exception ex)
         {
@@ -116,6 +115,20 @@
             isLoading = false;
         }
     }
+
+    private void ProjectRows()
+    {
+        if (diag is null) { _healthRows = []; _configRows = []; return; }
+        _healthRows = diag.Health?.Entries
+            .Select(kv => new HealthRow(kv.Key, kv.Value.Status ?? "?", kv.Value.Description ?? string.Empty))
+            .ToList() ?? [];
+        _configRows = diag.Configuration?
+            .Select(kv => new ConfigRow(kv.Key, kv.Value ?? "(null)"))
+            .ToList() ?? [];
+    }
+
+    private sealed record HealthRow(string Key, string StatusBadge, string Description);
+    private sealed record ConfigRow(string Key, string Value);
 
     private sealed class DiagPayload
     {

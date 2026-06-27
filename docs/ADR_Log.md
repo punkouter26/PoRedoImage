@@ -47,16 +47,18 @@ format: "ADR (Architecture Decision Record)"
 - **Alternatives:** App Settings only (rejected: no rotation, manual restart required).
 - **Trade-off:** 30-min window where stale secrets could cause failures; mitigated by health checks.
 
-## ADR-006: Result<T,E> Discriminated Union
+## ADR-006: Result<T,E> Discriminated Union — Deferred
 
-- **Decision:** Use `Result<T, E>` struct instead of null returns or exceptions for expected failures.
+- **Decision (initial, 2026-04):** Use `Result<T, E>` struct instead of null returns or exceptions for expected failures.
 - **Why:** Eliminates silent no-ops (Po2Logic Failure #9). Forces callers to handle both success and error paths.
 - **Alternatives:** Nullable returns (rejected: hidden failures), exceptions (rejected: expensive for expected cases).
 - **Trade-off:** More verbose call sites; mitigated by `Match()` pattern.
+- **Status (2026-06):** **Removed.** The `Result<T, E>` type and its `StorageError` enum existed in `PoRedoImage.Domain/Result.cs` but had zero consumers. YAGNI — reintroduce when an actual repository/service needs to surface a typed error to a caller. The repositories today log and return `null` / `[]` on storage unavailability, which is acceptable for a single-tenant hobby workload; revisit if the multi-tenant path becomes real.
 
 ## ADR-007: Idempotency via IEndpointFilter
 
-- **Decision:** `[Idempotent]` marker attribute + `IdempotencyKeyFilter` backed by `IMemoryCache` with 24h TTL.
+- **Decision:** `IdempotencyKeyFilter` registered as a scoped `IEndpointFilter` and applied via `AddEndpointFilter<IdempotencyKeyFilter>()` on the user-image and bulk-generate endpoint groups. Backed by `IMemoryCache` with 24h TTL.
+- **Note:** The companion `[Idempotent]` marker attribute (originally part of this ADR) was **removed in 2026-06** because no endpoint ever applied it — the filter is wired explicitly per group instead. Reintroduce the attribute if a future feature benefits from declarative opt-in.
 - **Why:** Prevents duplicate writes from network retries (Po2Logic F6). 24h TTL prevents replays across days.
 - **Alternatives:** Client-side dedup (rejected: unreliable), database constraints only (rejected: late detection).
 - **Trade-off:** Memory pressure from cached keys; mitigated by TTL eviction.
@@ -95,3 +97,16 @@ format: "ADR (Architecture Decision Record)"
 - **Why:** Dual telemetry: Serilog for structured logs, OTel for distributed traces. No OTLP collector needed.
 - **Alternatives:** NLog only (rejected: no OTel integration), pure OTel (rejected: no structured logging).
 - **Trade-off:** Two telemetry pipelines; justified by complementary capabilities.
+## ADR-013: Two-Tier Test Layout (Unit/Integration + E2E)
+
+- **Decision:** Consolidate the four initial test projects (Tests.Unit, Tests.Integration, Tests.E2EAPI, Tests.E2EUI) into three: Tests.Unit, Tests.Integration, Tests.E2E. The latter merges HTTP smoke + C# Playwright browser tests under one LiveServerFactAttribute.
+- **Why:** Single base-URL resolver, single attribute, single fixture graph. The duplicate LiveServerFactAttribute (byte-for-byte the same in both E2E projects) was a known smell.
+- **Status (2026-06):** E2EAPI + E2EUI merged into Tests.E2E. The remaining Tests.Unit + Tests.Integration split mirrors test-runner conventions (Testcontainers-backed tests vs. pure logic tests) and is intentional — combining them would force unit tests to take an IClassFixture<WebApplicationFactory> even when they don't need one.
+- **Trade-off:** Two remaining test projects instead of the audit-recommended one. Justified by the run-time cost difference (Azurite container vs. in-process).
+
+## ADR-014: Shared References Domain — Intentional
+
+- **Decision:** PoRedoImage.Shared has a project reference to PoRedoImage.Domain. The shared DTOs re-use UserImageKind, CaptionPersona, and MemeTemplate from Domain so the wire contract and the domain contract share enum values without copy-paste drift.
+- **Why:** A leaf-Shared rule would force every cross-wire enum to live in two places (Domain + Shared), with mapping extensions at the endpoint boundary. The mapping cost is real (10+ mapping sites) for a benefit that doesn't show up in any user-facing behaviour.
+- **Alternatives considered:** Move UserImageKind and CaptionPersona to Shared (rejected: Domain would then need to reference Shared to use the enums in entities — circular). Introduce a third "Enums" project (rejected: extra project overhead for two small enums).
+- **Trade-off:** Shared is not a leaf. Acceptable because the Shared surface is genuinely DTOs; the Domain enums are the source of truth.

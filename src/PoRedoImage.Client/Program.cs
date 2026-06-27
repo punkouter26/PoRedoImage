@@ -22,6 +22,10 @@ builder.Services.AddRadzenComponents();
 // Active-image session, persisted across feature pages for the browser session.
 builder.Services.AddScoped<ImageSessionService>();
 
+// Procedural Web Audio micro-feedback (success / failure / tick). Zero asset cost —
+// every cue is synthesized via OscillatorNode + lowpass-filtered noise in wwwroot/js/audio.js.
+builder.Services.AddScoped<AudioFeedbackService>();
+
 // BFF auth (§2): the server serializes the authenticated principal (claims only, no tokens);
 // the client deserializes it into an AuthenticationStateProvider.
 builder.Services.AddAuthorizationCore();

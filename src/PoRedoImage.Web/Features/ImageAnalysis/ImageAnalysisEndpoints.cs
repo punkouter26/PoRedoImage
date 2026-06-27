@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PoRedoImage.Application.Features.ImageAnalysis;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Shared.Imaging;
 using PoRedoImage.Web.Features;
 using System.ClientModel;
 using Azure;

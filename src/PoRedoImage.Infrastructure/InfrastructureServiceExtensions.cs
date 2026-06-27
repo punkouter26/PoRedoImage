@@ -43,7 +43,6 @@ public static class InfrastructureServiceExtensions
 
         // Idea #1 — Agentic Style Director: 4-agent sequential workflow.
         // Registered as transient so per-request scoped DI services (logger) flow correctly.
-        services.AddTransient<SequentialAgentWorkflow>();
         services.AddTransient<VisionAnalystAgent>();
         services.AddTransient<StyleStrategistAgent>();
         services.AddTransient<PromptRefinerAgent>();

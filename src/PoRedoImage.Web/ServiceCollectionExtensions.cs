@@ -66,7 +66,12 @@ public static class ServiceCollectionExtensions
         ConfigureOptions(builder);
 
         // ─── Idempotency (Po2Logic R5 / F6) ─────────────────────────────────────────
+        // IMemoryCache backs the de-dup; IEndpointFilter applied to Write endpoints via
+        // [IdempotencyRequired] marker attribute. 24h TTL prevents replays across days.
+        // AddHybridCache (PoNetCaching): tiered L1+L2 cache (in-process + distributed when a
+        // distributed cache is registered later) with stampede protection and tagging support.
         builder.Services.AddMemoryCache();
+        builder.Services.AddHybridCache();
         builder.Services.AddScoped<IdempotencyKeyFilter>();
 
         // ─── Rate limiting ──────────────────────────────────────────────────
@@ -76,6 +81,17 @@ public static class ServiceCollectionExtensions
         ConfigureHealthChecks(builder);
 
         // ─── HTTP client ────────────────────────────────────────────────────
+        // Named "BffApi" client (used by SSR pre-render + server-side health checks) gets the
+        // standard resilience pipeline (retry + circuit-breaker + timeout). Keeps transient
+        // failures from propagating as 500s to the browser.
+        builder.Services.AddHttpClient("BffApi")
+            .AddStandardResilienceHandler(options =>
+            {
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(4);
+                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
+                options.Retry.MaxRetryAttempts = 3;
+            });
+
         builder.Services.AddHttpClient();
         builder.Services.AddScoped(sp =>
         {

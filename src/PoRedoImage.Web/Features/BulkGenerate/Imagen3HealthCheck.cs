@@ -18,7 +18,10 @@ public class Imagen3HealthCheck : IHealthCheck
     {
         if (!_imagen3.IsConfigured)
         {
-            return Task.FromResult(HealthCheckResult.Unhealthy(
+            // Degraded (not Unhealthy) — missing config is expected in dev when
+            // the user has not provided Google:ApiKey. Still functional, just
+            // with image generation disabled.
+            return Task.FromResult(HealthCheckResult.Degraded(
                 "Gemini image generation not configured (Google:ApiKey missing). Image generation is unavailable."));
         }
 
