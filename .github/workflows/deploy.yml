@@ -17,9 +17,9 @@ env:
   AZURE_RESOURCE_GROUP: PoRedoImage
   SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
-  # Expected App Service Plan (Basic B2 in PoShared) — drift onto an F1 Free plan
-  # caused QuotaExceeded "Site Disabled" deploy failures. Asserted post-deploy.
-  EXPECTED_PLAN: asp-poshared-linux
+  # Expected App Service Plan (Basic B1 in PoShared, westus2 Linux) — drift onto an F1 Free
+  # plan caused QuotaExceeded "Site Disabled" deploy failures. Asserted post-deploy.
+  EXPECTED_PLAN: asp-PoShared-b1
   # Run pre-June-16-2026 Node 20 actions on Node 24 ahead of the forced migration.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
@@ -93,7 +93,32 @@ jobs:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           package: webapp.zip
+      - name: Bind Key Vault Secrets User role
+        # Grants the freshly-provisioned app's system-assigned managed identity
+        # read access to the shared Key Vault. Without this, every
+        # `@Microsoft.KeyVault(...)` app setting resolves to an empty string
+        # and the app fails its StartupSecretValidator in Production.
+        run: |
+          PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
+            --query identity.principalId -o tsv)
+          if [ -z "$PRINCIPAL" ] || [ "$PRINCIPAL" = "None" ]; then
+            echo "::error::App has no system-assigned identity; re-check infra/main.bicep."
+            exit 1
+          fi
+          VAULT="/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared"
+          # Idempotent: ignore AlreadyExists so re-runs are clean.
+          az role assignment create --role "Key Vault Secrets User" \
+            --assignee "$PRINCIPAL" --scope "$VAULT" 2>&1 \
+            | grep -v "AlreadyExists" || true
+          # Verify the binding is in place; fail the pipeline if not.
+          az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
+            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv \
+            | xargs -I{} test {} -ge 1
+
       - name: Verify App Service Plan binding & state
+        # Hard-fail when the plan is not the expected Basic B1 shared plan. F1
+        # Free plans hit QuotaExceeded and disable the site; an empty/unresolved
+        # plan is also a hard failure now (no silent warnings).
         run: |
           STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
           # serverFarmId is the raw ARM property (reliable); appServicePlanId is a
@@ -106,21 +131,38 @@ jobs:
             echo "::error::App state is '$STATE', expected 'Running'."
             exit 1
           fi
-          # Only fail on a confirmed wrong plan; an unresolved id just warns (no false negatives).
-          if [ -z "$PLAN" ]; then
-            echo "::warning::Could not resolve the App Service Plan id; skipping the binding check."
-          elif [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
+          if [ -z "$PLAN" ] || [ "$PLAN" = "<unresolved>" ]; then
+            echo "::error::Could not resolve the App Service Plan id — bicep deploy may have failed silently."
+            exit 1
+          fi
+          if [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
             echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. F1 Free plans hit QuotaExceeded and disable the site."
             exit 1
           fi
-      - name: Verify deployment (health check)
+      - name: Verify deployment (health + diag smoke test)
+        # Hits the live prod endpoints with a guest session cookie so the
+        # masked config payload can be read back. A 200 from /health is
+        # necessary but not sufficient — /api/diag returning masked config
+        # proves the Key Vault → managed identity → app pipeline works.
         run: |
           sleep 20
+          BASE="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health" --max-time 30 || echo "000")
-            echo "Health check attempt $i: HTTP $STATUS"
-            if [ "$STATUS" = "200" ]; then echo "Deployment verified."; exit 0; fi
+            HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/health" --max-time 30 || echo "000")
+            echo "Health check attempt $i: HTTP $HEALTH"
+            if [ "$HEALTH" = "200" ]; then
+              # Bootstrap a guest session then assert the masked config payload.
+              curl -s -c /tmp/cookies.txt -o /dev/null "$BASE/dev-login?email=smoke@guest.local"
+              DIAG=$(curl -s -b /tmp/cookies.txt "$BASE/api/diag" --max-time 30 || echo "")
+              if echo "$DIAG" | grep -q "OpenAI"; then
+                echo "Diag payload contains OpenAI — Key Vault + MI binding verified."
+                echo "$DIAG" | head -c 400; echo
+                exit 0
+              else
+                echo "::warning::Diag payload missing OpenAI on attempt $i: ${DIAG:0:200}"
+              fi
+            fi
             sleep 15
           done
-          echo "::error::Health check did not return 200 after 5 attempts."
+          echo "::error::Health check did not return 200 with valid diag after 5 attempts."
           exit 1

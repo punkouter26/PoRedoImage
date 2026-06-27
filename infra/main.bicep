@@ -14,8 +14,8 @@ param location string = resourceGroup().location
 @description('App Service name — must match AZURE_WEBAPP_NAME in .github/workflows/deploy.yml')
 param appServiceName string = 'poredoimage-web'
 
-@description('Storage account name (must be globally unique)')
-param storageAccountName string = 'stporedoimageprodwus2001'
+@description('Storage account name (must be globally unique). Reuses the existing stporedoimage26 created 2026-02-07; change this only when migrating regions.')
+param storageAccountName string = 'stporedoimage26'
 
 @description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
 param storageLocation string = 'eastus'
@@ -23,8 +23,8 @@ param storageLocation string = 'eastus'
 @description('Azure subscription ID hosting the shared PoShared App Service Plan')
 param subscriptionId string = subscription().subscriptionId
 
-@description('App Service Plan resource ID — shared Basic B2 plan in PoShared. Plan name must match EXPECTED_PLAN in .github/workflows/deploy.yml')
-param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poshared-linux'
+@description('App Service Plan resource ID — shared Basic B1 Linux plan in PoShared (westus2). Plan name must match EXPECTED_PLAN in .github/workflows/deploy.yml')
+param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-PoShared-b1'
 
 @description('Key Vault endpoint in the PoShared resource group')
 param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
@@ -65,13 +65,12 @@ resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-0
 }
 
 // ─── App Service ────────────────────────────────────────────────────────────
-// Uses the shared Basic B2 Linux plan (asp-poshared-linux) from PoShared. A prior
-// drift onto an F1 Free plan hit QuotaExceeded and disabled the site, so the plan
-// binding is asserted post-deploy in CI. System-assigned managed identity is enabled
-// for Key Vault access.
+// Uses the shared Basic B1 Linux plan (asp-PoShared-b1) from PoShared. A prior drift
+// onto an F1 Free plan hit QuotaExceeded and disabled the site, so the plan binding is
+// asserted post-deploy in CI. System-assigned managed identity is enabled for Key Vault access.
 resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   name: appServiceName
-  location: location
+  location: 'westus2' // must match the shared App Service Plan region
   kind: 'app,linux'
   identity: {
     type: 'SystemAssigned'
@@ -134,7 +133,6 @@ output storageAccountName string = storageAccount.name
 output webAppPrincipalId string = webApp.identity.principalId
 output webAppDefaultHostName string = webApp.properties.defaultHostName
 
-// NOTE: Key Vault role assignment (Key Vault Secrets User) is applied post-deploy via:
-//   az role assignment create --role "Key Vault Secrets User" \
-//     --assignee <webAppPrincipalId> \
-//     --scope /subscriptions/${subscriptionId}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared
+// NOTE: Key Vault role assignment (Key Vault Secrets User) is applied post-deploy via the
+// GitHub Actions workflow (deploy.yml). The pipeline derives the principalId from the freshly
+// created web app and grants access at the vault scope, so a manual step is never required.

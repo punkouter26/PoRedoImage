@@ -1,0 +1,22 @@
+{
+  "rules": [
+    {
+      "enabled": true,
+      "name": "MoveOldLogsToCool",
+      "type": "Lifecycle",
+      "definition": {
+        "actions": {
+          "baseBlob": {
+            "tierToCool": { "daysAfterModificationGreaterThan": 30 },
+            "tierToArchive": { "daysAfterModificationGreaterThan": 365 },
+            "delete": { "daysAfterModificationGreaterThan": 730 }
+          }
+        },
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["logs/"]
+        }
+      }
+    }
+  ]
+}
