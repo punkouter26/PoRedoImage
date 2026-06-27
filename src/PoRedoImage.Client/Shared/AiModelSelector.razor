@@ -1,24 +1,28 @@
-@using PoRedoImage.Web.Models
-@inject IWebHostEnvironment Env
+@using PoRedoImage.Client.Models
+@inject IWebAssemblyHostEnvironment Env
 
 @* AI Model Selector — Rule 14
-   Dropdown of AI models split by category: Remote, Web Browser, Ollama.
-   Persists selection in user session for the lifetime of the circuit. *@
+   Native grouped dropdown: models are grouped under Remote (Azure), Web Browser (Local),
+   and Ollama (Local Machine). Ollama appears in Development only. *@
 <div class="model-selector">
     <label class="model-selector__label" for="ai-model-select">
         <i class="bi bi-cpu me-1"></i>AI Model
     </label>
     <div class="model-selector__dropdown-wrapper">
-        <RadzenDropDown Name="ai-model-select"
-                    Data="@_filteredModels"
-                    TextProperty="@nameof(AiModelInfo.DisplayName)"
-                    ValueProperty="@nameof(AiModelInfo.ModelId)"
-                    TValue="string"
-                    @bind-Value="@_selectedModelId"
-                    Change="@(args => HandleModelChange(args?.ToString()))"
-                    Placeholder="Select AI model…" />
+        <select id="ai-model-select" class="model-selector__select form-select"
+                @bind="_selectedModelId" @bind:after="HandleModelChange">
+            @foreach (var group in _groups)
+            {
+                <optgroup label="@group.Category.Label()">
+                    @foreach (var m in group.Models)
+                    {
+                        <option value="@m.ModelId">@m.DisplayName</option>
+                    }
+                </optgroup>
+            }
+        </select>
     </div>
-    @if (_selectedModel != null && !string.IsNullOrEmpty(_selectedModel.Description))
+    @if (_selectedModel is not null && !string.IsNullOrEmpty(_selectedModel.Description))
     {
         <div class="model-selector__hint">@_selectedModel.Description</div>
     }
@@ -44,6 +48,9 @@
     .model-selector__dropdown-wrapper {
         position: relative;
     }
+    .model-selector__select {
+        font-size: 0.9rem;
+    }
     .model-selector__hint {
         font-size: 0.7rem;
         color: #64748b;
@@ -57,24 +64,30 @@
 
     private string? _selectedModelId;
     private AiModelInfo? _selectedModel;
-    private List<AiModelInfo> _filteredModels = new();
+    private List<(AiModelCategory Category, List<AiModelInfo> Models)> _groups = new();
 
     protected override void OnInitialized()
     {
-        // Filter models based on environment — Ollama models are dev-only
+        // Ollama (and any other dev-only models) are hidden outside Development.
         var isDev = Env.IsDevelopment();
 
-        _filteredModels = AiModelCatalog.All
-            .Where(m => !m.IsDevOnly || isDev)
+        _groups = AiModelCatalog.CategoryOrder
+            .Select(cat => (Category: cat,
+                Models: AiModelCatalog.All.Where(m => m.Category == cat && (!m.IsDevOnly || isDev)).ToList()))
+            .Where(g => g.Models.Count > 0)
             .ToList();
+
+        // Default to the first model in the first group (e.g. GPT-4o).
+        _selectedModel = _groups.FirstOrDefault().Models?.FirstOrDefault();
+        _selectedModelId = _selectedModel?.ModelId;
     }
 
-    private async Task HandleModelChange(string? modelId)
+    private async Task HandleModelChange()
     {
-        _selectedModel = AiModelCatalog.Find(modelId);
+        _selectedModel = AiModelCatalog.Find(_selectedModelId);
         if (OnModelSelected.HasDelegate)
         {
-            await OnModelSelected.InvokeAsync(modelId);
+            await OnModelSelected.InvokeAsync(_selectedModelId);
         }
     }
 }

@@ -17,7 +17,6 @@ env:
   AZURE_RESOURCE_GROUP: PoRedoImage
   SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
-  UNIT_TEST_PATH: tests/PoRedoImage.Tests.Unit
   # Expected App Service Plan (Basic B2 in PoShared) — drift onto an F1 Free plan
   # caused QuotaExceeded "Site Disabled" deploy failures. Asserted post-deploy.
   EXPECTED_PLAN: asp-poshared-linux
@@ -45,13 +44,9 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore ${{ env.SOLUTION_PATH }}
       - run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -c Release
-      - run: dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity minimal
-      - run: dotnet test ${{ env.UNIT_TEST_PATH }} -c Release --no-build --logger trx --results-directory TestResults
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-results
-          path: TestResults/*.trx
+      # Tests are intentionally NOT run in CI/CD (project policy): the pipeline only
+      # builds and ships. Run unit/integration/E2E suites locally or via a dedicated,
+      # non-deploy workflow. See AGENT.MD §Testing.
       # Publish + artifact upload are only consumed by the deploy job (push /
       # workflow_dispatch). Skip them on pull_request to cut PR CI time.
       - if: github.event_name != 'pull_request'

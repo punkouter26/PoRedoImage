@@ -11,8 +11,8 @@ targetScope = 'resourceGroup'
 @description('Azure region for resources')
 param location string = resourceGroup().location
 
-@description('App Service name')
-param appServiceName string = 'app-poredoimage-web-prod-wus2-001'
+@description('App Service name — must match AZURE_WEBAPP_NAME in .github/workflows/deploy.yml')
+param appServiceName string = 'poredoimage-web'
 
 @description('Storage account name (must be globally unique)')
 param storageAccountName string = 'stporedoimageprodwus2001'
@@ -23,11 +23,11 @@ param storageLocation string = 'eastus'
 @description('Azure subscription ID hosting the shared PoShared App Service Plan')
 param subscriptionId string = subscription().subscriptionId
 
-@description('App Service Plan resource ID (shared plan in PoShared)')
-param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups/rg-platform-shared-prod-eus2/providers/Microsoft.Web/serverfarms/asp-platform-linux-b2-prod-wus2-001'
+@description('App Service Plan resource ID — shared Basic B2 plan in PoShared. Plan name must match EXPECTED_PLAN in .github/workflows/deploy.yml')
+param appServicePlanId string = '/subscriptions/${subscriptionId}/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poshared-linux'
 
 @description('Key Vault endpoint in the PoShared resource group')
-param keyVaultEndpoint string = 'https://kv-platform-prod-eus2-00.vault.azure.net/'
+param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
 
 @description('Key Vault name in the PoShared resource group (used for Key Vault reference app settings)')
 param keyVaultName string = 'kv-poshared'
@@ -65,8 +65,10 @@ resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-0
 }
 
 // ─── App Service ────────────────────────────────────────────────────────────
-// Uses the shared Linux plan from PoShared (F1 free tier).
-// System-assigned managed identity is enabled for Key Vault access.
+// Uses the shared Basic B2 Linux plan (asp-poshared-linux) from PoShared. A prior
+// drift onto an F1 Free plan hit QuotaExceeded and disabled the site, so the plan
+// binding is asserted post-deploy in CI. System-assigned managed identity is enabled
+// for Key Vault access.
 resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   name: appServiceName
   location: location
@@ -98,7 +100,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
           value: '8080'
         }
         {
-          // Allow up to 10 minutes for cold starts (F1 with cert updates can be slow)
+          // Allow up to 10 minutes for cold starts (cert updates can be slow)
           name: 'WEBSITE_CONTAINER_START_TIME_LIMIT'
           value: '600'
         }

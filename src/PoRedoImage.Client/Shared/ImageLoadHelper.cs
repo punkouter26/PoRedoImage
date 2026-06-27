@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components.Forms;
 
-namespace PoRedoImage.Web.Components.Shared;
+namespace PoRedoImage.Client.Shared;
 
 public static class ImageLoadHelper
 {

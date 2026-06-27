@@ -1,5 +1,5 @@
 @inherits LayoutComponentBase
-@inject IWebHostEnvironment Env
+@inject IWebAssemblyHostEnvironment Env
 
 <header class="app-header">
     <nav class="app-nav container-fluid">
@@ -28,7 +28,7 @@
         <span class="app-footer__env">
             @if (!Env.IsProduction())
             {
-                <span class="app-footer__env-badge" title="Running in Development mode — Key Vault and real auth are bypassed">@Env.EnvironmentName.ToUpperInvariant()</span>
+                <span class="app-footer__env-badge" title="Running in Development mode — Key Vault and real auth are bypassed">@Env.Environment.ToUpperInvariant()</span>
             }
         </span>
     </div>

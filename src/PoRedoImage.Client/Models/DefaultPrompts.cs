@@ -1,4 +1,4 @@
-namespace PoRedoImage.Web.Models;
+namespace PoRedoImage.Client.Models;
 
 /// <summary>
 /// Default Category 1 art-style transformation prompts for Bulk Generate.

@@ -1,3 +1,9 @@
+@using PoRedoImage.Client
+@code {
+    // Global Interactive WebAssembly (no prerender): the whole app — router, layout, pages —
+    // runs in the browser. The host (this server project) is the BFF/API only.
+    private static readonly Microsoft.AspNetCore.Components.IComponentRenderMode WasmMode = RenderModes.WasmNoPrerender;
+}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -13,15 +19,15 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="_content/Radzen.Blazor/css/default.css" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["PoRedoImage.Web.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["PoRedoImage.Client.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="WasmMode" />
     <title>PoRedoImage</title>
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="WasmMode" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="js/imageProcessing.js"></script>

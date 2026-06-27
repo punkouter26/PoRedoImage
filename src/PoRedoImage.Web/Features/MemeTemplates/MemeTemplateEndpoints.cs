@@ -16,7 +16,8 @@ public static class MemeTemplateEndpoints
     public static IEndpointRouteBuilder MapMemeTemplateEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/meme-templates")
-            .WithTags("MemeTemplates");
+            .WithTags("MemeTemplates")
+            .RequireAuthorization();
 
         group.MapGet("/", (IMemeTemplateService templates) =>
         {

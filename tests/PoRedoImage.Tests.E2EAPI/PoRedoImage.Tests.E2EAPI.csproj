@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- E2EAPI: pure HTTP API calls against a running instance to emulate real
+       client functionality end-to-end (no in-process TestServer). Base URL is
+       configured via E2E_BASE_URL (default http://localhost:5000). Auth uses the
+       GUEST dev-bypass (/dev-login) so the suite runs in the Test environment. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PoRedoImage.Shared\PoRedoImage.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

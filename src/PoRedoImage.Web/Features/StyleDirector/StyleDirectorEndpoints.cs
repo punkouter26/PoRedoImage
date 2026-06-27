@@ -14,7 +14,8 @@ public static class StyleDirectorEndpoints
     public static IEndpointRouteBuilder MapStyleDirectorEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/style-director")
-            .WithTags("StyleDirector");
+            .WithTags("StyleDirector")
+            .RequireAuthorization();
 
         group.MapPost("/run", async (
             StyleDirectorRequestDto request,

@@ -1,11 +1,6 @@
 @page "/diag"
 @attribute [Authorize]
-@rendermode InteractiveServer
-@using Microsoft.Extensions.Diagnostics.HealthChecks
-@inject IConfiguration Configuration
-@inject IWebHostEnvironment Env
-@inject HealthCheckService HealthService
-@inject IJSRuntime JSRuntime
+@inject HttpClient Http
 @inject ILogger<Diag> Logger
 
 <PageTitle>Diagnostics - PoRedoImage</PageTitle>
@@ -13,10 +8,8 @@
 <div class="container py-4">
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
         <div>
-            <h1 class="diag-title mb-1">
-                <i class="bi bi-activity me-2 text-primary"></i>Diagnostics
-            </h1>
-            <p class="text-muted mb-0 small">Runtime configuration &amp; service connectivity. Sensitive values are masked.</p>
+            <h1 class="diag-title mb-1"><i class="bi bi-activity me-2 text-primary"></i>Diagnostics</h1>
+            <p class="text-muted mb-0 small">Runtime configuration &amp; service connectivity (from the BFF /api/diag). Sensitive values are masked.</p>
         </div>
         <button class="btn btn-sm btn-outline-primary px-3" @onclick="LoadDiagnostics" disabled="@isLoading">
             @if (isLoading)
@@ -31,105 +24,62 @@
         </button>
     </div>
 
-    @if (isLoading && diagData == null)
+    @if (isLoading && diag is null)
     {
-        <div class="diag-skeleton">
-            @for (int i = 0; i < 3; i++)
-            {
-                <div class="diag-skeleton__card shimmer-anim mb-3"></div>
-            }
-        </div>
+        <div class="alert alert-info">Loading diagnostics…</div>
     }
     else if (!string.IsNullOrEmpty(errorMessage))
     {
         <div class="alert alert-danger d-flex align-items-center gap-2">
-            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-            <span>@errorMessage</span>
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i><span>@errorMessage</span>
         </div>
     }
-    else if (diagData != null)
+    else if (diag is not null)
     {
-        @* Runtime info row *@
         <div class="row g-3 mb-4">
-            <div class="col-sm-6 col-md-3">
-                <div class="diag-stat">
-                    <div class="diag-stat__label">Environment</div>
-                    <div class="diag-stat__value diag-stat__value--env">@diagData.Environment</div>
-                </div>
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <div class="diag-stat">
-                    <div class="diag-stat__label">.NET Version</div>
-                    <div class="diag-stat__value">@diagData.DotNetVersion</div>
-                </div>
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <div class="diag-stat">
-                    <div class="diag-stat__label">Machine</div>
-                    <div class="diag-stat__value">@diagData.MachineName</div>
-                </div>
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <div class="diag-stat">
-                    <div class="diag-stat__label">Process ID</div>
-                    <div class="diag-stat__value">@diagData.ProcessId</div>
-                </div>
-            </div>
+            <div class="col-sm-6 col-md-3"><div class="diag-stat"><div class="diag-stat__label">Environment</div><div class="diag-stat__value diag-stat__value--env">@diag.Environment</div></div></div>
+            <div class="col-sm-6 col-md-3"><div class="diag-stat"><div class="diag-stat__label">.NET Version</div><div class="diag-stat__value">@diag.DotNetVersion</div></div></div>
+            <div class="col-sm-6 col-md-3"><div class="diag-stat"><div class="diag-stat__label">Machine</div><div class="diag-stat__value">@diag.MachineName</div></div></div>
+            <div class="col-sm-6 col-md-3"><div class="diag-stat"><div class="diag-stat__label">Process ID</div><div class="diag-stat__value">@diag.ProcessId</div></div></div>
         </div>
 
-        @* Health checks *@
-        @if (diagData?.HealthEntries != null)
+        @if (diag.Health is not null)
         {
             <div class="card mb-3">
                 <div class="card-header d-flex align-items-center justify-content-between">
                     <h5 class="mb-0"><i class="bi bi-heart-pulse me-2"></i>Health Checks</h5>
-                    <span class="badge @(diagData.HealthStatus == "Healthy" ? "bg-success" : "bg-danger")">@diagData.HealthStatus</span>
+                    <span class="badge @(diag.Health.Status == "Healthy" ? "bg-success" : "bg-danger")">@diag.Health.Status</span>
                 </div>
                 <div class="card-body p-0">
-                    <table class="table table-sm table-hover mb-0 diag-config-table">
-                        <tbody>
-                            @foreach (var kv in diagData.HealthEntries)
-                            {
-                                <tr>
-                                    <td class="ps-3 text-muted" style="width:40%;font-size:0.8rem">@kv.Key</td>
-                                    <td style="font-size:0.8rem;font-family:monospace">@(kv.Value ?? "(null)")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                    <table class="table table-sm table-hover mb-0 diag-config-table"><tbody>
+                        @foreach (var kv in diag.Health.Entries)
+                        {
+                            <tr>
+                                <td class="ps-3 text-muted" style="width:40%;font-size:0.8rem">@kv.Key</td>
+                                <td style="font-size:0.8rem;font-family:monospace">@kv.Value.Status @(kv.Value.Description is not null ? "— " + kv.Value.Description : "")</td>
+                            </tr>
+                        }
+                    </tbody></table>
                 </div>
             </div>
         }
 
-        @* Config key/value table *@
-        @if (diagData?.Configuration != null)
+        @if (diag.Configuration is not null)
         {
             <div class="card">
                 <div class="card-header d-flex align-items-center justify-content-between">
                     <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Configuration</h5>
-                    <span class="badge bg-secondary">@diagData.Configuration.Count entries</span>
+                    <span class="badge bg-secondary">@diag.Configuration.Count entries</span>
                 </div>
                 <div class="card-body p-0">
                     <table class="table table-sm table-hover mb-0 diag-config-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-3" style="width:40%">Key</th>
-                                <th>Value</th>
-                                <th style="width:3rem"></th>
-                            </tr>
-                        </thead>
+                        <thead class="table-light"><tr><th class="ps-3" style="width:40%">Key</th><th>Value</th></tr></thead>
                         <tbody>
-                            @foreach (var kv in diagData.Configuration)
+                            @foreach (var kv in diag.Configuration)
                             {
                                 <tr>
                                     <td class="ps-3 text-muted" style="word-break:break-all;font-size:0.8rem">@kv.Key</td>
                                     <td style="word-break:break-all;font-size:0.8rem;font-family:monospace">@(kv.Value ?? "(null)")</td>
-                                    <td class="pe-2 text-end">
-                                        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem" title="Copy value"
-                                                @onclick="@(() => CopyToClipboard(kv.Value ?? string.Empty))">
-                                            <i class="bi bi-copy"></i>
-                                        </button>
-                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -141,7 +91,7 @@
 </div>
 
 @code {
-    private DiagPayload? diagData;
+    private DiagPayload? diag;
     private string? errorMessage;
     private bool isLoading = true;
 
@@ -154,38 +104,7 @@
             isLoading = true;
             errorMessage = null;
             StateHasChanged();
-
-            diagData = new DiagPayload
-            {
-                Environment = Env.EnvironmentName,
-                MachineName = System.Environment.MachineName,
-                OSVersion = System.Environment.OSVersion.ToString(),
-                DotNetVersion = System.Environment.Version.ToString(),
-                ProcessId = System.Environment.ProcessId,
-                Timestamp = DateTime.UtcNow.ToString("O"),
-                Configuration = new Dictionary<string, string?>
-                {
-                    ["AZURE_KEY_VAULT_ENDPOINT"] = MaskValue(Configuration["AZURE_KEY_VAULT_ENDPOINT"]),
-                    ["AzureAd:TenantId"] = Configuration["AzureAd:TenantId"],
-                    ["AzureAd:ClientId"] = MaskValue(Configuration["AzureAd:ClientId"]),
-                    ["ComputerVision:Endpoint"] = MaskValue(Configuration["ComputerVision:Endpoint"]),
-                    ["ComputerVision:ApiKey"] = MaskValue(Configuration["ComputerVision:ApiKey"]),
-                    ["ComputerVision:MinTagConfidence"] = Configuration["ComputerVision:MinTagConfidence"],
-                    ["OpenAI:Endpoint"] = MaskValue(Configuration["OpenAI:Endpoint"]),
-                    ["OpenAI:Key"] = MaskValue(Configuration["OpenAI:Key"]),
-                    ["OpenAI:ChatCompletionsDeployment"] = Configuration["OpenAI:ChatCompletionsDeployment"],
-                    ["Google:ApiKey"] = MaskValue(Configuration["Google:ApiKey"]),
-                    ["Google:Imagen3Model"] = Configuration["Google:Imagen3Model"],
-                    ["ApplicationInsights:ConnectionString"] = MaskValue(Configuration["ApplicationInsights:ConnectionString"]),
-                    ["Storage:ConnectionString"] = MaskValue(Configuration["Storage:ConnectionString"])
-                }
-            };
-
-            var healthReport = await HealthService.CheckHealthAsync();
-            diagData.HealthStatus = healthReport.Status.ToString();
-            diagData.HealthEntries = healthReport.Entries.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (string?)$"{kvp.Value.Status} ({kvp.Value.Duration.TotalMilliseconds:0}ms){(kvp.Value.Description is not null ? " — " + kvp.Value.Description : "")}");
+            diag = await Http.GetFromJsonAsync<DiagPayload>("/api/diag");
         }
         catch (Exception ex)
         {
@@ -198,30 +117,26 @@
         }
     }
 
-    private static string? MaskValue(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return "(not set)";
-        if (value.Length <= 8) return new string('*', value.Length);
-        var start = Math.Min(4, value.Length / 4);
-        var end = Math.Min(4, value.Length / 4);
-        return string.Concat(value.AsSpan(0, start), new string('*', value.Length - start - end), value.AsSpan(value.Length - end));
-    }
-
-    private async Task CopyToClipboard(string text)
-    {
-        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
-    }
-
     private sealed class DiagPayload
     {
         public string? Environment { get; set; }
         public string? MachineName { get; set; }
-        public string? OSVersion { get; set; }
         public string? DotNetVersion { get; set; }
         public int ProcessId { get; set; }
-        public string? Timestamp { get; set; }
-        public string? HealthStatus { get; set; }
-        public Dictionary<string, string?>? HealthEntries { get; set; }
+        public HealthPayload? Health { get; set; }
         public Dictionary<string, string?>? Configuration { get; set; }
+    }
+
+    private sealed class HealthPayload
+    {
+        public string? Status { get; set; }
+        public Dictionary<string, HealthEntry> Entries { get; set; } = new();
+    }
+
+    private sealed class HealthEntry
+    {
+        public string? Status { get; set; }
+        public string? Description { get; set; }
+        public double DurationMs { get; set; }
     }
 }

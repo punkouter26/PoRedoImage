@@ -20,9 +20,12 @@ public sealed class KeyVaultHealthCheck : IHealthCheck
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = _configuration["AZURE_KEY_VAULT_ENDPOINT"];
+        // Resolve the endpoint the same way Program.cs does (KeyVault:Uri is set in Development,
+        // AZURE_KEY_VAULT_ENDPOINT in Production), so dev correctly reports Key Vault as active and
+        // confirms it is serving real secrets via DefaultAzureCredential (az login / VS).
+        var endpoint = _configuration["KeyVault:Uri"] ?? _configuration["AZURE_KEY_VAULT_ENDPOINT"];
         if (string.IsNullOrWhiteSpace(endpoint))
-            return HealthCheckResult.Degraded("AZURE_KEY_VAULT_ENDPOINT is not configured; Key Vault is skipped.");
+            return HealthCheckResult.Degraded("No Key Vault endpoint configured (KeyVault:Uri / AZURE_KEY_VAULT_ENDPOINT); Key Vault is skipped.");
 
         try
         {

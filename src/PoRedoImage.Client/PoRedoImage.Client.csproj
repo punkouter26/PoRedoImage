@@ -5,13 +5,25 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!-- Trimming hygiene (§1): enable the trim analyzer on the WASM client's own code. -->
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <!-- IL2111: framework Router.NotFoundPage setter (reflection-annotated), not user code.
+         IL2026/IL3050: reflection-based System.Text.Json across the app. Fully trim/AOT-safe
+         JSON would require a JsonSerializerContext for every DTO (out of scope; AOT is disabled
+         per project policy). Scoped suppression keeps the analyzer on for everything else while
+         honouring TreatWarningsAsErrors. -->
+    <NoWarn>$(NoWarn);IL2111;IL2026;IL3050</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
     <PackageReference Include="Radzen.Blazor" />
     <ProjectReference Include="..\PoRedoImage.Shared\PoRedoImage.Shared.csproj" />
+    <ProjectReference Include="..\PoRedoImage.Domain\PoRedoImage.Domain.csproj" />
   </ItemGroup>
 
 </Project>

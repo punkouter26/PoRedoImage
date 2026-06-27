@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- E2EUI: C# Playwright browser tests against a running instance. After build, install
+       browsers once: pwsh tests/PoRedoImage.Tests.E2EUI/bin/Release/net10.0/playwright.ps1 install
+       Base URL via E2E_BASE_URL (default http://localhost:5000). Tests self-skip when the
+       instance is unreachable. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.Buffers.Text;
 
-namespace PoRedoImage.Web.Components.Shared;
+namespace PoRedoImage.Client.Shared;
 
 /// <summary>
 /// Per-circuit (scoped) service that persists the active image across all feature pages.

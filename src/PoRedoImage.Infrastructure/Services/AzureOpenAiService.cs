@@ -47,10 +47,17 @@ public sealed class AzureOpenAiService : IGenerativeAiService
 
     private static (AzureOpenAIClient Client, Azure.AzureKeyCredential? Credential) BuildClientWithCredential(string endpoint, string? apiKey)
     {
+        // Explicit resilience (§3): the SDK pipeline retries transient failures (429/5xx/timeouts)
+        // with exponential backoff before surfacing an error to the caller.
+        var options = new AzureOpenAIClientOptions
+        {
+            NetworkTimeout = TimeSpan.FromMinutes(3),
+            RetryPolicy = new System.ClientModel.Primitives.ClientRetryPolicy(maxRetries: 3),
+        };
         if (string.IsNullOrEmpty(apiKey))
-            return (new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential()), null);
+            return (new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential(), options), null);
         var cred = new Azure.AzureKeyCredential(apiKey);
-        return (new AzureOpenAIClient(new Uri(endpoint), cred), cred);
+        return (new AzureOpenAIClient(new Uri(endpoint), cred, options), cred);
     }
 
     private void RefreshCredentials()

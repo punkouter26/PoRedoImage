@@ -171,5 +171,3 @@ public static class BulkGenerateEndpoints
         return app;
     }
 }
-
-public record SavePromptsRequest(string[] Prompts);

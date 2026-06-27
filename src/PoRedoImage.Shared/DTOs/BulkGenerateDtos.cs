@@ -22,3 +22,6 @@ public record BulkDescribeResponse(string Description);
 
 public record BulkVariationRequest(string ImageData, string ContentType, string Prompt);
 public record BulkVariationResponse(string ImageData, string ContentType);
+
+/// <summary>Save the caller's 10 bulk-generation prompts. Shared so the WASM client and BFF agree on shape.</summary>
+public record SavePromptsRequest(string[] Prompts);

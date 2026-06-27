@@ -84,7 +84,7 @@ flowchart LR
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | .NET 10 Blazor Web App (SSR + Interactive Server) |
+| Framework | .NET 10 Blazor Web App (global Interactive WebAssembly, no prerender) behind an ASP.NET Core BFF |
 | AI — Vision | Azure Computer Vision `cv-poshared-eastus` |
 | AI — Language | Azure OpenAI GPT-4.1-nano `openai-poshared-eastus` |
 | AI — Image Gen | Google Gemini `gemini-2.5-flash-image` |
@@ -92,7 +92,7 @@ flowchart LR
 | Secrets | Azure Key Vault `kv-poshared` (Access Policy + 30 min rotation) |
 | Observability | OpenTelemetry + Serilog → Application Insights |
 | Infrastructure | Azure Bicep + GitHub Actions OIDC |
-| Testing | xUnit · Testcontainers · Playwright TypeScript |
+| Testing | xUnit · Testcontainers · C# Playwright (Unit · Integration · E2EAPI · E2EUI) — not run in CI |
 
 ---
 
@@ -202,19 +202,23 @@ cd tests/PoRedoImage.Tests.E2E && npx playwright test           # E2E
 
 ## Project Structure
 ```
-src/PoRedoImage.Web/
+src/PoRedoImage.Web/        # API/BFF host
   Features/
-    Auth/             # OIDC + dev login cookie handler
-    BulkGenerate/     # Imagen3Service, parallel generation, prompt storage
-    Diagnostics/      # /diag endpoint, middleware
+    Auth/             # OIDC + dev login cookie handler, /auth + /api auth
+    BulkGenerate/     # Imagen3Service, parallel generation, prompt storage endpoints
+    Diagnostics/      # /api/diag endpoint, middleware
     ImageAnalysis/    # ComputerVisionService, OpenAIService, MemeGeneratorService
-  Components/         # Blazor pages + shared layout (incl. ImageSessionService)
+  Components/         # App.razor host document + _Imports (renders the Client's <Routes> as WASM)
   Configuration/      # KeyVaultSecretNameMapping
-  Models/             # DefaultPrompts
+src/PoRedoImage.Client/     # Blazor WASM SPA
+  Routes.razor        # Router (global InteractiveWebAssembly)
+  Pages/ Layout/ Shared/ Models/   # all interactive UI + ImageSessionService
+  wwwroot/            # static assets (the only wwwroot in the solution)
 tests/
   PoRedoImage.Tests.Unit/            # xUnit pure logic
   PoRedoImage.Tests.Integration/     # xUnit + WebApplicationFactory + Testcontainers
-  PoRedoImage.Tests.E2E/             # Playwright TypeScript
+  PoRedoImage.Tests.E2EAPI/          # pure HTTP API E2E (xUnit, self-skip if no live instance)
+  PoRedoImage.Tests.E2EUI/           # C# Playwright UI E2E (self-skip if no live instance)
 infra/
   main.bicep          # App Service + Storage provisioning
 docs/                 # All .mmd diagrams + screenshots

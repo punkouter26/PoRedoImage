@@ -1,6 +1,5 @@
 @page "/meme-generation"
 @attribute [Authorize]
-@rendermode InteractiveServer
 @inherits FeaturePageBase
 @inject IJSRuntime JSRuntime
 
@@ -389,7 +388,7 @@
                 {
                     try
                     {
-                        var problem = await httpResponse.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+                        var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>();
                         errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
                     }
                     catch

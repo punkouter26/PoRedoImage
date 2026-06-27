@@ -52,6 +52,7 @@ public static partial class DiagnosticsEndpoints
             },
             ["Configuration"] = new Dictionary<string, string?>
             {
+                ["KeyVault:Uri"] = configuration["KeyVault:Uri"],
                 ["AZURE_KEY_VAULT_ENDPOINT"] = MaskValue(configuration["AZURE_KEY_VAULT_ENDPOINT"]),
                 ["AzureAd:TenantId"] = configuration["AzureAd:TenantId"],
                 ["AzureAd:ClientId"] = MaskValue(configuration["AzureAd:ClientId"]),

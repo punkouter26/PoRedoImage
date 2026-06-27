@@ -1,12 +1,9 @@
-﻿@rendermode InteractiveServer
-
-<Router AppAssembly="typeof(Program).Assembly"
-        AdditionalAssemblies="new[] { typeof(PoRedoImage.Client._Imports).Assembly }"
-        NotFoundPage="typeof(Pages.NotFound)">
+<Router AppAssembly="typeof(PoRedoImage.Client._Imports).Assembly"
+        NotFoundPage="typeof(PoRedoImage.Client.Pages.NotFound)">
     <Found Context="routeData">
-        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(PoRedoImage.Client.Layout.MainLayout)">
             <NotAuthorized>
-                <RedirectToLogin />
+                <PoRedoImage.Client.Shared.RedirectToLogin />
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

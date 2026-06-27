@@ -39,7 +39,18 @@ public sealed class AzureVisionService : IVisionService
         }
 
         _credential = new AzureKeyCredential(key);
-        _client = new ImageAnalysisClient(new Uri(endpoint), _credential);
+        // Explicit resilience (§3): exponential-backoff retries for transient 429/5xx/timeout failures.
+        var options = new ImageAnalysisClientOptions
+        {
+            Retry =
+            {
+                MaxRetries = 3,
+                Mode = Azure.Core.RetryMode.Exponential,
+                Delay = TimeSpan.FromSeconds(1),
+                NetworkTimeout = TimeSpan.FromSeconds(100),
+            }
+        };
+        _client = new ImageAnalysisClient(new Uri(endpoint), _credential, options);
         _logger.LogInformation("Azure Vision Service initialized with endpoint: {Endpoint}", endpoint);
     }
 

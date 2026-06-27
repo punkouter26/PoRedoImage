@@ -21,6 +21,7 @@ public static class CaptionBattleEndpoints
     {
         var group = app.MapGroup("/api/caption-battle")
             .WithTags("CaptionBattle")
+            .RequireAuthorization()
             .RequireRateLimiting("ai-endpoints");
 
         group.MapPost("/run", async (

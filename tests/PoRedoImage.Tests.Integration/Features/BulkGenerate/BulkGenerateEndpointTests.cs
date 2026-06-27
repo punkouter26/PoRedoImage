@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using PoRedoImage.Web.Features.BulkGenerate;
+using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Integration;
 

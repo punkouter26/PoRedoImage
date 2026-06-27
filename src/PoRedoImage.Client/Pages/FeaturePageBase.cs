@@ -1,12 +1,13 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
 using PoRedoImage.Shared.DTOs;
-using PoRedoImage.Web.Components.Shared;
+using PoRedoImage.Client.Shared;
 using Radzen;
 using System.Security.Claims;
 
-namespace PoRedoImage.Web.Components.Pages;
+namespace PoRedoImage.Client.Pages;
 
 /// <summary>
 /// Shared base component for feature pages (ImageRegeneration, MemeGeneration).

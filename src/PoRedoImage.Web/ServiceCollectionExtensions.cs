@@ -56,7 +56,8 @@ public static class ServiceCollectionExtensions
         // ─── Core services ──────────────────────────────────────────────────
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents()
-            .AddInteractiveWebAssemblyComponents();
+            .AddInteractiveWebAssemblyComponents()
+            .AddAuthenticationStateSerialization();
 
         builder.Services.AddRadzenComponents();
         builder.Services.AddOpenApi();
@@ -88,7 +89,7 @@ public static class ServiceCollectionExtensions
 
         // ─── Feature services ────────────────────────────────────────────────
         builder.Services.AddPoRedoImageInfrastructure();
-        builder.Services.AddScoped<PoRedoImage.Web.Components.Shared.ImageSessionService>();
+        // ImageSessionService is registered in the WASM Client host (client-side concern).
 
         // ─── Authentication & Authorization ─────────────────────────────────
         builder.Services.AddPoRedoImageAuth(builder.Configuration, builder.Environment);

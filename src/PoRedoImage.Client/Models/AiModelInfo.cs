@@ -1,4 +1,4 @@
-namespace PoRedoImage.Web.Models;
+namespace PoRedoImage.Client.Models;
 
 /// <summary>
 /// Represents an AI model available for selection in the Studio UI.
@@ -72,4 +72,17 @@ public static class AiModelCatalog
     /// <summary>Finds a model by its ModelId.</summary>
     public static AiModelInfo? Find(string? modelId) =>
         All.FirstOrDefault(m => m.ModelId == modelId);
+
+    /// <summary>The category order shown in the model dropdown.</summary>
+    public static readonly IReadOnlyList<AiModelCategory> CategoryOrder =
+        [AiModelCategory.Remote, AiModelCategory.WebBrowser, AiModelCategory.Ollama];
+
+    /// <summary>Human-readable group label for a category (used as the dropdown optgroup header).</summary>
+    public static string Label(this AiModelCategory category) => category switch
+    {
+        AiModelCategory.Remote => "Remote (Azure)",
+        AiModelCategory.WebBrowser => "Web Browser (Local)",
+        AiModelCategory.Ollama => "Ollama (Local Machine)",
+        _ => category.ToString(),
+    };
 }

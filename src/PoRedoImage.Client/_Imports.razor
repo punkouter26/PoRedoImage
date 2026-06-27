@@ -1,13 +1,26 @@
-﻿@using System.Net.Http
+@using System.Net.Http
 @using System.Net.Http.Json
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+@using Microsoft.Extensions.Logging
 @using Microsoft.JSInterop
 @using PoRedoImage.Client
 @using PoRedoImage.Client.Layout
+@using PoRedoImage.Client.Pages
+@using PoRedoImage.Client.Shared
+@using PoRedoImage.Client.Models
 @using PoRedoImage.Shared.DTOs
+@using PoRedoImage.Domain.Entities
 @using Radzen
 @using Radzen.Blazor
+
+@* Forced login (§2): every routable page requires an authenticated user by default.
+   Pages that must stay public opt out with [AllowAnonymous]. *@
+@attribute [Authorize]

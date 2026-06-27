@@ -15,7 +15,7 @@ public sealed class ImageAnalysisOrchestrator(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        logger.LogInformation("Starting image analysis pipeline. Mode={Mode}", request.Mode);
+        logger.PipelineStarting(request.Mode);
 
         var imageBytes = Convert.FromBase64String(request.ImageData);
         var metrics = new ProcessingMetricsDto();
@@ -62,7 +62,7 @@ public sealed class ImageAnalysisOrchestrator(
         }
 
         response.Metrics = metrics;
-        logger.LogInformation("Image analysis pipeline complete. TotalMs={Total}", metrics.TotalProcessingTimeMs);
+        logger.PipelineComplete(metrics.TotalProcessingTimeMs);
         return response;
     }
 }

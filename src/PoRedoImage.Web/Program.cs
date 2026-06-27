@@ -220,9 +220,12 @@ try
     }
 
     // ─── Core services ──────────────────────────────────────────────────
+    // Global Interactive WebAssembly (§1 BFF model): the whole UI runs in the browser; this
+    // project is the API/BFF host only. AddAuthenticationStateSerialization flows the cookie-
+    // authenticated principal (claims only, never tokens) to the WASM AuthenticationStateProvider.
     builder.Services.AddRazorComponents()
-        .AddInteractiveServerComponents()
-        .AddInteractiveWebAssemblyComponents();
+        .AddInteractiveWebAssemblyComponents()
+        .AddAuthenticationStateSerialization();
 
     // Register Radzen services on the server so SSR pre-rendering can resolve
     // Radzen-injected properties on Client WASM components (e.g. NotificationService).
@@ -302,8 +305,7 @@ try
     // DI registration follows Dependency Inversion Principle (SOLID-D)
     builder.Services.AddPoRedoImageInfrastructure();
 
-    // Scoped: persists the active uploaded image across feature pages for the lifetime of the circuit
-    builder.Services.AddScoped<PoRedoImage.Web.Components.Shared.ImageSessionService>();
+    // ImageSessionService is a client-side (WASM) concern now — registered in the Client host.
 
     // ─── Authentication & Authorization ─────────────────────────────────
     builder.Services.AddPoRedoImageAuth(builder.Configuration, builder.Environment);
@@ -389,7 +391,6 @@ try
 
     app.MapStaticAssets();
     app.MapRazorComponents<App>()
-        .AddInteractiveServerRenderMode()
         .AddInteractiveWebAssemblyRenderMode()
         .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly);
 

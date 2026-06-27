@@ -25,6 +25,7 @@ public static class ImageAnalysisEndpoints
             .Produces<ImageAnalysisResponse>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
             .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
+            .RequireAuthorization()
             .RequireRateLimiting("ai-endpoints")
             .AddEndpointFilter<ValidationFilter<ImageAnalysisRequest>>();
 

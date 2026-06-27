@@ -31,7 +31,10 @@ public static class AuthServiceExtensions
             services.AddAuthentication(options =>
             {
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+                // Cookie is also the default challenge so an unauthenticated page hit redirects to
+                // /login (which offers both Microsoft OAuth and, in Dev, GUEST) rather than jumping
+                // straight to Microsoft. The explicit /challenge-microsoft route invokes OIDC directly.
+                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             })
             .AddCookie(options =>
             {
@@ -53,6 +56,17 @@ public static class AuthServiceExtensions
                 options.Scope.Add("email");
                 options.GetClaimsFromUserInfoEndpoint = true;
                 options.TokenValidationParameters.NameClaimType = "name";
+                // API callers must get a 401, not a 302 to the Microsoft login page. Without this,
+                // a WASM fetch to a protected /api route would follow the redirect and fail opaquely.
+                options.Events.OnRedirectToIdentityProvider = ctx =>
+                {
+                    if (ctx.Request.Path.StartsWithSegments("/api"))
+                    {
+                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        ctx.HandleResponse();
+                    }
+                    return Task.CompletedTask;
+                };
                 // AzureAd:AllowedTenantIds (comma-separated) restricts access to specific tenants.
                 // When absent, issuer validation is disabled to support personal + multi-tenant accounts.
                 var allowedTenants = configuration["AzureAd:AllowedTenantIds"]?

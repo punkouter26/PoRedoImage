@@ -1,7 +1,5 @@
 @page "/bulk-generate"
 @attribute [Authorize]
-@rendermode InteractiveServer
-@inject IBulkPromptRepository PromptStorage
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 @inject ILogger<BulkGenerate> Logger
@@ -394,13 +392,9 @@
         _isSaving = true;
         try
         {
-            var prompt = new PoRedoImage.Domain.Entities.BulkPrompt
-            {
-                RowKey = _userId,
-                Name = _userId,
-                PromptText = System.Text.Json.JsonSerializer.Serialize(_prompts)
-            };
-            await PromptStorage.SaveAsync(prompt);
+            // Persist via the BFF — the WASM client never touches table storage directly.
+            var resp = await Http.PostAsJsonAsync("/api/bulk-generate/prompts", new SavePromptsRequest(_prompts));
+            resp.EnsureSuccessStatusCode();
             NotificationService.Notify(NotificationSeverity.Success, "Saved", "Prompts saved successfully!", duration: 3000);
         }
         catch (Exception ex)
@@ -423,12 +417,10 @@
         }
         try
         {
-            var stored = await PromptStorage.GetByRowKeyAsync(_userId);
-            if (stored is not null)
+            var resp = await Http.GetAsync("/api/bulk-generate/prompts");
+            if (resp.IsSuccessStatusCode)
             {
-                var saved = !string.IsNullOrWhiteSpace(stored.PromptText)
-                    ? System.Text.Json.JsonSerializer.Deserialize<string[]>(stored.PromptText)
-                    : null;
+                var saved = await resp.Content.ReadFromJsonAsync<string[]>();
                 if (saved is not null)
                 {
                     _prompts = saved;
