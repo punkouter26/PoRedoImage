@@ -1,10 +1,43 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@inject IWebHostEnvironment Env
 
-@* Client WASM layout — minimal passthrough.
-   The full app shell (header, nav, footer) is rendered by the SSR host
-   (PoRedoImage.Web Components/Layout/MainLayout.razor). *@
-<article class="content px-4 py-4">
-    @Body
-</article>
+<header class="app-header">
+    <nav class="app-nav container-fluid">
+        <a class="app-nav__brand" href="/">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" class="me-2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+            PoRedoImage
+        </a>
+        <NavMenu />
+        <LoginDisplay />
+    </nav>
+</header>
+<ActiveImageBar />
 
-<RadzenComponents />
+<main class="app-main">
+    <article class="content px-4 py-4">
+        @Body
+    </article>
+</main>
+
+
+<footer class="app-footer">
+    <div class="app-footer__inner container-fluid">
+        <span class="app-footer__center">PoRedoImage &copy; @DateTime.UtcNow.Year</span>
+        <span class="app-footer__env">
+            @if (!Env.IsProduction())
+            {
+                <span class="app-footer__env-badge" title="Running in Development mode — Key Vault and real auth are bypassed">@Env.EnvironmentName.ToUpperInvariant()</span>
+            }
+        </span>
+    </div>
+</footer>
+
+<RadzenNotification />
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
