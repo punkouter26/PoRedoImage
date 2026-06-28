@@ -126,25 +126,47 @@ try
 
     static string? ResolveAppInsightsConnectionString(IConfiguration config)
     {
-        // 1. Full connection string (env var or config key, e.g. App Service setting / Key Vault).
-        var connectionString = config["APPLICATIONINSIGHTS_CONNECTION_STRING"]
-            ?? config["ApplicationInsights:ConnectionString"];
-        if (!string.IsNullOrWhiteSpace(connectionString))
+        var resolved = ResolveRaw(config);
+
+        // Telemetry misconfiguration must NEVER crash the app. The Azure Monitor / App Insights SDKs
+        // throw "Connection String Invalid: InstrumentationKey is required." when handed a value that
+        // has no InstrumentationKey — which previously fail-fasted the whole host in Production and
+        // drove it into a cold-start crash loop (which in turn exhausted the F1 daily CPU quota and
+        // disabled the site). Treat a present-but-malformed connection string as "no telemetry":
+        // export is skipped (instrumentation still runs locally) and the app starts normally.
+        if (!string.IsNullOrWhiteSpace(resolved) &&
+            !resolved.Contains("InstrumentationKey=", StringComparison.OrdinalIgnoreCase))
         {
-            return connectionString;
+            Log.Warning("Application Insights connection string is present but malformed "
+                + "(no InstrumentationKey). Telemetry export is disabled; the app will start normally. "
+                + "Fix the ApplicationInsights:ConnectionString value to restore telemetry.");
+            return null;
         }
 
-        // 2. Legacy instrumentation key → synthesize a connection string.
-        var instrumentationKey = config["APPINSIGHTS_INSTRUMENTATIONKEY"];
-        if (!string.IsNullOrWhiteSpace(instrumentationKey))
-        {
-            return $"InstrumentationKey={instrumentationKey}";
-        }
+        return resolved;
 
-        // 3. Hardcoded staging fallback. Populate "ApplicationInsights:StagingConnectionString"
-        //    (appsettings or Key Vault) to keep telemetry flowing if the primary sources are absent;
-        //    null disables export rather than fabricating a credential.
-        return config["ApplicationInsights:StagingConnectionString"];
+        static string? ResolveRaw(IConfiguration config)
+        {
+            // 1. Full connection string (env var or config key, e.g. App Service setting / Key Vault).
+            var connectionString = config["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+                ?? config["ApplicationInsights:ConnectionString"];
+            if (!string.IsNullOrWhiteSpace(connectionString))
+            {
+                return connectionString;
+            }
+
+            // 2. Legacy instrumentation key → synthesize a connection string.
+            var instrumentationKey = config["APPINSIGHTS_INSTRUMENTATIONKEY"];
+            if (!string.IsNullOrWhiteSpace(instrumentationKey))
+            {
+                return $"InstrumentationKey={instrumentationKey}";
+            }
+
+            // 3. Hardcoded staging fallback. Populate "ApplicationInsights:StagingConnectionString"
+            //    (appsettings or Key Vault) to keep telemetry flowing if the primary sources are absent;
+            //    null disables export rather than fabricating a credential.
+            return config["ApplicationInsights:StagingConnectionString"];
+        }
     }
 
     // ─── Serilog ────────────────────────────────────────────────────────
