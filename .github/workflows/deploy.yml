@@ -17,9 +17,9 @@ env:
   AZURE_RESOURCE_GROUP: PoRedoImage
   SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
-  # Expected App Service Plan (Basic B1 in PoShared, westus2 Linux) — drift onto an F1 Free
-  # plan caused QuotaExceeded "Site Disabled" deploy failures. Asserted post-deploy.
-  EXPECTED_PLAN: asp-PoShared-b1
+  # Expected App Service Plan (F1 Free, westus2 Linux) — owned by the PoRedoImage RG and
+  # provisioned by infra/main.bicep. Asserted post-deploy to catch plan drift.
+  EXPECTED_PLAN: asp-poredoimage-f1
   # Run pre-June-16-2026 Node 20 actions on Node 24 ahead of the forced migration.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
@@ -80,13 +80,15 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Infra drift preflight (what-if)
-        continue-on-error: true # informational — never block a deploy on what-if
+      - name: Deploy infrastructure (bicep)
+        # Applies infra/main.bicep so the F1 plan (asp-poredoimage-f1) exists and the web
+        # app is bound to it. Idempotent — converges storage, plan, and site config every run.
+        # This is what re-parents the app onto the expected plan; the verify step below asserts it.
         run: |
-          az deployment group what-if \
+          az deployment group create \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --template-file infra/main.bicep \
-            --result-format ResourceIdOnly || echo "what-if unavailable; continuing."
+            --name "ci-${{ github.run_id }}"
       - run: cd publish && zip -r ../webapp.zip . && cd ..
       - uses: azure/webapps-deploy@v3
         with:
@@ -116,9 +118,8 @@ jobs:
             | xargs -I{} test {} -ge 1
 
       - name: Verify App Service Plan binding & state
-        # Hard-fail when the plan is not the expected Basic B1 shared plan. F1
-        # Free plans hit QuotaExceeded and disable the site; an empty/unresolved
-        # plan is also a hard failure now (no silent warnings).
+        # Hard-fail when the app is not on the expected F1 plan (asp-poredoimage-f1).
+        # An empty/unresolved plan is also a hard failure (no silent warnings).
         run: |
           STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
           # serverFarmId is the raw ARM property (reliable); appServicePlanId is a
@@ -136,7 +137,7 @@ jobs:
             exit 1
           fi
           if [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
-            echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. F1 Free plans hit QuotaExceeded and disable the site."
+            echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. The bicep deploy should have bound it to the F1 plan."
             exit 1
           fi
       - name: Verify deployment (health + diag smoke test)
