@@ -59,11 +59,31 @@ if (Assert-CommandExists 'winget' 'Install App Installer from the Microsoft Stor
 # ── 2. Docker / Azurite ──────────────────────────────────────────────
 Write-Step "Starting Azurite via Docker Compose"
 
+# Stop any npm/global Azurite first — it binds 10000-10002 and would make `docker compose up`
+# fail with a port conflict (both emulators fighting over the same ports + .azurite-data files).
+$npmAzurite = Get-CimInstance Win32_Process -Filter "name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*azurite*' }
+if ($npmAzurite) {
+    Write-Host "  Stopping non-Docker (npm) Azurite to free ports 10000-10002..." -ForegroundColor Yellow
+    $npmAzurite | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
 if (Assert-CommandExists 'docker' 'Install Docker Desktop from https://www.docker.com/products/docker-desktop/') {
     Push-Location $Root
     try {
         docker compose up -d
         Write-Host "  Azurite started on default ports (Blob: 10000, Queue: 10001, Table: 10002)" -ForegroundColor Green
+
+        # Post-start health check: confirm the Table endpoint actually answers (a 400/403 proves
+        # the listener is up; a connection failure means the container did not come healthy).
+        Start-Sleep -Seconds 2
+        try {
+            Invoke-WebRequest -Uri 'http://127.0.0.1:10002/devstoreaccount1' -TimeoutSec 5 -SkipHttpErrorCheck |
+                Out-Null
+            Write-Host "  Azurite Table endpoint is responding on 127.0.0.1:10002." -ForegroundColor Green
+        } catch {
+            Write-Warning "  Azurite Table endpoint did not respond on 127.0.0.1:10002 — check 'docker compose logs azurite'."
+        }
     }
     finally {
         Pop-Location
@@ -80,12 +100,21 @@ if (Assert-CommandExists 'dotnet' 'Install .NET 10 SDK from https://dotnet.micro
 }
 
 # ── 4. Playwright browsers (C# E2E suite) ───────────────────────────
-# The C# Playwright SDK is restored with the test project; the browser installer
-# (`playwright.ps1`) is emitted under tests/PoRedoImage.Tests.E2E/bin/<config>/<tfm>/ on first
-# build. Install once after first build:
-#   pwsh tests/PoRedoImage.Tests.E2E/bin/Release/net10.0/playwright.ps1 install
-# We don't run it here because it must happen after `dotnet build` of the test project,
-# which is the user's first `dotnet test` invocation rather than a setup-time step.
+# The browser installer (`playwright.ps1`) is emitted only after the E2E project is built.
+# Build it (Release), then install Chromium so the E2EUI suite runs instead of self-skipping.
+Write-Step "Installing Playwright browsers (Chromium) for the E2E UI suite"
+
+if (Get-Command 'dotnet' -ErrorAction SilentlyContinue) {
+    $e2eProj = Join-Path $Root 'tests/PoRedoImage.Tests.E2E/PoRedoImage.Tests.E2E.csproj'
+    dotnet build $e2eProj -c Release --nologo | Out-Null
+    $playwrightScript = Join-Path $Root 'tests/PoRedoImage.Tests.E2E/bin/Release/net10.0/playwright.ps1'
+    if (Test-Path $playwrightScript) {
+        pwsh $playwrightScript install chromium
+        Write-Host "  Chromium installed for Playwright." -ForegroundColor Green
+    } else {
+        Write-Warning "  playwright.ps1 not found after build — run it manually: pwsh $playwrightScript install chromium"
+    }
+}
 
 # ── 4b. Azure CLI auth check (Key Vault access) ──────────────────────
 Write-Step "Checking Azure CLI authentication"
@@ -110,7 +139,20 @@ if (Test-Path $devSettings) {
     Write-Host "  $devSettings already exists — not overwritten." -ForegroundColor Green
     Write-Host "  Populate secrets from Azure Key Vault (kv-poshared) or fill in manually." -ForegroundColor Gray
 } else {
-    Write-Warning "appsettings.Development.json not found at expected path: $devSettings"
+    # Bootstrap a minimal placeholder so the app boots locally even before Key Vault access is set
+    # up. Storage points at the Azurite container; AI keys are blank (set Mocks:UseMockAi=true to
+    # run fully offline with the mock services + "USING MOCK DATA" banner).
+    Write-Host "  Creating placeholder $devSettings ..." -ForegroundColor Yellow
+    $placeholder = [ordered]@{
+        Storage = [ordered]@{ ConnectionString = 'UseDevelopmentStorage=true' }
+        Mocks   = [ordered]@{ UseMockAi = $false }
+        Auth    = [ordered]@{ EnableFakeAuth = $false }
+        OpenAI  = [ordered]@{ Endpoint = ''; Key = '' }
+        ComputerVision = [ordered]@{ Endpoint = ''; ApiKey = '' }
+        Google  = [ordered]@{ ApiKey = '' }
+    }
+    $placeholder | ConvertTo-Json -Depth 5 | Set-Content -Path $devSettings -Encoding utf8
+    Write-Host "  Wrote placeholder dev settings. Fill in real secrets or set Mocks:UseMockAi=true." -ForegroundColor Green
 }
 
 # ── Done ─────────────────────────────────────────────────────────────

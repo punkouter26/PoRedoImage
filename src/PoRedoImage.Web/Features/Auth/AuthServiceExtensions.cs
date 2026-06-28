@@ -12,6 +12,21 @@ public static class AuthServiceExtensions
     public static IServiceCollection AddPoRedoImageAuth(
         this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
+        // ─── Fake-auth bypass (test/dev only) ───────────────────────────────────────
+        // When Auth:EnableFakeAuth=true (and NOT Production), the entire auth pipeline is the
+        // header-driven FakeAuthHandler — callers assume an identity via X-Fake-User / X-Fake-Roles.
+        // This is the BFF local bypass used by headless Playwright golden-path suites.
+        var enableFakeAuth = configuration.GetValue<bool>("Auth:EnableFakeAuth");
+        if (enableFakeAuth && !environment.IsProduction())
+        {
+            services.AddAuthentication(FakeAuthHandler.SchemeName)
+                .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, FakeAuthHandler>(
+                    FakeAuthHandler.SchemeName, _ => { });
+            services.AddAuthorization();
+            services.AddCascadingAuthenticationState();
+            return services;
+        }
+
         var clientId = configuration["AzureAd:ClientId"];
         var hasOidc = !string.IsNullOrWhiteSpace(clientId);
 

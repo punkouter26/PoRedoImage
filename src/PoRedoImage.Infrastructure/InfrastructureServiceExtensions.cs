@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Agents;
@@ -7,6 +8,7 @@ using PoRedoImage.Application.Features.UserImages;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Repositories;
 using PoRedoImage.Infrastructure.Services;
+using PoRedoImage.Infrastructure.Services.Mocks;
 
 namespace PoRedoImage.Infrastructure;
 
@@ -17,12 +19,40 @@ namespace PoRedoImage.Infrastructure;
 /// </summary>
 public static class InfrastructureServiceExtensions
 {
-    public static IServiceCollection AddPoRedoImageInfrastructure(this IServiceCollection services)
+    /// <param name="configuration">
+    /// Optional. When <c>Mocks:UseMockAi</c> is <c>true</c>, the three high-cost AI services
+    /// (Vision, OpenAI text, Imagen3) are replaced with zero-network mock implementations that
+    /// also implement <see cref="IMockable"/> — driving the client "USING MOCK DATA" banner and
+    /// guaranteeing zero live token spend. Passing <c>null</c> always wires the real services.
+    /// </param>
+    public static IServiceCollection AddPoRedoImageInfrastructure(
+        this IServiceCollection services, IConfiguration? configuration = null)
     {
+        var useMockAi = configuration?.GetValue<bool>("Mocks:UseMockAi") ?? false;
+
         // Domain service implementations (Singleton: clients own long-lived HTTP/SDK resources)
-        services.AddSingleton<IVisionService, AzureVisionService>();
-        services.AddSingleton<IGenerativeAiService, AzureOpenAiService>();
-        services.AddSingleton<IImagen3Service, GeminiImagen3Service>();
+        if (useMockAi)
+        {
+            // Register the concrete mock once and surface it under BOTH its service interface and
+            // IMockable, so the banner can enumerate reasons without constructing the service twice.
+            services.AddSingleton<MockVisionService>();
+            services.AddSingleton<IVisionService>(sp => sp.GetRequiredService<MockVisionService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockVisionService>());
+
+            services.AddSingleton<MockGenerativeAiService>();
+            services.AddSingleton<IGenerativeAiService>(sp => sp.GetRequiredService<MockGenerativeAiService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockGenerativeAiService>());
+
+            services.AddSingleton<MockImagen3Service>();
+            services.AddSingleton<IImagen3Service>(sp => sp.GetRequiredService<MockImagen3Service>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockImagen3Service>());
+        }
+        else
+        {
+            services.AddSingleton<IVisionService, AzureVisionService>();
+            services.AddSingleton<IGenerativeAiService, AzureOpenAiService>();
+            services.AddSingleton<IImagen3Service, GeminiImagen3Service>();
+        }
 
         // Scoped services
         services.AddScoped<IMemeGeneratorService, ImageSharpMemeGeneratorService>();

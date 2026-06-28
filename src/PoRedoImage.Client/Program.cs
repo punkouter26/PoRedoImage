@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using PoRedoImage.Client.Shared;
 using Radzen;
+using System.Net.Http.Json;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -31,5 +32,27 @@ builder.Services.AddScoped<AudioFeedbackService>();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthenticationStateDeserialization();
+
+// Mirror the server's mock-service reasons into client DI so MockDataBanner can render the
+// "USING MOCK DATA" banner. The probe is anonymous and tiny; failures are swallowed so a slow
+// or unreachable server never blocks app start. Returns empty in production → no banner.
+try
+{
+    using var probe = new HttpClient
+    {
+        BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
+        Timeout = TimeSpan.FromSeconds(3),
+    };
+    var reasons = await probe.GetFromJsonAsync<string[]>("api/diag/mock-status");
+    foreach (var reason in reasons ?? [])
+    {
+        builder.Services.AddSingleton<PoRedoImage.Domain.Interfaces.IMockable>(
+            new PoRedoImage.Client.Shared.RemoteMockFlag(reason));
+    }
+}
+catch
+{
+    // No mock-status endpoint / offline / timeout → assume real data, render no banner.
+}
 
 await builder.Build().RunAsync();

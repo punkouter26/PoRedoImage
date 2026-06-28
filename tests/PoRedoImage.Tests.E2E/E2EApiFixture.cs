@@ -15,7 +15,16 @@ public sealed class E2EApiFixture : IDisposable
     {
         var baseAddress = new Uri(BaseUrl);
         Client = new HttpClient { BaseAddress = baseAddress, Timeout = TimeSpan.FromSeconds(30) };
-        AnonymousClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+        // UseCookies = false is critical: this client is shared across the class fixture, and a
+        // sibling test (Dev_login_endpoint_issues_cookie) hits /dev-login which returns Set-Cookie.
+        // With the default cookie container the auth cookie would stick to this "anonymous" client,
+        // making later negative-auth tests (e.g. /api/diag → 401) flakily pass as 200 depending on
+        // xUnit's execution order. Disabling the cookie container keeps it permanently anonymous.
+        AnonymousClient = new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false,
+        })
         {
             BaseAddress = baseAddress,
             Timeout = TimeSpan.FromSeconds(30),

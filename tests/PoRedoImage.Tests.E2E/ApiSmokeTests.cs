@@ -45,11 +45,12 @@ public sealed class ApiSmokeTests : IClassFixture<E2EApiFixture>
     [LiveServerFact]
     public async Task Favicon_ico_redirects_to_png()
     {
-        // Browsers auto-request /favicon.ico; the server must return 301/308
+        // Browsers auto-request /favicon.ico; the server returns 301 (permanent)
         // pointing at /favicon.png so the 404 noise disappears from logs.
-        var response = await _fixture.Client.GetAsync("/favicon.ico");
+        // AnonymousClient is used so an auto-redirect doesn't swallow the 301.
+        var response = await _fixture.AnonymousClient.GetAsync("/favicon.ico");
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
         Assert.EndsWith("/favicon.png", response.Headers.Location!.ToString(),
             StringComparison.OrdinalIgnoreCase);

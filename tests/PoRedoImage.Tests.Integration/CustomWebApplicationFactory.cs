@@ -2,7 +2,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Infrastructure.Services.Mocks;
 
 
 namespace PoRedoImage.Tests.Integration;
@@ -14,6 +17,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     /// Override per-test-class to achieve storage isolation between test runs.
     /// </summary>
     public string TestUserId { get; init; } = TestAuthHandler.DefaultUserId;
+
+    /// <summary>
+    /// Storage connection string injected into the host. Empty by default (storage features become
+    /// graceful no-ops). <see cref="AzuriteWebApplicationFactory"/> overrides this with a live
+    /// Testcontainers Azurite endpoint so storage-backed endpoints can be exercised end-to-end.
+    /// </summary>
+    protected virtual string StorageConnectionString => "";
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -36,8 +46,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",
                 ["OpenAI:Key"] = "test-key",
                 ["ApplicationInsights:ConnectionString"] = "",
-                ["Storage:ConnectionString"] = "",
-                ["Google:ApiKey"] = ""
+                ["Storage:ConnectionString"] = StorageConnectionString,
+                ["Google:ApiKey"] = "",
+                // Budget guardrail: force the mock AI services so NO test can spend a live token
+                // against Azure OpenAI / Computer Vision / Google Gemini. The placeholder keys above
+                // would otherwise let a service instantiate and attempt a real (failing) call.
+                ["Mocks:UseMockAi"] = "true"
             });
         });
 
@@ -58,6 +72,26 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 options.DefaultSignInScheme = TestAuthHandler.SchemeName;
                 options.DefaultSignOutScheme = TestAuthHandler.SchemeName;
             });
+
+            // Budget guardrail: swap the real AI clients for zero-network mocks. Done here (not via
+            // the Mocks:UseMockAi flag) because Program.cs reads that flag during the builder phase,
+            // before the factory's in-memory config is applied — so a ConfigureServices override is
+            // the only reliable way to guarantee no integration test can spend a live token.
+            services.RemoveAll<IVisionService>();
+            services.RemoveAll<IGenerativeAiService>();
+            services.RemoveAll<IImagen3Service>();
+
+            services.AddSingleton<MockVisionService>();
+            services.AddSingleton<IVisionService>(sp => sp.GetRequiredService<MockVisionService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockVisionService>());
+
+            services.AddSingleton<MockGenerativeAiService>();
+            services.AddSingleton<IGenerativeAiService>(sp => sp.GetRequiredService<MockGenerativeAiService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockGenerativeAiService>());
+
+            services.AddSingleton<MockImagen3Service>();
+            services.AddSingleton<IImagen3Service>(sp => sp.GetRequiredService<MockImagen3Service>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockImagen3Service>());
         });
 
         return base.CreateHost(builder);

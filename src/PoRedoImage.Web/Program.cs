@@ -320,7 +320,7 @@ try
 
     // ─── Feature services (Onion Architecture — Infrastructure layer wires all services) ──
     // DI registration follows Dependency Inversion Principle (SOLID-D)
-    builder.Services.AddPoRedoImageInfrastructure();
+    builder.Services.AddPoRedoImageInfrastructure(builder.Configuration);
 
     // ImageSessionService is a client-side (WASM) concern now — registered in the Client host.
 
@@ -342,7 +342,14 @@ try
     app.UseWhen(
         ctx => !ctx.Request.Path.StartsWithSegments("/api"),
         branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
-    app.UseHttpsRedirection();
+
+    // HTTPS redirect is skipped in Development so the E2E suite (default base URL
+    // http://localhost:5000) gets real status codes instead of a 307 to https — the dev cert
+    // already secures :5001 for interactive use. Production/Staging keep the redirect + HSTS.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
 
     // Pushes CorrelationId, UserId, and SessionId into Serilog LogContext for every request
     app.UseMiddleware<RequestContextMiddleware>();

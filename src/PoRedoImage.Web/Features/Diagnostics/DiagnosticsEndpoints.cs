@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using PoRedoImage.Domain.Interfaces;
 
 namespace PoRedoImage.Web.Features.Diagnostics;
 
@@ -18,6 +19,17 @@ public static partial class DiagnosticsEndpoints
         group.MapGet("/", GetDiagnostics)
             .WithName("GetDiagnostics")
             .WithSummary("Get masked configuration values for diagnostics");
+
+        // Anonymous, unauthenticated mock-status probe. The WASM client calls this at startup
+        // (before any login) to learn whether the server is running mocked AI services, then
+        // renders the "USING MOCK DATA" banner. Returns the IMockable reasons; empty in production.
+        app.MapGet("/api/diag/mock-status", (IEnumerable<IMockable> mocks) =>
+                Results.Ok(mocks.Select(m => m.MockReason)
+                                .Where(r => !string.IsNullOrWhiteSpace(r))
+                                .ToArray()))
+            .WithName("GetMockStatus")
+            .WithSummary("List active mock-service reasons (drives the client mock banner)")
+            .AllowAnonymous();
     }
 
     private static async Task<IResult> GetDiagnostics(
