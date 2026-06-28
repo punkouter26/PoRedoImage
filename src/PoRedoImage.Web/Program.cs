@@ -411,6 +411,14 @@ try
         ResponseWriter = async (context, report) =>
         {
             context.Response.ContentType = "application/json";
+            // JsonStringEnumConverter ensures per-entry Status is serialized as
+            // "Healthy"/"Degraded"/"Unhealthy" (not a raw int) so the post-deploy
+            // smoke test can grep the failing check name without parsing numbers.
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                Converters = { new JsonStringEnumConverter() },
+                WriteIndented = false
+            };
             await context.Response.WriteAsJsonAsync(new
             {
                 Status = report.Status.ToString(),
@@ -420,9 +428,10 @@ try
                     e.Key,
                     Status = e.Value.Status.ToString(),
                     Duration = e.Value.Duration.TotalMilliseconds,
-                    e.Value.Description
+                    Description = e.Value.Description,
+                    Error = e.Value.Exception?.Message
                 })
-            });
+            }, options);
         }
     });
     app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false });

@@ -170,30 +170,32 @@ jobs:
         # The /health endpoint runs the named readiness checks (key-vault, openai,
         # computer-vision, table-storage, imagen3) against the LIVE upstreams using the
         # secrets loaded via Key Vault references + managed identity. A 200 with the
-        # 'openai' and 'key-vault' entries present and no 'Unhealthy' status therefore
-        # proves the Key Vault → managed identity → app pipeline end-to-end — without
-        # depending on the (now admin-gated, prod-locked) /api/diag endpoint or the
-        # Development-only /dev-login route.
+        # overall status "Healthy" therefore proves the Key Vault → managed identity →
+        # app pipeline end-to-end — without depending on the (now admin-gated, prod-locked)
+        # /api/diag endpoint or the Development-only /dev-login route.
+        #
+        # Diagnostics-first: every attempt logs the FULL response body so a 503 surfaces
+        # the failing check name and exception. F1 Free cold start + ARM role-assignment
+        # propagation can take 60–90s after the role-binding step, so the initial sleep is
+        # 60s and the retry budget is 10 attempts × 15s = ~150s (total ~3.5 min).
         run: |
-          sleep 20
+          sleep 60
           BASE="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
-          for i in 1 2 3 4 5; do
-            BODY=$(curl -s -w $'\n%{http_code}' "$BASE/health" --max-time 30 || printf '\n000')
-            CODE=$(printf '%s' "$BODY" | tail -n1)
-            JSON=$(printf '%s' "$BODY" | sed '$d')
-            echo "Health check attempt $i: HTTP $CODE"
-            if [ "$CODE" = "200" ]; then
-              if echo "$JSON" | grep -q '"key-vault"' \
-                 && echo "$JSON" | grep -q '"openai"' \
-                 && ! echo "$JSON" | grep -q '"Status":"Unhealthy"'; then
-                echo "Health report healthy with key-vault + openai checks — KV + MI binding verified."
-                echo "$JSON" | head -c 400; echo
-                exit 0
-              else
-                echo "::warning::Health 200 but checks not all healthy on attempt $i: ${JSON:0:200}"
-              fi
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            RESP=$(curl -s -w $'\n__HTTP_CODE__%{http_code}__' "$BASE/health" --max-time 30 || printf '\n__HTTP_CODE__000__')
+            CODE=$(printf '%s' "$RESP" | sed -n 's/.*__HTTP_CODE__\([0-9]*\)__.*/\1/p')
+            JSON=$(printf '%s' "$RESP" | sed 's/__HTTP_CODE__[0-9]*__//')
+            echo "==== Health check attempt $i: HTTP $CODE ===="
+            # Truncate to keep log readable; 2 KB is enough to see every entry status + description.
+            echo "$JSON" | head -c 2000; echo
+            if [ "$CODE" = "200" ] \
+               && echo "$JSON" | grep -q '"status":"Healthy"' \
+               && ! echo "$JSON" | grep -q '"status":"Unhealthy"'; then
+              echo "Health OK — KV + MI binding verified end-to-end."
+              exit 0
             fi
             sleep 15
           done
-          echo "::error::Health check did not return a healthy report after 5 attempts."
+          echo "::error::Health check did not return a healthy report after 10 attempts."
+          echo "::error::Last body above shows which check is Unhealthy/Degraded."
           exit 1
