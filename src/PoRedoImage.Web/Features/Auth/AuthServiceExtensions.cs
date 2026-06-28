@@ -1,10 +1,43 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using System.Security.Claims;
 
 namespace PoRedoImage.Web.Features.Auth;
 
 public static class AuthServiceExtensions
 {
+    /// <summary>
+    /// Authorization policy guarding the /api/diag endpoint. In Production it requires the caller's
+    /// identity to be on the <c>Diagnostics:AdminEmails</c> allow-list (fail-closed: an empty list
+    /// denies everyone). In non-Production any authenticated user may read diagnostics.
+    /// </summary>
+    public const string DiagnosticsPolicy = "DiagnosticsAccess";
+
+    private static void AddPoRedoImageAuthorization(
+        IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
+    {
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy(DiagnosticsPolicy, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+
+                if (environment.IsProduction())
+                {
+                    var admins = (configuration["Diagnostics:AdminEmails"] ?? string.Empty)
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                    // Fail closed: with no configured admins, nobody can read prod diagnostics.
+                    policy.RequireAssertion(ctx =>
+                        admins.Length > 0 &&
+                        ctx.User.Claims.Any(c =>
+                            (c.Type is ClaimTypes.Email or ClaimTypes.Name or "email" or "preferred_username")
+                            && admins.Contains(c.Value, StringComparer.OrdinalIgnoreCase)));
+                }
+            });
+        });
+    }
+
     /// <summary>
     /// Registers authentication and authorization for PoRedoImage.
     /// Dev (no ClientId): cookie-only. All other environments: Microsoft OIDC + cookie.
@@ -22,7 +55,7 @@ public static class AuthServiceExtensions
             services.AddAuthentication(FakeAuthHandler.SchemeName)
                 .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, FakeAuthHandler>(
                     FakeAuthHandler.SchemeName, _ => { });
-            services.AddAuthorization();
+            AddPoRedoImageAuthorization(services, configuration, environment);
             services.AddCascadingAuthenticationState();
             return services;
         }
@@ -99,7 +132,7 @@ public static class AuthServiceExtensions
             });
         }
 
-        services.AddAuthorization();
+        AddPoRedoImageAuthorization(services, configuration, environment);
         services.AddCascadingAuthenticationState();
         return services;
     }

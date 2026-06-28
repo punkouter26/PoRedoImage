@@ -110,3 +110,11 @@ format: "ADR (Architecture Decision Record)"
 - **Why:** A leaf-Shared rule would force every cross-wire enum to live in two places (Domain + Shared), with mapping extensions at the endpoint boundary. The mapping cost is real (10+ mapping sites) for a benefit that doesn't show up in any user-facing behaviour.
 - **Alternatives considered:** Move UserImageKind and CaptionPersona to Shared (rejected: Domain would then need to reference Shared to use the enums in entities — circular). Introduce a third "Enums" project (rejected: extra project overhead for two small enums).
 - **Trade-off:** Shared is not a leaf. Acceptable because the Shared surface is genuinely DTOs; the Domain enums are the source of truth.
+
+## ADR-015: F1 Free App Service Plan — Cold Starts Accepted
+
+- **Decision:** Host the web app on the F1 Free Linux plan (`asp-poredoimage-f1`). Accept cold starts as the cost of the Free tier; do **not** add a keep-warm pinger.
+- **Why:** This is a low-traffic personal app. F1 is $0/month. The alternative (B1 Basic, ~$13/month, supports Always On) buys warm starts the traffic does not justify.
+- **Constraints that force the trade-off:** F1 cannot enable Always On (`alwaysOn: false` is mandatory in `infra/main.bicep` or the deploy fails) and caps CPU at 60 min/day. A scheduled keep-warm ping would burn into that 60-min budget and could exhaust it, so it is explicitly rejected — a pinger would trade cold starts for hard CPU-quota throttling, which is worse.
+- **Mitigations already in place:** `WEBSITE_CONTAINER_START_TIME_LIMIT=600` allows slow first-token cold starts to complete; the post-deploy `/health` smoke test retries 5× with back-off to ride out the first cold start; Key Vault references populate config at platform level so the first request doesn't wait on the in-app KV provider.
+- **Revisit when:** sustained traffic makes cold-start latency a real UX complaint, or a feature needs background processing — at which point move to B1 (Always On) rather than papering over F1 with a pinger. The plan binding is asserted post-deploy in CI, so an accidental tier change is caught.

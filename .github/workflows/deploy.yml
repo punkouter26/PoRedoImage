@@ -140,30 +140,34 @@ jobs:
             echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. The bicep deploy should have bound it to the F1 plan."
             exit 1
           fi
-      - name: Verify deployment (health + diag smoke test)
-        # Hits the live prod endpoints with a guest session cookie so the
-        # masked config payload can be read back. A 200 from /health is
-        # necessary but not sufficient — /api/diag returning masked config
-        # proves the Key Vault → managed identity → app pipeline works.
+      - name: Verify deployment (health smoke test)
+        # The /health endpoint runs the named readiness checks (key-vault, openai,
+        # computer-vision, table-storage, imagen3) against the LIVE upstreams using the
+        # secrets loaded via Key Vault references + managed identity. A 200 with the
+        # 'openai' and 'key-vault' entries present and no 'Unhealthy' status therefore
+        # proves the Key Vault → managed identity → app pipeline end-to-end — without
+        # depending on the (now admin-gated, prod-locked) /api/diag endpoint or the
+        # Development-only /dev-login route.
         run: |
           sleep 20
           BASE="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
           for i in 1 2 3 4 5; do
-            HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/health" --max-time 30 || echo "000")
-            echo "Health check attempt $i: HTTP $HEALTH"
-            if [ "$HEALTH" = "200" ]; then
-              # Bootstrap a guest session then assert the masked config payload.
-              curl -s -c /tmp/cookies.txt -o /dev/null "$BASE/dev-login?email=smoke@guest.local"
-              DIAG=$(curl -s -b /tmp/cookies.txt "$BASE/api/diag" --max-time 30 || echo "")
-              if echo "$DIAG" | grep -q "OpenAI"; then
-                echo "Diag payload contains OpenAI — Key Vault + MI binding verified."
-                echo "$DIAG" | head -c 400; echo
+            BODY=$(curl -s -w $'\n%{http_code}' "$BASE/health" --max-time 30 || printf '\n000')
+            CODE=$(printf '%s' "$BODY" | tail -n1)
+            JSON=$(printf '%s' "$BODY" | sed '$d')
+            echo "Health check attempt $i: HTTP $CODE"
+            if [ "$CODE" = "200" ]; then
+              if echo "$JSON" | grep -q '"key-vault"' \
+                 && echo "$JSON" | grep -q '"openai"' \
+                 && ! echo "$JSON" | grep -q '"Status":"Unhealthy"'; then
+                echo "Health report healthy with key-vault + openai checks — KV + MI binding verified."
+                echo "$JSON" | head -c 400; echo
                 exit 0
               else
-                echo "::warning::Diag payload missing OpenAI on attempt $i: ${DIAG:0:200}"
+                echo "::warning::Health 200 but checks not all healthy on attempt $i: ${JSON:0:200}"
               fi
             fi
             sleep 15
           done
-          echo "::error::Health check did not return 200 with valid diag after 5 attempts."
+          echo "::error::Health check did not return a healthy report after 5 attempts."
           exit 1

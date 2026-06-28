@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Web.Features.Auth;
 
 namespace PoRedoImage.Web.Features.Diagnostics;
 
@@ -12,9 +13,12 @@ public static partial class DiagnosticsEndpoints
 {
     public static void MapDiagnosticsEndpoints(this WebApplication app)
     {
+        // In Production this requires a Diagnostics:AdminEmails-listed identity (fail-closed); in
+        // non-Production any authenticated user. Prevents arbitrary signed-in users from reading the
+        // (masked) infra topology in prod. See AuthServiceExtensions.DiagnosticsPolicy.
         var group = app.MapGroup("/api/diag")
             .WithTags("Diagnostics")
-            .RequireAuthorization();
+            .RequireAuthorization(AuthServiceExtensions.DiagnosticsPolicy);
 
         group.MapGet("/", GetDiagnostics)
             .WithName("GetDiagnostics")
@@ -64,9 +68,9 @@ public static partial class DiagnosticsEndpoints
             },
             ["Configuration"] = new Dictionary<string, string?>
             {
-                ["KeyVault:Uri"] = configuration["KeyVault:Uri"],
+                ["KeyVault:Uri"] = MaskValue(configuration["KeyVault:Uri"]),
                 ["AZURE_KEY_VAULT_ENDPOINT"] = MaskValue(configuration["AZURE_KEY_VAULT_ENDPOINT"]),
-                ["AzureAd:TenantId"] = configuration["AzureAd:TenantId"],
+                ["AzureAd:TenantId"] = MaskValue(configuration["AzureAd:TenantId"]),
                 ["AzureAd:ClientId"] = MaskValue(configuration["AzureAd:ClientId"]),
                 ["ComputerVision:Endpoint"] = MaskValue(configuration["ComputerVision:Endpoint"]),
                 ["ComputerVision:ApiKey"] = MaskValue(configuration["ComputerVision:ApiKey"]),

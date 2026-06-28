@@ -1,9 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using PoRedoImage.Domain.Interfaces;
@@ -150,32 +152,37 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
     {
         builder.UseEnvironment("Development");
 
-        builder.ConfigureHostConfiguration(config =>
+        // ConfigureAppConfiguration runs AFTER appsettings.{Environment}.json, so these in-memory
+        // values win on conflict. Critically, Storage:ConnectionString="" stops startup from trying
+        // to reach a (non-running) Azurite, and KeyVault:Uri="" skips the Key Vault provider — both
+        // are required for the host to build at all. (ConfigureHostConfiguration runs FIRST and would
+        // be overwritten by appsettings, which is why the host previously failed to build.)
+        builder.ConfigureAppConfiguration(config =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["KeyVault:Uri"] = "",
                 ["AZURE_KEY_VAULT_ENDPOINT"] = "",
                 ["ComputerVision:Endpoint"] = "https://test.cognitiveservices.azure.com/",
                 ["ComputerVision:ApiKey"] = "test-key",
                 ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",
                 ["OpenAI:Key"] = "test-key",
-                ["ApplicationInsights:ConnectionString"] = ""
-            });
-        });
-
-        builder.ConfigureHostConfiguration(config =>
-        {
-            // Clear user-secret keys that can trigger real external API calls
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Google:ApiKey"] = "",
-                ["Storage:ConnectionString"] = ""
+                ["ApplicationInsights:ConnectionString"] = "",
+                ["Storage:ConnectionString"] = "",
+                ["Google:ApiKey"] = "test-key",
+                // Force the zero-network mock AI services at the builder phase (Program.cs reads this
+                // flag before our ConfigureServices runs). We then override the three AI mocks below
+                // with test-specific behaviours; this keeps the real Azure clients from ever registering.
+                ["Mocks:UseMockAi"] = "true"
             });
         });
 
         builder.ConfigureServices(services =>
         {
-            // Remove real service registrations and replace with mocks
+            // The /analyze endpoint requires authorization — authenticate every request as the test user.
+            AddTestAuth(services);
+
+            // Remove real service registrations and replace with mocks (zero network, zero tokens).
             ReplaceService<IVisionService>(services, CreateMockComputerVision());
             ReplaceService<IGenerativeAiService>(services, CreateMockOpenAI());
             ReplaceService<IMemeGeneratorService>(services, CreateMockMemeGenerator());
@@ -185,14 +192,25 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
         return base.CreateHost(builder);
     }
 
-    private static void ReplaceService<T>(IServiceCollection services, T mockInstance) where T : class
+    internal static void AddTestAuth(IServiceCollection services)
     {
-        // Remove all existing registrations for the interface
-        var descriptors = services.Where(d => d.ServiceType == typeof(T)).ToList();
-        foreach (var d in descriptors)
-            services.Remove(d);
+        services.AddAuthentication()
+            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+        services.PostConfigure<AuthenticationOptions>(options =>
+        {
+            options.DefaultScheme = TestAuthHandler.SchemeName;
+            options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+            options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+        });
+    }
 
-        services.AddScoped(_ => mockInstance);
+    internal static void ReplaceService<T>(IServiceCollection services, T mockInstance) where T : class
+    {
+        // Singleton to match the real registrations (InfrastructureServiceExtensions). ICaptionBattleService
+        // is a singleton that consumes IGenerativeAiService, so a scoped AI mock would fail DI scope
+        // validation (a singleton cannot capture a scoped dependency).
+        services.RemoveAll<T>();
+        services.AddSingleton(mockInstance);
     }
 
     private static IVisionService CreateMockComputerVision()
@@ -210,9 +228,7 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
         mock.Setup(s => s.EnhanceDescriptionAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("An enhanced detailed description of the image", 120, 250L));
 
-        mock.Setup(s => s.GenerateImageAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 }, "image/png", 500L));
-
+        // NOTE: image generation moved off IGenerativeAiService onto IImagen3Service — see CreateMockImagen3.
         mock.Setup(s => s.GenerateMemeCaptionAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("FUNNY TOP", "FUNNY BOTTOM", 50, 180L));
 
@@ -229,8 +245,11 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
 
     private static IImagen3Service CreateMockImagen3()
     {
+        // ImageRegeneration requires a configured Imagen3 service; the orchestrator throws otherwise.
         var mock = new Mock<IImagen3Service>();
-        mock.SetupGet(s => s.IsConfigured).Returns(false);
+        mock.SetupGet(s => s.IsConfigured).Returns(true);
+        mock.Setup(s => s.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 }, "image/png", 500L));
         return mock.Object;
     }
 }
@@ -298,31 +317,39 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
     {
         builder.UseEnvironment("Development");
 
-        builder.ConfigureHostConfiguration(config =>
+        builder.ConfigureAppConfiguration(config =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["KeyVault:Uri"] = "",
                 ["AZURE_KEY_VAULT_ENDPOINT"] = "",
                 ["ComputerVision:Endpoint"] = "https://test.cognitiveservices.azure.com/",
                 ["ComputerVision:ApiKey"] = "test-key",
                 ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",
                 ["OpenAI:Key"] = "test-key",
-                ["ApplicationInsights:ConnectionString"] = ""
+                ["ApplicationInsights:ConnectionString"] = "",
+                ["Storage:ConnectionString"] = "",
+                ["Google:ApiKey"] = "test-key",
+                ["Mocks:UseMockAi"] = "true"
             });
         });
 
         builder.ConfigureServices(services =>
         {
-            // Replace ComputerVision with a mock that always simulates a network failure
-            var descriptors = services.Where(d => d.ServiceType == typeof(IVisionService)).ToList();
-            foreach (var d in descriptors) services.Remove(d);
+            MockedServicesWebApplicationFactory.AddTestAuth(services);
 
+            // Vision (step 1 of the pipeline) always throws — proves the endpoint surfaces a clean 500.
             var throwingMock = new Mock<IVisionService>();
             throwingMock
                 .Setup(s => s.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new HttpRequestException("Simulated Azure CV outage"));
+            MockedServicesWebApplicationFactory.ReplaceService<IVisionService>(services, throwingMock.Object);
 
-            services.AddSingleton(_ => throwingMock.Object);
+            // The orchestrator constructs all four AI services up front, so the remaining three must
+            // resolve cleanly even though vision throws before they're invoked.
+            MockedServicesWebApplicationFactory.ReplaceService<IGenerativeAiService>(services, Mock.Of<IGenerativeAiService>());
+            MockedServicesWebApplicationFactory.ReplaceService<IImagen3Service>(services, Mock.Of<IImagen3Service>());
+            MockedServicesWebApplicationFactory.ReplaceService<IMemeGeneratorService>(services, Mock.Of<IMemeGeneratorService>());
         });
 
         return base.CreateHost(builder);

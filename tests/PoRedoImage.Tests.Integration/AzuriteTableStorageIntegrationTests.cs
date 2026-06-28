@@ -1,43 +1,21 @@
 using Azure.Data.Tables;
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
-using Xunit;
 
 namespace PoRedoImage.Tests.Integration;
 
 /// <summary>
 /// Real integration tests for BulkPromptStorageService against a Docker-hosted Azurite container.
 /// Validates that prompt persistence (save → load → verify) works against actual Table Storage.
+/// Uses the shared <see cref="AzuriteContainerFixture"/> (one container for the whole collection)
+/// rather than starting its own.
 /// </summary>
 [Trait("Category", "Docker")]
-public sealed class AzuriteTableStorageIntegrationTests : IAsyncLifetime
+[Collection(AzuriteCollection.Name)]
+public sealed class AzuriteTableStorageIntegrationTests
 {
-    private IContainer? _container;
-    private string? _connectionString;
+    private readonly string _connectionString;
 
-    public async Task InitializeAsync()
-    {
-        _container = new ContainerBuilder()
-            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
-            .WithPortBinding(0, 10002) // random host port → avoids conflicts
-            .WithCommand("azurite-table", "--tableHost", "0.0.0.0", "--loose")
-            .WithCleanUp(true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(10002))
-            .Build();
-
-        await _container.StartAsync();
-        var port = _container.GetMappedPublicPort(10002);
-        _connectionString =
-            $"DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;" +
-            $"AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;" +
-            $"TableEndpoint=http://127.0.0.1:{port}/devstoreaccount1;";
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_container is not null)
-            await _container.DisposeAsync();
-    }
+    public AzuriteTableStorageIntegrationTests(AzuriteContainerFixture azurite)
+        => _connectionString = azurite.ConnectionString;
 
     [DockerFact]
     public async Task SaveAndLoadPrompts_RoundTrip_Succeeds()

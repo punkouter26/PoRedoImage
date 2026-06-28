@@ -1,33 +1,32 @@
-using DotNet.Testcontainers.Builders;
-using Xunit;
+using Azure.Data.Tables;
 
 namespace PoRedoImage.Tests.Integration;
 
 /// <summary>
-/// Verifies that a Docker-hosted Azurite container starts and accepts TCP connections.
-/// This test validates the Docker/Azurite usage requirement for local dev storage.
+/// Verifies that the Docker-hosted Azurite container starts and accepts connections. Uses the shared
+/// <see cref="AzuriteContainerFixture"/> — the container started once for the whole collection IS the
+/// proof of the Docker/Azurite usage requirement, so this no longer spins up a throwaway container
+/// per run.
 /// </summary>
+[Collection(AzuriteCollection.Name)]
 public class TestcontainersAzuriteHealthCheckTests
 {
+    private readonly AzuriteContainerFixture _azurite;
+
+    public TestcontainersAzuriteHealthCheckTests(AzuriteContainerFixture azurite) => _azurite = azurite;
+
     [DockerFact]
-    public async Task AzuriteContainer_CanStartAndListenOnExpectedPorts()
+    public async Task SharedAzuriteContainer_IsRunningAndAcceptsConnections()
     {
-        // Random host ports (0) so the test never collides with a locally-running
-        // docker-compose Azurite on 10000-10002.
-        await using var container = new ContainerBuilder()
-            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
-            .WithPortBinding(0, 10000)
-            .WithPortBinding(0, 10001)
-            .WithPortBinding(0, 10002)
-            .WithCommand("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--loose")
-            .WithCleanUp(true)
-            .Build();
+        Assert.True(_azurite.IsAvailable,
+            "Shared Azurite container should be running when Docker is available.");
 
-        await container.StartAsync();
+        // Prove the Table endpoint actually answers — a successful CreateIfNotExists round-trips to
+        // the listener, which is what the original per-test container start was verifying.
+        var serviceClient = new TableServiceClient(_azurite.ConnectionString);
+        var table = serviceClient.GetTableClient("HealthProbe");
+        await table.CreateIfNotExistsAsync();
 
-        // Container should be running and expose Blob (10000), Queue (10001), Table (10002)
-        Assert.Equal(DotNet.Testcontainers.Containers.TestcontainersStates.Running, container.State);
-
-        await container.StopAsync();
+        Assert.NotNull(serviceClient.Uri);
     }
 }

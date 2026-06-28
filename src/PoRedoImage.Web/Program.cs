@@ -91,19 +91,15 @@ try
 
             Log.Information("Key Vault configuration loaded from {Endpoint}", keyVaultEndpoint);
 
-            // In Development, Key Vault would override appsettings.Development.json values (KV is the last
-            // provider added). Pin local-only values back so dev works regardless of what KV provides:
-            //  • Storage → Azurite (Docker).
-            //  • Chat deployment → the deployment that actually exists on po-aiservices-shared.
-            //    The KV secret is stale (gpt-4.1-nano); the live AIServices resource only has gpt-5.4-nano,
-            //    so the prior value returned 404 DeploymentNotFound. Override locally rather than writing
-            //    to the shared production Key Vault.
+            // In Development, Key Vault would override appsettings.Development.json values (KV is the
+            // last provider added). Pin Storage back to Azurite (Docker) regardless of what KV provides.
+            // The chat deployment name is no longer pinned here: it is no longer a Key Vault secret
+            // (see KeyVaultSecretNameMapping), so appsettings.json is the single source of truth for it.
             if (builder.Environment.IsDevelopment())
             {
                 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Storage:ConnectionString"] = "UseDevelopmentStorage=true",
-                    ["OpenAI:ChatCompletionsDeployment"] = "gpt-5.4-nano"
+                    ["Storage:ConnectionString"] = "UseDevelopmentStorage=true"
                 });
             }
         }
@@ -212,15 +208,25 @@ try
     if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
     {
         // Sampling profiles (§8): full fidelity (100%) in Dev/Test so nothing is dropped while
-        // debugging; ~10% ceiling in Production to cap trace volume. The Azure Monitor distro uses
-        // head-based fixed-ratio sampling (ApplicationInsightsSampler); it has no per-second adaptive
-        // cap, and Live Metrics (QuickPulse) stays unsampled at 100%.
-        var samplingRatio = builder.Environment.IsDevelopment() ? 1.0f : 0.1f;
+        // debugging; a configurable ceiling (default 10%) in Production to cap trace volume. The
+        // ratio is read from ApplicationInsights:SamplingRatio so it can be tuned without a redeploy.
+        // Live Metrics (QuickPulse) stays unsampled at 100% regardless.
+        var samplingRatio = builder.Environment.IsDevelopment()
+            ? 1.0
+            : builder.Configuration.GetValue<double?>("ApplicationInsights:SamplingRatio") ?? 0.1;
+
         otelBuilder.UseAzureMonitor(options =>
         {
             options.ConnectionString = appInsightsConnectionString;
-            options.SamplingRatio = samplingRatio;
+            options.SamplingRatio = (float)samplingRatio;
         });
+
+        // Override the distro's blanket fixed-ratio sampler with one that drops routine noise at the
+        // same ratio but NEVER drops error-bearing spans (status ≥ 500 / error=true). Registered
+        // after UseAzureMonitor so this SetSampler wins. Exceptions thrown mid-request are still
+        // captured at 100% via the unsampled Serilog → App Insights sink above (defence in depth).
+        builder.Services.ConfigureOpenTelemetryTracerProvider((_, tracerProvider) =>
+            tracerProvider.SetSampler(new ErrorPreservingSampler(samplingRatio)));
     }
 
     // ─── Core services ──────────────────────────────────────────────────

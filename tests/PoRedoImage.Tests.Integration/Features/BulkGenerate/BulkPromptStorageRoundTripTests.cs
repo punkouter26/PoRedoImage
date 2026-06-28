@@ -10,19 +10,25 @@ namespace PoRedoImage.Tests.Integration;
 /// Unlike <see cref="BulkGenerateEndpointTests"/> (storage disabled → no-op assertions), this proves
 /// save → load actually persists through the repository and Table API mapping with a clean slate.
 /// </summary>
-public sealed class BulkPromptStorageRoundTripTests
-    : IClassFixture<AzuriteWebApplicationFactory>, IDisposable
+[Collection(AzuriteCollection.Name)]
+public sealed class BulkPromptStorageRoundTripTests : IDisposable
 {
     private readonly AzuriteWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public BulkPromptStorageRoundTripTests(AzuriteWebApplicationFactory factory)
+    public BulkPromptStorageRoundTripTests(AzuriteContainerFixture azurite)
     {
-        _factory = factory;
-        _client = factory.CreateClient();
+        // Reuse the single shared Azurite container's connection string rather than spinning up a
+        // dedicated container for this class. [DockerFact] below self-skips when Docker is absent.
+        _factory = new AzuriteWebApplicationFactory(azurite.ConnectionString);
+        _client = _factory.CreateClient();
     }
 
-    public void Dispose() => _client.Dispose();
+    public void Dispose()
+    {
+        _client.Dispose();
+        _factory.Dispose();
+    }
 
     [DockerFact]
     public async Task SavePrompts_thenGetPrompts_roundTripsThroughAzurite()

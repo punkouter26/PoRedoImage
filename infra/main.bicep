@@ -65,7 +65,9 @@ resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-0
 // F1 Free Linux plan, owned by this resource group. Lives in westus2 because the
 // subscription has no free-tier Linux VM quota in eastus (the RG region).
 // NOTE: F1 Free does NOT support Always On and caps CPU at 60 min/day — fine for a
-// low-traffic app, but expect cold starts. The plan binding is asserted post-deploy in CI.
+// low-traffic app, but expect cold starts. Cold starts are an ACCEPTED trade-off (no keep-warm
+// pinger — it would burn the 60-min CPU budget); see docs/ADR_Log.md ADR-015. The plan binding
+// is asserted post-deploy in CI.
 resource appServicePlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: appServicePlanName
   location: appServicePlanLocation

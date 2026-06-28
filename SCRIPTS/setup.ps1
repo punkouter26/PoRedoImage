@@ -36,17 +36,30 @@ function Assert-CommandExists([string]$Command, [string]$InstallHint) {
 }
 
 # ── 1. Prerequisites via Winget ──────────────────────────────────────
+# Idempotent: each package declares a probe (a command + optional version test). If the probe
+# already passes, the winget install is skipped entirely — so a re-run on a provisioned machine
+# is a fast series of no-ops instead of four silent reinstall attempts.
 Write-Step "Checking prerequisites"
 
+# Returns $true when a .NET 10.x SDK is already installed.
+function Test-DotNet10 {
+    if (-not (Get-Command 'dotnet' -ErrorAction SilentlyContinue)) { return $false }
+    return [bool]((dotnet --list-sdks 2>$null) -match '^10\.')
+}
+
 $wingetPackages = @(
-    @{ Id = 'Microsoft.DotNet.SDK.10'; Name = '.NET 10 SDK' },
-    @{ Id = 'Docker.DockerDesktop';    Name = 'Docker Desktop' },
-    @{ Id = 'Git.Git';                 Name = 'Git' },
-    @{ Id = 'Microsoft.NodeJS.LTS';    Name = 'Node.js LTS' }
+    @{ Id = 'Microsoft.DotNet.SDK.10'; Name = '.NET 10 SDK'; Probe = { Test-DotNet10 } },
+    @{ Id = 'Docker.DockerDesktop';    Name = 'Docker Desktop'; Probe = { [bool](Get-Command 'docker' -ErrorAction SilentlyContinue) } },
+    @{ Id = 'Git.Git';                 Name = 'Git'; Probe = { [bool](Get-Command 'git' -ErrorAction SilentlyContinue) } },
+    @{ Id = 'Microsoft.NodeJS.LTS';    Name = 'Node.js LTS'; Probe = { [bool](Get-Command 'node' -ErrorAction SilentlyContinue) } }
 )
 
 if (Assert-CommandExists 'winget' 'Install App Installer from the Microsoft Store.') {
     foreach ($pkg in $wingetPackages) {
+        if (& $pkg.Probe) {
+            Write-Host "  $($pkg.Name) already present — skipping." -ForegroundColor Green
+            continue
+        }
         Write-Host "  Installing $($pkg.Name)..." -ForegroundColor Gray
         winget install --id $pkg.Id --silent --accept-source-agreements --accept-package-agreements 2>&1 |
             Where-Object { $_ -notmatch '^$' } |
@@ -101,10 +114,19 @@ if (Assert-CommandExists 'dotnet' 'Install .NET 10 SDK from https://dotnet.micro
 
 # ── 4. Playwright browsers (C# E2E suite) ───────────────────────────
 # The browser installer (`playwright.ps1`) is emitted only after the E2E project is built.
-# Build it (Release), then install Chromium so the E2EUI suite runs instead of self-skipping.
+# Idempotent: Playwright caches browsers under %USERPROFILE%\AppData\Local\ms-playwright. If a
+# chromium build is already cached, skip the (slow) Release build + reinstall entirely.
 Write-Step "Installing Playwright browsers (Chromium) for the E2E UI suite"
 
-if (Get-Command 'dotnet' -ErrorAction SilentlyContinue) {
+$chromiumCached = $false
+$pwCache = Join-Path $env:LOCALAPPDATA 'ms-playwright'
+if (Test-Path $pwCache) {
+    $chromiumCached = [bool](Get-ChildItem -Path $pwCache -Directory -Filter 'chromium-*' -ErrorAction SilentlyContinue)
+}
+
+if ($chromiumCached) {
+    Write-Host "  Chromium already cached under $pwCache — skipping build + install." -ForegroundColor Green
+} elseif (Get-Command 'dotnet' -ErrorAction SilentlyContinue) {
     $e2eProj = Join-Path $Root 'tests/PoRedoImage.Tests.E2E/PoRedoImage.Tests.E2E.csproj'
     dotnet build $e2eProj -c Release --nologo | Out-Null
     $playwrightScript = Join-Path $Root 'tests/PoRedoImage.Tests.E2E/bin/Release/net10.0/playwright.ps1'
