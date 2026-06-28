@@ -8,7 +8,6 @@ services:
       - "10001:10001"   # Queue service
       - "10002:10002"   # Table service
     volumes:
-      - azurite-data:/data
-
-volumes:
-  azurite-data:
+      # Bind-mount the repo's existing emulator data so the container reuses the
+      # same tables/blobs the app already created under the local npm Azurite.
+      - ./.azurite-data:/data
