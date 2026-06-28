@@ -158,6 +158,9 @@ ipch/
 
 # Visual Studio Trace Files
 *.e2e
+# ...but not the E2E test project dir, which *.e2e matches case-insensitively.
+# The slnx references it, so it must be tracked or `dotnet restore` fails in CI.
+!tests/PoRedoImage.Tests.E2E/
 
 # TFS 2012 Local Workspace
 $tf/
