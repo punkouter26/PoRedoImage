@@ -25,14 +25,18 @@ public sealed class OpenAIHealthCheck : IHealthCheck
         var endpoint = _configuration["OpenAI:Endpoint"];
         var apiKey = _configuration["OpenAI:Key"];
 
-        if (string.IsNullOrEmpty(endpoint))
-            return HealthCheckResult.Degraded("OpenAI:Endpoint is not configured (expected in local dev without Azure secrets)");
-        if (string.IsNullOrEmpty(apiKey))
-            return HealthCheckResult.Degraded("OpenAI:Key is not configured (expected in local dev without Azure secrets)");
+        // Distinguish "secret not configured" from "endpoint broken".
+        // In Production, missing config usually means the App Service Key Vault reference
+        // (@Microsoft.KeyVault(...)) failed to resolve — surfaced as Degraded with a
+        // remediation hint rather than Unhealthy, so the smoke test can tell the difference.
+        if (string.IsNullOrWhiteSpace(endpoint))
+            return HealthCheckResult.Degraded("OpenAI:Endpoint is not configured. In Production this usually means the Key Vault reference (OpenAI__Endpoint) did not resolve — verify the secret 'PoRedoImage-OpenAI-Endpoint' exists in 'kv-poshared' and that the app's managed identity has 'Key Vault Secrets User' on the vault.");
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return HealthCheckResult.Degraded("OpenAI:Key is not configured. In Production this usually means the Key Vault reference (OpenAI__Key) did not resolve — same KV/MI checks as OpenAI:Endpoint.");
 
         try
         {
-            var client = _httpClientFactory.CreateClient("health");
+            var client = _httpClientFactory.CreateClient();
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(TimeSpan.FromSeconds(5));
 
@@ -54,7 +58,7 @@ public sealed class OpenAIHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy("OpenAI endpoint is unreachable", ex);
+            return HealthCheckResult.Unhealthy($"OpenAI endpoint probe failed (endpoint='{endpoint}')", ex);
         }
     }
 }

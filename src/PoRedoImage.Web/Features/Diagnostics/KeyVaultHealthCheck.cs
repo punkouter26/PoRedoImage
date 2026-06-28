@@ -25,7 +25,9 @@ public sealed class KeyVaultHealthCheck : IHealthCheck
         // confirms it is serving real secrets via DefaultAzureCredential (az login / VS).
         var endpoint = _configuration["KeyVault:Uri"] ?? _configuration["AZURE_KEY_VAULT_ENDPOINT"];
         if (string.IsNullOrWhiteSpace(endpoint))
-            return HealthCheckResult.Degraded("No Key Vault endpoint configured (KeyVault:Uri / AZURE_KEY_VAULT_ENDPOINT); Key Vault is skipped.");
+            return HealthCheckResult.Degraded(
+                "No Key Vault endpoint configured (KeyVault:Uri / AZURE_KEY_VAULT_ENDPOINT). "
+                + "In Production, this should be set by the 'AZURE_KEY_VAULT_ENDPOINT' App Setting in infra/main.bicep; if it is missing the platform-side App Service Key Vault references (@Microsoft.KeyVault(...)) cannot resolve and dependent checks will also be Degraded.");
 
         try
         {

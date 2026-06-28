@@ -25,14 +25,14 @@ public sealed class ComputerVisionHealthCheck : IHealthCheck
         var endpoint = _configuration["ComputerVision:Endpoint"];
         var apiKey = _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
 
-        if (string.IsNullOrEmpty(endpoint))
-            return HealthCheckResult.Degraded("ComputerVision:Endpoint is not configured (expected in local dev without Azure secrets)");
-        if (string.IsNullOrEmpty(apiKey))
-            return HealthCheckResult.Degraded("ComputerVision:ApiKey is not configured (expected in local dev without Azure secrets)");
+        if (string.IsNullOrWhiteSpace(endpoint))
+            return HealthCheckResult.Degraded("ComputerVision:Endpoint is not configured. In Production this usually means the Key Vault reference (ComputerVision__Endpoint) did not resolve — verify the secret 'PoRedoImage-ComputerVision-Endpoint' exists in 'kv-poshared' and the app's managed identity has 'Key Vault Secrets User' on the vault.");
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return HealthCheckResult.Degraded("ComputerVision:ApiKey is not configured. In Production this usually means the Key Vault reference (ComputerVision__ApiKey) did not resolve.");
 
         try
         {
-            var client = _httpClientFactory.CreateClient("health");
+            var client = _httpClientFactory.CreateClient();
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(TimeSpan.FromSeconds(5));
 
@@ -55,7 +55,7 @@ public sealed class ComputerVisionHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy("ComputerVision endpoint is unreachable", ex);
+            return HealthCheckResult.Unhealthy($"ComputerVision endpoint probe failed (endpoint='{endpoint}')", ex);
         }
     }
 }

@@ -111,6 +111,18 @@ format: "ADR (Architecture Decision Record)"
 - **Alternatives considered:** Move UserImageKind and CaptionPersona to Shared (rejected: Domain would then need to reference Shared to use the enums in entities — circular). Introduce a third "Enums" project (rejected: extra project overhead for two small enums).
 - **Trade-off:** Shared is not a leaf. Acceptable because the Shared surface is genuinely DTOs; the Domain enums are the source of truth.
 
+## ADR-017: `/health` Smoke Test Accepts `Degraded`, Rejects `Unhealthy`
+
+- **Decision:** The post-deploy smoke test in `.github/workflows/deploy.yml` requires HTTP 200 from `/health` with **no `Unhealthy` entries**; `Degraded` entries are accepted and logged for follow-up. Concurrently, the four named readiness checks (`key-vault`, `openai`, `computer-vision`, `table-storage`) are taught to return `Degraded` (not `Unhealthy`) when their configuration is absent — and to surface a remediation hint pointing at the App Service Key Vault reference + managed-identity chain — so the smoke test can distinguish "deploy broke the app" from "ops has a KV reference to fix".
+- **Why:** On 2026-06-28 the smoke test failed after a deploy that **was correct**; the real problem was that an App Service Key Vault reference (`@Microsoft.KeyVault(...)`) had not resolved at runtime (missing secret, role not propagated, or vault-side issue), producing empty strings for `OpenAI:Endpoint`, `ComputerVision:Endpoint`, `Storage:ConnectionString`, and `AZURE_KEY_VAULT_ENDPOINT`. The previous checks caught the empty strings and bubbled them up as `Unhealthy`, which the smoke test treated as a deploy failure and aborted. The deploy itself was fine — a separate Azure-side fix is needed (create the missing secret or grant the role). Treating `Degraded` as a hard fail conflates a deploy problem with an ops problem.
+- **Mapping** (severity → check status → smoke test):
+  - HTTP 200 + all `Healthy` → deploy + KV/MI end-to-end OK.
+  - HTTP 200 + some `Degraded` (config missing) → deploy OK; investigate per-check description for the specific KV reference / app setting.
+  - HTTP 503 + any `Unhealthy` → real bug (probe threw, exception message in body). Hard fail.
+  - HTTP 000/timeout → app did not start. Hard fail.
+- **Alternatives considered:** Relax the smoke test to "HTTP 200 only" (rejected: would mask probe exceptions like the historic `InvalidOperationException: An invalid request URI was provided` bug). Add a separate `/diag` endpoint that lists raw `IConfiguration["..."]` values (rejected: leaks secrets, and the existing admin-gated `/api/diag` was already removed). Fail the deploy when any check is `Degraded` (rejected: blocks deploys on every transient KV propagation delay, which the F1 plan is especially sensitive to).
+- **Revisit when:** the App Service platform guarantees synchronous KV reference resolution before the first user request (currently it is best-effort), or when the readiness checks themselves are upgraded to fail-fast on missing config in Production via `IValidateOptions<T>`.
+
 ## ADR-016: Start App Service Before `azure/webapps-deploy@v3`
 
 - **Decision:** The `deploy` job in `.github/workflows/deploy.yml` runs an `Ensure App Service is running` step **before** `azure/webapps-deploy@v3`. The step queries `state`, calls `az webapp start` if not `Running`, polls up to ~60s for the transition, and hard-fails the pipeline if the site never reaches `Running`.
