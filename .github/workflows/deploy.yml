@@ -89,6 +89,32 @@ jobs:
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --template-file infra/main.bicep \
             --name "ci-${{ github.run_id }}"
+      - name: Ensure App Service is running
+        # OneDeploy (azure/webapps-deploy@v3) returns 403 "Site Disabled" when the
+        # App Service is in the Stopped state. A previous failed run — or the
+        # idempotent bicep apply above, which creates the site but does NOT restart
+        # an already-stopped site — can leave it Stopped, so we explicitly start it
+        # before deploy. Idempotent: no-op when already Running.
+        run: |
+          STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
+          echo "App Service state before deploy: $STATE"
+          if [ "$STATE" != "Running" ]; then
+            echo "App Service is '$STATE' — starting it before deploy."
+            az webapp start -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --output none || true
+            # Poll up to ~60s for the state transition (start is usually <10s, but
+            # free-tier cold-starts on F1 can be slower).
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              sleep 5
+              STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
+              echo "  attempt $i: state=$STATE"
+              if [ "$STATE" = "Running" ]; then break; fi
+            done
+          fi
+          if [ "$STATE" != "Running" ]; then
+            echo "::error::App Service did not reach Running state before deploy; OneDeploy would 403."
+            exit 1
+          fi
+          echo "App Service is Running — proceeding with deploy."
       - run: cd publish && zip -r ../webapp.zip . && cd ..
       - uses: azure/webapps-deploy@v3
         with:

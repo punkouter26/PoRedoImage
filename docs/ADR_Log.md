@@ -111,6 +111,14 @@ format: "ADR (Architecture Decision Record)"
 - **Alternatives considered:** Move UserImageKind and CaptionPersona to Shared (rejected: Domain would then need to reference Shared to use the enums in entities — circular). Introduce a third "Enums" project (rejected: extra project overhead for two small enums).
 - **Trade-off:** Shared is not a leaf. Acceptable because the Shared surface is genuinely DTOs; the Domain enums are the source of truth.
 
+## ADR-016: Start App Service Before `azure/webapps-deploy@v3`
+
+- **Decision:** The `deploy` job in `.github/workflows/deploy.yml` runs an `Ensure App Service is running` step **before** `azure/webapps-deploy@v3`. The step queries `state`, calls `az webapp start` if not `Running`, polls up to ~60s for the transition, and hard-fails the pipeline if the site never reaches `Running`.
+- **Why:** `azure/webapps-deploy@v3` uses OneDeploy, which returns `403 Site Disabled` when the App Service is `Stopped`. Two paths can leave the site Stopped: a previously failed deploy (the prior failed run never restarted it) and a manual stop via the Azure portal. The bicep apply that runs earlier in the same job is idempotent — it creates the site on first run but does **not** restart an already-stopped site on subsequent runs. Without the explicit start, OneDeploy 403s and the deploy fails even though nothing about the package is wrong.
+- **Alternatives considered:** Add `properties.state = 'Running'` to `Microsoft.Web/sites` in `infra/main.bicep` (rejected: that property does not exist on the ARM resource — runtime state is set exclusively via `az webapp start` / `az webapp stop` or the portal). Set `WEBSITE_STARTUP_AS_PAGE_PROCESS` and hope for auto-start (rejected: not a real mechanism). Switch to zip-deploy via `azure/appservice-zip-deploy` (rejected: OneDeploy is the supported action and adds package validation we want).
+- **Trade-off:** Adds one CLI call + up to 60s of polling per deploy. Mitigated by the early no-op fast path (`Running` → skip the `start` + loop) and by the existing post-deploy health-smoke test that already tolerates the first cold start.
+- **Revisit when:** Microsoft changes OneDeploy to accept Stopped sites, or when we move off F1 Free onto a tier with Always On (no Stopped state possible).
+
 ## ADR-015: F1 Free App Service Plan — Cold Starts Accepted
 
 - **Decision:** Host the web app on the F1 Free Linux plan (`asp-poredoimage-f1`). Accept cold starts as the cost of the Free tier; do **not** add a keep-warm pinger.
