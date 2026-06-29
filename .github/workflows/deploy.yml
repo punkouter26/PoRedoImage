@@ -134,6 +134,59 @@ jobs:
           az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
             --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv \
             | xargs -I{} test {} -ge 1
+      - name: Rewrite App Service Key Vault references as literal App Settings
+        # Belt-and-suspenders against the App Service platform failing to resolve
+        # `@Microsoft.KeyVault(...)` App Settings at container start. Reproduced on
+        # deploy #54/2026-06-29: the @Microsoft.KeyVault(...) sentinels were returned to
+        # the .NET process unchanged, every check that reads configuration via the
+        # App Service layer saw the literal, and the StartupSecretValidator fail-fasted
+        # on an empty AzureAd:ClientId. The container kept restarting in a 503 loop
+        # for the full 230s cold-start budget.
+        #
+        # This step reads each secret via the CI SP (which has `Key Vault Secrets User`
+        # on kv-poshared, set by the previous step) and writes the resolved value as a
+        # plain App Setting — overwriting the unresolved @Microsoft.KeyVault(...)
+        # sentinels for this deploy. The .NET process then sees real values, the
+        # StartupSecretValidator passes, and the app boots on the first try.
+        #
+        # The bicep template keeps the @Microsoft.KeyVault(...) App Settings as
+        # documentation + fallback for the in-app `AddAzureKeyVault` provider (so dev
+        # + integration tests that read Configuration still see the mapping); this step
+        # is the production-runtime safety net.
+        run: |
+          RESOLVED=()
+          MISSING=()
+          for pair in \
+            "ApplicationInsights__ConnectionString=PoRedoImage-ApplicationInsights-ConnectionString" \
+            "AzureAd__ClientId=PoRedoImage-AzureAd-ClientId" \
+            "AzureAd__ClientSecret=PoRedoImage-AzureAd-ClientSecret" \
+            "ComputerVision__ApiKey=PoRedoImage-ComputerVision-ApiKey" \
+            "ComputerVision__Endpoint=PoRedoImage-ComputerVision-Endpoint" \
+            "Google__ApiKey=PoRedoImage-Google-ApiKey" \
+            "Google__Imagen3Model=PoRedoImage-Google-Imagen3Model" \
+            "OpenAI__Endpoint=PoRedoImage-OpenAI-Endpoint" \
+            "OpenAI__Key=PoRedoImage-OpenAI-ApiKey" \
+            "Storage__ConnectionString=PoRedoImage-StorageConnectionString"; do
+            APP="${pair%=*}"
+            SECRET="${pair#*=}"
+            VAL=$(az keyvault secret show --vault-name kv-poshared --name "$SECRET" --query value -o tsv 2>/dev/null || true)
+            if [ -n "$VAL" ]; then
+              RESOLVED+=("$APP=$VAL")
+              echo "  ✓ $APP  (from $SECRET, ${#VAL} chars)"
+            else
+              MISSING+=("$SECRET")
+              echo "  ✗ $APP  ($SECRET not found in kv-poshared)"
+            fi
+          done
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error::Missing secrets in kv-poshared: ${MISSING[*]}"
+            exit 1
+          fi
+          echo "Applying ${#RESOLVED[@]} literal App Settings to ${{ env.AZURE_WEBAPP_NAME }}…"
+          az webapp config appsettings set \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --settings "${RESOLVED[@]}" --output none
       - name: Wait for Key Vault RBAC propagation
         # `az role assignment create` returns as soon as the CONTROL-plane assignment exists, but
         # the Key Vault DATA-plane honours it only after Azure RBAC propagation — typically
