@@ -201,3 +201,39 @@ format: "ADR (Architecture Decision Record)"
 - **Build/test state:** 0 warnings, 0 errors; unit tests went from 103 → 96 (the 7 caption-battle tests are gone, the rest are unchanged and green).
 - **What this is NOT:** This is not a judgment that the persona-based caption generator is a bad idea. It's a judgment that the cost (8× token spend, 152s latency, 4-of-8 typical failure rate under shared TPM) is too high for a hobby workload, and the UI value (vote + adapt voice) was never actually implemented — the winner just changed a `__winningPersona` field that nothing else consumed.
 - **Revisit when:** (a) per-user rate-limit budget is allocated (a dedicated `gpt-5.4-nano` deployment with enough TPM to absorb 8 concurrent calls), OR (b) the persona contrast is redesigned to use a single, structured JSON response with all 8 personas (1 OpenAI call instead of 8), OR (c) the winner-feedback loop is actually wired into the "regenerate" path so the user sees a tangible benefit from picking a winner.
+
+## ADR-025: Move Off F1 Free Tier — F1 CPU Quota Burned, 2026-06-29
+
+- **Decision:** The web app (`poredoimage-web`) is moved from the F1 Free Linux App Service Plan (`asp-poredoimage-f1`) to the Basic B1 plan (`asp-poredoimage-b1`) in the same resource group. The Bicep default flips from `F1` to `B1` (`appServicePlanSkuName` param), and the workflow's `EXPECTED_PLAN` env updates to match.
+- **Why:** F1 caps daily CPU at 60 minutes wall-clock across the whole plan. A single dev-day of activity exceeded the quota:
+  - 6+ cold starts (each ~60s on F1 cold-start) on the post-deploy smoke test
+  - The 152-second caption-battle request that hit OpenAI rate limits (the 8 parallel fanout held the CPU)
+  - The post-deploy OneDeploy retries (`Ensure App Service is running` step)
+  - Total: well over 60 min of CPU
+- **Observed failure mode:** `state: QuotaExceeded`, `usageState: Exceeded`. `az webapp start` was throttled by the same quota — it returned `QuotaExceeded` 12 times in 60s. The Kudu deployment endpoint (`*.scm.azurewebsites.net/api/deployments/`) returned `403 Site Disabled`. CI deploys started failing at the `Ensure App Service is running` step instead of at the actual deploy step.
+- **Why this fix is sustainable:** B1 costs ~$13/month but removes the daily CPU cap AND enables `alwaysOn: true` (so no more 60-second cold starts). Cold-start cost reduction alone is worth the spend on a dev-day cadence.
+- **Why not "just wait for the quota to reset":** F1 quota resets at midnight UTC; current reset was in 11h 47m. Multi-day cadence + the cold-start tax on F1 means the next dev day would burn through it again. The cost of $13/mo is lower than the cost of an extra hour of blocked dev per day.
+- **Cleanup:** The legacy `asp-poredoimage-f1` plan remains in the RG (empty, no cost). Delete it manually via `az appservice plan delete -g PoRedoImage -n asp-poredoimage-f1` when convenient. The `infra/main.bicep` defaults to creating `asp-poredoimage-b1` going forward; an `appServicePlanSkuName="F1"` override reverts to free tier (NOT recommended).
+- **Revisit when:** Subscription credit / monthly budget becomes a real constraint (move back to F1 + reduce dev-day deploy cadence) OR a different App Service plan tier becomes available with Always On and no daily cap at the same price.
+
+## ADR-026: Health Checks Must Detect Unresolved App Service Key Vault References, 2026-06-29
+
+- **Decision:** The OpenAI and Computer Vision health checks (`Features/ImageAnalysis/OpenAIHealthCheck.cs`, `Features/ImageAnalysis/ComputerVisionHealthCheck.cs`) now explicitly detect the App Service Key Vault reference sentinel string (`@Microsoft.KeyVault(...)`) and surface it as `Degraded` with a remediation hint, **before** attempting the URL probe. BulkPromptStorageHealthCheck already had this guard (it was added when the storage check first hit the same race).
+- **Why:** Production deploy #53 failed its post-deploy `/health` smoke test with 503s, and the Kudu `containerStream.log` showed the actual cause was a race between the Azure cold-start probe and the platform's Key Vault reference resolution:
+  - The app process starts and reads the env var.
+  - The env var is bound as `@Microsoft.KeyVault(VaultName=kv-poshared;SecretName=PoRedoImage-OpenAI-Endpoint)` — a non-empty **literal** string.
+  - The app's `IConfiguration["OpenAI:Endpoint"]` returns the literal sentinel.
+  - The existing `string.IsNullOrWhiteSpace` check **passes** (the sentinel is not blank).
+  - The `HttpClient.SendAsync` then throws `System.InvalidOperationException: An invalid request URI was provided. Either the request URI must be an absolute URI or BaseAddress must be set.` because the literal is not a valid URL.
+  - The catch block returns `Unhealthy` — which the overall aggregator turns into 503.
+  - The CI smoke test treats 503 as a deploy failure.
+- **What "good" looks like:** The check should distinguish:
+  - `Unhealthy` = the probe tried to use a real, well-formed URL and the network/auth failed (real problem).
+  - `Degraded` = config is missing or hasn't resolved yet (platform propagation delay, not a deploy bug).
+- **Mapping (per ADR-017):** the post-deploy smoke test accepts `Degraded` and rejects `Unhealthy`. So a 200 with `Degraded` checks means the deploy succeeded and the platform just needs a few more seconds to resolve the KV references — the next /health hit (15s later, after the platform has populated the env var) will return all-`Healthy`.
+- **Revisit when:** App Service adds first-class support for the platform to signal "reference unresolved" separately from "reference resolved to empty" (currently both surface as the literal reference string vs an empty string). Until then, every config-reading health check needs the explicit `@Microsoft.KeyVault(` guard.
+- **Files touched:**
+  - `src/PoRedoImage.Web/Features/ImageAnalysis/OpenAIHealthCheck.cs` — added `IsUnresolvedKeyVaultReference` guard.
+  - `src/PoRedoImage.Web/Features/ImageAnalysis/ComputerVisionHealthCheck.cs` — same.
+  - `infra/main.bicep` — moved to B1 Basic plan (see ADR-025, separate quota fix).
+  - `.github/workflows/deploy.yml` — updated `EXPECTED_PLAN` to `asp-poredoimage-b1`.

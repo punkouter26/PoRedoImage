@@ -17,8 +17,11 @@ param storageAccountName string = 'stporedoimage26'
 @description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
 param storageLocation string = 'eastus'
 
-@description('App Service Plan name — F1 Free Linux plan in this resource group. Must match EXPECTED_PLAN in .github/workflows/deploy.yml')
-param appServicePlanName string = 'asp-poredoimage-f1'
+@description('App Service Plan name — Basic B1 Linux plan in this resource group. Must match EXPECTED_PLAN in .github/workflows/deploy.yml')
+param appServicePlanName string = 'asp-poredoimage-b1'
+
+@description('App Service Plan SKU tier. Default is B1 (Basic, ~$13/mo) because the F1 free tier caps CPU at 60 min/day and the cold-start budget made every dev-day deploy burn into the quota. Pass "F1" to revert (NOT recommended for daily deploy cadence).')
+param appServicePlanSkuName string = 'B1'
 
 @description('App Service Plan region — westus2. East US has no free-tier (F1) Linux VM quota on this subscription, so the plan and web app both live in westus2.')
 param appServicePlanLocation string = 'westus2'
@@ -111,19 +114,19 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
 }
 
 // ─── App Service Plan ───────────────────────────────────────────────────────
-// F1 Free Linux plan, owned by this resource group. Lives in westus2 because the
-// subscription has no free-tier Linux VM quota in eastus (the RG region).
-// NOTE: F1 Free does NOT support Always On and caps CPU at 60 min/day — fine for a
-// low-traffic app, but expect cold starts. Cold starts are an ACCEPTED trade-off (no keep-warm
-// pinger — it would burn the 60-min CPU budget); see docs/ADR_Log.md ADR-015. The plan binding
-// is asserted post-deploy in CI.
+// Basic B1 Linux plan, owned by this resource group. Lives in westus2 because the
+// subscription has no free-tier (F1) Linux VM quota in eastus (the RG region).
+// NOTE: B1 Basic supports Always On and has no daily CPU cap (F1 caps at 60 min/day and
+// burned the quota in a single dev-day). Cost ~$13/mo. The plan binding is asserted
+// post-deploy in CI. The legacy F1 plan (asp-poredoimage-f1) still exists in the RG
+// from a previous config and is now empty — set appServicePlanSkuName="F1" to revert.
 resource appServicePlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: appServicePlanName
   location: appServicePlanLocation
   kind: 'linux'
   sku: {
-    name: 'F1'
-    tier: 'Free'
+    name: appServicePlanSkuName
+    tier: appServicePlanSkuName == 'F1' ? 'Free' : 'Basic'
   }
   properties: {
     reserved: true // reserved == true marks this as a Linux plan
@@ -131,7 +134,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2024-04-01' = {
 }
 
 // ─── App Service ────────────────────────────────────────────────────────────
-// Bound to the F1 Free Linux plan (asp-poredoimage-f1) above. System-assigned
+// Bound to the App Service Plan (B1 Basic by default) above. System-assigned
 // managed identity is enabled for Key Vault access.
 resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   name: appServiceName
@@ -145,7 +148,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
-      alwaysOn: false // F1 Free does not support Always On; must be false or deploy fails
+      alwaysOn: appServicePlanSkuName != 'F1' // Always On requires B1+; off for F1 (deploy fails otherwise)
       appCommandLine: 'dotnet /home/site/wwwroot/PoRedoImage.Web.dll'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'

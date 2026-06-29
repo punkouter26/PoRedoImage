@@ -25,14 +25,23 @@ public sealed class OpenAIHealthCheck : IHealthCheck
         var endpoint = _configuration["OpenAI:Endpoint"];
         var apiKey = _configuration["OpenAI:Key"];
 
-        // Distinguish "secret not configured" from "endpoint broken".
-        // In Production, missing config usually means the App Service Key Vault reference
-        // (@Microsoft.KeyVault(...)) failed to resolve — surfaced as Degraded with a
-        // remediation hint rather than Unhealthy, so the smoke test can tell the difference.
-        if (string.IsNullOrWhiteSpace(endpoint))
+        // Distinguish "secret not configured" / "App Service KV reference not yet resolved" /
+        // "endpoint broken". In Production, an unresolved @Microsoft.KeyVault(...) reference
+        // is the cold-start race where the app process started before the platform populated
+        // the env var with the secret value. Surface as Degraded, NOT Unhealthy, so the
+        // post-deploy smoke test can tell a deploy failure (Unhealthy = probe threw) from
+        // a platform propagation delay (Degraded = config pending). See ADR-017 + ADR-026.
+        if (string.IsNullOrWhiteSpace(endpoint) || IsUnresolvedKeyVaultReference(endpoint))
             return HealthCheckResult.Degraded("OpenAI:Endpoint is not configured. In Production this usually means the Key Vault reference (OpenAI__Endpoint) did not resolve — verify the secret 'PoRedoImage-OpenAI-Endpoint' exists in 'kv-poshared' and that the app's managed identity has 'Key Vault Secrets User' on the vault.");
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (string.IsNullOrWhiteSpace(apiKey) || IsUnresolvedKeyVaultReference(apiKey))
             return HealthCheckResult.Degraded("OpenAI:Key is not configured. In Production this usually means the Key Vault reference (OpenAI__Key) did not resolve — same KV/MI checks as OpenAI:Endpoint.");
+
+        // App Service Key Vault reference sentinel value — the platform returns the literal
+        // reference string until the managed identity resolves it. Detecting this explicitly
+        // is more robust than a string.IsNullOrWhiteSpace check, which passes for the
+        // non-blank reference string and then lets the URL probe throw as Unhealthy.
+        static bool IsUnresolvedKeyVaultReference(string s) =>
+            s.StartsWith("@Microsoft.KeyVault(", StringComparison.OrdinalIgnoreCase);
 
         try
         {

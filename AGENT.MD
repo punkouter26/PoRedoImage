@@ -118,8 +118,8 @@ tests/                          # Target = 4 projects per spec; current state ha
 1. **Primary**: Azure Key Vault (`kv-poshared`, in the `PoShared` resource group)
 2. **Backup**: App Service Application Settings (Key Vault references)
 3. **Identity**: System-assigned Managed Identity (`Key Vault Secrets User` on `kv-poshared`)
-4. **App resources** (App Service `poredoimage-web`, storage) live in the `PoRedoImage` resource group;
-   the shared Basic-B2 plan `asp-poshared-linux` lives in `PoShared`.
+4. **App resources** (App Service `poredoimage-web`, storage) live in the `PoRedoImage` resource group.
+   The web app runs on the Basic B1 Linux plan `asp-poredoimage-b1` (was F1 free tier until 2026-06-29 — see ADR-025 for why F1's 60-min/day CPU cap was unsustainable).
 
 ## Key Configuration
 ```json

@@ -17,9 +17,11 @@ env:
   AZURE_RESOURCE_GROUP: PoRedoImage
   SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
-  # Expected App Service Plan (F1 Free, westus2 Linux) — owned by the PoRedoImage RG and
-  # provisioned by infra/main.bicep. Asserted post-deploy to catch plan drift.
-  EXPECTED_PLAN: asp-poredoimage-f1
+  # Expected App Service Plan (B1 Basic, westus2 Linux) — owned by the PoRedoImage RG and
+  # provisioned by infra/main.bicep. Asserted post-deploy to catch plan drift. Was F1
+  # (free tier, 60-min/day CPU cap) until 2026-06-29 when the dev-day deploy cadence
+  # burned through the quota. B1 is ~$13/mo and has no daily cap.
+  EXPECTED_PLAN: asp-poredoimage-b1
   # Run pre-June-16-2026 Node 20 actions on Node 24 ahead of the forced migration.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 

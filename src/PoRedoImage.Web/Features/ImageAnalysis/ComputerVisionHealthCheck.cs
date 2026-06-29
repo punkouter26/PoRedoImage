@@ -25,10 +25,17 @@ public sealed class ComputerVisionHealthCheck : IHealthCheck
         var endpoint = _configuration["ComputerVision:Endpoint"];
         var apiKey = _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
 
-        if (string.IsNullOrWhiteSpace(endpoint))
+        // See OpenAIHealthCheck: an unresolved @Microsoft.KeyVault(...) reference is the
+        // cold-start race where the app process started before the platform populated
+        // the env var. Surface as Degraded (config pending) so the smoke test can tell
+        // it apart from a real Unhealthy (probe threw). See ADR-017 + ADR-026.
+        if (string.IsNullOrWhiteSpace(endpoint) || IsUnresolvedKeyVaultReference(endpoint))
             return HealthCheckResult.Degraded("ComputerVision:Endpoint is not configured. In Production this usually means the Key Vault reference (ComputerVision__Endpoint) did not resolve — verify the secret 'PoRedoImage-ComputerVision-Endpoint' exists in 'kv-poshared' and the app's managed identity has 'Key Vault Secrets User' on the vault.");
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (string.IsNullOrWhiteSpace(apiKey) || IsUnresolvedKeyVaultReference(apiKey))
             return HealthCheckResult.Degraded("ComputerVision:ApiKey is not configured. In Production this usually means the Key Vault reference (ComputerVision__ApiKey) did not resolve.");
+
+        static bool IsUnresolvedKeyVaultReference(string s) =>
+            s.StartsWith("@Microsoft.KeyVault(", StringComparison.OrdinalIgnoreCase);
 
         try
         {
