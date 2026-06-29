@@ -1,3 +1,8 @@
+# Azurite for the LOCAL DEV INNER LOOP ONLY (F5 / `dotnet run`).
+# The TEST suites do NOT use this container — the Integration tier spins up its own ephemeral
+# Azurite via Testcontainers inside the WebApplicationFactory lifecycle (see
+# tests/PoRedoImage.Tests.Integration/AzuriteContainerFixture.cs). Keeping the two paths separate
+# means a stale dev container can never leak state into a test run. See ADR-019.
 services:
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:latest
@@ -8,6 +13,11 @@ services:
       - "10001:10001"   # Queue service
       - "10002:10002"   # Table service
     volumes:
-      # Bind-mount the repo's existing emulator data so the container reuses the
-      # same tables/blobs the app already created under the local npm Azurite.
-      - ./.azurite-data:/data
+      # Named volume (ephemeral, Docker-managed) instead of a repo bind-mount. The old
+      # ./.azurite-data bind-mount committed emulator state into the working tree and let stale
+      # tables/blobs persist across runs; a named volume keeps dev data out of git and easy to reset
+      # (`docker compose down -v`).
+      - poredoimage-azurite-data:/data
+
+volumes:
+  poredoimage-azurite-data:

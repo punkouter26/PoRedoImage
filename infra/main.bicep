@@ -61,6 +61,55 @@ resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-0
   name: 'default'
 }
 
+// ─── Blob Service + soft-delete retention ───────────────────────────────────
+// 7-day soft-delete window guards against accidental deletes without bloating cost.
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: storageAccount
+  name: 'default'
+  properties: {
+    deleteRetentionPolicy: {
+      enabled: true
+      days: 7
+    }
+  }
+}
+
+// ─── Storage lifecycle management (cloud-waste reduction) ────────────────────
+// Audit item: "Auto-delete/archive blobs/logs older than 30 days." Generated user
+// images and Kudu/app log blobs are regenerable, so we tier them to Cool after 7 days
+// (cheaper storage) and delete after 30 days. This caps unbounded blob growth — the
+// single clearest cost leak, since nothing previously expired stored images.
+resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+  parent: storageAccount
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          name: 'expire-generated-blobs-30d'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            filters: {
+              blobTypes: [ 'blockBlob' ]
+            }
+            actions: {
+              baseBlob: {
+                tierToCool: {
+                  daysAfterModificationGreaterThan: 7
+                }
+                delete: {
+                  daysAfterModificationGreaterThan: 30
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
 // ─── App Service Plan ───────────────────────────────────────────────────────
 // F1 Free Linux plan, owned by this resource group. Lives in westus2 because the
 // subscription has no free-tier Linux VM quota in eastus (the RG region).
@@ -134,6 +183,11 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'ComputerVision__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-ApiKey') }
         { name: 'ComputerVision__Endpoint', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-Endpoint') }
         { name: 'ApplicationInsights__ConnectionString', value: kvRef(keyVaultName, 'PoRedoImage-ApplicationInsights-ConnectionString') }
+        // Telemetry budget (audit item: "aggressive App Insights sampling"). Set EXPLICITLY here so the
+        // production sampling ratio is auditable in the portal rather than relying on the 0.1 code default
+        // in HostBootstrapExtensions.AddPoRedoImageTelemetry. ErrorPreservingSampler keeps all error spans
+        // and heartbeat/exception telemetry regardless of this ratio.
+        { name: 'ApplicationInsights__SamplingRatio', value: '0.1' }
         { name: 'Storage__ConnectionString', value: kvRef(keyVaultName, 'PoRedoImage-StorageConnectionString') }
         { name: 'AzureAd__ClientId', value: kvRef(keyVaultName, 'PoRedoImage-AzureAd-ClientId') }
         { name: 'AzureAd__ClientSecret', value: kvRef(keyVaultName, 'PoRedoImage-AzureAd-ClientSecret') }

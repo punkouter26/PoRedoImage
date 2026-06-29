@@ -70,7 +70,10 @@ if (Assert-CommandExists 'winget' 'Install App Installer from the Microsoft Stor
 }
 
 # ── 2. Docker / Azurite ──────────────────────────────────────────────
-Write-Step "Starting Azurite via Docker Compose"
+# This Azurite container is for the LOCAL DEV INNER LOOP only (F5 / `dotnet run`). The test suites
+# spin up their own ephemeral Azurite via Testcontainers, so they never touch this container — a
+# stale dev container can't leak state into a test run. See ADR-019.
+Write-Step "Starting Azurite via Docker Compose (local dev inner loop only)"
 
 # Stop any npm/global Azurite first — it binds 10000-10002 and would make `docker compose up`
 # fail with a port conflict (both emulators fighting over the same ports + .azurite-data files).
@@ -139,17 +142,48 @@ if ($chromiumCached) {
 }
 
 # ── 4b. Azure CLI auth check (Key Vault access) ──────────────────────
-Write-Step "Checking Azure CLI authentication"
+# Reports ONE of three explicit states and, when access is missing, prints the exact self-heal
+# command. Local runs depend on real Key Vault secrets (kv-poshared) loading via `az login`
+# credentials — a silent "warn and continue" here is the root cause of "every feature breaks
+# locally", so we make the failing state loud and actionable.
+Write-Step "Checking Azure CLI authentication + Key Vault access (kv-poshared)"
 
+$KeyVaultName = 'kv-poshared'
 if (Assert-CommandExists 'az' 'Install Azure CLI from https://aka.ms/installazurecli') {
     $account = az account show --query user.name -o tsv 2>$null
+
     if ([string]::IsNullOrWhiteSpace($account)) {
-        Write-Warning "Not logged in to Azure CLI. Run 'az login' so the app can read secrets from Key Vault (kv-poshared)."
+        # State 1: NOT LOGGED IN.
+        Write-Warning "  [NOT LOGGED IN] Run 'az login' so the app can read secrets from Key Vault ($KeyVaultName)."
+        Write-Host   "    Or run fully offline with mocks: set Mocks:UseMockAi=true in appsettings.Development.json." -ForegroundColor DarkGray
     } else {
         Write-Host "  Signed in as $account" -ForegroundColor Green
-        Write-Host "  Verifying Key Vault access (kv-poshared)..." -ForegroundColor Gray
-        az keyvault secret list --vault-name kv-poshared --query "length(@)" -o tsv 2>$null |
-            ForEach-Object { Write-Host "    Key Vault reachable — $_ secrets visible." -ForegroundColor Green }
+        Write-Host "  Verifying Key Vault access ($KeyVaultName)..." -ForegroundColor Gray
+
+        $secretCount = az keyvault secret list --vault-name $KeyVaultName --query "length(@)" -o tsv 2>$null
+        if (-not [string]::IsNullOrWhiteSpace($secretCount) -and $secretCount -match '^\d+$') {
+            # State 2: FULLY READY.
+            Write-Host "  [READY] Key Vault reachable — $secretCount secrets visible. Secrets will load locally." -ForegroundColor Green
+        } else {
+            # State 3: LOGGED IN BUT NO KEY VAULT RBAC. Emit the exact self-heal command.
+            $objectId = az ad signed-in-user show --query id -o tsv 2>$null
+            $subId    = az account show --query id -o tsv 2>$null
+            $scope    = "/subscriptions/$subId/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/$KeyVaultName"
+
+            Write-Warning "  [NO KEY VAULT ACCESS] Signed in, but cannot list secrets in $KeyVaultName."
+            Write-Host    "    Without access, real secrets won't load and AI/storage/auth features fail locally." -ForegroundColor Yellow
+            Write-Host    "    Self-heal (grant your account the Key Vault Secrets User role):" -ForegroundColor Yellow
+            if (-not [string]::IsNullOrWhiteSpace($objectId) -and -not [string]::IsNullOrWhiteSpace($subId)) {
+                Write-Host  "      az role assignment create ``" -ForegroundColor Cyan
+                Write-Host  "        --role 'Key Vault Secrets User' ``" -ForegroundColor Cyan
+                Write-Host  "        --assignee-object-id $objectId ``" -ForegroundColor Cyan
+                Write-Host  "        --assignee-principal-type User ``" -ForegroundColor Cyan
+                Write-Host  "        --scope $scope" -ForegroundColor Cyan
+            } else {
+                Write-Host  "      (Could not resolve your object id / subscription — ensure 'az login' completed, then retry.)" -ForegroundColor DarkGray
+            }
+            Write-Host    "    Or run fully offline with mocks: set Mocks:UseMockAi=true." -ForegroundColor DarkGray
+        }
     }
 }
 

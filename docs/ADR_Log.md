@@ -138,3 +138,27 @@ format: "ADR (Architecture Decision Record)"
 - **Constraints that force the trade-off:** F1 cannot enable Always On (`alwaysOn: false` is mandatory in `infra/main.bicep` or the deploy fails) and caps CPU at 60 min/day. A scheduled keep-warm ping would burn into that 60-min budget and could exhaust it, so it is explicitly rejected — a pinger would trade cold starts for hard CPU-quota throttling, which is worse.
 - **Mitigations already in place:** `WEBSITE_CONTAINER_START_TIME_LIMIT=600` allows slow first-token cold starts to complete; the post-deploy `/health` smoke test retries 5× with back-off to ride out the first cold start; Key Vault references populate config at platform level so the first request doesn't wait on the in-app KV provider.
 - **Revisit when:** sustained traffic makes cold-start latency a real UX complaint, or a feature needs background processing — at which point move to B1 (Always On) rather than papering over F1 with a pinger. The plan binding is asserted post-deploy in CI, so an accidental tier change is caught.
+
+## ADR-018: Resource Naming — `po`-prefixed lowercase (not strict `Po{SolutionName}`)
+
+- **Decision:** All Azure resources are named with a lowercase `po…` token (`poredoimage-web`, `asp-poredoimage-f1`, `stporedoimage26`, `kv-poshared`) and live in the `PoRedoImage` or `PoShared` resource groups. The governance convention enforced by `SCRIPTS/audit-arg.ps1` is the `^po` prefix, **not** PascalCase `Po{SolutionName}`.
+- **Why:** Most Azure resource types (Storage accounts, Web apps, Key Vaults) require globally-unique, DNS-safe, lowercase names — PascalCase `PoRedoImage` is simply illegal for them. So a strict `Po{SolutionName}` rule is unenforceable; codifying the *real* rule (lowercase `po` prefix) makes the audit meaningful instead of perpetually red.
+- **Enforcement:** `SCRIPTS/audit-arg.ps1` runs three Azure Resource Graph queries — stray resources outside the two owned RGs, names that don't start with `po`/`Po`, and idle compute (<5% CPU/7d). It is **report-only** and runs locally or as a *separate* scheduled workflow, never in the deploy pipeline (project policy: deploy.yml builds + ships only).
+- **Trade-off:** Resource-group names keep PascalCase (`PoRedoImage`, `PoShared`) since RGs allow it; only resources inside follow the lowercase rule. Two casings, but each matches what its scope actually permits.
+
+## ADR-019: Storage Lifecycle + Testcontainers-Only Test Storage
+
+- **Decision (lifecycle):** `infra/main.bicep` defines a blob management policy that tiers block blobs to Cool after 7 days and **deletes them after 30 days**, plus a 7-day blob soft-delete window. Generated images and Kudu/app log blobs are regenerable, so nothing needs to persist indefinitely.
+- **Why:** Previously nothing expired, so generated-image and log blobs grew unbounded — the clearest cloud-cost leak. A 30-day delete + cool-tiering caps cost while keeping a comfortable recovery window.
+- **Decision (test storage):** The Integration tier spins up its own **ephemeral Azurite via Testcontainers** inside the `WebApplicationFactory` lifecycle (`AzuriteContainerFixture`). The `docker-compose.yml` Azurite container is for the local dev inner loop (F5) ONLY and now uses a Docker-managed named volume, not the old `./.azurite-data` repo bind-mount.
+- **Why:** One storage path per purpose. The old bind-mount committed emulator state into the working tree and let stale tables/blobs survive across runs, which could leak into or flake tests. Tests owning their own throwaway container removes that class of failure.
+
+## ADR-020: Telemetry Budget — Explicit Sampling, No Keep-Warm Availability Test
+
+- **Decision:** The production App Insights sampling ratio (0.1) is set **explicitly** as `ApplicationInsights__SamplingRatio` in `infra/main.bicep` (not left to the code default), the `ErrorPreservingSampler` keeps all error spans, Serilog exports exceptions at 100%, and metrics/heartbeat are unaffected by the trace sampler. No availability/keep-warm web test is added.
+- **Why:** "Aggressive sampling, retain heartbeat + exceptions, drop noise." Making the ratio explicit in IaC keeps the budget auditable in the portal. An availability web-test would repeatedly wake the F1 app and burn its 60-min/day CPU budget (conflicts with ADR-015), so up/down visibility relies on the SDK heartbeat metric instead.
+
+## ADR-021: AI Mock Boundary — DI Swap + HTTP Handler (Defense in Depth)
+
+- **Decision:** When `Mocks:UseMockAi=true`, AI services are swapped for zero-network mocks at DI registration AND a `MockAiDelegatingHandler` sits on the outbound AI named HTTP clients (`GeminiApi`, `Ollama`). The handler throws (fails loud) if a real AI call is attempted while mock mode is on.
+- **Why:** The DI swap already guarantees zero token spend in normal operation, but a future regression (a real service wired while the flag is on) would silently spend tokens. The HTTP-pipeline handler is a second wall that blocks the call instead of masking the misconfiguration with fake data. Belt and suspenders for the "zero token spend" budget guarantee, reinforced by the E2E `Ai_services_are_mocked_when_mock_mode_is_required` pre-flight check.

@@ -28,6 +28,16 @@ public sealed class StartupSecretValidator : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        // Mock-mode opt-out: real services aren't wired, so AI key validation is unnecessary.
+        // Keeps the offline / CI path bootable while still producing loud, actionable failures
+        // when someone WANTS real AI but forgot the keys.
+        if (_configuration.GetValue<bool>("Mocks:UseMockAi"))
+        {
+            _logger.LogInformation(
+                "Mocks:UseMockAi=true — AI secret validation skipped. Mock services wired; no live keys required.");
+            return Task.CompletedTask;
+        }
+
         var required = new[]
         {
             ("OpenAI:Endpoint",         _configuration["OpenAI:Endpoint"]),
@@ -44,21 +54,35 @@ public sealed class StartupSecretValidator : IHostedService
             return Task.CompletedTask;
         }
 
+        // Dev policy: real services were selected, so missing keys must hard-fail in EVERY
+        // environment. The previous warn-and-continue in Development masked missing-key setups
+        // until the first AI call returned 401. To run fully offline, set Mocks:UseMockAi=true.
+        //
+        // Sources of truth (see infra/main.bicep):
+        //   - Production: App Settings referencing @Microsoft.KeyVault(...) — kv-poshared.
+        //   - Development: Key Vault kv-poshared via DefaultAzureCredential (requires
+        //     'az login' + 'Key Vault Secrets User' RBAC; setup.ps1 verifies both).
+        // Only Mocks:UseMockAi=true permits booting without these.
+        var offlineHint = _env.IsDevelopment()
+            ? " To run fully offline with mock AI, set \"Mocks:UseMockAi\": true in appsettings.Development.json or via env var Mocks__UseMockAi=true."
+            : string.Empty;
+
         var msg = $"Missing required AI configuration: {string.Join(", ", missing.Select(m => m.Item1))}. " +
-                  "Set them via user-secrets, Key Vault, or appsettings.Development.json. " +
-                  "In production this would block startup; in development the app continues with reduced features.";
+                  "Dev, test, and prod all source keys from Azure Key Vault kv-poshared " +
+                  "(po-aiservices-shared RG) or, in App Service, from the @Microsoft.KeyVault(...) " +
+                  "Application Settings bound in infra/main.bicep. " +
+                  "Key Vault secret names expected: PoRedoImage-OpenAI-Endpoint, PoRedoImage-OpenAI-ApiKey, " +
+                  "PoRedoImage-Google-ApiKey, plus OpenAI:ChatCompletionsDeployment (literal app setting). " +
+                  "Verify 'az login' succeeded and that your account has 'Key Vault Secrets User' on kv-poshared " +
+                  "(SCRIPTS/setup.ps1 prints the exact self-heal command)." +
+                  offlineHint;
 
         if (_env.IsProduction())
-        {
             _logger.LogCritical(msg);
-            throw new InvalidOperationException(msg);
-        }
         else
-        {
-            _logger.LogWarning(msg);
-        }
+            _logger.LogError(msg);
 
-        return Task.CompletedTask;
+        throw new InvalidOperationException(msg);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

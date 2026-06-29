@@ -19,17 +19,37 @@ namespace PoRedoImage.Web.Configuration;
 public static class HostBootstrapExtensions
 {
     /// <summary>
-    /// Loads Azure Key Vault into configuration via Managed Identity (App Service) so secrets are
-    /// present before Serilog/OpenTelemetry read them. Secret names are mapped by
-    /// <see cref="KeyVaultSecretNameMapping"/>. Fails fast outside Development if the vault is
-    /// unreachable; in Development it logs and continues, then pins Storage back to Azurite.
+    /// Loads Azure Key Vault into configuration so secrets are present before Serilog and the
+    /// option-binding validators run. Key Vault is the SINGLE source of truth for dev, test, and
+    /// prod — see ADR-021 policy "real keys only, sourced from kv-poshared or App Settings"
+    /// (the App Service <c>@Microsoft.KeyVault(...)</c> references also resolve from the same vault).
+    ///
+    /// Behaviour by configuration state:
+    ///   - <c>KeyVault:Uri</c> empty AND <c>AZURE_KEY_VAULT_ENDPOINT</c> empty: KV is explicitly
+    ///     disabled (e.g. integration tests, Mocks:UseMockAi flow). Proceed without it.
+    ///   - <c>Mocks:UseMockAi=true</c>: KV is irrelevant; proceed without it (skip cleanly).
+    ///   - KV endpoint set but load fails (auth/RBAC/timeout): fail-fast in EVERY environment —
+    ///     not just Production. Dev previously warned-and-continued, which masked missing
+    ///     <c>az login</c> / RBAC and surfaced as 401s at first AI call.
     /// </summary>
     public static WebApplicationBuilder AddPoRedoImageKeyVault(this WebApplicationBuilder builder)
     {
         var keyVaultEndpoint = builder.Configuration["KeyVault:Uri"]
             ?? builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
+
+        // Explicit opt-outs: never throw on missing endpoint when dev "really" wants offline,
+        // either by configuring the mock mode or by leaving the endpoint empty (test fixtures).
         if (string.IsNullOrEmpty(keyVaultEndpoint))
         {
+            Log.Information(
+                "Key Vault endpoint not configured (KeyVault:Uri / AZURE_KEY_VAULT_ENDPOINT empty). " +
+                "Skipping KV load; secrets must come from another provider or Mocks:UseMockAi must be true.");
+            return builder;
+        }
+        if (builder.Configuration.GetValue<bool>("Mocks:UseMockAi"))
+        {
+            Log.Information(
+                "Mocks:UseMockAi=true — skipping Key Vault load (real AI services are not wired).");
             return builder;
         }
 
@@ -75,17 +95,22 @@ public static class HostBootstrapExtensions
         }
         catch (Exception ex)
         {
-            Log.Warning(ex,
-                "Key Vault at {Endpoint} is unreachable or missing required secrets; secrets may not be loaded. "
-                + "Application Insights and other Key Vault-dependent features may be unavailable.",
-                keyVaultEndpoint);
+            // KV is configured but unreachable — fail-fast in EVERY environment. Soft-warn-and-continue
+            // in Dev previously masked the most common local-setup failure modes: missing `az login`
+            // and missing 'Key Vault Secrets User' RBAC. Both produce an empty config that surfaces
+            // as 401 on first AI call.
+            var envLabel = builder.Environment.IsDevelopment() ? "Development" : builder.Environment.EnvironmentName;
+            var msg =
+                $"[{envLabel}] Key Vault at {keyVaultEndpoint} is unreachable or your account " +
+                "lacks access. Real services are wired but no secrets loaded; aborting startup " +
+                "(keys must come from KV or App Settings — see infra/main.bicep). " +
+                "Self-heal: 1) run 'az login', 2) ensure your account has 'Key Vault Secrets User' " +
+                "on kv-poshared (SCRIPTS/setup.ps1 prints the exact 'az role assignment create' " +
+                "command when RBAC is missing). " +
+                "Run fully offline with Mocks:UseMockAi=true instead.";
 
-            // In production fail-fast if Key Vault cannot be read, otherwise continue in Dev.
-            if (!builder.Environment.IsDevelopment())
-            {
-                Log.Fatal(ex, "Key Vault startup validation failed, terminating app startup.");
-                throw;
-            }
+            Log.Error(ex, msg);
+            throw new InvalidOperationException(msg, ex);
         }
 
         return builder;
@@ -163,6 +188,16 @@ public static class HostBootstrapExtensions
 
         // Sampling: full fidelity (100%) in Dev/Test; a configurable ceiling (default 10%) in
         // Production, read from ApplicationInsights:SamplingRatio so it can be tuned without redeploy.
+        // The production value is also set EXPLICITLY in infra/main.bicep (ApplicationInsights__SamplingRatio)
+        // so the budget is auditable in the portal instead of an invisible code default.
+        //
+        // Telemetry budget intent (heartbeat + exceptions retained, noise dropped):
+        //   • Metrics (incl. the SDK heartbeat / availability signal) flow through the metrics pipeline
+        //     above and are NOT subject to this trace sampler — heartbeat is never thinned out.
+        //   • Exceptions: Serilog exports logged exceptions at 100% (separate from traces), and the
+        //     ErrorPreservingSampler below never drops error-bearing spans (status >= 500 / error=true).
+        //   • No keep-warm/availability web-test pinger is added: it would wake the F1 app and burn the
+        //     60-min/day CPU budget (see ADR-015). Up/down visibility comes from the heartbeat metric.
         var samplingRatio = builder.Environment.IsDevelopment()
             ? 1.0
             : builder.Configuration.GetValue<double?>("ApplicationInsights:SamplingRatio") ?? 0.1;

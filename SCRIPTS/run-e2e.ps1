@@ -22,6 +22,12 @@ Write-Host "==> Building solution" -ForegroundColor Cyan
 dotnet build "$Root/PoRedoImage.slnx" -c Release --nologo | Out-Null
 
 Write-Host "==> Launching Web app (Development) on $BaseUrl" -ForegroundColor Cyan
+# Budget guardrail: force the app into mock-AI mode so the E2E suite can NEVER spend a live token,
+# and flag the test run to HARD-FAIL if the target isn't actually mocked (asserted by the
+# Ai_services_are_mocked_when_mock_mode_is_required E2E test via /api/diag/mock-status).
+# Start-Process inherits these from the current process, so the launched app picks them up.
+$env:Mocks__UseMockAi = 'true'
+$env:E2E_REQUIRE_MOCK = 'true'
 $server = Start-Process -FilePath 'dotnet' `
     -ArgumentList @('run', '--project', "$Root/src/PoRedoImage.Web/PoRedoImage.Web.csproj",
                     '--launch-profile', 'https', '--no-build', '-c', 'Release') `

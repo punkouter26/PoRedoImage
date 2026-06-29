@@ -87,6 +87,12 @@ public static class InfrastructureServiceExtensions
         services.AddTransient<CriticAgent>();
         services.AddTransient<StyleDirectorWorkflow>();
 
+        // Defense-in-depth budget guardrail: an HTTP-pipeline interceptor that blocks any outbound AI
+        // call when Mocks:UseMockAi=true. Registered on the AI named clients below. In mock mode the
+        // real clients aren't even resolved (services are swapped above), so this only ever fires on a
+        // future regression — at which point it fails loud instead of spending a live token.
+        services.AddTransient<MockAiDelegatingHandler>();
+
         // Named HttpClient for local Ollama (image-to-text via gemma4 etc.).
         // Long timeout: first call may load the model into memory; no retries (local, fail fast).
         var ollamaEndpoint = configuration?["Ollama:Endpoint"] ?? "http://localhost:11434";
@@ -94,10 +100,12 @@ public static class InfrastructureServiceExtensions
         {
             c.BaseAddress = new Uri(ollamaEndpoint);
             c.Timeout = TimeSpan.FromMinutes(5);
-        });
+        })
+        .AddHttpMessageHandler<MockAiDelegatingHandler>();
 
         // Named HttpClient for Gemini with standard resilience: retry, timeout, circuit-breaker
         services.AddHttpClient("GeminiApi")
+            .AddHttpMessageHandler<MockAiDelegatingHandler>()
             .AddStandardResilienceHandler(options =>
             {
                 options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);

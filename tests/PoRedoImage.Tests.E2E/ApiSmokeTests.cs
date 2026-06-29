@@ -27,6 +27,33 @@ public sealed class ApiSmokeTests : IClassFixture<E2EApiFixture>
     }
 
     [LiveServerFact]
+    public async Task Ai_services_are_mocked_when_mock_mode_is_required()
+    {
+        // Budget guardrail for the E2E tier — the ONLY tier that drives a live instance and therefore
+        // the only place a real AI token could be spent. The anonymous /api/diag/mock-status endpoint
+        // lists active mock reasons (empty when running real services).
+        //
+        // When E2E_REQUIRE_MOCK=true (set by SCRIPTS/run-e2e.ps1, which launches the app with
+        // Mocks:UseMockAi=true), we HARD-FAIL unless the target reports mock mode. This makes it
+        // impossible to silently point the UI suite at a real-config build and burn tokens. When the
+        // var is unset (e.g. a smoke test against a real prod instance) we only assert the contract.
+        var response = await _fixture.AnonymousClient.GetAsync("/api/diag/mock-status");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+
+        var requireMock = string.Equals(
+            Environment.GetEnvironmentVariable("E2E_REQUIRE_MOCK"), "true",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (requireMock)
+        {
+            // A non-empty JSON array of reasons proves the server swapped in mock AI services.
+            Assert.Contains("MOCK", body, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [LiveServerFact]
     public async Task Alive_liveness_probe_returns_200()
     {
         var response = await _fixture.Client.GetAsync("/alive");

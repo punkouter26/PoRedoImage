@@ -9,6 +9,11 @@ namespace PoRedoImage.Tests.Unit;
 /// keep execution instantaneous and prevent cross-tier redundancy creeping in. Counts methods (a
 /// [Theory] counts once regardless of InlineData cases) and excludes this meta-test itself.
 /// If this fails, either delete redundant unit tests or promote behaviour to the integration tier.
+///
+/// The ceiling is a BUDGET, not a target — being under it is healthy headroom, not unused capacity.
+/// DTO/validation CONTRACT tests deliberately live in the Integration tier (see
+/// tests/PoRedoImage.Tests.Integration/Contracts/), which freed Unit headroom and keeps this tier to
+/// pure no-I/O logic. Do not backfill to "use up" the budget.
 /// </summary>
 public sealed class TestCountCeilingTests
 {
