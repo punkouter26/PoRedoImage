@@ -36,10 +36,6 @@ public sealed class MockGenerativeAiService : IGenerativeAiService, IMockable
 
     public Task<string> DescribePersonAsync(byte[] imageData, CancellationToken ct = default)
         => Task.FromResult("A mock person description — generated locally with no AI call.");
-
-    public Task<(string Caption, int TokensUsed, long ElapsedMs)>
-        GenerateCaptionAsync(IReadOnlyList<string> tags, string systemPrompt, CancellationToken ct = default)
-        => Task.FromResult(("A mock caption.", 0, 1L));
 }
 
 /// <summary>Canned image generation — returns a tiny PNG and never calls Google Gemini/Imagen.</summary>

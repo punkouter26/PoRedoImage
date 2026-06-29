@@ -30,8 +30,6 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(MemeTemplateDto))]
 [JsonSerializable(typeof(MemeTemplateRenderRequest))]
 [JsonSerializable(typeof(MemeTemplateRenderResponse))]
-[JsonSerializable(typeof(CaptionBattleRequest))]
-[JsonSerializable(typeof(CaptionBattleResultDto))]
 [JsonSerializable(typeof(StyleDirectorRequestDto))]
 [JsonSerializable(typeof(StyleDirectorResultDto))]
 [JsonSerializable(typeof(StyleDirectorReasoningEntryDto))]

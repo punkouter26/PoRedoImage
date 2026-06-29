@@ -207,9 +207,8 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
 
     internal static void ReplaceService<T>(IServiceCollection services, T mockInstance) where T : class
     {
-        // Singleton to match the real registrations (InfrastructureServiceExtensions). ICaptionBattleService
-        // is a singleton that consumes IGenerativeAiService, so a scoped AI mock would fail DI scope
-        // validation (a singleton cannot capture a scoped dependency).
+        // Singleton to match the real registrations (InfrastructureServiceExtensions). A scoped AI
+        // mock would fail DI scope validation (a singleton cannot capture a scoped dependency).
         services.RemoveAll<T>();
         services.AddSingleton(mockInstance);
     }

@@ -94,7 +94,6 @@ tests/                          # Target = 4 projects per spec; current state ha
 | `GET /api/user-images` | List user's saved images |
 | `GET /api/meme-templates` | List meme templates |
 | `POST /api/meme-templates/render` | Render meme from template |
-| `POST /api/caption-battle/run` | Multi-persona caption battle |
 | `POST /api/style-director/run` | 4-agent style director |
 | `GET /auth/login/microsoft?returnUrl=…` | Microsoft OIDC challenge (canonical) |
 | `GET /auth/login/fake?email=…` | Dev/Test sign-in (canonical; GUEST or named user) |

@@ -13,7 +13,6 @@ using PoRedoImage.Web.Components;
 using PoRedoImage.Web.Configuration;
 using PoRedoImage.Web.Features.Auth;
 using PoRedoImage.Web.Features.BulkGenerate;
-using PoRedoImage.Web.Features.CaptionBattle;
 using PoRedoImage.Web.Features.Diagnostics;
 using PoRedoImage.Web.Features.Idempotency;
 using PoRedoImage.Web.Features.ImageAnalysis;
@@ -256,7 +255,6 @@ try
     app.MapBulkGenerateEndpoints();
     app.MapUserImageEndpoints();
     app.MapMemeTemplateEndpoints();
-    app.MapCaptionBattleEndpoints();
     app.MapStyleDirectorEndpoints();
 
     // Redirect /favicon.ico → /favicon.png so browsers don't get a 404.

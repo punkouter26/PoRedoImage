@@ -76,9 +76,6 @@ public static class InfrastructureServiceExtensions
         // Application layer orchestrator
         services.AddScoped<IImageAnalysisOrchestrator, ImageAnalysisOrchestrator>();
 
-        // Idea #5 — Meme Caption Battle: persona-fanned-out caption generation.
-        services.AddSingleton<ICaptionBattleService, CaptionBattleService>();
-
         // Idea #1 — Agentic Style Director: 4-agent sequential workflow.
         // Registered as transient so per-request scoped DI services (logger) flow correctly.
         services.AddTransient<VisionAnalystAgent>();
