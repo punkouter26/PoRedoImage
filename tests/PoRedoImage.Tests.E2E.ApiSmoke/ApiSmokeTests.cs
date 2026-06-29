@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace PoRedoImage.Tests.E2E;
+namespace PoRedoImage.Tests.E2E.ApiSmoke;
 
 /// <summary>
 /// End-to-end API tests: drive the public HTTP surface of a running instance exactly

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Moq;
+using PoRedoImage.Web.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 
@@ -150,7 +151,7 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
 {
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment(PoEnvironments.Test);
 
         // ConfigureAppConfiguration runs AFTER appsettings.{Environment}.json, so these in-memory
         // values win on conflict. Critically, Storage:ConnectionString="" stops startup from trying
@@ -315,7 +316,7 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
 {
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment(PoEnvironments.Test);
 
         builder.ConfigureAppConfiguration(config =>
         {

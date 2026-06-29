@@ -121,11 +121,15 @@ jobs:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           package: webapp.zip
-      - name: Bind Key Vault Secrets User role
+      - name: Bind Key Vault Secrets User role (Bicep)
         # Grants the freshly-provisioned app's system-assigned managed identity
         # read access to the shared Key Vault. Without this, every
         # `@Microsoft.KeyVault(...)` app setting resolves to an empty string
         # and the app fails its StartupSecretValidator in Production.
+        # Implemented as a subscription-scoped Bicep deployment (infra/kv-role.bicep) for:
+        #   - true idempotency (no `grep -v AlreadyExists` shell hack)
+        #   - what-if preview support (`az deployment sub what-if`)
+        #   - reusability across every Po* project that consumes kv-poshared.
         run: |
           PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
             --query identity.principalId -o tsv)
@@ -134,14 +138,22 @@ jobs:
             exit 1
           fi
           VAULT="/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared"
-          # Idempotent: ignore AlreadyExists so re-runs are clean.
-          az role assignment create --role "Key Vault Secrets User" \
-            --assignee "$PRINCIPAL" --scope "$VAULT" 2>&1 \
-            | grep -v "AlreadyExists" || true
+          # Bicep is idempotent: re-runs update the same role assignment (stable GUID name)
+          # instead of leaking duplicates. The deployment is what-if-able locally.
+          az deployment sub create \
+            --location westus2 \
+            --name "ci-kvrole-${{ github.run_id }}" \
+            --template-file infra/kv-role.bicep \
+            --parameters principalId="$PRINCIPAL" \
+            --output none
           # Verify the binding is in place; fail the pipeline if not.
-          az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
-            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv \
-            | xargs -I{} test {} -ge 1
+          COUNT=$(az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
+            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv)
+          echo "Key Vault Secrets User assignments for $PRINCIPAL: $COUNT"
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "::error::Role assignment did not propagate; check the kv-role.bicep deployment output above."
+            exit 1
+          fi
 
       - name: Verify App Service Plan binding & state
         # Hard-fail when the app is not on the expected F1 plan (asp-poredoimage-f1).

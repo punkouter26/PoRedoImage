@@ -1,13 +1,13 @@
 using Microsoft.Playwright;
 
-namespace PoRedoImage.Tests.E2E;
+namespace PoRedoImage.Tests.E2E.UI;
 
 /// <summary>
 /// C# Playwright UI tests covering the forced-login gate and the dev GUEST bypass.
 /// Mobile-portrait and desktop viewports share the same logical flow; this file
 /// asserts desktop default behavior. Adding per-device matrix cases is on the
 /// roadmap once Playwright browsers are installed in CI (see
-/// tests/PoRedoImage.Tests.E2E/bin/&lt;cfg&gt;/net10.0/playwright.ps1 install).
+/// tests/PoRedoImage.Tests.E2E.UI/bin/&lt;cfg&gt;/net10.0/playwright.ps1 install).
 /// </summary>
 public sealed class LoginUiTests : IAsyncLifetime
 {

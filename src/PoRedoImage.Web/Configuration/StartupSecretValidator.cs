@@ -50,7 +50,8 @@ public sealed class StartupSecretValidator : IHostedService
 
         if (missing.Count == 0)
         {
-            _logger.LogInformation("All required AI secrets present. Startup secret validation passed.");
+            _logger.LogInformation("All required AI secrets present. Validating AzureAd OIDC configuration…");
+            ValidateOpenIdConnectConfig();
             return Task.CompletedTask;
         }
 
@@ -83,6 +84,73 @@ public sealed class StartupSecretValidator : IHostedService
             _logger.LogError(msg);
 
         throw new InvalidOperationException(msg);
+    }
+
+    /// <summary>
+    /// Fails fast when the auth pipeline is going to register an OIDC scheme with a
+    /// misconfigured <c>AzureAd:</c> section. A 401/500 on first click of "Sign in with Microsoft"
+    /// is the most common production-deploy regression: the app boots, the AI keys check out, the
+    /// first user hits the OIDC challenge, and the scheme registration 500s because ClientId is
+    /// blank or CallbackPath collides with a real route. The dev-cookie-only branch (no ClientId
+    /// in Development) and the FakeAuth branch are skipped — neither registers an OIDC scheme.
+    ///
+    /// Mirrors the AI-secret check above: fail-fast in every environment so the problem surfaces
+    /// in <c>SCRIPTS/setup.ps1</c> / <c>deploy.yml</c> rather than in the browser.
+    /// </summary>
+    private void ValidateOpenIdConnectConfig()
+    {
+        // FakeAuth replaces the whole pipeline; nothing to validate.
+        if (_configuration.GetValue<bool>("Auth:EnableFakeAuth"))
+            return;
+
+        var clientId = _configuration["AzureAd:ClientId"];
+        var hasOidc = !string.IsNullOrWhiteSpace(clientId);
+
+        // Dev without a ClientId registers cookie-only auth (see AuthServiceExtensions) and is
+        // explicitly supported by the project — skip the OIDC shape check.
+        if (_env.IsDevelopment() && !hasOidc)
+            return;
+
+        var failures = new List<string>();
+
+        if (!hasOidc || !Guid.TryParse(clientId, out _))
+        {
+            failures.Add(
+                "AzureAd:ClientId is missing or not a parseable GUID. " +
+                "Set it via Key Vault (PoRedoImage-AzureAd-ClientId) or `dotnet user-secrets set \"AzureAd:ClientId\" --project src/PoRedoImage.Web`.");
+        }
+
+        var tenantId = _configuration["AzureAd:TenantId"];
+        var isReservedTenant = tenantId is "common" or "consumers" or "organizations";
+        var isGuidTenant = !string.IsNullOrWhiteSpace(tenantId) && Guid.TryParse(tenantId, out _);
+        if (string.IsNullOrWhiteSpace(tenantId) || (!isReservedTenant && !isGuidTenant))
+        {
+            failures.Add(
+                $"AzureAd:TenantId ('{tenantId ?? "<null>"}') is invalid. " +
+                "Expected 'common' / 'consumers' / 'organizations' or a parseable tenant GUID. " +
+                "The user spec mandates 'common' authority for all MS outlook accounts.");
+        }
+
+        var callbackPath = _configuration["AzureAd:CallbackPath"] ?? "/signin-oidc";
+        if (callbackPath.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
+        {
+            failures.Add(
+                $"AzureAd:CallbackPath ('{callbackPath}') collides with the /api/* route prefix. " +
+                "An OIDC callback under /api would be intercepted by the API-aware auth redirect " +
+                "and the OIDC handshake would never complete.");
+        }
+
+        if (failures.Count == 0)
+        {
+            _logger.LogInformation("AzureAd OIDC configuration valid (TenantId={TenantId}, CallbackPath={CallbackPath}).",
+                tenantId, callbackPath);
+            return;
+        }
+
+        var oidcMsg = "AzureAd OIDC configuration invalid: " + string.Join(" | ", failures);
+        if (_env.IsProduction()) _logger.LogCritical(oidcMsg);
+        else _logger.LogError(oidcMsg);
+        throw new InvalidOperationException(oidcMsg);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

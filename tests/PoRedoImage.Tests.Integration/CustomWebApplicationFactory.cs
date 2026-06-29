@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services.Mocks;
+using PoRedoImage.Web.Configuration;
 
 
 namespace PoRedoImage.Tests.Integration;
@@ -27,8 +28,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        // Set environment to Development to skip Key Vault configuration
-        builder.UseEnvironment("Development");
+        // Set environment to Test so /auth/login/fake, the FakeAuthHandler registration path,
+        // and any future "is this a test run?" branches fire correctly (not "Development" — the
+        // spec defines Test as the integration/E2E tier's env name; Development is for the local
+        // F5 inner loop only). AddPoRedoImageKeyVault also skips when AZURE_KEY_VAULT_ENDPOINT
+        // is empty, which we set in the ConfigureAppConfiguration block below, so KV load is
+        // disabled in this env regardless of the env name.
+        builder.UseEnvironment(PoEnvironments.Test);
 
         // ConfigureAppConfiguration runs AFTER the host builder loads appsettings.json +
         // appsettings.{Environment}.json, so the in-memory overrides win on conflict. Earlier

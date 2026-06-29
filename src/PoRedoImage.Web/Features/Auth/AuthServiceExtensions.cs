@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 
 namespace PoRedoImage.Web.Features.Auth;
@@ -116,7 +117,10 @@ public static class AuthServiceExtensions
                     return Task.CompletedTask;
                 };
                 // AzureAd:AllowedTenantIds (comma-separated) restricts access to specific tenants.
-                // When absent, issuer validation is disabled to support personal + multi-tenant accounts.
+                // When absent, ANY well-formed Microsoft Entra issuer is accepted — this preserves
+                // the multi-tenant + personal-account behavior the user asked for ("all MS outlook
+                // accounts / common authority") while rejecting malformed/unexpected issuer strings
+                // that an unvalidated Authority setting could otherwise produce.
                 var allowedTenants = configuration["AzureAd:AllowedTenantIds"]?
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 if (allowedTenants?.Length > 0)
@@ -127,7 +131,12 @@ public static class AuthServiceExtensions
                 }
                 else
                 {
-                    options.TokenValidationParameters.ValidateIssuer = false;
+                    options.TokenValidationParameters.IssuerValidator = (issuer, _, _) =>
+                        issuer is { } i
+                        && i.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase)
+                        && i.EndsWith("/v2.0", StringComparison.OrdinalIgnoreCase)
+                            ? i
+                            : throw new SecurityTokenInvalidIssuerException($"Untrusted issuer: {issuer}");
                 }
             });
         }

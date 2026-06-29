@@ -1,12 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- PoRedoImage.Tests.E2E: end-to-end tests against a live instance.
-       Combines the previous Tests.E2EAPI (HTTP smoke) and Tests.E2EUI (C# Playwright) suites
-       into a single project so the suite uses one LiveServerFactAttribute, one base-URL
-       resolver, and one test fixture graph. Browser tests self-skip when no live server is
-       reachable; Playwright browsers must be installed once after build:
-         pwsh tests/PoRedoImage.Tests.E2E/bin/Release/net10.0/playwright.ps1 install
-       Base URL via E2E_BASE_URL (default http://localhost:5000). -->
+  <!-- PoRedoImage.Tests.E2E.ApiSmoke: pure HTTP smoke tests against a live instance.
+       The split from the previous merged Tests.E2E project lets the API suite run on
+       any agent without the Playwright / Chromium cache dependency. The companion
+       PoRedoImage.Tests.E2E.UI project owns the C# Playwright browser tests.
+       Both self-skip when no live instance is reachable via LiveServerFactAttribute
+       (defined here so the UI project can reference it). -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -14,7 +13,6 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>

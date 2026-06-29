@@ -19,6 +19,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <!-- WebAssembly.Authentication supplies AddAuthenticationStateDeserialization(), the WASM-side
+         counterpart to the server's AddAuthenticationStateSerialization(). It is the SAFE, claims-only
+         API — `AddOidcAuthentication()` (the unsafe, token-handling API in the same package) is never
+         used here. The BFF invariant (no tokens in the browser) is preserved. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
     <PackageReference Include="Radzen.Blazor" />

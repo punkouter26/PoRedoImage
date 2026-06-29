@@ -1,4 +1,4 @@
-namespace PoRedoImage.Tests.E2E;
+namespace PoRedoImage.Tests.E2E.ApiSmoke;
 
 /// <summary>
 /// Shared HTTP clients for the API smoke tests. <see cref="Client"/> follows redirects and

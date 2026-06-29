@@ -1,6 +1,6 @@
 using Microsoft.Playwright;
 
-namespace PoRedoImage.Tests.E2E;
+namespace PoRedoImage.Tests.E2E.UI;
 
 /// <summary>
 /// Dedicated mobile-portrait golden-path UI suite. Every page is loaded inside a 390×844 portrait

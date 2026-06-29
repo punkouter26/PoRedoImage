@@ -12,12 +12,13 @@ format: "ADR (Architecture Decision Record)"
 
 ---
 
-## ADR-001: Blazor Web App (SSR + Interactive Server + WASM)
+## ADR-001: Blazor Web App — Interactive WebAssembly Only (no SSR / no Interactive Server)
 
-- **Decision:** Use .NET 10 Blazor Web App with hybrid SSR + Interactive Server + WASM rendering.
-- **Why:** Single language (C#) across full stack. SSR for fast initial load, WASM for rich interactivity, SignalR for real-time sync.
-- **Alternatives:** React SPA + .NET API (rejected: two languages, two build systems).
-- **Trade-off:** Larger initial bundle; mitigated by SSR pre-rendering.
+- **Decision:** Use .NET 10 Blazor Web App with `AddInteractiveWebAssemblyComponents()` + global `InteractiveWebAssembly` render mode. Pre-rendering is disabled (`RenderModes.WasmNoPrerender`).
+- **Why:** Single language (C#) across the full stack, no second build system, the API host owns the BFF and serializes the cookie-authenticated principal (claims only, never tokens) into the WASM client via `AddAuthenticationStateSerialization`/`AddAuthenticationStateDeserialization`. SSR + Interactive Server were evaluated and rejected for this app: SSR pre-render would re-issue cookie auth + KV calls per request, eroding the BFF invariant, and Interactive Server requires a persistent SignalR channel that conflicts with the F1 cold-start budget (ADR-015).
+- **Alternatives:** React SPA + .NET API (rejected: two languages, two build systems), Blazor United with SSR (rejected: token-in-browser risk + extra render cost), Blazor Server only (rejected: stateful, blocks F1 cold-starts).
+- **Trade-off:** Larger initial bundle than SSR, but the bundle is small (no SSR markup payload) and the BFF invariant is preserved.
+- **Revisit when:** a feature genuinely needs pre-rendered HTML for SEO or first-paint, or the F1 plan is replaced with Always On.
 
 ## ADR-002: Minimal APIs (No MVC Controllers)
 
@@ -28,8 +29,9 @@ format: "ADR (Architecture Decision Record)"
 
 ## ADR-003: Azure Computer Vision + OpenAI + Gemini (Multi-AI)
 
-- **Decision:** Chain Azure CV (vision) → Azure OpenAI GPT-4.1-nano (language) → Google Gemini Imagen3 (generation).
+- **Decision:** Chain Azure CV (vision) → Azure OpenAI `gpt-5.4-nano` chat deployment (language) → Google Gemini Imagen3 (generation).
 - **Why:** Each AI service excels at its domain. CV for tagging, OpenAI for description enhancement, Gemini for image generation.
+- **Source of truth:** deployment name is set in `infra/main.bicep` as the literal `OpenAI__ChatCompletionsDeployment` app setting (NOT a Key Vault reference — KV reference caching previously returned a stale `gpt-4.1-nano` and produced 404 `DeploymentNotFound` at first call). The C# code default in `Configuration/OpenAiOptions.cs` and the dev `appsettings.json` value both match this name.
 - **Alternatives:** Single-provider (e.g., all OpenAI): rejected due to Gemini's superior image-to-image quality.
 - **Trade-off:** Three API keys, three health checks; mitigated by Key Vault + health check endpoints.
 
@@ -97,12 +99,12 @@ format: "ADR (Architecture Decision Record)"
 - **Why:** Dual telemetry: Serilog for structured logs, OTel for distributed traces. No OTLP collector needed.
 - **Alternatives:** NLog only (rejected: no OTel integration), pure OTel (rejected: no structured logging).
 - **Trade-off:** Two telemetry pipelines; justified by complementary capabilities.
-## ADR-013: Two-Tier Test Layout (Unit/Integration + E2E)
+## ADR-013: Two-Tier Test Layout (Unit/Integration + E2E) — Superseded by ADR-022
 
-- **Decision:** Consolidate the four initial test projects (Tests.Unit, Tests.Integration, Tests.E2EAPI, Tests.E2EUI) into three: Tests.Unit, Tests.Integration, Tests.E2E. The latter merges HTTP smoke + C# Playwright browser tests under one LiveServerFactAttribute.
+- **Decision (original):** Consolidate the four initial test projects (Tests.Unit, Tests.Integration, Tests.E2EAPI, Tests.E2EUI) into three: Tests.Unit, Tests.Integration, Tests.E2E. The latter merges HTTP smoke + C# Playwright browser tests under one LiveServerFactAttribute.
 - **Why:** Single base-URL resolver, single attribute, single fixture graph. The duplicate LiveServerFactAttribute (byte-for-byte the same in both E2E projects) was a known smell.
-- **Status (2026-06):** E2EAPI + E2EUI merged into Tests.E2E. The remaining Tests.Unit + Tests.Integration split mirrors test-runner conventions (Testcontainers-backed tests vs. pure logic tests) and is intentional — combining them would force unit tests to take an IClassFixture<WebApplicationFactory> even when they don't need one.
-- **Trade-off:** Two remaining test projects instead of the audit-recommended one. Justified by the run-time cost difference (Azurite container vs. in-process).
+- **Status (2026-06):** **Superseded by ADR-022.** The user's project spec mandates four test projects (`Tests.Unit`, `Tests.Integration`, `Tests.E2E.ApiSmoke`, `Tests.E2E.UI`) — not the three we landed on. The ApiSmoke + UI split is now in place (see ADR-022). The remaining Tests.Unit + Tests.Integration split mirrors test-runner conventions (Testcontainers-backed tests vs. pure logic tests) and is intentional — combining them would force unit tests to take an IClassFixture<WebApplicationFactory> even when they don't need one.
+- **Trade-off (revisited):** Four test projects, with `Tests.E2E.UI` (Playwright) a separate compile target from `Tests.E2E.ApiSmoke` (pure HTTP). The duplicate-LiveServerFactAttribute smell is resolved by defining the attribute once in `ApiSmoke` and `<ProjectReference>`-ing it from `UI`.
 
 ## ADR-014: Shared References Domain — Intentional
 
@@ -162,3 +164,14 @@ format: "ADR (Architecture Decision Record)"
 
 - **Decision:** When `Mocks:UseMockAi=true`, AI services are swapped for zero-network mocks at DI registration AND a `MockAiDelegatingHandler` sits on the outbound AI named HTTP clients (`GeminiApi`, `Ollama`). The handler throws (fails loud) if a real AI call is attempted while mock mode is on.
 - **Why:** The DI swap already guarantees zero token spend in normal operation, but a future regression (a real service wired while the flag is on) would silently spend tokens. The HTTP-pipeline handler is a second wall that blocks the call instead of masking the misconfiguration with fake data. Belt and suspenders for the "zero token spend" budget guarantee, reinforced by the E2E `Ai_services_are_mocked_when_mock_mode_is_required` pre-flight check.
+
+## ADR-022: Four-Project E2E Split (ApiSmoke + UI)
+
+- **Decision:** The end-to-end test suite is split into two projects, matching the user spec's four-project rule (`Tests.Unit`, `Tests.Integration`, `Tests.E2E.ApiSmoke`, `Tests.E2E.UI`). The previous merged `Tests.E2E` is gone. `Tests.E2E.ApiSmoke` is the source of truth for the shared `LiveServerFactAttribute` + `E2EApiFixture`; `Tests.E2E.UI` references it via `<ProjectReference>`.
+- **Why:**
+  - **Independent test agents:** ApiSmoke runs on any CI agent without the Playwright/Chromium cache dependency. UI opts into the slower `pwsh playwright.ps1 install chromium` step only when a browser run is queued.
+  - **Faster signal:** an ApiSmoke failure (HTTP contract, auth, /health) surfaces separately from a UI failure (layout, viewport, hydration), so triage is faster.
+  - **No token spend on UI runs:** the API smoke budget guardrail (`Ai_services_are_mocked_when_mock_mode_is_required`) lives in ApiSmoke; UI can run against a real-config build without worrying about budget exposure.
+  - **Single source of truth for the live-server probe:** `LiveServerFactAttribute` and the shared `E2EApiFixture` are defined once in ApiSmoke and `<ProjectReference>`-d by UI — the previous byte-for-byte duplicate is eliminated.
+- **Per-tier ceilings:** both projects independently enforce the 25-method cap (was previously 25 for the merged E2E). The `Contains("Ui")` convention is no longer needed because each assembly contains exactly one tier.
+- **Revisit when:** a third E2E tier appears (e.g. long-running soak tests) — at which point add a third project and re-evaluate the LiveServerFact base-URL resolver to share via a common test-utility project instead of ApiSmoke.

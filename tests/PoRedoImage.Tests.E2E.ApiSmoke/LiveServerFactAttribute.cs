@@ -1,7 +1,7 @@
 using System.Net.Sockets;
 using Xunit;
 
-namespace PoRedoImage.Tests.E2E;
+namespace PoRedoImage.Tests.E2E.ApiSmoke;
 
 /// <summary>
 /// A <see cref="FactAttribute"/> that runs only when a live PoRedoImage instance is

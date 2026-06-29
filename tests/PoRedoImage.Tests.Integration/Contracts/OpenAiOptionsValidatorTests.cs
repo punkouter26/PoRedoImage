@@ -27,8 +27,8 @@ public class OpenAiOptionsValidatorTests
         var env = new HostingEnvironment
         {
             EnvironmentName = isProduction
-                ? Environments.Production
-                : Environments.Development
+                ? Microsoft.Extensions.Hosting.Environments.Production
+                : Microsoft.Extensions.Hosting.Environments.Development
         };
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

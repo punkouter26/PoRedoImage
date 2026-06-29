@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- PoRedoImage.Tests.E2E.UI: C# Playwright browser tests against a live instance.
+       Owns the UI suite only; the companion PoRedoImage.Tests.E2E.ApiSmoke project owns
+       the pure-HTTP API smoke tests. Both share the LiveServerFactAttribute + E2EApiFixture
+       (via ProjectReference) so a single attribute self-skips both tiers when no instance
+       is reachable. Install Playwright browsers once after build:
+         pwsh tests/PoRedoImage.Tests.E2E.UI/bin/Release/net10.0/playwright.ps1 install
+       Base URL via E2E_BASE_URL (default http://localhost:5000). -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PoRedoImage.Shared\PoRedoImage.Shared.csproj" />
+    <!-- Shared test infrastructure (LiveServerFactAttribute, E2EApiFixture) lives in the
+         ApiSmoke project. Referencing it here keeps the source of truth in one place. -->
+    <ProjectReference Include="..\PoRedoImage.Tests.E2E.ApiSmoke\PoRedoImage.Tests.E2E.ApiSmoke.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\TestCounting.cs" Link="TestCounting.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="PoRedoImage.Tests.E2E.ApiSmoke" />
+  </ItemGroup>
+
+</Project>
