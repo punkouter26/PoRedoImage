@@ -48,6 +48,26 @@ public class Imagen3ServiceTests
         Assert.False(svc.IsConfigured);
     }
 
+    // ─── Mock-mode guard (Item #4) ──────────────────────────────────
+    // Mirror of the AzureOpenAiService construction-time guard. Gemini DOES route through
+    // HttpClient (covered by MockAiDelegatingHandler), but failing at construction surfaces a
+    // regression immediately instead of at the first call.
+
+    [Fact]
+    public void Constructor_MockModeEnabled_ThrowsToBlockLiveTokenSpend()
+    {
+        var dict = new Dictionary<string, string?>
+        {
+            ["Google:ApiKey"] = "test-google-api-key",
+            ["Mocks:UseMockAi"] = "true"
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => CreateService(config));
+        Assert.Contains("Mocks:UseMockAi", ex.Message);
+    }
+
     // ─── Constructor — does not throw regardless of config ──────────
 
     [Fact]

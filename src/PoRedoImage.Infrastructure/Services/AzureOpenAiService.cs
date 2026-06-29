@@ -25,6 +25,21 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         _logger = logger;
         _configuration = configuration;
 
+        // Defense-in-depth budget guardrail. When Mocks:UseMockAi=true, the DI container should
+        // swap this service for MockGenerativeAiService and never construct this class at all.
+        // The MockAiDelegatingHandler only covers HttpClient-based clients (Gemini/Ollama); this
+        // service uses the Azure.AI.OpenAI SDK, which is NOT routed through HttpClient — so a
+        // future regression that wires a real client while mock mode is on would bypass the
+        // handler and silently spend a live token. Fail loud here instead.
+        if (configuration.GetValue<bool>("Mocks:UseMockAi"))
+        {
+            throw new InvalidOperationException(
+                "AzureOpenAiService was constructed while Mocks:UseMockAi=true. The DI container "
+                + "should have resolved MockGenerativeAiService instead — check "
+                + "AddPoRedoImageInfrastructure(useMockAi: true) and the service registrations. "
+                + "Blocking construction to guarantee zero live token spend in test/dev paths.");
+        }
+
         var endpoint = configuration["OpenAI:Endpoint"];
         if (string.IsNullOrWhiteSpace(endpoint))
         {

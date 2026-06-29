@@ -58,6 +58,37 @@ public class AzureOpenAiServiceTests
         Assert.NotNull(service);
     }
 
+    // ─── Mock-mode guard (Item #4) ──────────────────────────────────
+    // AzureOpenAiService uses the Azure.AI.OpenAI SDK which does NOT route through HttpClient,
+    // so the MockAiDelegatingHandler cannot intercept it. The construction-time guard is the
+    // last line of defense against a regression that wires the real service while mock mode is on.
+
+    [Fact]
+    public void Constructor_MockModeEnabled_ThrowsToBlockLiveTokenSpend()
+    {
+        var dict = new Dictionary<string, string?>
+        {
+            ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",
+            ["OpenAI:Key"] = "test-key",
+            ["Mocks:UseMockAi"] = "true"
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => new AzureOpenAiService(config, _loggerMock.Object));
+        Assert.Contains("Mocks:UseMockAi", ex.Message);
+    }
+
+    [Fact]
+    public void Constructor_MockModeDisabled_StillSucceedsWithValidConfig()
+    {
+        // Explicitly verify the default BuildConfig does NOT set Mocks:UseMockAi, so the existing
+        // happy-path tests aren't accidentally relying on a misconfigured default.
+        var config = BuildConfig();
+        var service = new AzureOpenAiService(config, _loggerMock.Object);
+        Assert.NotNull(service);
+    }
+
     // ─── EnhanceDescriptionAsync guard-clause tests ─────────────────
 
     [Fact]

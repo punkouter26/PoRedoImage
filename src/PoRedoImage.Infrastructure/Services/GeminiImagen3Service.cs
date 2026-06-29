@@ -27,6 +27,19 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         _configuration = configuration;
         _model = configuration["Google:Imagen3Model"] ?? "gemini-2.0-flash-exp-image-generation";
 
+        // Defense-in-depth budget guardrail. The MockAiDelegatingHandler sits on the GeminiApi
+        // named HttpClient and would also block this path, but failing here at construction
+        // surfaces the misconfiguration immediately instead of at the first call. Mirrors the
+        // AzureOpenAiService guard for consistency.
+        if (configuration.GetValue<bool>("Mocks:UseMockAi"))
+        {
+            throw new InvalidOperationException(
+                "GeminiImagen3Service was constructed while Mocks:UseMockAi=true. The DI container "
+                + "should have resolved MockImagen3Service instead — check "
+                + "AddPoRedoImageInfrastructure(useMockAi: true). Blocking construction to "
+                + "guarantee zero live token spend in test/dev paths.");
+        }
+
         if (IsConfigured)
             _logger.LogInformation("Gemini image service initialized. Model={Model}", _model);
         else

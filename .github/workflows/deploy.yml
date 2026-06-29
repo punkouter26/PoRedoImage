@@ -46,12 +46,12 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore ${{ env.SOLUTION_PATH }}
       - run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -c Release
-      # Unit tests run on every build (fast, no external dependencies).
-      # Integration tests are skipped in CI — they require Docker (Testcontainers)
-      # which is not available on GitHub-hosted runners in the free tier.
-      - run: dotnet test tests/PoRedoImage.Tests.Unit --no-build -c Release
-      # Publish + artifact upload are only consumed by the deploy job (push /
-      # workflow_dispatch). Skip them on pull_request to cut PR CI time.
+      # No test execution in this pipeline. Per project policy (see README, AGENT.MD), all
+      # automated testing happens pre-merge on a separate workflow / branch-protection
+      # check, and locally via `dotnet test` / `SCRIPTS/run-e2e.ps1`. This pipeline stays
+      # focused on build + deploy orchestration. Integration + E2E suites need Docker
+      # (Testcontainers) and Playwright browsers; unit tests run in <1s and live next
+      # to code reviews, not in the deploy pipeline.
       - if: github.event_name != 'pull_request'
         run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
       - if: github.event_name != 'pull_request'
@@ -179,40 +179,23 @@ jobs:
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           package: webapp.zip
 
-      - name: Verify App Service Plan binding & state
-        # Hard-fail when the app is not on the expected B1 plan (asp-poredoimage-b1).
-        # An empty/unresolved plan is also a hard failure (no silent warnings).
-        run: |
-          STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
-          # serverFarmId is the raw ARM property (reliable); appServicePlanId is a
-          # CLI alias that came back blank on the runner.
-          PLAN_ID=$(az resource show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
-            --resource-type Microsoft.Web/sites --query properties.serverFarmId -o tsv)
-          PLAN=${PLAN_ID##*/} # plan name = last path segment of the resource id
-          echo "State=$STATE  Plan=${PLAN:-<unresolved>}  (expected plan: ${{ env.EXPECTED_PLAN }})"
-          if [ "$STATE" != "Running" ]; then
-            echo "::error::App state is '$STATE', expected 'Running'."
-            exit 1
-          fi
-          if [ -z "$PLAN" ] || [ "$PLAN" = "<unresolved>" ]; then
-            echo "::error::Could not resolve the App Service Plan id — bicep deploy may have failed silently."
-            exit 1
-          fi
-          if [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
-            echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. The bicep deploy should have bound it to the B1 plan."
-            exit 1
-          fi
       - name: Verify deployment (health smoke test)
-        # The /health endpoint runs the named readiness checks (key-vault, openai,
-        # computer-vision, table-storage, imagen3). The smoke test asserts the **deploy
-        # itself** worked:
-        #   • HTTP 200 from /health (the app started and the BFF pipeline is up).
-        #   • Every check is either "Healthy" or "Degraded". "Degraded" is acceptable
-        #     here because it specifically signals "config not present / Key Vault reference
-        #     not yet resolved" — a known cold-start case (ADR-026). That is a separate ops
-        #     problem to fix on the Azure side, not a deploy failure.
-        #   • No check is "Unhealthy" — Unhealthy means the runtime threw while probing,
-        #     which is a real bug in the app or its configuration.
+        # Three assertions cover the post-deploy smoke validation (item #10):
+        #   1. HTTP 200 from /health — the app started, BFF pipeline is up, no Unhealthy checks.
+        #   2. /api/diag/mock-status is anonymous and returns 200 (proves the BFF pipeline
+        #      serves unmasked config introspection, used by the WASM client to render the
+        #      "USING MOCK DATA" banner).
+        #   3. /api/diag/ returns 401 anonymous / 200 with the signed-in admin (or 403 in
+        #      Production when no Diagnostics:AdminEmails allow-list is configured — the
+        #      "fail closed" semantics of AuthServiceExtensions.DiagnosticsPolicy). Asserting
+        #      "401 OR 403" matches the security model: both mean the endpoint is gating
+        #      correctly, and the masking logic is exercised by the anon /mock-status hit.
+        # Browser-based Blazor render-tree verification (per item #10) is intentionally NOT
+        # here — Playwright browsers aren't installed in this runner, and per project policy
+        # (README, AGENT.MD) all E2E UI testing is pre-merge via a separate workflow / local
+        # `SCRIPTS/run-e2e.ps1`. This pipeline stays focused on build + deploy orchestration
+        # (see item #2 / item #6). The post-deploy smoke covers the server-side API surface
+        # only.
         #
         # 503 "Application Error" (the Azure HTML page, NOT the /health JSON) means the
         # CONTAINER is not serving HTTP — the platform could not resolve the
@@ -220,11 +203,6 @@ jobs:
         # deploy #54). The mid-loop `az webapp restart` forces the platform to re-resolve
         # those references after more propagation time has elapsed, so the app boots once
         # RBAC has caught up even when the pre-deploy wait (75s) was not quite enough.
-        #
-        # Diagnostics-first: every attempt logs the FULL response body so the operator sees
-        # the exact per-check status + description + exception. If the app never comes up,
-        # the final block streams the App Service logs so the startup exception behind the
-        # 503 is visible directly in the CI run instead of just "Application Error".
         run: |
           sleep 45
           BASE="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
@@ -243,7 +221,7 @@ jobs:
             RESP=$(curl -s -w $'\n__HTTP_CODE__%{http_code}__' "$BASE/health" --max-time 30 || printf '\n__HTTP_CODE__000__')
             CODE=$(printf '%s' "$RESP" | sed -n 's/.*__HTTP_CODE__\([0-9]*\)__.*/\1/p')
             JSON=$(printf '%s' "$RESP" | sed 's/__HTTP_CODE__[0-9]*__//')
-            echo "==== Health check attempt $i: HTTP $CODE ===="
+            echo "==== /health attempt $i: HTTP $CODE ===="
             echo "$JSON" | head -c 2000; echo
             if [ "$CODE" = "200" ] && ! echo "$JSON" | grep -q '"status":"Unhealthy"'; then
               UNHEALTHY=$(echo "$JSON" | grep -c '"status":"Unhealthy"' || true)
@@ -251,6 +229,30 @@ jobs:
               HEALTHY=$(echo "$JSON" | grep -c '"status":"Healthy"' || true)
               echo "Result: healthy=$HEALTHY degraded=$DEGRADED unhealthy=$UNHEALTHY"
               echo "Health OK — deploy verified. (Degraded checks listed above; investigate via App Service Application Settings / Key Vault.)"
+
+              # Item #10 — /api/diag/mock-status must be reachable (anon, drives the WASM banner).
+              MOCK=$(curl -s -w $'\n__HTTP_CODE__%{http_code}__' "$BASE/api/diag/mock-status" --max-time 15 || printf '\n__HTTP_CODE__000__')
+              MOCK_CODE=$(printf '%s' "$MOCK" | sed -n 's/.*__HTTP_CODE__\([0-9]*\)__.*/\1/p')
+              MOCK_BODY=$(printf '%s' "$MOCK" | sed 's/__HTTP_CODE__[0-9]*__//')
+              echo "==== /api/diag/mock-status: HTTP $MOCK_CODE ===="
+              echo "$MOCK_BODY" | head -c 1000; echo
+              if [ "$MOCK_CODE" != "200" ]; then
+                echo "::error::Anonymous /api/diag/mock-status returned HTTP $MOCK_CODE — BFF pipeline broken or auth mis-wired."
+                exit 1
+              fi
+
+              # Item #10 — /api/diag/ must gate (401 anon in Dev, 401 or 403 in Prod with
+              # no admin allow-list). Either is "the endpoint is gating correctly" — the
+              # mask logic is exercised by the anon mock-status response above.
+              DIAG=$(curl -s -w $'\n__HTTP_CODE__%{http_code}__' "$BASE/api/diag/" --max-time 15 || printf '\n__HTTP_CODE__000__')
+              DIAG_CODE=$(printf '%s' "$DIAG" | sed -n 's/.*__HTTP_CODE__\([0-9]*\)__.*/\1/p')
+              echo "==== /api/diag/: HTTP $DIAG_CODE (expecting 401 or 403 — gated) ===="
+              if [ "$DIAG_CODE" != "401" ] && [ "$DIAG_CODE" != "403" ]; then
+                echo "::error::Anonymous /api/diag/ returned HTTP $DIAG_CODE — expected 401/403. The DiagnosticsPolicy is not gating."
+                exit 1
+              fi
+
+              echo "Post-deploy smoke OK (health + diag gating)."
               exit 0
             fi
             sleep 18

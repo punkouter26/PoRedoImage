@@ -31,6 +31,19 @@ $OwnedResourceGroups = @('PoRedoImage', 'PoShared')
 $NamePrefixPattern = '^po'   # case-insensitive; storage/web must be lowercase 'po…'
 $IdleCpuThreshold = 5.0       # percent average over the window
 $IdleWindowDays = 7
+# Plan names that legitimately look idle and must NEVER be auto-stopped. The F1 plan is always
+# expected to show <5% CPU (it is the dev/CI plan; runs at 60-min/day cap and is now empty since
+# ADR-025 moved the app to B1). Add additional names here as you find more "structural idle" plans.
+$AutoStopExcludedPlans = @('asp-poredoimage-f1')
+
+[CmdletBinding()]
+param(
+    # Print-only mode by default. When -AutoStopIdleCompute is passed, the script additionally
+    # calls 'az webapp stop' on the listed App Service Plans after a 10s operator-abort window.
+    # Reversible (az webapp start brings it back in seconds). No deletion. No naming-prune.
+    # See ADR-030 for the safety design.
+    [switch]$AutoStopIdleCompute
+)
 
 function Write-Step([string]$Message) { Write-Host "`n==> $Message" -ForegroundColor Cyan }
 
@@ -121,6 +134,48 @@ foreach ($p in @($plans)) {
 if ($idle.Count -gt 0) {
     Write-Warning "  $($idle.Count) low-utilization plan(s) (review; F1 is expected here):"
     $idle | Format-Table Name, RG, Sku, AvgCpu -AutoSize | Out-Host
+
+    # ── 3a. Optional auto-stop (ADR-030) ────────────────────────────────────
+    # Print-only by default. When -AutoStopIdleCompute is passed, the script stops (NOT deletes)
+    # any idle plan that is NOT in $AutoStopExcludedPlans. Reversible via 'az webapp start'.
+    if ($AutoStopIdleCompute) {
+        $candidates = @($idle | Where-Object { $AutoStopExcludedPlans -notcontains $_.Name })
+        $excluded = @($idle | Where-Object { $AutoStopExcludedPlans -contains $_.Name })
+
+        if ($excluded.Count -gt 0) {
+            Write-Host ("  Excluded (structural idle, never auto-stop): " + (($excluded | ForEach-Object { $_.Name }) -join ', ')) -ForegroundColor DarkGray
+        }
+
+        if ($candidates.Count -eq 0) {
+            Write-Host "  No auto-stop candidates after exclusions." -ForegroundColor Green
+        } else {
+            Write-Host ""
+            Write-Warning "  Auto-stop will fire on the following $($candidates.Count) plan(s) in 10s — press Ctrl-C to abort:"
+            $candidates | Format-Table Name, RG, Sku, AvgCpu -AutoSize | Out-Host
+            for ($s = 10; $s -gt 0; $s--) {
+                Write-Host -NoNewline "`r  Auto-stop in ${s}s… "
+                Start-Sleep -Seconds 1
+            }
+            Write-Host "`r  Auto-stop proceeding.                 "
+
+            foreach ($p in $candidates) {
+                $plan = $p.Name
+                $rg = $p.RG
+                Write-Host "  Stopping '$plan' in $rg… " -NoNewline
+                # az webapp stop on a serverfarm stops every web app on that plan — that is the
+                # intended behavior here (the whole plan is idle). Single line of output.
+                $stopOut = az webapp stop --resource-group $rg --name $plan 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "OK" -ForegroundColor Green
+                } else {
+                    Write-Host "FAILED ($stopOut)" -ForegroundColor Red
+                }
+            }
+            Write-Host "  Auto-stop complete. Restart with 'az webapp start -g <rg> -n <plan>'." -ForegroundColor Cyan
+        }
+    } else {
+        Write-Host "  Tip: pass -AutoStopIdleCompute to stop (not delete) these plans. Reversible." -ForegroundColor DarkGray
+    }
 } else {
     Write-Host "  No plans below the idle threshold (or no CPU metrics available)." -ForegroundColor Green
 }
