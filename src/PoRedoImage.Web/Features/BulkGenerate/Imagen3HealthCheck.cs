@@ -5,9 +5,9 @@ namespace PoRedoImage.Web.Features.BulkGenerate;
 
 public class Imagen3HealthCheck : IHealthCheck
 {
-    private readonly IImagen3Service _imagen3;
+    private readonly IImageGenerationService _imagen3;
 
-    public Imagen3HealthCheck(IImagen3Service imagen3)
+    public Imagen3HealthCheck(IImageGenerationService imagen3)
     {
         _imagen3 = imagen3;
     }

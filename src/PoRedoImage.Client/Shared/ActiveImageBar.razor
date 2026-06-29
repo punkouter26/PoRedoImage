@@ -1,6 +1,5 @@
 @implements IDisposable
 @inject ImageSessionService SessionService
-@inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 
 @if (SessionService.HasImage)
@@ -15,27 +14,8 @@
                 <span class="active-image-bar__filename">@(SessionService.FileName ?? "Active Image")</span>
             </span>
             <div class="active-image-bar__actions">
-                @* #4 — Deep-link back to the last feature the user was working on. *@
-                @if (!string.IsNullOrEmpty(SessionService.LastVisitedFeatureRoute)
-                     && !NavigationManager.Uri.Contains(SessionService.LastVisitedFeatureRoute, StringComparison.OrdinalIgnoreCase))
-                {
-                    <a href="@SessionService.LastVisitedFeatureRoute"
-                       class="active-image-bar__btn active-image-bar__btn--resume"
-                       title="Return to @SessionService.LastVisitedFeatureRoute">
-                        <i class="bi bi-arrow-left-circle" aria-hidden="true"></i>
-                        <span class="ms-1 d-none d-sm-inline">Back</span>
-                    </a>
-                }
-                <span class="active-image-bar__try d-none d-md-inline">Also try:</span>
-                @foreach (var (href, icon, label) in _features)
-                {
-                    if (!NavigationManager.Uri.Contains("/" + href, StringComparison.OrdinalIgnoreCase))
-                    {
-                        <a href="@href" class="active-image-bar__btn">
-                            <i class="bi @icon" aria-hidden="true"></i><span class="ms-1 d-none d-sm-inline">@label</span>
-                        </a>
-                    }
-                }
+                @* Feature switching lives in the top nav (single source of truth); the active image
+                   persists across navigation, so this bar only indicates and clears it. *@
                 <button class="active-image-bar__clear" @onclick="SessionService.Clear" title="Clear active image" aria-label="Clear active image">
                     <i class="bi bi-x-lg" aria-hidden="true"></i>
                 </button>
@@ -45,13 +25,6 @@
 }
 
 @code {
-    private static readonly (string href, string icon, string label)[] _features =
-    [
-        ("image-regeneration", "bi-palette2", "Regen"),
-        ("meme-generation",    "bi-emoji-laughing", "Meme"),
-        ("bulk-generate",      "bi-collection", "Bulk"),
-    ];
-
     protected override void OnInitialized() => SessionService.OnChange += OnSessionChanged;
     public void Dispose()              => SessionService.OnChange -= OnSessionChanged;
 

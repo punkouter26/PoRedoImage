@@ -89,7 +89,7 @@ public static class BulkGenerateEndpoints
         .WithSummary("Describe the primary person in an image for use in art-style prompts");
 
         // Generate a single art-style variation using Gemini Imagen3 image-to-image.
-        aiGroup.MapPost("/variation", async (BulkVariationRequest request, IImagen3Service imagen3) =>
+        aiGroup.MapPost("/variation", async (BulkVariationRequest request, IImageGenerationService imagen3) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");
@@ -111,7 +111,7 @@ public static class BulkGenerateEndpoints
         // Idea #11 — One-Tap Re-roll x3: spawn N parallel variations from a winning prompt.
         // Uses a deterministic seed hint so re-rolls are reproducible per session and
         // visibly distinct from the winner, but stay close in style.
-        aiGroup.MapPost("/reroll", async (BulkRerollRequest request, IImagen3Service imagen3, ILoggerFactory loggerFactory) =>
+        aiGroup.MapPost("/reroll", async (BulkRerollRequest request, IImageGenerationService imagen3, ILoggerFactory loggerFactory) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");

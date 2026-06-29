@@ -34,7 +34,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
             return;
         }
 
-        // Chat/text only — image generation is handled exclusively by Gemini (IImagen3Service).
+        // Chat/text only — image generation is handled exclusively by Gemini (IImageGenerationService).
         var chatDeployment = configuration["OpenAI:ChatCompletionsDeployment"] ?? "gpt-4o";
         var apiKey = configuration["OpenAI:Key"];
 

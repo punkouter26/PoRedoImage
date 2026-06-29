@@ -31,8 +31,7 @@ src/
 tests/
 ├── PoRedoImage.Tests.Unit/        # Unit tests (xUnit + Moq)
 ├── PoRedoImage.Tests.Integration/ # Integration tests (Testcontainers — Azurite)
-├── PoRedoImage.Tests.E2EAPI/      # End-to-end pure HTTP API tests (self-skip if no live instance)
-└── PoRedoImage.Tests.E2EUI/       # End-to-end C# Playwright UI tests (self-skip if no live instance)
+└── PoRedoImage.Tests.E2E/         # End-to-end: HTTP API smoke + C# Playwright UI (self-skip if no live instance)
 ```
 > Render model: only `.Client` ships to the browser, so every interactive component lives there.
 > `.Web` holds just `Components/App.razor` (host document) + `_Imports.razor`; it renders the Client's
@@ -116,8 +115,10 @@ tests/
 ## Testing
 - **Unit**: xUnit + Moq (dev/test data)
 - **Integration**: Testcontainers (Azurite, non-AI mock data)
-- **E2EAPI**: pure HTTP API tests against a running instance (`[LiveServerFact]` self-skips when down)
-- **E2EUI**: C# Playwright browser tests (`[LiveServerFact]`); install browsers via the generated `playwright.ps1`
+- **E2E** (`PoRedoImage.Tests.E2E`): one project holding both pure HTTP API smoke tests and C# Playwright
+  browser/UI tests against a running instance (`[LiveServerFact]` self-skips when down). UI vs API suites are
+  distinguished by convention — class names containing "Ui" are the UI suite. Install browsers via the
+  generated `playwright.ps1`. Per-tier method ceilings (100/50/25) are enforced by `TestCountCeilingTests`.
 - **CI/CD does NOT run tests** (project policy) — run suites locally. `E2E_BASE_URL` overrides the target (default `http://localhost:5000`).
 - **Test data**: Non-AI mock data for integration/E2E. Real AI data for local dev.
 
@@ -126,18 +127,3 @@ Three categories selectable from the Studio home page:
 1. **Remote** — Azure OpenAI (gpt-4o chat/vision) + Google Gemini (image generation)
 2. **Web Browser** — Models that run client-side via WebGPU/WebAssembly
 3. **Ollama** — Local models (dev only, requires Ollama running locally)
-
-## Available Skills
-Installed globally under `~/.claude/skills/` (from github/awesome-copilot). Invoke with `/<skill-name>`:
-- `acquire-codebase-knowledge`
-- `architecture-blueprint-generator`
-- `folder-structure-blueprint-generator`
-- `dotnet-best-practices`
-- `dotnet-design-pattern-review`
-- `autoresearch`
-- `security-review`
-- `appinsights-instrumentation`
-- `azure-deployment-preflight`
-- `azure-resource-health-diagnose`
-- `create-readme`
-- `repo-story-time`

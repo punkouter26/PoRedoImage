@@ -1,3 +1,6 @@
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
 <AuthorizeView>
     <Authorized>
         @{
@@ -12,7 +15,7 @@
             <span class="app-nav__user text-truncate" style="max-width:200px" title="@displayLabel">
                 <i class="bi bi-person-circle me-1"></i>@displayLabel
             </span>
-            <a href="/logout" class="app-nav__link">
+            <a href="/logout" class="app-nav__link" @onclick="SignOutAsync" @onclick:preventDefault="true">
                 <i class="bi bi-box-arrow-right me-1"></i><span class="d-none d-sm-inline">Sign out</span>
             </a>
         </div>
@@ -23,3 +26,21 @@
         </a>
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    // Clear the persisted GUEST identity from LocalStorage before signing out, otherwise the
+    // /login page's auto-restore re-authenticates the user as GUEST immediately after /logout
+    // clears the auth cookie. forceLoad ensures the server /logout endpoint actually runs.
+    private async Task SignOutAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("poRedoImageGuest.clearGuestId");
+        }
+        catch (JSException)
+        {
+            // Non-fatal: proceed with sign-out even if LocalStorage is unavailable.
+        }
+        NavigationManager.NavigateTo("/logout", forceLoad: true);
+    }
+}

@@ -79,7 +79,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // the only reliable way to guarantee no integration test can spend a live token.
             services.RemoveAll<IVisionService>();
             services.RemoveAll<IGenerativeAiService>();
-            services.RemoveAll<IImagen3Service>();
+            services.RemoveAll<IImageGenerationService>();
 
             services.AddSingleton<MockVisionService>();
             services.AddSingleton<IVisionService>(sp => sp.GetRequiredService<MockVisionService>());
@@ -90,7 +90,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockGenerativeAiService>());
 
             services.AddSingleton<MockImagen3Service>();
-            services.AddSingleton<IImagen3Service>(sp => sp.GetRequiredService<MockImagen3Service>());
+            services.AddSingleton<IImageGenerationService>(sp => sp.GetRequiredService<MockImagen3Service>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockImagen3Service>());
         });
 

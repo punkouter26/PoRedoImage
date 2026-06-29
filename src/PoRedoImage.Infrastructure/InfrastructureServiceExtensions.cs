@@ -38,20 +38,28 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<MockVisionService>();
             services.AddSingleton<IVisionService>(sp => sp.GetRequiredService<MockVisionService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockVisionService>());
+            services.AddSingleton<IVisionServiceRouter>(sp =>
+                new SingleVisionServiceRouter(sp.GetRequiredService<MockVisionService>()));
 
             services.AddSingleton<MockGenerativeAiService>();
             services.AddSingleton<IGenerativeAiService>(sp => sp.GetRequiredService<MockGenerativeAiService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockGenerativeAiService>());
 
             services.AddSingleton<MockImagen3Service>();
-            services.AddSingleton<IImagen3Service>(sp => sp.GetRequiredService<MockImagen3Service>());
+            services.AddSingleton<IImageGenerationService>(sp => sp.GetRequiredService<MockImagen3Service>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockImagen3Service>());
         }
         else
         {
-            services.AddSingleton<IVisionService, AzureVisionService>();
+            // Vision backends: Azure Computer Vision (default/cloud) + Ollama (local image-to-text).
+            // The router picks per-request based on the selected model id.
+            services.AddSingleton<AzureVisionService>();
+            services.AddSingleton<OllamaVisionService>();
+            services.AddSingleton<IVisionService>(sp => sp.GetRequiredService<AzureVisionService>());
+            services.AddSingleton<IVisionServiceRouter, VisionServiceRouter>();
+
             services.AddSingleton<IGenerativeAiService, AzureOpenAiService>();
-            services.AddSingleton<IImagen3Service, GeminiImagen3Service>();
+            services.AddSingleton<IImageGenerationService, GeminiImagen3Service>();
         }
 
         // Scoped services
@@ -78,6 +86,15 @@ public static class InfrastructureServiceExtensions
         services.AddTransient<PromptRefinerAgent>();
         services.AddTransient<CriticAgent>();
         services.AddTransient<StyleDirectorWorkflow>();
+
+        // Named HttpClient for local Ollama (image-to-text via gemma4 etc.).
+        // Long timeout: first call may load the model into memory; no retries (local, fail fast).
+        var ollamaEndpoint = configuration?["Ollama:Endpoint"] ?? "http://localhost:11434";
+        services.AddHttpClient("Ollama", c =>
+        {
+            c.BaseAddress = new Uri(ollamaEndpoint);
+            c.Timeout = TimeSpan.FromMinutes(5);
+        });
 
         // Named HttpClient for Gemini with standard resilience: retry, timeout, circuit-breaker
         services.AddHttpClient("GeminiApi")

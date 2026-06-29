@@ -1,10 +1,11 @@
 namespace PoRedoImage.Domain.Interfaces;
 
 /// <summary>
-/// Domain service interface for image-generation via Imagen 3.
-/// Separate from IGenerativeAiService to allow independent mocking and registration.
+/// Vendor-agnostic domain abstraction for text-to-image and image-to-image generation.
+/// Kept separate from IGenerativeAiService so the image-generation provider (currently Gemini /
+/// Imagen 3, see GeminiImagen3Service) can be mocked and swapped independently of the chat model.
 /// </summary>
-public interface IImagen3Service
+public interface IImageGenerationService
 {
     Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
         GenerateAsync(string prompt, CancellationToken ct = default);

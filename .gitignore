@@ -220,6 +220,16 @@ DocProject/Help/html
 # Click-Once directory
 publish/
 
+# PoRedoImage runtime artifacts & deploy/diagnostic dumps (regenerable — never commit)
+.azurite-data/
+.playwright-mcp/
+prod-logs/
+prod-logs.zip
+webapp_logs.zip
+app.out.log
+app.err.log
+diag-*.png
+
 # Publish Web Output
 *.[Pp]ublish.xml
 *.azurePubxml

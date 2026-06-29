@@ -43,7 +43,7 @@ public sealed class MockGenerativeAiService : IGenerativeAiService, IMockable
 }
 
 /// <summary>Canned image generation — returns a tiny PNG and never calls Google Gemini/Imagen.</summary>
-public sealed class MockImagen3Service : IImagen3Service, IMockable
+public sealed class MockImagen3Service : IImageGenerationService, IMockable
 {
     public string MockReason => "Imagen3 image-gen (mock)";
 

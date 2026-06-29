@@ -23,7 +23,7 @@ public sealed class BudgetGuardrailTests : IClassFixture<CustomWebApplicationFac
 
         Assert.IsType<MockVisionService>(sp.GetRequiredService<IVisionService>());
         Assert.IsType<MockGenerativeAiService>(sp.GetRequiredService<IGenerativeAiService>());
-        Assert.IsType<MockImagen3Service>(sp.GetRequiredService<IImagen3Service>());
+        Assert.IsType<MockImagen3Service>(sp.GetRequiredService<IImageGenerationService>());
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class BudgetGuardrailTests : IClassFixture<CustomWebApplicationFac
     public async Task Mock_image_generation_returns_canned_png_without_network()
     {
         using var scope = _factory.Services.CreateScope();
-        var imagen = scope.ServiceProvider.GetRequiredService<IImagen3Service>();
+        var imagen = scope.ServiceProvider.GetRequiredService<IImageGenerationService>();
 
         var (bytes, contentType, _) = await imagen.GenerateAsync("anything");
 

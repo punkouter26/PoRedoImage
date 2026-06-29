@@ -20,4 +20,10 @@ public class ImageAnalysisRequest
     public int DescriptionLength { get; set; } = 200;
 
     public ProcessingMode Mode { get; set; } = ProcessingMode.ImageRegeneration;
+
+    /// <summary>
+    /// Optional selected AI model id (e.g. "gpt-4o", "gemma4"). Routes the vision/analysis
+    /// step to the matching backend. Null/unknown falls back to the default Azure vision service.
+    /// </summary>
+    public string? ModelId { get; set; }
 }

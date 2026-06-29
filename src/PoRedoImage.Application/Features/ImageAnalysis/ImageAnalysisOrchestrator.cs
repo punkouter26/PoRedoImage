@@ -5,10 +5,10 @@ using PoRedoImage.Shared.DTOs;
 namespace PoRedoImage.Application.Features.ImageAnalysis;
 
 public sealed class ImageAnalysisOrchestrator(
-    IVisionService visionService,
+    IVisionServiceRouter visionRouter,
     IGenerativeAiService aiService,
     IMemeGeneratorService memeService,
-    IImagen3Service imagen3Service,
+    IImageGenerationService imagen3Service,
     ILogger<ImageAnalysisOrchestrator> logger) : IImageAnalysisOrchestrator
 {
     public async Task<ImageAnalysisResponse> ProcessAsync(ImageAnalysisRequest request, CancellationToken ct = default)
@@ -21,7 +21,9 @@ public sealed class ImageAnalysisOrchestrator(
         var metrics = new ProcessingMetricsDto();
         var response = new ImageAnalysisResponse();
 
-        // Step 1 — Vision analysis (always runs)
+        // Step 1 — Vision analysis (always runs). The backend (Azure vs local Ollama) is chosen
+        // per-request from the selected model id.
+        var visionService = visionRouter.Resolve(request.ModelId);
         var (description, tags, confidence, analysisMs) = await visionService.AnalyzeAsync(imageBytes, ct);
         metrics.ImageAnalysisTimeMs = analysisMs;
         response.Tags = [.. tags];

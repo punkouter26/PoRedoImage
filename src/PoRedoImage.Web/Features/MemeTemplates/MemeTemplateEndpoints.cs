@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Hybrid;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
@@ -20,9 +21,15 @@ public static class MemeTemplateEndpoints
             .WithTags("MemeTemplates")
             .RequireAuthorization();
 
-        group.MapGet("/", (IMemeTemplateService templates) =>
+        group.MapGet("/", async (IMemeTemplateService templates, HybridCache cache, CancellationToken ct) =>
         {
-            var catalog = templates.GetTemplates().ToDtos();
+            // The catalog is immutable for the process lifetime, so cache the DTO projection rather
+            // than re-projecting/serializing on every request. HybridCache gives L1 (+ L2 if a
+            // distributed cache is later registered) with built-in stampede protection.
+            var catalog = await cache.GetOrCreateAsync(
+                "meme-templates:catalog",
+                _ => ValueTask.FromResult(templates.GetTemplates().ToDtos().ToArray()),
+                cancellationToken: ct);
             return Results.Ok(catalog);
         })
         .WithName("ListMemeTemplates")

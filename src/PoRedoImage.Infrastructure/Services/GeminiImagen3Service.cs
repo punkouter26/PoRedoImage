@@ -8,10 +8,10 @@ using PoRedoImage.Domain.Interfaces;
 namespace PoRedoImage.Infrastructure.Services;
 
 /// <summary>
-/// Google Gemini / Imagen 3 implementation of IImagen3Service.
+/// Google Gemini / Imagen 3 implementation of IImageGenerationService.
 /// Adapter pattern (GoF): wraps the Gemini REST API.
 /// </summary>
-public sealed class GeminiImagen3Service : IImagen3Service
+public sealed class GeminiImagen3Service : IImageGenerationService
 {
     private readonly ILogger<GeminiImagen3Service> _logger;
     private readonly IHttpClientFactory _httpClientFactory;

@@ -186,7 +186,7 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
             ReplaceService<IVisionService>(services, CreateMockComputerVision());
             ReplaceService<IGenerativeAiService>(services, CreateMockOpenAI());
             ReplaceService<IMemeGeneratorService>(services, CreateMockMemeGenerator());
-            ReplaceService<IImagen3Service>(services, CreateMockImagen3());
+            ReplaceService<IImageGenerationService>(services, CreateMockImagen3());
         });
 
         return base.CreateHost(builder);
@@ -228,7 +228,7 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
         mock.Setup(s => s.EnhanceDescriptionAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("An enhanced detailed description of the image", 120, 250L));
 
-        // NOTE: image generation moved off IGenerativeAiService onto IImagen3Service — see CreateMockImagen3.
+        // NOTE: image generation moved off IGenerativeAiService onto IImageGenerationService — see CreateMockImagen3.
         mock.Setup(s => s.GenerateMemeCaptionAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("FUNNY TOP", "FUNNY BOTTOM", 50, 180L));
 
@@ -243,10 +243,10 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
         return mock.Object;
     }
 
-    private static IImagen3Service CreateMockImagen3()
+    private static IImageGenerationService CreateMockImagen3()
     {
         // ImageRegeneration requires a configured Imagen3 service; the orchestrator throws otherwise.
-        var mock = new Mock<IImagen3Service>();
+        var mock = new Mock<IImageGenerationService>();
         mock.SetupGet(s => s.IsConfigured).Returns(true);
         mock.Setup(s => s.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 }, "image/png", 500L));
@@ -348,7 +348,7 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
             // The orchestrator constructs all four AI services up front, so the remaining three must
             // resolve cleanly even though vision throws before they're invoked.
             MockedServicesWebApplicationFactory.ReplaceService<IGenerativeAiService>(services, Mock.Of<IGenerativeAiService>());
-            MockedServicesWebApplicationFactory.ReplaceService<IImagen3Service>(services, Mock.Of<IImagen3Service>());
+            MockedServicesWebApplicationFactory.ReplaceService<IImageGenerationService>(services, Mock.Of<IImageGenerationService>());
             MockedServicesWebApplicationFactory.ReplaceService<IMemeGeneratorService>(services, Mock.Of<IMemeGeneratorService>());
         });
 
