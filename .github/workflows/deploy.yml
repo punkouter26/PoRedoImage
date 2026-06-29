@@ -46,9 +46,10 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore ${{ env.SOLUTION_PATH }}
       - run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -c Release
-      # Tests are intentionally NOT run in CI/CD (project policy): the pipeline only
-      # builds and ships. Run unit/integration/E2E suites locally or via a dedicated,
-      # non-deploy workflow. See AGENT.MD §Testing.
+      # Unit tests run on every build (fast, no external dependencies).
+      # Integration tests are skipped in CI — they require Docker (Testcontainers)
+      # which is not available on GitHub-hosted runners in the free tier.
+      - run: dotnet test tests/PoRedoImage.Tests.Unit --no-build -c Release
       # Publish + artifact upload are only consumed by the deploy job (push /
       # workflow_dispatch). Skip them on pull_request to cut PR CI time.
       - if: github.event_name != 'pull_request'
@@ -161,7 +162,7 @@ jobs:
             | xargs -I{} test {} -ge 1
 
       - name: Verify App Service Plan binding & state
-        # Hard-fail when the app is not on the expected F1 plan (asp-poredoimage-f1).
+        # Hard-fail when the app is not on the expected B1 plan (asp-poredoimage-b1).
         # An empty/unresolved plan is also a hard failure (no silent warnings).
         run: |
           STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
@@ -180,7 +181,7 @@ jobs:
             exit 1
           fi
           if [ "$PLAN" != "${{ env.EXPECTED_PLAN }}" ]; then
-            echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. The bicep deploy should have bound it to the F1 plan."
+            echo "::error::App is on plan '$PLAN', expected '${{ env.EXPECTED_PLAN }}'. The bicep deploy should have bound it to the B1 plan."
             exit 1
           fi
       - name: Verify deployment (health smoke test)
@@ -197,7 +198,7 @@ jobs:
         #
         # Diagnostics-first: every attempt logs the FULL response body so the operator
         # sees the exact per-check status + description + exception on failure. Initial
-        # sleep is 60s to ride out the F1 cold-start + ARM role-assignment propagation.
+        # sleep is 60s to ride out the B1 cold-start + ARM role-assignment propagation.
         run: |
           sleep 60
           BASE="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"

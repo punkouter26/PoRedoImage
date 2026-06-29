@@ -1,5 +1,5 @@
 # Build stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy build configuration files first for restore layer caching
@@ -19,7 +19,7 @@ COPY src/ src/
 RUN dotnet publish src/PoRedoImage.Web/PoRedoImage.Web.csproj -c Release --no-restore -o /app/publish
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # Install fonts required by MemeGeneratorService (SixLabors.Fonts needs TrueType fonts on Linux)
