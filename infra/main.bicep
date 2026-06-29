@@ -204,7 +204,9 @@ output webAppPrincipalId string = webApp.identity.principalId
 output webAppDefaultHostName string = webApp.properties.defaultHostName
 
 // NOTE: Key Vault role assignment (Key Vault Secrets User) is applied post-deploy via the
-// GitHub Actions workflow (deploy.yml → "Bind Key Vault Secrets User role (Bicep)"). The
-// workflow derives the principalId from the freshly created web app and applies
-// infra/kv-role.bicep as a subscription-scoped deployment, so a manual step is never
-// required. See infra/kv-role.bicep for the role definition + idempotency guarantees.
+// GitHub Actions workflow (deploy.yml → "Bind Key Vault Secrets User role"). The workflow
+// derives the principalId from the freshly created web app and runs `az role assignment
+// create` against the vault in the PoShared RG. A previous Bicep-module attempt was rolled
+// back (PR #51) because a subscription-scoped Bicep deployment requires the CI service
+// principal to hold Microsoft.Resources/deployments/validate/action at the subscription
+// scope, which it does not — see ADR-023.
