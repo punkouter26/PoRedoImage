@@ -84,7 +84,7 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Deploy infrastructure (bicep)
-        # Applies infra/main.bicep so the F1 plan (asp-poredoimage-f1) exists and the web
+        # Applies infra/main.bicep so the B1 plan (asp-poredoimage-b1) exists and the web
         # app is bound to it. Idempotent — converges storage, plan, and site config every run.
         # This is what re-parents the app onto the expected plan; the verify step below asserts it.
         run: |
@@ -92,6 +92,60 @@ jobs:
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --template-file infra/main.bicep \
             --name "ci-${{ github.run_id }}"
+      - name: Bind Key Vault Secrets User role
+        # Grants the app's system-assigned managed identity read access to the shared Key Vault.
+        # The App Service platform resolves the `@Microsoft.KeyVault(...)` App Settings (bound in
+        # infra/main.bicep) AT CONTAINER START using this identity. If the identity does not yet
+        # hold `Key Vault Secrets User` on kv-poshared — or that grant has not propagated to the
+        # data plane — the platform CANNOT resolve the references and the container fails to start,
+        # surfacing as a 503 "Application Error" crash loop (deploy #54 root cause; see ADR-026).
+        #
+        # ORDERING: this step runs BEFORE the code deploy/restart, not after. The previous order
+        # (grant AFTER deploy) left a window where the container started with no vault access and
+        # crash-looped; the post-deploy smoke test then raced the RBAC data-plane propagation
+        # (1–5+ min) and lost. Granting first + waiting for propagation (next step) means the
+        # deploy-restart finds the references resolvable and the app boots on the first try.
+        #
+        # Implemented as a direct `az role assignment create` (NOT a Bicep deployment) because:
+        #   - The CI service principal has Contributor on PoRedoImage + PoShared RGs but
+        #     does NOT have Microsoft.Resources/deployments/validate/action at the
+        #     subscription scope. A subscription-scoped Bicep deployment (`az deployment
+        #     sub create`) would fail with "AuthorizationFailed" — see PR #51 CI run 28381505637.
+        #   - The role assignment itself is a one-line API call that fires once per deploy.
+        #     Wrapping it in a Bicep module adds an indirection layer without buying anything
+        #     the inline command doesn't already give us.
+        #
+        # Idempotency: the `grep -v AlreadyExists` filter swallows the 409 from re-runs. The
+        # post-assign `az role assignment list` query is the hard verification — a missing
+        # assignment hard-fails the pipeline.
+        run: |
+          PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
+            --query identity.principalId -o tsv)
+          if [ -z "$PRINCIPAL" ] || [ "$PRINCIPAL" = "None" ]; then
+            echo "::error::App has no system-assigned identity; re-check infra/main.bicep."
+            exit 1
+          fi
+          VAULT="/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared"
+          # Idempotent: ignore AlreadyExists so re-runs are clean.
+          az role assignment create --role "Key Vault Secrets User" \
+            --assignee "$PRINCIPAL" --scope "$VAULT" 2>&1 \
+            | grep -v "AlreadyExists" || true
+          # Verify the binding is in place; fail the pipeline if not.
+          az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
+            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv \
+            | xargs -I{} test {} -ge 1
+      - name: Wait for Key Vault RBAC propagation
+        # `az role assignment create` returns as soon as the CONTROL-plane assignment exists, but
+        # the Key Vault DATA-plane honours it only after Azure RBAC propagation — typically
+        # 30–90s, occasionally several minutes. If the container starts before propagation
+        # completes, the platform cannot resolve the `@Microsoft.KeyVault(...)` App Settings and
+        # the app crash-loops with 503 "Application Error" (deploy #54). This wait gives
+        # propagation a head start before the deploy-restart; the health smoke test's mid-loop
+        # restart handles the long tail.
+        run: |
+          echo "Waiting 75s for Key Vault RBAC data-plane propagation (role granted above)…"
+          sleep 75
+          echo "Propagation wait complete — proceeding to deploy."
       - name: Ensure App Service is running
         # OneDeploy (azure/webapps-deploy@v3) returns 403 "Site Disabled" when the
         # App Service is in the Stopped state. A previous failed run — or the
@@ -105,7 +159,7 @@ jobs:
             echo "App Service is '$STATE' — starting it before deploy."
             az webapp start -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --output none || true
             # Poll up to ~60s for the state transition (start is usually <10s, but
-            # free-tier cold-starts on F1 can be slower).
+            # B1 cold-starts can be slower).
             for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
               sleep 5
               STATE=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query state -o tsv)
@@ -124,42 +178,6 @@ jobs:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           package: webapp.zip
-      - name: Bind Key Vault Secrets User role
-        # Grants the freshly-provisioned app's system-assigned managed identity
-        # read access to the shared Key Vault. Without this, every
-        # `@Microsoft.KeyVault(...)` app setting resolves to an empty string
-        # and the app fails its StartupSecretValidator in Production.
-        #
-        # Implemented as a direct `az role assignment create` (NOT a Bicep deployment) because:
-        #   - The CI service principal has Contributor on PoRedoImage + PoShared RGs but
-        #     does NOT have Microsoft.Resources/deployments/validate/action at the
-        #     subscription scope. A subscription-scoped Bicep deployment (`az deployment
-        #     sub create`) would fail with "AuthorizationFailed" — see PR #51 CI run 28381505637.
-        #   - The role assignment itself is a one-line API call that fires once per deploy.
-        #     Wrapping it in a Bicep module adds an indirection layer without buying anything
-        #     the inline command doesn't already give us.
-        #
-        # Idempotency: a stable GUID name (`guid(vaultId, principalId, roleId)`) ensures re-runs
-        # collide on the existing assignment instead of creating duplicates. The `grep -v
-        # AlreadyExists` filter swallows the 409 from any race window before the collision check.
-        # The post-assign `az role assignment list` query is the hard verification — a missing
-        # assignment hard-fails the pipeline.
-        run: |
-          PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
-            --query identity.principalId -o tsv)
-          if [ -z "$PRINCIPAL" ] || [ "$PRINCIPAL" = "None" ]; then
-            echo "::error::App has no system-assigned identity; re-check infra/main.bicep."
-            exit 1
-          fi
-          VAULT="/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared"
-          # Idempotent: ignore AlreadyExists so re-runs are clean.
-          az role assignment create --role "Key Vault Secrets User" \
-            --assignee "$PRINCIPAL" --scope "$VAULT" 2>&1 \
-            | grep -v "AlreadyExists" || true
-          # Verify the binding is in place; fail the pipeline if not.
-          az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
-            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv \
-            | xargs -I{} test {} -ge 1
 
       - name: Verify App Service Plan binding & state
         # Hard-fail when the app is not on the expected B1 plan (asp-poredoimage-b1).
@@ -190,19 +208,38 @@ jobs:
         # itself** worked:
         #   • HTTP 200 from /health (the app started and the BFF pipeline is up).
         #   • Every check is either "Healthy" or "Degraded". "Degraded" is acceptable
-        #     here because it specifically signals "config not present" — a known case
-        #     when an App Service Key Vault reference failed to resolve at runtime. That
-        #     is a separate ops problem to fix on the Azure side, not a deploy failure.
+        #     here because it specifically signals "config not present / Key Vault reference
+        #     not yet resolved" — a known cold-start case (ADR-026). That is a separate ops
+        #     problem to fix on the Azure side, not a deploy failure.
         #   • No check is "Unhealthy" — Unhealthy means the runtime threw while probing,
         #     which is a real bug in the app or its configuration.
         #
-        # Diagnostics-first: every attempt logs the FULL response body so the operator
-        # sees the exact per-check status + description + exception on failure. Initial
-        # sleep is 60s to ride out the B1 cold-start + ARM role-assignment propagation.
+        # 503 "Application Error" (the Azure HTML page, NOT the /health JSON) means the
+        # CONTAINER is not serving HTTP — the platform could not resolve the
+        # @Microsoft.KeyVault(...) App Settings at container start (RBAC not yet propagated,
+        # deploy #54). The mid-loop `az webapp restart` forces the platform to re-resolve
+        # those references after more propagation time has elapsed, so the app boots once
+        # RBAC has caught up even when the pre-deploy wait (75s) was not quite enough.
+        #
+        # Diagnostics-first: every attempt logs the FULL response body so the operator sees
+        # the exact per-check status + description + exception. If the app never comes up,
+        # the final block streams the App Service logs so the startup exception behind the
+        # 503 is visible directly in the CI run instead of just "Application Error".
         run: |
-          sleep 60
+          sleep 45
           BASE="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
-          for i in 1 2 3 4 5 6 7 8 9 10; do
+          RG="${{ env.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.AZURE_WEBAPP_NAME }}"
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            # Mid-loop restart (once, after 4 failed attempts): if the app is still 503'ing,
+            # RBAC propagation was slower than the pre-deploy 75s wait. Restarting forces the
+            # platform to re-resolve the @Microsoft.KeyVault(...) references with the now-propagated
+            # grant. No-op for health once the app is already up (we exit 0 on the first 200).
+            if [ "$i" = "5" ]; then
+              echo "==== Still not healthy after 4 attempts — restarting app to force Key Vault reference re-resolution ===="
+              az webapp restart -g "$RG" -n "$APP" --output none || true
+              sleep 20
+            fi
             RESP=$(curl -s -w $'\n__HTTP_CODE__%{http_code}__' "$BASE/health" --max-time 30 || printf '\n__HTTP_CODE__000__')
             CODE=$(printf '%s' "$RESP" | sed -n 's/.*__HTTP_CODE__\([0-9]*\)__.*/\1/p')
             JSON=$(printf '%s' "$RESP" | sed 's/__HTTP_CODE__[0-9]*__//')
@@ -216,8 +253,11 @@ jobs:
               echo "Health OK — deploy verified. (Degraded checks listed above; investigate via App Service Application Settings / Key Vault.)"
               exit 0
             fi
-            sleep 15
+            sleep 18
           done
-          echo "::error::Health check stayed Unhealthy after 10 attempts."
-          echo "::error::Last body above shows which check is Unhealthy and the exception message."
+          echo "::error::Health check did not reach 200 (Healthy or Degraded) after 12 attempts."
+          echo "::error::A 503 'Application Error' HTML page (not JSON) means the container is not serving HTTP — usually an unresolved @Microsoft.KeyVault(...) App Setting (RBAC) or a startup exception. Last body above."
+          echo "==== Streaming App Service logs (30s) to capture the startup exception behind the failure ===="
+          timeout 30 az webapp log tail -g "$RG" -n "$APP" 2>&1 | tail -120 || true
+          echo "==== (If the stream is empty, enable Application Logging (Filesystem, Verbose) under App Service → Monitoring → App Service logs, then redeploy.) ===="
           exit 1
