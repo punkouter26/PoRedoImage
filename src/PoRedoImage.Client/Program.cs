@@ -6,8 +6,14 @@ using System.Net.Http.Json;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Hosted Blazor Web App: the root component (App/Routes) is rendered by the server host
-// and hydrated here — no builder.RootComponents mount.
+// Blazor Web App with prerender:false — the WASM runtime activates Routes and HeadOutlet
+// by fully-qualified type name from server-sent descriptors, not from builder.RootComponents.
+// With <IsTrimmable>true</IsTrimmable>, ILLink removes any type that has no static code
+// reference, including these two. typeof() emits an ldtoken instruction that ILLink treats
+// as a hard root, keeping the classes (and their transitive Razor-generated members) in the
+// published assembly so Assembly.GetType("PoRedoImage.Client.Routes") succeeds at runtime.
+_ = typeof(Routes);
+_ = typeof(Microsoft.AspNetCore.Components.Web.HeadOutlet);
 
 // HTTP client targeting the BFF host that served this app (same origin → cookies flow,
 // the WASM client never handles tokens).
