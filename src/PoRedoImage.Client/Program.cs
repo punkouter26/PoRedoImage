@@ -12,7 +12,7 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 // reference, including these two. typeof() emits an ldtoken instruction that ILLink treats
 // as a hard root, keeping the classes (and their transitive Razor-generated members) in the
 // published assembly so Assembly.GetType("PoRedoImage.Client.Routes") succeeds at runtime.
-_ = typeof(Routes);
+_ = typeof(PoRedoImage.Client.Routes);
 _ = typeof(Microsoft.AspNetCore.Components.Web.HeadOutlet);
 
 // HTTP client targeting the BFF host that served this app (same origin → cookies flow,
