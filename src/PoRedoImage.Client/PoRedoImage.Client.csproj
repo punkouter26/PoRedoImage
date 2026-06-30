@@ -5,8 +5,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
-    <!-- Trimming hygiene (§1): enable the trim analyzer on the WASM client's own code. -->
-    <IsTrimmable>true</IsTrimmable>
+    <!-- Trimming hygiene (§1): run the trim analyzer on the WASM client's own code so
+         trim-unsafe patterns surface as warnings. We deliberately do NOT set
+         <IsTrimmable>true</IsTrimmable> here: that flag is for audited *library* assemblies and
+         opts THIS app assembly into aggressive member-level trimming. Because the root component
+         (Routes) and every page/layout are resolved by type-name from server-emitted render-mode
+         markers — never via a static reference from the WASM entry point — the trimmer sees no
+         component graph and strips them all, so the WASM runtime throws "Root component type
+         'PoRedoImage.Client.Routes' could not be found in the assembly". EnableTrimAnalyzer keeps
+         the warnings; leaving IsTrimmable unset lets the Blazor SDK root the app assembly's
+         components as it does by default. -->
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <!-- IL2111: framework Router.NotFoundPage setter (reflection-annotated), not user code.
          IL2026/IL3050: reflection-based System.Text.Json across the app. Fully trim/AOT-safe
