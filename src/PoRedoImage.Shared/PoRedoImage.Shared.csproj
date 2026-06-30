@@ -4,8 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Trimming hygiene (§1): ship trim-safe code to the WASM client. -->
-    <IsTrimmable>true</IsTrimmable>
+    <!-- Trimming hygiene (§1): run the trim analyzer for warnings, but do NOT mark this
+         assembly IsTrimmable. These DTOs are deserialized on the WASM client via reflection-based
+         System.Text.Json (HttpClient.GetFromJsonAsync), which needs the records' constructors at
+         runtime. IsTrimmable=true member-trims those constructors away, so deserialization throws
+         "System.NotSupportedException: DeserializeNoConstructor ... MemeTemplateDto". (The
+         source-gen SharedJsonContext is trim-safe but is not wired into the client HttpClient's
+         JsonSerializerOptions, so the reflection path is what actually runs client-side.) -->
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
