@@ -2,18 +2,9 @@
 project: PoRedoImage
 tier: 1
 type: prd
-last_updated: 2026-06-01
+last_updated: 2026-07-11
 dotnet: "10.0"
 csharp: "14"
-stack:
-  - Blazor Web App (SSR + Interactive Server + WASM)
-  - Azure Container Apps
-  - Azure Table Storage
-  - Azure Blob Storage
-  - Azure Key Vault
-  - Azure Computer Vision
-  - Azure OpenAI GPT-4.1-nano
-  - Google Gemini gemini-2.5-flash-image
 ---
 
 # PRD Master — PoRedoImage
@@ -26,26 +17,29 @@ stack:
 
 PoRedoImage is a cloud-native AI image studio that transforms ordinary photos into artistic masterpieces, memes, and stylistic variations in seconds. Chain Azure Computer Vision, Azure OpenAI GPT-4.1-nano, and Google Gemini Imagen3 behind a Blazor Web App for zero-prompt-engineering AI image manipulation.
 
-**Core Promise:** Upload → Choose Style → Gallery-Ready Result in < 10s.
+**Core Promise:** Upload → Choose Style → Gallery-Ready Result in < 10 s.
 
 ---
 
 ## 2. Vertical Slice Definitions
 
-| Slice | Route Prefix | Purpose | Auth Required |
-|-------|-------------|---------|---------------|
-| **Auth** | `/dev-login`, `/challenge-microsoft`, `/logout` | OIDC + dev cookie login | No |
-| **ImageAnalysis** | `/api/images` | CV → OpenAI → Gemini pipeline | No (rate-limited) |
-| **BulkGenerate** | `/api/bulk-generate` | 10× parallel Gemini variations | Prompt CRUD: Yes / AI: No |
-| **CaptionBattle** | `/api/caption-battle` | 8-persona parallel caption gen | No (rate-limited) |
-| **MemeTemplates** | `/api/meme-templates` | Reusable meme layout library | No |
-| **StyleDirector** | `/api/style-director` | 4-agent sequential workflow | No (rate-limited) |
-| **UserImages** | `/api/user-images` | Per-user gallery CRUD | Yes |
-| **Diagnostics** | `/api/diag` | Masked config + health checks | Yes |
+| Slice | Route Prefix | Purpose | Auth Required | Anonymous Paths |
+|-------|--------------|---------|---------------|-----------------|
+| **Auth** | `/auth/*` | OIDC + dev cookie login (`/auth/login/microsoft`, `/auth/login/fake`, `/auth/logout`, `/auth/me`) | n/a (entry) | yes — `/auth/login/*`, `/auth/logout` |
+| **ImageAnalysis** | `/api/images` | CV → OpenAI → Gemini pipeline | Yes (FallbackPolicy) | — |
+| **BulkGenerate** | `/api/bulk-generate` | 10× parallel Gemini variations | Yes | — |
+| **StyleDirector** | `/api/style-director` | 4-agent sequential workflow | Yes | — |
+| **MemeTemplates** | `/api/meme-templates` | Reusable meme layout library | Yes | — |
+| **UserImages** | `/api/user-images` | Per-user gallery CRUD | Yes | — |
+| **Pricing** | `/api/pricing` | Active image-gen provider + indicative prices | Yes | — |
+| **Diagnostics** | `/api/diag` | Masked config + health checks | Yes | — |
+| **Host shell** | `/`, `/scalar/v1`, `/health`, `/alive`, static | App shell + docs | n/a | yes — host shell + health endpoints |
+
+> **Rule:** every endpoint under `/api` is fail-closed (`FallbackPolicy = RequireAuthenticatedUser`). The WASM `[Authorize]` attribute is **UI-only** and never the security boundary.
 
 ---
 
-## 3. API Contracts
+## 3. API Contracts (selected)
 
 ### 3.1 ImageAnalysis
 
@@ -68,204 +62,169 @@ Response:
     Metrics: ProcessingMetricsDto
     MemeImageData: string? (base64)
     MemeCaption: string?
-  ProcessingMetricsDto:
-    ImageAnalysisTimeMs: long
-    DescriptionGenerationTimeMs: long
-    ImageRegenerationTimeMs: long
-    DescriptionTokensUsed: int
-    ErrorInfo: string?
-    TotalProcessingTimeMs: long (computed)
 Errors:
-  400: Invalid image / validation failure
+  400: Invalid image / FluentValidation failure
   401: Unauthorized (no auth cookie)
-  422: Content policy violation / generation declined
-  429: Rate limit exceeded (10 req/min per user)
-  503: AI service authentication failure
-  500: Processing error
+  422: AI content policy / Gemini declined
+  429: Rate limited (>10 req/min/IP)
+  503: AI key/endpoint mismatch
 ```
 
 ### 3.2 BulkGenerate
 
 ```yaml
-GET /api/bulk-generate/prompts
-Auth: Required
-Response: string[] (exactly 10 prompts)
-
-POST /api/bulk-generate/prompts
-Auth: Required
-Request:
-  SavePromptsRequest:
-    Prompts: string[] (exactly 10, each ≤2000 chars)
-Response: 204 No Content
-
-POST /api/bulk-generate/describe
-Auth: Not required (rate-limited)
-Request:
-  BulkDescribeRequest:
-    ImageData: string (base64)
-    ContentType: string
-Response:
-  BulkDescribeResponse:
-    Description: string
-
-POST /api/bulk-generate/variation
-Auth: Not required (rate-limited)
-Request:
-  BulkVariationRequest:
-    ImageData: string (base64)
-    ContentType: string
-    Prompt: string
-Response:
-  BulkVariationResponse:
-    ImageData: string (base64)
-    ContentType: string
-
-POST /api/bulk-generate/reroll
-Auth: Not required (rate-limited)
-Request:
-  BulkRerollRequest:
-    ImageData: string (base64)
-    SeedPrompt: string
-    Count: int (1–10)
-Response:
-  BulkRerollResponse:
-    Variations: BulkRerollVariation[]
-    Requested: int
-    Succeeded: int
-    ElapsedMs: long
+GET  /api/bulk-generate/prompts           # load saved art prompts (auth)
+POST /api/bulk-generate/prompts           # save art prompts    (auth)
+POST /api/bulk-generate/describe          # GPT-4o vision caption (auth)
+POST /api/bulk-generate/variation         # single variation    (auth)
+POST /api/bulk-generate/reroll            # re-roll N variations from winning prompt (auth)
 ```
 
-### 3.3 Diagnostics
+### 3.3 UserImages
 
 ```yaml
-GET /api/diag
-Auth: Required
-Response:
-  Environment: string
-  MachineName: string
-  OSVersion: string
-  DotNetVersion: string
-  ProcessId: int
-  Timestamp: string (ISO 8601)
-  Health:
-    Status: string
-    TotalDurationMs: double
-    Entries: dict[string, {Status, Description, DurationMs}]
-  Configuration:
-    (all values masked: "sk-a***3456" pattern)
+POST /api/user-images/original            # save original upload bytes
+POST /api/user-images/result              # save generated result bytes
+GET  /api/user-images                     # list user's saved images
 ```
 
-### 3.4 Health
+### 3.4 Auth
 
 ```yaml
-GET /health
-Response:
-  Status: string ("Healthy" | "Degraded" | "Unhealthy")
-  Duration: double (ms)
-  Entries: array of { Key, Status, Duration, Description }
-Checks: key-vault, computer-vision, openai, table-storage, imagen3
-
-GET /alive
-Response: 200 OK (liveness probe, no dependency checks)
+GET  /auth/login/microsoft?returnUrl=…   # Microsoft Entra OIDC challenge (canonical)
+GET  /auth/login/fake?email=…            # Dev/Test sign-in (canonical; GUEST or named)
+GET  /auth/logout                         # sign out (canonical)
+GET  /auth/me?returnUrl=…                 # server auth state + returnUrl validation (401 if anon)
 ```
 
 ---
 
-## 4. Domain Entities
-
-### 4.1 UserImage
+## 4. Data Contracts (DTOs)
 
 ```csharp
-public sealed class UserImage {
-    string UserId        // PartitionKey — user identity
-    string Id            // RowKey — GUID "N"
-    string FileName
-    string ContentType   // default "image/jpeg"
-    UserImageKind Kind   // Original | Regeneration | Meme | BulkVariation
-    DateTimeOffset CreatedAt
-    long SizeBytes
-}
-```
+public sealed record ImageAnalysisRequest(
+    string ImageData,
+    string ContentType,
+    string? FileName = null,
+    int DescriptionLength = 200,
+    ProcessingMode Mode = ProcessingMode.ImageRegeneration);
 
-### 4.2 BulkPrompt
-
-```csharp
-public sealed class BulkPrompt {
-    string PartitionKey   // "prompts"
-    string RowKey         // userId
-    string Name
-    string PromptText     // JSON-serialized string[]
-    DateTimeOffset CreatedAt
-}
-```
-
-### 4.3 MemeTemplate
-
-```csharp
-public sealed record MemeTemplate(
-    string Id,                    // kebab-case stable ID
-    string Name,                  // display name
+public sealed record ImageAnalysisResponse(
     string Description,
-    string Category,              // classic | reaction | office | wholesome | experimental
-    int RequiredZoneCount,
-    IReadOnlyList<MemeTextZone> Zones
-);
+    IReadOnlyList<string> Tags,
+    double ConfidenceScore,
+    string? RegeneratedImageData,
+    string RegeneratedImageContentType,
+    ProcessingMetricsDto Metrics,
+    string? MemeImageData,
+    string? MemeCaption);
 
-public sealed record MemeTextZone(
-    string Label,
-    double X, double Y,           // normalized 0..1
-    double MaxWidthRatio,
-    double FontSizeRatio,
-    string Alignment              // center | left | right
-);
+public sealed record ProcessingMetricsDto(
+    long ImageAnalysisTimeMs,
+    long DescriptionGenerationTimeMs,
+    long ImageRegenerationTimeMs,
+    int DescriptionTokensUsed,
+    string? ErrorInfo,
+    long TotalProcessingTimeMs);
+
+public enum ProcessingMode : byte { ImageRegeneration = 0, MemeGeneration = 1 }
 ```
 
-### 4.4 Enums
+DTOs are declared in `PoRedoImage.Shared/DTOs/` and **shared between WASM and the API**. They must be:
+
+- **trim-safe** — no reflection on closed generics, no `dynamic`, no `BinaryFormatter`
+- **explicit AOT annotations** — `[JsonSerializable(typeof(...))]` source-generated
+- **readonly records** — prefer `sealed record` over mutable classes
+- **zero-alloc logging** — `LoggerMessage.Define` source generators, never `$"..."` interpolation in hot paths
+
+---
+
+## 5. .NET 10 / C# 14 Constraints (must hold)
+
+| Concern | Rule |
+|---|---|
+| `<Nullable>` | `enable` (global) |
+| `<TreatWarningsAsErrors>` | `true` |
+| `<EnableTrimAnalyzer>` | `true` on `Shared`, `Client`, `Web` |
+| `<ImplicitUsings>` | `enable` per project |
+| AOT | **disabled** (interpreted WASM); no AOT-only APIs without annotations |
+| Source-gen logging | **required** in production code paths |
+| Central Package Management | yes — `<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>` |
+| Versioning | MinVer via Git tags |
+
+---
+
+## 6. Trimmer-Compatible Model Criteria
+
+A type is "trim-safe" iff:
+
+1. It is a `sealed record` (or `sealed class` with explicit `[DynamicallyAccessedMembers]`).
+2. All properties are blittable, public, and have either:
+   - primitive types (`string`, `int`, `double`, `DateTimeOffset`, `Guid`, `byte[]`)
+   - other trim-safe types
+   - `IReadOnlyList<T>` / `IReadOnlyDictionary<K,V>` of trim-safe T
+3. JSON serialization uses **`System.Text.Json` source generators** (`[JsonSerializable(typeof(T))]`).
+4. No `dynamic`, no `MethodInfo.Invoke`, no `Activator.CreateInstance(t)` without an AOT `MetadataLoadContext` annotation.
+5. No reflection on closed generic instantiations (`typeof(List<>).MakeGenericType(...)` is forbidden).
+
+---
+
+## 7. Zero-Allocation Source-Generated Logging Standards
 
 ```csharp
-enum UserImageKind  { Original, Regeneration, Meme, BulkVariation }
-enum ProcessingMode { ImageRegeneration = 0, MemeGeneration = 1 }
-enum BulkGenerateStatus { Pending, Processing, Complete, Failed }
-enum CaptionPersona { GenZ, Corporate, Absurdist, DadJoke, Sarcastic, Wholesome, TechBro, Surreal }
-enum StorageError   { NotConfigured, NotFound, TransientFailure, Conflict, CircuitOpen, Unknown }
+// ✔ Correct — source-generated, zero-alloc
+private static readonly ILogger<ImageAnalysisHandler> _log =
+    LoggerMessage.Define<string, int>(
+        LogLevel.Information,
+        new EventId(1, "AnalyzeStart"),
+        "Image analysis started. ContentType={ContentType}, Bytes={Length}");
+
+// ✗ Forbidden in hot paths
+_log.LogInformation($"Analyzing {contentType} ({bytes.Length} bytes)");
 ```
 
----
+Rules:
 
-## 5. .NET 10 Specific Constraints
-
-| Constraint | Rule | Rationale |
-|-----------|------|-----------|
-| **No reflection for AOT** | Avoid `Activator.CreateInstance`, runtime type inspection | .NET 10 Native AOT compatibility |
-| **Minimal APIs only** | No MVC controllers; use `MapGroup` + static handler methods | Vertical Slice Architecture |
-| **Nullable + Warnings as errors** | Enforced via `Directory.Build.props` | Zero-defect culture |
-| **Options Pattern with Validation** | `IValidateOptions<T>` + `ValidateOnStart()` | Fail-fast on missing config |
-| **Result<T,E> pattern** | Discriminated union for service operations | Replaces silent null returns |
-| **Idempotency via IEndpointFilter** | `[Idempotent]` marker attribute + `IMemoryCache` | Prevent duplicate writes |
-| **Rate Limiting** | Sliding window: 10 req/min per user/IP | Protect costly AI calls |
-| **Request Body Size** | 25 MB max (Kestrel + FormOptions) | Prevent OOM on ACA pods |
-| **Magic-byte validation** | JPEG, PNG, GIF, WebP, BMP; HEIC hint | Po2Logic F10 |
-| **Key Vault rotation** | 30 min `ReloadInterval` with `KeyVaultSecretNameMapping` | Zero-downtime secret rotation |
-| **Serilog structured logging** | Console (Dev) + File + Application Insights (Prod) | Observability |
-| **OpenTelemetry → Azure Monitor** | Traces + Metrics export via `UseAzureMonitor()` | No OTLP collector needed |
+- Every log call site uses `LoggerMessage.Define` or `LoggerMessage.DefineScope`.
+- `[EventId]` ranges are reserved per feature slice (Auth: 1–99, ImageAnalysis: 100–199, BulkGenerate: 200–299, etc.).
+- Verbose/Trace levels must guard via `if (_log.IsEnabled(...))` even when using source-gen.
+- `IDisposable` scopes use `BeginScope` with `LogContext.PushProperty` for Serilog cross-cut.
 
 ---
 
-## 6. Key Metrics
+## 8. Feature → Endpoint Map
 
-| Metric | Target |
-|--------|--------|
-| E2E image regeneration latency | < 10s p95 |
-| Bulk generate (10 variations) wall-clock | < 45s p95 |
-| CI test coverage gate | ≥ 80% (opencover) |
-| Production deployment success rate | ≥ 99% (OIDC zero-secret deploy) |
-| `/health` uptime SLA | 99.5% |
+| Feature slice (server) | HTTP path(s) | DTO file |
+|---|---|---|
+| `Features/Auth/`          | `/auth/*`, `/api/diag/mock-status`             | `Features/Auth/AuthDtos.cs` |
+| `Features/ImageAnalysis/` | `POST /api/images/analyze`                      | `Shared/DTOs/ImageAnalysis*.cs` |
+| `Features/BulkGenerate/`  | `POST /api/bulk-generate/*`, `GET/POST /api/bulk-generate/prompts` | `Shared/DTOs/Bulk*.cs` |
+| `Features/MemeTemplates/` | `GET /api/meme-templates`, `POST /api/meme-templates/render` | `Shared/DTOs/Meme*.cs` |
+| `Features/StyleDirector/` | `POST /api/style-director/run`                  | `Shared/DTOs/StyleDirector*.cs` |
+| `Features/UserImages/`    | `GET/POST /api/user-images*`                     | `Shared/DTOs/UserImage*.cs` |
+| `Features/Pricing/`       | `GET /api/pricing`                              | `Shared/DTOs/Pricing*.cs` |
+| `Features/Diagnostics/`   | `GET /api/diag`                                 | `Shared/DTOs/Diag*.cs` |
+| `Features/Idempotency/`   | middleware filter for `POST /api/images/analyze` (cross-slice) | — |
 
 ---
 
-## 7. Non-Goals (v1)
+## 9. Telemetry Surface
 
-- Native mobile app (responsive web only)
-- Video processing
-- Real-time collaborative editing
-- Custom model fine-tuning UI
+| Signal | Type | Source |
+|---|---|---|
+| `poredoimage.request.duration` | histogram (ms) | ASP.NET Core Activity, tagged `http.route`, `http.status_code` |
+| `poredoimage.images.analyze.total_ms` | histogram | `ProcessingMetricsDto.TotalProcessingTimeMs` |
+| `poredoimage.images.analyze.tokens` | histogram | `ProcessingMetricsDto.DescriptionTokensUsed` |
+| `poredoimage.bulk.variations.count` | counter | per-call N |
+| `poredoimage.auth.failures` | counter | OIDC failure events |
+| `poredoimage.up{component="..."}` | gauge | health-check results |
+
+All spans carry: `correlation_id`, `session_id`, `user_id_hash`, `feature_slice`, `route`.
+
+---
+
+## 10. Versioning
+
+- Library version: **MinVer** (driven by `git tag`, e.g. `0.4.1`).
+- API version: **route-prefix versioning** (`/api/v1/...` reserved for future; today all routes are v0).
+- DTO compatibility: additive-only. Breaking changes require a new namespace `PoRedoImage.Shared.V2` and explicit OptIn at the consumer.

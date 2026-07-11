@@ -189,8 +189,8 @@ try
         branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
 
     // HTTPS redirect is skipped in Development so the E2E suite (default base URL
-    // http://localhost:5000) gets real status codes instead of a 307 to https — the dev cert
-    // already secures :5001 for interactive use. Production/Staging keep the redirect + HSTS.
+    // http://localhost:4000) gets real status codes instead of a 307 to https — the dev cert
+    // already secures :4001 for interactive use. Production/Staging keep the redirect + HSTS.
     if (!app.Environment.IsDevelopment())
     {
         app.UseHttpsRedirection();

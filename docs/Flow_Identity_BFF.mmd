@@ -1,0 +1,75 @@
+---
+project: PoRedoImage
+diagram: graph
+last_updated: 2026-07-11
+---
+%% Flow_Identity_BFF.mmd — Multi-tenant Entra ID OIDC challenge path
+%% Server-managed HttpOnly cookie loops and /auth/me local-path redirection gates.
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i Flow_Identity_BFF.mmd -o Flow_Identity_BFF.svg
+
+graph TD
+    classDef browser fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
+    classDef server fill:#fff3e0,stroke:#e65100,color:#bf360c
+    classDef entra fill:#ede7f6,stroke:#4527a0,color:#311b92
+    classDef gate fill:#fce4ec,stroke:#ad1457,color:#880e4f
+    classDef ok fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+    classDef fail fill:#ffebee,stroke:#c62828,color:#b71c1c
+
+    Browser["📱 Browser (WASM)<br/>PoRedoImage.Client"]:::browser
+    BFF["🛡️ ASP.NET Core BFF<br/>PoRedoImage.Web"]:::server
+    Entra["🌐 Microsoft Entra ID<br/>login.microsoftonline.com/{tenant}/v2.0"]:::entra
+
+    subgraph LocalGates["Local-path gates (server-side, fail-closed)"]
+        direction TB
+        G1["AuthorizationOptions.FallbackPolicy<br/>= RequireAuthenticatedUser"]:::gate
+        G2["HardenCookie:<br/>HttpOnly · SameSite=Strict · Secure=Always<br/>outside Development"]:::gate
+        G3["IssuerValidator accepts<br/>iss = https://login.microsoftonline.com/{tenant}/v2.0"]:::gate
+        G4["returnUrl validator<br/>must be local path starting with /"]:::gate
+    end
+
+    Start([User visits /]):::ok
+    AnonCheck{Anonymous path?<br/>/, /login, /health, /auth/*, /api/diag/mock-status}:::gate
+    AuthCheck{Has auth cookie?}:::gate
+    AuthMe["GET /auth/me?returnUrl=…<br/>(401 if anonymous)"]:::server
+    IssueLogin["Redirect /login"]:::server
+    ChoosePath{Pick provider}:::gate
+    DevFake["GET /auth/login/fake?email=…<br/>Dev + Test only — FakeAuthHandler"]:::server
+    ProdOIDC["GET /auth/login/microsoft?returnUrl=…"]:::server
+    EntraChallenge["302 to Entra authorize endpoint"]:::entra
+    SignIn([User signs in @ Microsoft]):::ok
+    Callback["GET /signin-oidc<br/>exchange code → tokens"]:::server
+    SetCookie["Set-Cookie: .AspNetCore.Cookies<br/>HttpOnly · SameSite=Strict · Secure"]:::server
+    Serialize["AddAuthenticationStateSerialization:<br/>claims-only AuthenticationState"]:::server
+    Deserialize["AddAuthenticationStateDeserialization:<br/>into client's AuthenticationStateProvider"]:::server
+    ValidateRU["Validate returnUrl:<br/>must start with / and not //"]:::gate
+    FinalRedirect["302 → validated returnUrl"]:::ok
+    End([User lands on requested page]):::ok
+
+    LogoutBtn([User taps /auth/logout]):::fail
+    LogoutServer["SignOutAsync(Cookie)<br/>+ SignOutAsync(OpenIdConnect)"]:::server
+    ClearBrowser["200 (no body)<br/>browser cookie cleared"]:::fail
+
+    Start --> AnonCheck
+    AnonCheck -- "yes" --> AuthMe
+    AnonCheck -- "no (/api/* or [Authorize] page)" --> AuthCheck
+    AuthCheck -- "no" --> IssueLogin
+    AuthCheck -- "yes" --> AuthMe
+    IssueLogin --> ChoosePath
+    ChoosePath -- "Dev: GUEST" --> DevFake
+    ChoosePath -- "Prod: Microsoft" --> ProdOIDC
+    DevFake --> SetCookie
+    ProdOIDC --> EntraChallenge --> Entra
+    Entra --> SignIn --> Callback
+    Callback -- "iss validated" --> G3
+    G3 -- "ok" --> SetCookie
+    SetCookie --> G2
+    G2 --> Serialize --> Deserialize --> AuthMe
+    AuthMe -- "200 {user, returnUrl}" --> ValidateRU
+    ValidateRU -- "ok" --> FinalRedirect --> End
+    ValidateRU -- "blocked (open-redirect)" --> IssueLogin
+
+    LogoutBtn --> LogoutServer --> ClearBrowser
+
+    %% Touch the BFF invariant
+    G2 -. "BFF invariant: tokens never leave server" .- BFF

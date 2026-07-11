@@ -1,7 +1,7 @@
 ### PoRedoImage API - HTTP Request File
 ### Use this file for manual API debugging in VS Code / Visual Studio
 
-@baseUrl = https://localhost:5001
+@baseUrl = https://localhost:4001
 
 ### Health Check
 GET {{baseUrl}}/health

@@ -3,7 +3,7 @@
     Run the E2E tier (E2EAPI + E2EUI) against a freshly-launched local server.
 
 .DESCRIPTION
-    Starts the Web app on http://localhost:5000 (Development → no HTTPS redirect, so the default
+    Starts the Web app on http://localhost:4000 (Development → no HTTPS redirect, so the default
     E2E_BASE_URL works), waits for /alive, runs the E2E test project, then stops the server.
     Playwright Chromium must be installed (SCRIPTS/setup.ps1 does this).
 
@@ -16,7 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $Root = Split-Path $PSScriptRoot -Parent
-$BaseUrl = 'http://localhost:5000'
+$BaseUrl = 'http://localhost:4000'
 
 Write-Host "==> Building solution" -ForegroundColor Cyan
 dotnet build "$Root/PoRedoImage.slnx" -c Release --nologo | Out-Null

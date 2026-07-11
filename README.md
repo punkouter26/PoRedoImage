@@ -132,8 +132,8 @@ dotnet user-secrets set "Storage:ConnectionString" "your-connection-string" --pr
 ### 3. Run
 ```bash
 dotnet run --project src/PoRedoImage.Web
-# → http://localhost:5000  |  https://localhost:5001
-# Dev login: http://localhost:5000/dev-login?email=you@example.com
+# → http://localhost:4000  |  https://localhost:4001
+# Dev login: http://localhost:4000/dev-login?email=you@example.com
 ```
 
 ### 4. Test

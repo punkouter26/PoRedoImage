@@ -1,73 +1,62 @@
----
-project: PoRedoImage
-tier: 0
-type: index
-last_updated: 2026-06-01
----
+# PoRedoImage
 
-# PoRedoImage — Documentation Index
+> AI-powered image studio · art, memes, and bulk variations from a single upload.
 
-> Machine-Readable, Human-Glanceable documentation suite for .NET 10 / C# 14 / Zero-Waste AI.
+## What
+PoRedoImage is a Blazor Web App that uses **Azure Computer Vision**, **Azure OpenAI GPT-4.1-nano**, and **Google Gemini Imagen3** to turn any photo into gallery-ready art, captions, or memes. Mobile-first, global Interactive WebAssembly, no prerender. Lives behind an ASP.NET Core BFF; storage is Azure Table Storage; secrets are in Azure Key Vault.
 
-## Dependency Tree
+## Who
+- **Creatives** — social-media creators who want 10 stylised variations from one photo.
+- **Casual users** — anyone wanting a fun meme from a single image.
+- **Developers** — engineers integrating the API; rely on `/scalar/v1`, `/health`, `/diag`.
 
-```mermaid
-flowchart TD
-    T0["📖 README.md\n(Dependency Tree)"] --> T1a["📋 PRD_Master.md\n(Source of Truth)"]
-    T0 --> T1b["🏗️ Architecture_Blueprint.mmd\n(C4 L1+L2)"]
-    T1a --> T2a["🔄 User_Journey_Master.mmd\n(Behavior Flow)"]
-    T1a --> T2b["⚡ System_State.mmd\n(Entity Lifecycle)"]
-    T1b --> T2c["🔀 Interaction_Trace.mmd\n(Sequence Diagram)"]
-    T2a --> T3a["🎨 UI_Design_Tokens.md\n(Component Registry)"]
-    T2b --> T3b["📝 ADR_Log.md\n(Decision Records)"]
-    T2c --> T3c["📊 Data_Lineage.mmd\n(Ingress → Egress)"]
+## Why
+The promise is **upload → choose style → result in < 10 seconds**. The vertical-slice layout of the server makes it cheap to add new image transforms. The BFF-with-HttpOnly-cookie model means production OIDC works for any M365 tenant without putting tokens in the browser.
 
-    classDef tier0 fill:#1e1e2e,stroke:#89b4fa,color:#fff
-    classDef tier1 fill:#1e1e2e,stroke:#a6e3a1,color:#fff
-    classDef tier2 fill:#1e1e2e,stroke:#f9e2af,color:#fff
-    classDef tier3 fill:#1e1e2e,stroke:#f38ba8,color:#fff
+## Local setup (bare-metal, ~5 min)
 
-    class T0 tier0
-    class T1a,T1b tier1
-    class T2a,T2b,T2c tier2
-    class T3a,T3b,T3c tier3
+Requires **Windows 10/11, PowerShell 7+, Docker, Winget**.
+
+```powershell
+# One-time, idempotent setup
+pwsh -File SCRIPTS/setup.ps1
+
+# Then run
+dotnet run --project src/PoRedoImage.Web
+# → http://localhost:4000  |  https://localhost:4001
+# Dev sign-in: open /dev-login?email=you@example.com (cookie login)
+# or click "Continue as GUEST" (Development only).
 ```
 
-## Documentation Tiers
+## Documentation index
 
-| Tier | File | Purpose | Audience |
-|------|------|---------|----------|
-| **0** | [README.md](README.md) | This index — dependency graph + navigation | Everyone |
-| **1** | [PRD_Master.md](PRD_Master.md) | Source of Truth — API contracts, slices, constraints | Architects, AI Agents |
-| **1** | [Architecture_Blueprint.mmd](Architecture_Blueprint.mmd) | C4 L1+L2 — MSI Dev Machine vs. Azure Container Apps | Architects, DevOps |
-| **2** | [User_Journey_Master.mmd](User_Journey_Master.mmd) | Identity, success path, error handling flows | Product, UX |
-| **2** | [System_State.mmd](System_State.mmd) | Entity lifecycle state machines with guards | Backend Devs |
-| **2** | [Interaction_Trace.mmd](Interaction_Trace.mmd) | Blazor WASM → API → Table Storage sequence | Backend Devs |
-| **3** | [UI_Design_Tokens.md](UI_Design_Tokens.md) | Radzen component settings, CSS vars, layout rules | Frontend Devs |
-| **3** | [ADR_Log.md](ADR_Log.md) | Architecture Decision Records — why, not just what | Architects |
-| **3** | [Data_Lineage.mmd](Data_Lineage.mmd) | Data flow from ingress through transformation to UI | Data Engineers |
+| Doc | Purpose |
+|---|---|
+| [`AGENT.md`](AGENT.md)               | Foundational context for AI coding agents |
+| [`PRD_Master.md`](PRD_Master.md)     | Source of truth: API, slices, data, contracts |
+| [`User_Journey.mmd`](User_Journey.mmd) | Mobile portrait user journey with perf scores |
+| [`User_Journey_simplified.mmd`](User_Journey_simplified.mmd) | Simplified journey view |
+| [`UI_Screen_Matrix.mmd`](UI_Screen_Matrix.mmd) | Client routes, layout flash mitigations |
+| [`UI_Screen_Matrix_simplified.mmd`](UI_Screen_Matrix_simplified.mmd) | Simplified view |
+| [`Flow_Identity_BFF.mmd`](Flow_Identity_BFF.mmd) | Entra OIDC, BFF cookie loop, `/auth/me` |
+| [`Flow_Identity_BFF_simplified.mmd`](Flow_Identity_BFF_simplified.mmd) | Simplified view |
+| [`Flow_Validation_Failures.mmd`](Flow_Validation_Failures.mmd) | UI validation → backend exceptions |
+| [`Flow_Validation_Failures_simplified.mmd`](Flow_Validation_Failures_simplified.mmd) | Simplified view |
+| [`Flow_RealTime_Lobby.mmd`](Flow_RealTime_Lobby.mmd) | SignalR Hub lifecycle |
+| [`Flow_RealTime_Lobby_simplified.mmd`](Flow_RealTime_Lobby_simplified.mmd) | Simplified view |
+| [`Architecture_VSA_Blueprint.mmd`](Architecture_VSA_Blueprint.mmd) | VSA topology across Web / Client / Shared |
+| [`Architecture_VSA_Blueprint_simplified.mmd`](Architecture_VSA_Blueprint_simplified.mmd) | Simplified view |
+| [`Interaction_Trace.mmd`](Interaction_Trace.mmd) | End-to-end request trace via BFF |
+| [`Interaction_Trace_simplified.mmd`](Interaction_Trace_simplified.mmd) | Simplified view |
+| [`DatabaseSchema.mmd`](DatabaseSchema.mmd) | Table Storage entities, PK/RK, indexes |
+| [`DatabaseSchema_simplified.mmd`](DatabaseSchema_simplified.mmd) | Simplified view |
 
-## Quick Start
+## Render the diagrams
 
-```bash
-# Convert all Mermaid diagrams to SVG
-Get-ChildItem docs\*.mmd | ForEach-Object {
-    mmdc -i $_.FullName -o "$($_.DirectoryName)\$($_.BaseName).svg" -t dark
+```powershell
+Get-ChildItem docs/*.mmd | ForEach-Object {
+    $out = [System.IO.Path]::ChangeExtension($_.FullName, "svg")
+    npx @mermaid-js/mermaid-cli -i $_.FullName -o $out | Out-Null
+    Write-Host "✔ $($_.Name) → $(Split-Path $out -Leaf)"
 }
 ```
-
-## Architecture at a Glance
-
-```
-PoRedoImage = Blazor Web App (.NET 10)
-  ├── Vertical Slice Features (Minimal API)
-  │   ├── Auth (OIDC + Dev Cookie)
-  │   ├── ImageAnalysis (CV → OpenAI → Gemini)
-  │   ├── BulkGenerate (10× parallel Gemini)
-  │   ├── CaptionBattle (8-persona parallel)
-  │   ├── MemeTemplates (Normalized coords)
-  │   └── StyleDirector (4-agent sequential)
-  ├── Domain Layer (Entities + Interfaces)
-  ├── Application Layer (Orchestrators + Agents)
-  ├── Infrastructure Layer (Azure Services)
-  └── Shared Layer (DTOs)

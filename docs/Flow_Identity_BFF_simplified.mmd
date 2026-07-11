@@ -1,0 +1,33 @@
+---
+project: PoRedoImage
+diagram: graph
+variant: simplified
+last_updated: 2026-07-11
+---
+%% Flow_Identity_BFF_simplified.mmd — Simplified Entra OIDC + BFF cookie loop
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i Flow_Identity_BFF_simplified.mmd -o Flow_Identity_BFF_simplified.svg
+
+graph TD
+    classDef browser fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
+    classDef server fill:#fff3e0,stroke:#e65100,color:#bf360c
+    classDef entra fill:#ede7f6,stroke:#4527a0,color:#311b92
+    classDef gate fill:#fce4ec,stroke:#ad1457,color:#880e4f
+
+    Browser["Browser"]:::browser
+    BFF["BFF (PoRedoImage.Web)"]:::server
+    Entra["Microsoft Entra ID"]:::entra
+    Gate["Local-path gates<br/>FallbackPolicy · HardenCookie<br/>IssuerValidator · returnUrl check"]:::gate
+
+    Start([Visit /]) --> AnonCheck
+    AnonCheck -- "public path" --> Browser
+    AnonCheck -- "needs auth" --> Gate
+    Gate -- "no cookie" --> Login
+    Login -- "GUEST (Dev)" --> Cookie
+    Login -- "Microsoft" --> Entra --> Cookie
+    Cookie -- "HttpOnly + SameSite=Strict" --> BFF
+    BFF -- "claims-only state" --> Browser
+    Browser --> End([ReturnUrl validated])
+
+    Logout([/auth/logout]) --> BFF
+    BFF -- "clear cookie + OIDC signout" --> End

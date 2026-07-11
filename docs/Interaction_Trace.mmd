@@ -1,73 +1,78 @@
 ---
 project: PoRedoImage
-tier: 2
-type: behavior
-diagram: sequenceDiagram
-last_updated: 2026-06-01
+diagram: sequence
+last_updated: 2026-07-11
 ---
+%% Interaction_Trace.mmd — End-to-end user transaction trace via the BFF boundary.
+%% Component.razor → Resilient Typed HttpClient → BFF Cookie Verification → Minimal API
+%% Feature Handler → Table Storage Execution.
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i Interaction_Trace.mmd -o Interaction_Trace.svg
 
 sequenceDiagram
     autonumber
-    participant U as 👤 User
-    participant WASM as Blazor WASM
-    participant SSR as Blazor SSR
-    participant API as Minimal API
-    participant CV as Computer Vision
-    participant OAI as OpenAI GPT-4.1
-    participant GEM as Gemini Imagen3
-    participant TS as Table Storage
-    participant BS as Blob Storage
-    participant SR as SignalR
+    actor U as 📱 User
+    participant CMP as Component.razor<br/>(InteractiveWebAssembly)
+    participant HTTPC as Typed HttpClient<br/>+ CorrelationHeaderHandler
+    participant BFF as PoRedoImage.Web<br/>Middleware pipeline
+    participant AUTH as AuthenticationHandler<br/>(Cookie + Entra OIDC)
+    participant EP as Minimal API<br/>/api/images/analyze
+    participant VAL as FluentValidation<br/>(ImageAnalysisRequestValidator)
+    participant HND as ImageAnalysisHandler<br/>(orchestrator)
+    participant CV as ComputerVisionService
+    participant OAI as OpenAIService
+    participant GEM as GeminiImagen3Service
+    participant TS as TableStorage<br/>UserImageRepository
+    participant SR as Serilog + OTLP
 
-    Note over U,SR: ═══ Auth Flow ═══
-    U->>SSR: /dev-login?email=user@test.com
-    SSR-->>U: 302 → / (Set-Cookie)
-    U->>SSR: GET / (authenticated)
+    Note over U,SR: ═══ Initial request: POST /api/images/analyze ═══
+    U->>CMP: Click "Analyze"
+    CMP->>CMP: Magic-byte sniff + form validation
+    CMP->>HTTPC: POST {base}/api/images/analyze<br/>ImageData(b64) · ContentType · DescriptionLength · Mode
+    HTTPC->>HTTPC: Stamp X-Session-ID (tab) + X-Correlation-ID (per req)
+    HTTPC->>BFF: HTTPS + Set-Cookie: .AspNetCore.Cookies (auto)
+    BFF->>BFF: RequestContextMiddleware<br/>echo headers → LogContext
+    BFF->>AUTH: AuthenticateAsync(cookie)
+    AUTH-->>BFF: ClaimsPrincipal (or 401)
+    BFF->>SR: ActivitySource.StartActivity("POST /api/images/analyze")
+    BFF->>EP: route → endpoint
+    EP->>VAL: ImageAnalysisRequestValidator.Validate
+    alt validation fails
+        VAL-->>EP: ValidationFailure list
+        EP-->>HTTPC: 400 ValidationProblemDetails (RFC 7807)
+        HTTPC-->>CMP: 400 → Radzen Alert
+    else valid
+        EP->>HND: AnalyzeAsync(request, ct)
+        HND->>CV: AnalyzeAsync(imageBytes)
+        CV-->>HND: (description, tags, confidence)
+        alt Mode = ImageRegeneration
+            HND->>OAI: EnhanceDescriptionAsync(desc, tags)
+            OAI-->>HND: (enhanced, tokens)
+            HND->>GEM: GenerateAsync(enhanced, refBytes)
+            GEM-->>HND: (imgData, imgType)
+        else Mode = MemeGeneration
+            HND->>OAI: GenerateMemeCaptionAsync(tags)
+            OAI-->>HND: (top, bottom, tokens)
+            HND->>HND: SkiaSharp overlay
+        end
+        HND-->>EP: ImageAnalysisResponse
+        EP-->>HTTPC: 200 ImageAnalysisResponse
+        HTTPC-->>CMP: 200 → ResultsPanel
+        CMP-->>U: rendered Radzen card + "Save to Gallery"
 
-    Note over U,SR: ═══ Image Analysis Flow ═══
-    U->>WASM: Upload Image (base64)
-    WASM->>API: POST /api/images/analyze<br/>ImageData + Mode
-    API->>API: Rate Limit Check (10/min)
-    API->>API: Magic-byte Validation
-    API->>CV: AnalyzeAsync(imageBytes)
-    CV-->>API: (description, tags, confidence)
-    alt Mode = ImageRegeneration
-        API->>OAI: EnhanceDescriptionAsync(desc, tags)
-        OAI-->>API: (enhanced, tokens)
-        API->>GEM: GenerateAsync(enhanced)
-        GEM-->>API: (imgData, imgType)
-    else Mode = MemeGeneration
-        API->>OAI: GenerateMemeCaptionAsync(tags)
-        OAI-->>API: (top, bottom, tokens)
-        API->>API: SkiaSharp Overlay
+        opt User clicks Save
+            U->>CMP: Click "Save to Gallery"
+            CMP->>HTTPC: POST /api/user-images/result (base64)
+            HTTPC->>BFF: HTTPS
+            BFF->>AUTH: AuthenticateAsync
+            BFF->>EP: route → /api/user-images/result
+            EP->>HND: SaveResultAsync(...)
+            HND->>TS: InsertOrReplace(UserImageEntity)<br/>PK=UserId, RK=Guid.NewGuid()
+            TS-->>HND: 204
+            HND-->>EP: 201 Created
+            EP-->>HTTPC: 201
+            HTTPC-->>CMP: 201 → MyImagesGallery refresh
+        end
     end
-    API-->>WASM: ImageAnalysisResponse (base64)
-    WASM-->>U: Display Result
-
-    Note over U,SR: ═══ Gallery Persist Flow ═══
-    U->>WASM: Save to Gallery
-    WASM->>API: POST /api/user-images
-    API->>BS: Upload Blob
-    API->>TS: Insert UserImage Entity
-    TS-->>API: OK
-    API-->>WASM: 201 Created
-
-    Note over U,SR: ═══ Bulk Generate Flow ═══
-    U->>WASM: Bulk Generate (10 prompts)
-    WASM->>API: POST /api/bulk-generate/describe
-    API->>OAI: DescribePersonAsync
-    OAI-->>API: description
-    API-->>WASM: BulkDescribeResponse
-    loop 10× Parallel Variations
-        WASM->>API: POST /api/bulk-generate/variation
-        API->>GEM: GenerateImageAsync(prompt, image)
-        GEM-->>API: (imgData, imgType)
-        API-->>WASM: BulkVariationResponse
-        WASM->>SR: Update Slot State
-        SR-->>U: Live Progress Update
-    end
-
-    Note over U,SR: ═══ SignalR Sync ═══
-    SSR->>SR: Circuit Established
-    SR->>WASM: State Sync
-    WASM->>U: Reactive UI Update
+    BFF->>SR: Activity.Stop + emit metrics + log
+    Note over BFF,SR: All spans tagged correlation_id, session_id, feature_slice=ImageAnalysis

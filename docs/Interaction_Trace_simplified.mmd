@@ -1,0 +1,38 @@
+---
+project: PoRedoImage
+diagram: sequence
+variant: simplified
+last_updated: 2026-07-11
+---
+%% Interaction_Trace_simplified.mmd — Simplified request trace
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i Interaction_Trace_simplified.mmd -o Interaction_Trace_simplified.svg
+
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant CMP as Component.razor (WASM)
+    participant HTTPC as Typed HttpClient
+    participant BFF as BFF Middleware
+    participant EP as Minimal API Endpoint
+    participant HND as Feature Handler
+    participant AI as CV · OpenAI · Gemini
+    participant TS as Table Storage
+
+    U->>CMP: Click "Analyze"
+    CMP->>HTTPC: POST /api/images/analyze<br/>X-Session-ID · X-Correlation-ID
+    HTTPC->>BFF: HTTPS + cookie
+    BFF->>BFF: Auth · Correlation · RateLimit · Exception
+    BFF->>EP: route
+    EP->>HND: AnalyzeAsync(request)
+    HND->>AI: CV → OpenAI → Gemini
+    AI-->>HND: result
+    HND-->>EP: ImageAnalysisResponse
+    EP-->>CMP: 200 → render
+    opt Save
+        CMP->>HTTPC: POST /api/user-images/result
+        HTTPC->>BFF: HTTPS
+        BFF->>HND: SaveResultAsync
+        HND->>TS: InsertOrReplace (PK=UserId, RK=Guid)
+        TS-->>CMP: 201 → gallery refresh
+    end

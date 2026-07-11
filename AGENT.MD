@@ -17,7 +17,7 @@ preserved only for cross-slice concerns.
 - **Framework**: .NET 10 (pinned via global.json)
 - **Client**: Blazor WASM (global InteractiveWebAssembly, prerender disabled) + Radzen UI — owns router, layout, all pages
 - **Server (.Web)**: API/BFF host — minimal-API endpoints, OIDC+cookie auth, serves the WASM client
-- **Ports**: HTTP 5000 / HTTPS 5001 (fixed)
+- **Ports**: HTTP 4000 / HTTPS 4001 (fixed)
 - **Database**: Azure Table Storage (Azurite locally)
 - **Auth**: Microsoft OIDC (prod) + GUEST mode (dev/test)
 - **Telemetry**: OpenTelemetry → Application Insights + Serilog
@@ -150,7 +150,7 @@ tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI
   generated `playwright.ps1`.
 - **Per-tier method ceilings** (100/50/25) are enforced by `TestCountCeilingTests`.
 - **CI/CD does NOT run tests** (project policy) — run suites locally or in a dedicated
-  non-deploy workflow. `E2E_BASE_URL` overrides the target (default `http://localhost:5000`).
+  non-deploy workflow. `E2E_BASE_URL` overrides the target (default `http://localhost:4000`).
 - **Test data**: Non-AI mock data for integration/E2E. Real AI data for local dev.
 - **Environment isolation**: integration + E2E tests run with `ASPNETCORE_ENVIRONMENT=Test` so the
   `FakeAuthHandler` and `/auth/login/fake` (Dev+Test only) become available without dev-mode UI.

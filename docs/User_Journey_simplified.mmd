@@ -1,0 +1,32 @@
+---
+project: PoRedoImage
+diagram: journey
+variant: simplified
+last_updated: 2026-07-11
+---
+%% User_Journey_simplified.mmd — Simplified mobile portrait journey
+%% Renders the journey without the per-step SLA annotation. Pair with User_Journey.mmd.
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i User_Journey_simplified.mmd -o User_Journey_simplified.svg
+
+journey
+    title PoRedoImage — Mobile Portrait Journey (Simplified)
+    section Onboarding
+      Open app                 : 2: Guest
+      Continue as GUEST        : 1: Guest
+      Cookie issued            : 5: Guest
+    section Upload & Analyze
+      Pick image               : 1: Guest
+      Magic-byte check         : 2: Guest
+      Submit /api/images/analyze : 4: Guest
+      CV → OpenAI → Gemini     : 5: User
+    section Save & Iterate
+      Save to gallery          : 1: User
+      Open BulkGenerate        : 1: User
+      10× Gemini variations    : 5: PowerUser
+    section Realtime (opt-in)
+      Join shared room         : 2: PowerUser
+      Live cursor broadcast    : 3: PowerUser
+    section Logout
+      Logout                   : 1: User
+      Back to /login           : 1: User

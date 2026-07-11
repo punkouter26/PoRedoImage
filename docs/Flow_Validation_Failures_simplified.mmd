@@ -1,0 +1,31 @@
+---
+project: PoRedoImage
+diagram: graph
+variant: simplified
+last_updated: 2026-07-11
+---
+%% Flow_Validation_Failures_simplified.mmd — Simplified validation pipeline
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i Flow_Validation_Failures_simplified.mmd -o Flow_Validation_Failures_simplified.svg
+
+graph TD
+    classDef ui fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
+    classDef slice fill:#fff3e0,stroke:#e65100,color:#bf360c
+    classDef ok fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+    classDef err fill:#ffebee,stroke:#c62828,color:#b71c1c
+
+    Start([User submits image])
+    Start --> ClientChecks
+    ClientChecks["Client guards<br/>InputFile accept · magic bytes<br/>EditForm + DataAnnotations"]:::ui
+    ClientChecks -- "fail" --> ShowInline["Radzen Alert — inline + summary"]:::err
+    ClientChecks -- "ok" --> ServerPipeline
+    ShowInline --> Retry([User fixes & retries]):::ok
+
+    ServerPipeline["BFF pipeline<br/>AuthN → RateLimit → FluentValidation → Handler"]:::slice
+    ServerPipeline -- "401" --> Unauth["401 Unauthorized"]:::err
+    ServerPipeline -- "429" --> Rate["429 Too Many Requests"]:::err
+    ServerPipeline -- "400" --> Bad["ValidationProblemDetails 400"]:::err
+    ServerPipeline -- "ok" --> AI["CV → OpenAI → Gemini"]
+    AI -- "policy" --> Pol["422 Content Policy"]:::err
+    AI -- "down" --> Down["503 Unavailable"]:::err
+    AI -- "ok" --> OK["200 ImageAnalysisResponse"]:::ok

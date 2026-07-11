@@ -1,0 +1,40 @@
+---
+project: PoRedoImage
+diagram: stateDiagram-v2
+variant: simplified
+last_updated: 2026-07-11
+---
+%% UI_Screen_Matrix_simplified.mmd — Simplified client routing state machine
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i UI_Screen_Matrix_simplified.mmd -o UI_Screen_Matrix_simplified.svg
+
+stateDiagram-v2
+    direction TB
+
+    [*] --> Bootstrap : App.razor mounts
+    Bootstrap --> Routing : AuthState ready
+
+    state Routing {
+        [*] --> Authorized : authenticated
+        [*] --> Anonymous : public route
+    }
+
+    Authorized --> Page : AuthorizeRouteView renders
+    Authorized --> RedirectLogin : <NotAuthorized>
+
+    RedirectLogin --> LoginState : 302 /login?returnUrl=…
+    LoginState --> Authorized : cookie set, returnUrl ok
+
+    Anonymous --> Page : RouteView renders
+
+    Page --> Interactive : WASM hydrated
+    Interactive --> Fetching : typed HttpClient
+    Fetching --> Interactive : response
+
+    Interactive --> LoggedOut : /auth/logout
+    LoggedOut --> Bootstrap : new shell
+
+    note right of LoginState
+        Cookie is HttpOnly + SameSite=Strict.
+        Claims-only flow — no tokens in WASM.
+    end note

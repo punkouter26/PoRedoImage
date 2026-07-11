@@ -1,0 +1,127 @@
+---
+project: PoRedoImage
+diagram: graph
+last_updated: 2026-07-11
+---
+%% Architecture_VSA_Blueprint.mmd — Vertical Slice Architecture topology
+%% Shows feature slice isolation inside PoRedoImage.Web, the .Client WASM interaction
+%% bounds, and the restricted PoRedoImage.Shared assembly.
+%% Render with:
+%%   npx @mermaid-js/mermaid-cli -i Architecture_VSA_Blueprint.mmd -o Architecture_VSA_Blueprint.svg
+
+graph TD
+    classDef web fill:#fff3e0,stroke:#e65100,color:#bf360c
+    classDef client fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
+    classDef shared fill:#ede7f6,stroke:#4527a0,color:#311b92
+    classDef domain fill:#f3e5f5,stroke:#6a1b9a,color:#4a148c
+    classDef infra fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+    classDef slice fill:#fff8e1,stroke:#ff8f00,color:#e65100
+    classDef cross fill:#fce4ec,stroke:#ad1457,color:#880e4f
+    classDef gate fill:#ffebee,stroke:#c62828,color:#b71c1c
+    classDef ext fill:#f5f5f5,stroke:#616161,color:#212121
+
+    Browser["📱 Browser (mobile-first portrait)"]:::ext
+
+    subgraph ClientAsm["PoRedoImage.Client (Blazor WASM, global InteractiveWebAssembly)"]
+        direction TB
+        AppRazor["App.razor<br/>Routes.razor<br/>_Imports.razor"]:::client
+        Pages["Pages/<br/>Studio · BulkGenerate · StyleDirector<br/>ImageRegeneration · MemeGeneration · Login"]:::client
+        SharedUI["Shared/<br/>RedirectToLogin · LoginDisplay · MockDataBanner<br/>FeatureLayout · ImageSessionService"]:::client
+        Http["Http/<br/>CorrelationHeaderHandler · ClientRequestContext"]:::client
+        Models["Models/DefaultPrompts.cs<br/>client-only view models"]:::client
+        AppRazor --> Pages
+        AppRazor --> SharedUI
+        Pages --> SharedUI
+        Pages --> Http
+        Pages --> Models
+        SharedUI --> Http
+    end
+
+    subgraph WebAsm["PoRedoImage.Web (ASP.NET Core BFF / API host)"]
+        direction TB
+        HostDoc["Components/App.razor<br/>host doc only — renders Client's Routes<br/>RenderModes.WasmNoPrerender"]:::web
+        AuthSrv["Authentication:<br/>Cookie (HttpOnly + SameSite=Strict)<br/>+ Microsoft Entra OIDC<br/>+ FakeAuthHandler (Dev/Test)"]:::web
+        CorrelationMw["RequestContextMiddleware<br/>echoes X-Session-ID + X-Correlation-ID<br/>into Serilog LogContext"]:::web
+        ExceptionMw["ExceptionHandler middleware<br/>RFC 7807 ProblemDetails"]:::web
+        RateMw["RateLimiter middleware<br/>10 req/min/IP per feature slice"]:::web
+        Idempotency["Idempotency-Key middleware<br/>(cross-slice)"]:::cross
+
+        subgraph Slices["Vertical Slice endpoints (Features/{Name}/)"]
+            direction TB
+            SF1["Features/Auth/<br/>AuthEndpoints.cs · AuthServiceExtensions.cs"]:::slice
+            SF2["Features/ImageAnalysis/<br/>POST /api/images/analyze"]:::slice
+            SF3["Features/BulkGenerate/<br/>/api/bulk-generate/*"]:::slice
+            SF4["Features/StyleDirector/<br/>POST /api/style-director/run"]:::slice
+            SF5["Features/MemeTemplates/<br/>/api/meme-templates/*"]:::slice
+            SF6["Features/UserImages/<br/>/api/user-images*"]:::slice
+            SF7["Features/Pricing/<br/>GET /api/pricing"]:::slice
+            SF8["Features/Diagnostics/<br/>GET /api/diag"]:::slice
+        end
+
+        HostDoc -.-> ClientAsm
+    end
+
+    subgraph SharedAsm["PoRedoImage.Shared — RESTRICTED\nDTOs · Json · Imaging helpers"]
+        direction TB
+        DTO["DTOs/<br/>ImageAnalysisRequest/Response · BulkDescribe · UserImage<br/>StyleDirectorRequest · PricingDto · DiagDto"]:::shared
+        Json["Json/<br/>[JsonSerializable] source-gen contexts"]:::shared
+        Imaging["Imaging/<br/>MagicByteSniffer (byte[] prefix)<br/>ImageContentType enum"]:::shared
+    end
+
+    subgraph DomainAsm["PoRedoImage.Domain — Onion layer (cross-slice primitives only)"]
+        direction TB
+        Entities["Entities/<br/>BulkPrompt · MemeTemplate · UserImage · UserImageKind"]:::domain
+        Interfaces["Interfaces/<br/>IImageGenerationService · IImageAnalysisService<br/>IBulkPromptRepository · IUserImageRepository"]:::domain
+    end
+
+    subgraph InfraAsm["PoRedoImage.Infrastructure — Onion layer (implementations)"]
+        direction TB
+        Repos["Repositories/<br/>TableStorageBulkPromptRepository<br/>TableStorageUserImageRepository"]:::infra
+        Svc["Services/<br/>GeminiImagen3Service · ComputerVisionService<br/>OpenAIService · MemeGeneratorService<br/>HuggingFaceImageGenerationService"]:::infra
+    end
+
+    subgraph External["External Azure services"]
+        direction TB
+        AzTable["Azure Table Storage\n(Azurite locally)"]:::ext
+        AzKV["Azure Key Vault\nkv-poshared"]:::ext
+        CV["Computer Vision\ncv-poshared-eastus"]:::ext
+        OAI["OpenAI GPT-4.1-nano\nopenai-poshared-eastus"]:::ext
+        Gem["Gemini Imagen3\ngoogleapis.com"]:::ext
+        AI["App Insights + Serilog"]:::ext
+    end
+
+    Browser <-->|"cookies only\nX-Session-ID + X-Correlation-ID"| HostDoc
+    Http -- "typed HttpClient" --> HostDoc
+
+    HostDoc --> AuthSrv
+    HostDoc --> CorrelationMw --> ExceptionMw --> RateMw --> Idempotency --> Slices
+    Slices --> SF1 & SF2 & SF3 & SF4 & SF5 & SF6 & SF7 & SF8
+
+    SF2 --> DTO
+    SF3 --> DTO
+    SF4 --> DTO
+    SF5 --> DTO
+    SF6 --> Entities
+    SF6 --> DTO
+    SF7 --> DTO
+    SF8 --> DTO
+
+    SF2 --> Svc
+    SF3 --> Svc
+    SF5 --> Svc
+    SF6 --> Repos
+
+    Entities --> Interfaces
+    Interfaces -. "implemented by" .-> Repos
+    Interfaces -. "implemented by" .-> Svc
+
+    Repos --> AzTable
+    Svc --> AzKV
+    Svc --> CV & OAI & Gem
+    WebAsm --> AI
+
+    %% Hard bounds (red gates)
+    ClientAsm -. "no references to\nInfra/Domain/Web/Web-only DTOs" .- gate1:::gate
+    SharedAsm -. "no references to\nClient/Web/Domain/Infra" .- gate2:::gate
+    DomainAsm -. "no references to\nWeb/Client/Infra/Shared" .- gate3:::gate
+    InfraAsm -. "no references to\nWeb/Client" .- gate4:::gate

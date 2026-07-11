@@ -160,7 +160,7 @@ public static class AuthServiceExtensions
     /// §4.2 BFF cookie hardening: the session cookie is HttpOnly (never readable by WASM/JS),
     /// SameSite=Strict (not sent on cross-site navigations — the OIDC nonce/correlation cookies keep
     /// their own SameSite=None Secure defaults so the handshake still works), and Secure in every
-    /// non-Development environment (SameAsRequest locally so the http://localhost:5000 F5 loop works).
+    /// non-Development environment (SameAsRequest locally so the http://localhost:4000 F5 loop works).
     /// </summary>
     private static void HardenCookie(CookieAuthenticationOptions options, IWebHostEnvironment environment)
     {
