@@ -38,6 +38,24 @@ public sealed class MockGenerativeAiService : IGenerativeAiService, IMockable
         => Task.FromResult("A mock person description — generated locally with no AI call.");
 }
 
+/// <summary>
+/// Canned chat completion — never calls HuggingFace. Reports <see cref="IsConfigured"/> == false so
+/// the Style Director agents deterministically fall back to their heuristic path (zero network, stable
+/// output for the automated-test tier).
+/// </summary>
+public sealed class MockChatCompletionService : IChatCompletionService, IMockable
+{
+    public string MockReason => "Chat completion (mock)";
+
+    public bool IsConfigured => false;
+
+    public Task<ChatCompletionResult> CompleteAsync(
+        string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+        => throw new InvalidOperationException(
+            "MockChatCompletionService.CompleteAsync should never be called — IsConfigured is false so "
+            + "callers must use their heuristic fallback. Reaching here indicates a missing IsConfigured guard.");
+}
+
 /// <summary>Canned image generation — returns a tiny PNG and never calls Google Gemini/Imagen.</summary>
 public sealed class MockImagen3Service : IImageGenerationService, IMockable
 {

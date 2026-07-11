@@ -73,14 +73,18 @@ else
         StateHasChanged();
         try
         {
-            var httpResponse = await Http.GetAsync("/api/user-images");
+            // The gallery is a non-critical widget. Cap the wait so a slow/unreachable backend
+            // (e.g. storage emulator down locally, which otherwise retries for ~37s before 500ing)
+            // degrades quickly to the empty state instead of shimmering skeletons indefinitely.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            var httpResponse = await Http.GetAsync("/api/user-images", cts.Token);
             var contentType = httpResponse.Content.Headers.ContentType?.MediaType;
             if (!httpResponse.IsSuccessStatusCode || contentType != "application/json")
             {
                 _images = [];
                 return;
             }
-            var result = await httpResponse.Content.ReadFromJsonAsync<List<GalleryItem>>();
+            var result = await httpResponse.Content.ReadFromJsonAsync<List<GalleryItem>>(cts.Token);
             _images = result ?? [];
         }
         catch (Exception ex)

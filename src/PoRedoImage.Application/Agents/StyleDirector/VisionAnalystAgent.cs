@@ -5,41 +5,88 @@ using PoRedoImage.Domain.Interfaces;
 namespace PoRedoImage.Application.Agents.StyleDirector;
 
 /// <summary>
-/// Agent 1 of the Style Director workflow. Given raw image bytes + raw CV tags,
-/// produces a higher-level subject/mood/themes interpretation. Heuristic-only
-/// (no AI call) — keeps the workflow fast and free, while still giving the
-/// Style Strategist something richer than bare CV tags to work with.
+/// Agent 1 of the Style Director workflow. Studies the uploaded image (via a vision-language model)
+/// and produces a higher-level subject/mood/themes interpretation for the Style Strategist. When no
+/// chat provider is configured (or the call fails) it falls back to a heuristic over the Computer
+/// Vision tags, so the workflow always produces a usable result.
 /// </summary>
 /// <remarks>
 /// Idea #1 — Agentic Style Director (step 1 of 4).
 /// </remarks>
 public sealed class VisionAnalystAgent : IAgent<VisionAnalystInput, VisionAnalystOutput>
 {
+    private readonly IChatCompletionService _chat;
     private readonly ILogger<VisionAnalystAgent> _logger;
 
     public string Id => "vision-analyst";
     public string DisplayName => "Vision Analyst";
     public string IconClass => "bi-eye";
 
-    public VisionAnalystAgent(ILogger<VisionAnalystAgent> logger) => _logger = logger;
+    public VisionAnalystAgent(IChatCompletionService chat, ILogger<VisionAnalystAgent> logger)
+    {
+        _chat = chat;
+        _logger = logger;
+    }
 
-    public Task<AgentStepResult<VisionAnalystOutput>> RunAsync(VisionAnalystInput input, CancellationToken ct = default)
+    public async Task<AgentStepResult<VisionAnalystOutput>> RunAsync(VisionAnalystInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         var sw = Stopwatch.StartNew();
 
+        if (_chat.IsConfigured && input.ImageBytes is { Length: > 0 })
+        {
+            try
+            {
+                return await RunWithAiAsync(input, sw, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "VisionAnalyst AI path failed; falling back to heuristic.");
+            }
+        }
+
+        return Heuristic(input, sw);
+    }
+
+    private async Task<AgentStepResult<VisionAnalystOutput>> RunWithAiAsync(
+        VisionAnalystInput input, Stopwatch sw, CancellationToken ct)
+    {
+        var tags = input.DetectedTags ?? [];
+        const string system =
+            "You are the Vision Analyst in an art-direction pipeline. Study the image and reply with "
+            + "MINIFIED JSON only — no prose, no markdown code fences.";
+        var user =
+            "Analyze this photo for an art-restyling brief. Detected tags (hints, may be empty): "
+            + $"{(tags.Count > 0 ? string.Join(", ", tags) : "none")}. "
+            + "Respond as JSON: {\"subject\":\"concise description of the main subject\","
+            + "\"mood\":\"single evocative word\",\"themes\":[\"3-5 short theme words\"]}.";
+
+        var result = await _chat.CompleteAsync(system, user, input.ImageBytes, ct);
+        var el = AgentJson.Parse(result.Content);
+
+        var subject = AgentJson.Str(el, "subject", tags.Count > 0 ? string.Join(", ", tags.Take(3)) : "scene");
+        var mood = AgentJson.Str(el, "mood", "neutral");
+        var themes = AgentJson.StrArray(el, "themes");
+        if (themes.Count == 0) themes.Add("portrait");
+
+        var output = new VisionAnalystOutput(subject, mood, themes.Take(5).ToList());
+        sw.Stop();
+
+        _logger.LogInformation("VisionAnalyst (AI) done in {Elapsed}ms. Subject='{Subject}', Mood='{Mood}', Tokens={Tokens}",
+            result.ElapsedMs, subject, mood, result.TokensUsed);
+
+        return new AgentStepResult<VisionAnalystOutput>(output, Reasoning(
+            $"Subject: {subject} · Mood: {mood} · Themes: {string.Join(", ", themes)}",
+            result.ElapsedMs, result.TokensUsed));
+    }
+
+    private AgentStepResult<VisionAnalystOutput> Heuristic(VisionAnalystInput input, Stopwatch sw)
+    {
         // Tolerate null/empty tag sets — the workflow can still produce a useful result.
         var tags = input.DetectedTags ?? [];
 
-        // Subject: take the first 3 tags as the focal subject, fall back to "scene".
-        var subject = tags.Count > 0
-            ? string.Join(", ", tags.Take(3))
-            : "scene";
-
-        // Mood: heuristic — outdoor + nature = serene; people = candid; night = moody.
+        var subject = tags.Count > 0 ? string.Join(", ", tags.Take(3)) : "scene";
         var mood = InferMood(tags);
-
-        // Themes: unique 3-5 most "evocative" tags.
         var themes = tags
             .Where(t => t.Length > 3)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -50,21 +97,23 @@ public sealed class VisionAnalystAgent : IAgent<VisionAnalystInput, VisionAnalys
         var output = new VisionAnalystOutput(subject, mood, themes);
         sw.Stop();
 
-        var reasoning = new AgentReasoningEntry(
-            AgentId: Id,
-            AgentDisplayName: DisplayName,
-            IconClass: IconClass,
-            Summary: $"Subject: {subject} · Mood: {mood} · Themes: {string.Join(", ", themes)}",
-            ElapsedMs: (long)sw.ElapsedMilliseconds,
-            TokensUsed: null,
-            Timestamp: DateTimeOffset.UtcNow,
-            Activity: null);
+        _logger.LogInformation("VisionAnalyst (heuristic) done in {Elapsed}ms. Subject='{Subject}', Mood='{Mood}'",
+            sw.ElapsedMilliseconds, subject, mood);
 
-        _logger.LogInformation("VisionAnalyst done in {Elapsed}ms. Subject='{Subject}', Mood='{Mood}'",
-            reasoning.ElapsedMs, subject, mood);
-
-        return Task.FromResult(new AgentStepResult<VisionAnalystOutput>(output, reasoning));
+        return new AgentStepResult<VisionAnalystOutput>(output, Reasoning(
+            $"Subject: {subject} · Mood: {mood} · Themes: {string.Join(", ", themes)}",
+            sw.ElapsedMilliseconds, tokensUsed: null));
     }
+
+    private AgentReasoningEntry Reasoning(string summary, long elapsedMs, int? tokensUsed) => new(
+        AgentId: Id,
+        AgentDisplayName: DisplayName,
+        IconClass: IconClass,
+        Summary: summary,
+        ElapsedMs: elapsedMs,
+        TokensUsed: tokensUsed,
+        Timestamp: DateTimeOffset.UtcNow,
+        Activity: null);
 
     private static string InferMood(IReadOnlyList<string> tags)
     {

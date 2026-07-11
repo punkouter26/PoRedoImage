@@ -5,40 +5,92 @@ using PoRedoImage.Domain.Interfaces;
 namespace PoRedoImage.Application.Agents.StyleDirector;
 
 /// <summary>
-/// Agent 3 of the Style Director workflow. Takes the Strategist's directions
-/// and turns them into a single, renderable Imagen 3 prompt. Heuristic — no AI
-/// call — but the structure mirrors a real prompt-refinement chain (the kind
-/// of work a fine-tuned GPT would do in production).
+/// Agent 3 of the Style Director workflow. Turns the Strategist's primary direction into a single,
+/// concrete image-to-image prompt via an LLM (with a deterministic template fallback). The prompt
+/// always preserves the subject's likeness and forbids watermarks/text.
 /// </summary>
 /// <remarks>
 /// Idea #1 — Agentic Style Director (step 3 of 4).
 /// </remarks>
 public sealed class PromptRefinerAgent : IAgent<PromptRefinerInput, PromptRefinerOutput>
 {
+    private readonly IChatCompletionService _chat;
     private readonly ILogger<PromptRefinerAgent> _logger;
 
     public string Id => "prompt-refiner";
     public string DisplayName => "Prompt Refiner";
     public string IconClass => "bi-pencil-square";
 
-    public PromptRefinerAgent(ILogger<PromptRefinerAgent> logger) => _logger = logger;
+    public PromptRefinerAgent(IChatCompletionService chat, ILogger<PromptRefinerAgent> logger)
+    {
+        _chat = chat;
+        _logger = logger;
+    }
 
-    public Task<AgentStepResult<PromptRefinerOutput>> RunAsync(PromptRefinerInput input, CancellationToken ct = default)
+    public async Task<AgentStepResult<PromptRefinerOutput>> RunAsync(PromptRefinerInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         var sw = Stopwatch.StartNew();
 
-        // Pick the highest-priority direction; in production this is where a model
-        // would do the heavy lifting (clarity, de-duplication, factuality checks).
+        if (_chat.IsConfigured)
+        {
+            try
+            {
+                return await RunWithAiAsync(input, sw, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "PromptRefiner AI path failed; falling back to heuristic.");
+            }
+        }
+
+        return Heuristic(input, sw);
+    }
+
+    private async Task<AgentStepResult<PromptRefinerOutput>> RunWithAiAsync(
+        PromptRefinerInput input, Stopwatch sw, CancellationToken ct)
+    {
         var primary = input.Strategy.Directions.FirstOrDefault()
             ?? new StyleDirection("Editorial Portrait", "neutral", "soft light", "modern");
 
-        // Build a concrete Imagen 3 prompt: subject + palette + technique + era + safety suffix.
+        const string system =
+            "You are the Prompt Refiner in an art-direction pipeline — an expert image-generation prompt "
+            + "engineer. Reply with MINIFIED JSON only — no prose, no markdown code fences.";
+        var user =
+            $"Primary style direction — name: {primary.Name}; palette: {primary.Palette}; technique: "
+            + $"{primary.Technique}; era: {primary.ReferenceEra}. Write ONE concrete image-to-image prompt "
+            + "(max 60 words) that applies this style while preserving the subject's facial features and "
+            + "likeness, and explicitly forbids watermarks, text and logos. Respond as JSON: "
+            + "{\"prompt\":\"the prompt\",\"whyThisPrompt\":\"one sentence rationale\"}.";
+
+        var result = await _chat.CompleteAsync(system, user, image: null, ct);
+        var el = AgentJson.Parse(result.Content);
+
+        var prompt = AgentJson.Str(el, "prompt");
+        if (string.IsNullOrWhiteSpace(prompt)) throw new FormatException("Refiner returned an empty prompt.");
+        var why = AgentJson.Str(el, "whyThisPrompt",
+            $"Applies the Strategist's primary direction ('{primary.Name}') with a subject-preservation guard.");
+
+        var output = new PromptRefinerOutput(prompt, why);
+        sw.Stop();
+
+        _logger.LogInformation("PromptRefiner (AI) done in {Elapsed}ms. Words={Words}, Tokens={Tokens}",
+            result.ElapsedMs, prompt.Split(' ').Length, result.TokensUsed);
+
+        return new AgentStepResult<PromptRefinerOutput>(output, Reasoning(
+            $"Refined into a single {prompt.Split(' ').Length}-word prompt.", result.ElapsedMs, result.TokensUsed));
+    }
+
+    private AgentStepResult<PromptRefinerOutput> Heuristic(PromptRefinerInput input, Stopwatch sw)
+    {
+        var primary = input.Strategy.Directions.FirstOrDefault()
+            ?? new StyleDirection("Editorial Portrait", "neutral", "soft light", "modern");
+
         var prompt =
             $"Reimagine the subject as a {primary.ReferenceEra} {primary.Name} illustration. " +
             $"Use a {primary.Palette} palette, {primary.Technique}. " +
-            $"Preserve the subject's facial features and likeness. " +
-            $"Studio quality, sharp focus, no watermarks, no text.";
+            "Preserve the subject's facial features and likeness. " +
+            "Studio quality, sharp focus, no watermarks, no text.";
 
         var why =
             $"Combines the Strategist's primary direction ('{primary.Name}') with the subject " +
@@ -47,19 +99,20 @@ public sealed class PromptRefinerAgent : IAgent<PromptRefinerInput, PromptRefine
         var output = new PromptRefinerOutput(prompt, why);
         sw.Stop();
 
-        var reasoning = new AgentReasoningEntry(
-            AgentId: Id,
-            AgentDisplayName: DisplayName,
-            IconClass: IconClass,
-            Summary: $"Refined into a single {prompt.Split(' ').Length}-word prompt.",
-            ElapsedMs: (long)sw.ElapsedMilliseconds,
-            TokensUsed: null,
-            Timestamp: DateTimeOffset.UtcNow,
-            Activity: null);
+        _logger.LogInformation("PromptRefiner (heuristic) done in {Elapsed}ms. Words={Words}",
+            sw.ElapsedMilliseconds, prompt.Split(' ').Length);
 
-        _logger.LogInformation("PromptRefiner done in {Elapsed}ms. Words={Words}",
-            reasoning.ElapsedMs, prompt.Split(' ').Length);
-
-        return Task.FromResult(new AgentStepResult<PromptRefinerOutput>(output, reasoning));
+        return new AgentStepResult<PromptRefinerOutput>(output, Reasoning(
+            $"Refined into a single {prompt.Split(' ').Length}-word prompt.", sw.ElapsedMilliseconds, tokensUsed: null));
     }
+
+    private AgentReasoningEntry Reasoning(string summary, long elapsedMs, int? tokensUsed) => new(
+        AgentId: Id,
+        AgentDisplayName: DisplayName,
+        IconClass: IconClass,
+        Summary: summary,
+        ElapsedMs: elapsedMs,
+        TokensUsed: tokensUsed,
+        Timestamp: DateTimeOffset.UtcNow,
+        Activity: null);
 }

@@ -1,34 +1,100 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
 
 namespace PoRedoImage.Application.Agents.StyleDirector;
 
 /// <summary>
-/// Agent 2 of the Style Director workflow. Picks 2–3 art-style directions that
-/// match the mood inferred by the Vision Analyst. Heuristic-only — the goal is
-/// to give the user concrete choices to approve, not to invent styles from scratch.
+/// Agent 2 of the Style Director workflow. Given the Vision Analyst's subject/mood/themes, an LLM
+/// proposes 2–3 concrete art-style directions (name, palette, technique, era). Falls back to a
+/// curated mood→directions library when no chat provider is configured or the call fails.
 /// </summary>
 /// <remarks>
 /// Idea #1 — Agentic Style Director (step 2 of 4).
 /// </remarks>
 public sealed class StyleStrategistAgent : IAgent<StyleStrategistInput, StyleStrategistOutput>
 {
+    private readonly IChatCompletionService _chat;
     private readonly ILogger<StyleStrategistAgent> _logger;
 
     public string Id => "style-strategist";
     public string DisplayName => "Style Strategist";
     public string IconClass => "bi-palette";
 
-    public StyleStrategistAgent(ILogger<StyleStrategistAgent> logger) => _logger = logger;
+    public StyleStrategistAgent(IChatCompletionService chat, ILogger<StyleStrategistAgent> logger)
+    {
+        _chat = chat;
+        _logger = logger;
+    }
 
-    public Task<AgentStepResult<StyleStrategistOutput>> RunAsync(StyleStrategistInput input, CancellationToken ct = default)
+    public async Task<AgentStepResult<StyleStrategistOutput>> RunAsync(StyleStrategistInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         var sw = Stopwatch.StartNew();
 
-        // A tiny library of "vibes" → style directions. Each direction is a
-        // self-contained, renderable Imagen 3 direction — names + palette + technique.
+        if (_chat.IsConfigured)
+        {
+            try
+            {
+                return await RunWithAiAsync(input, sw, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "StyleStrategist AI path failed; falling back to heuristic.");
+            }
+        }
+
+        return Heuristic(input, sw);
+    }
+
+    private async Task<AgentStepResult<StyleStrategistOutput>> RunWithAiAsync(
+        StyleStrategistInput input, Stopwatch sw, CancellationToken ct)
+    {
+        var v = input.Vision;
+        const string system =
+            "You are the Style Strategist in an art-direction pipeline. Propose distinct, renderable "
+            + "art-style directions. Reply with MINIFIED JSON only — no prose, no markdown code fences.";
+        var user =
+            $"Subject: {v.Subject}. Mood: {v.Mood}. Themes: {string.Join(", ", v.Themes)}. "
+            + "Propose 2-3 distinct art-style directions that suit this. Respond as JSON: "
+            + "{\"rationale\":\"one sentence on why these fit\",\"directions\":[{\"name\":\"style name\","
+            + "\"palette\":\"colour palette\",\"technique\":\"medium/technique\",\"referenceEra\":\"era or movement\"}]}.";
+
+        var result = await _chat.CompleteAsync(system, user, image: null, ct);
+        var el = AgentJson.Parse(result.Content);
+
+        var directions = new List<StyleDirection>();
+        if (el.TryGetProperty("directions", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var d in arr.EnumerateArray())
+            {
+                var name = AgentJson.Str(d, "name");
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                directions.Add(new StyleDirection(
+                    name,
+                    AgentJson.Str(d, "palette", "balanced tones"),
+                    AgentJson.Str(d, "technique", "clean rendering"),
+                    AgentJson.Str(d, "referenceEra", "contemporary")));
+            }
+        }
+        if (directions.Count == 0) throw new FormatException("Strategist returned no usable directions.");
+        directions = directions.Take(3).ToList();
+
+        var rationale = AgentJson.Str(el, "rationale",
+            $"The {v.Mood} mood suggests {directions.Count} directions: {string.Join(" · ", directions.Select(d => d.Name))}.");
+
+        var output = new StyleStrategistOutput(directions, rationale);
+        sw.Stop();
+
+        _logger.LogInformation("StyleStrategist (AI) done in {Elapsed}ms. Directions={Count}, Tokens={Tokens}",
+            result.ElapsedMs, directions.Count, result.TokensUsed);
+
+        return new AgentStepResult<StyleStrategistOutput>(output, Reasoning(rationale, result.ElapsedMs, result.TokensUsed));
+    }
+
+    private AgentStepResult<StyleStrategistOutput> Heuristic(StyleStrategistInput input, Stopwatch sw)
+    {
         var directions = MoodToDirections(input.Vision.Mood).Take(3).ToList();
         if (directions.Count == 0)
         {
@@ -45,21 +111,21 @@ public sealed class StyleStrategistAgent : IAgent<StyleStrategistInput, StyleStr
         var output = new StyleStrategistOutput(directions, rationale);
         sw.Stop();
 
-        var reasoning = new AgentReasoningEntry(
-            AgentId: Id,
-            AgentDisplayName: DisplayName,
-            IconClass: IconClass,
-            Summary: rationale,
-            ElapsedMs: (long)sw.ElapsedMilliseconds,
-            TokensUsed: null,
-            Timestamp: DateTimeOffset.UtcNow,
-            Activity: null);
+        _logger.LogInformation("StyleStrategist (heuristic) done in {Elapsed}ms. Directions={Count}",
+            sw.ElapsedMilliseconds, directions.Count);
 
-        _logger.LogInformation("StyleStrategist done in {Elapsed}ms. Directions={Count}",
-            reasoning.ElapsedMs, directions.Count);
-
-        return Task.FromResult(new AgentStepResult<StyleStrategistOutput>(output, reasoning));
+        return new AgentStepResult<StyleStrategistOutput>(output, Reasoning(rationale, sw.ElapsedMilliseconds, tokensUsed: null));
     }
+
+    private AgentReasoningEntry Reasoning(string summary, long elapsedMs, int? tokensUsed) => new(
+        AgentId: Id,
+        AgentDisplayName: DisplayName,
+        IconClass: IconClass,
+        Summary: summary,
+        ElapsedMs: elapsedMs,
+        TokensUsed: tokensUsed,
+        Timestamp: DateTimeOffset.UtcNow,
+        Activity: null);
 
     private static IEnumerable<StyleDirection> MoodToDirections(string mood) => mood switch
     {

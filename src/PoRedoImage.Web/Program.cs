@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
@@ -216,6 +217,33 @@ try
     app.UseRateLimiter();
     app.UseAntiforgery();
     app.UseAuthentication();
+
+    // The Blazor WebAssembly boot assets under /_framework must load for anonymous users: the whole
+    // UI — including the /login page — is Interactive WebAssembly and cannot boot without them. Most
+    // of these are static files served by MapStaticAssets().AllowAnonymous(), BUT the runtime-generated
+    // boot manifest (resource-collection.js) is NOT a static asset, so it is not covered by that opt-out.
+    // The fail-closed FallbackPolicy (RequireAuthenticatedUser) then 302-redirects it to /login, and the
+    // browser — following the redirect and receiving the login HTML instead of the JS module — fails the
+    // subresource-integrity check and never boots the app (blank page). Routing has already matched the
+    // endpoint by this point, so we tag any /_framework endpoint that lacks an explicit authorization
+    // opt-out with AllowAnonymous before UseAuthorization evaluates the fallback policy. Every real
+    // endpoint (no /_framework prefix) stays fail-closed.
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/_framework")
+            && context.GetEndpoint() is { } endpoint
+            && endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
+        {
+            var metadata = new List<object>(endpoint.Metadata) { new AllowAnonymousAttribute() };
+            context.SetEndpoint(new Endpoint(
+                endpoint.RequestDelegate,
+                new EndpointMetadataCollection(metadata),
+                endpoint.DisplayName));
+        }
+
+        await next();
+    });
+
     app.UseAuthorization();
 
     // OpenAPI + Scalar API documentation (public — the FallbackPolicy would otherwise gate them)

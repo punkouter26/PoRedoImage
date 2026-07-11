@@ -1,21 +1,33 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using PoRedoImage.Application.Agents;
 using PoRedoImage.Application.Agents.StyleDirector;
+using PoRedoImage.Domain.Interfaces;
 
 namespace PoRedoImage.Tests.Unit.Agents;
 
 /// <summary>
 /// End-to-end unit tests for the Style Director workflow (Idea #1).
-/// Verifies the chain produces a coherent result on the happy path and
-/// returns a partial trace when an intermediate step throws.
+/// Runs against the deterministic heuristic path (chat not configured) so assertions are stable;
+/// verifies the chain produces a coherent result on the happy path.
 /// </summary>
 public class StyleDirectorWorkflowTests
 {
+    /// <summary>Chat service that reports not-configured, so agents use their heuristic fallback.</summary>
+    private sealed class NotConfiguredChat : IChatCompletionService
+    {
+        public bool IsConfigured => false;
+        public Task<ChatCompletionResult> CompleteAsync(
+            string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Heuristic path should be used when IsConfigured is false.");
+    }
+
+    private static readonly IChatCompletionService Chat = new NotConfiguredChat();
+
     private static StyleDirectorWorkflow CreateWorkflow() => new(
-        new VisionAnalystAgent(NullLogger<VisionAnalystAgent>.Instance),
-        new StyleStrategistAgent(NullLogger<StyleStrategistAgent>.Instance),
-        new PromptRefinerAgent(NullLogger<PromptRefinerAgent>.Instance),
-        new CriticAgent(NullLogger<CriticAgent>.Instance),
+        new VisionAnalystAgent(Chat, NullLogger<VisionAnalystAgent>.Instance),
+        new StyleStrategistAgent(Chat, NullLogger<StyleStrategistAgent>.Instance),
+        new PromptRefinerAgent(Chat, NullLogger<PromptRefinerAgent>.Instance),
+        new CriticAgent(Chat, NullLogger<CriticAgent>.Instance),
         NullLogger<StyleDirectorWorkflow>.Instance);
 
     [Fact]

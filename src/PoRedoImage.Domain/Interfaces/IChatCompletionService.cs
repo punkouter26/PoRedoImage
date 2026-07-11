@@ -1,0 +1,31 @@
+namespace PoRedoImage.Domain.Interfaces;
+
+/// <summary>
+/// General-purpose chat-completion abstraction used by the multi-agent Style Director.
+/// Unlike <see cref="IGenerativeAiService"/> (task-specific: enhance description, meme caption,
+/// describe person), this is a free-form reasoning primitive: give it a system + user prompt and,
+/// optionally, an image, and it returns the model's text. Kept separate so the reasoning agents can
+/// be backed by any provider (HuggingFace Inference Providers today) without touching the
+/// task-specific service surface.
+/// </summary>
+public interface IChatCompletionService
+{
+    /// <summary>
+    /// <c>true</c> when a provider + credentials are configured. When <c>false</c>, callers must
+    /// fall back to their own deterministic behaviour rather than invoking <see cref="CompleteAsync"/>.
+    /// </summary>
+    bool IsConfigured { get; }
+
+    /// <summary>
+    /// Runs a single chat completion. When <paramref name="image"/> is supplied, a vision-capable
+    /// model is used and the image travels as a data-URI content part.
+    /// </summary>
+    Task<ChatCompletionResult> CompleteAsync(
+        string systemPrompt,
+        string userPrompt,
+        byte[]? image = null,
+        CancellationToken ct = default);
+}
+
+/// <summary>Result of a chat completion — the model's text plus usage/timing telemetry.</summary>
+public sealed record ChatCompletionResult(string Content, int TokensUsed, long ElapsedMs);
