@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 
@@ -19,6 +20,13 @@ public static class AuthServiceExtensions
     {
         services.AddAuthorization(options =>
         {
+            // §4.5 fail-closed default: every endpoint requires an authenticated user unless it
+            // explicitly opts out with .AllowAnonymous() (WASM host, static assets, /health, /auth/*,
+            // OpenAPI/Scalar). A future un-annotated endpoint is protected by default, never fail-open.
+            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
+
             options.AddPolicy(DiagnosticsPolicy, policy =>
             {
                 policy.RequireAuthenticatedUser();
@@ -72,6 +80,7 @@ public static class AuthServiceExtensions
                     options.LoginPath = "/login";
                     options.AccessDeniedPath = "/login";
                     options.Events.OnRedirectToLogin = ApiAwareRedirectToLogin;
+                    HardenCookie(options, environment);
                 });
         }
         else
@@ -90,6 +99,7 @@ public static class AuthServiceExtensions
                 options.LoginPath = "/login";
                 options.AccessDeniedPath = "/access-denied";
                 options.Events.OnRedirectToLogin = ApiAwareRedirectToLogin;
+                HardenCookie(options, environment);
             })
             .AddOpenIdConnect(options =>
             {
@@ -144,6 +154,21 @@ public static class AuthServiceExtensions
         AddPoRedoImageAuthorization(services, configuration, environment);
         services.AddCascadingAuthenticationState();
         return services;
+    }
+
+    /// <summary>
+    /// §4.2 BFF cookie hardening: the session cookie is HttpOnly (never readable by WASM/JS),
+    /// SameSite=Strict (not sent on cross-site navigations — the OIDC nonce/correlation cookies keep
+    /// their own SameSite=None Secure defaults so the handshake still works), and Secure in every
+    /// non-Development environment (SameAsRequest locally so the http://localhost:5000 F5 loop works).
+    /// </summary>
+    private static void HardenCookie(CookieAuthenticationOptions options, IWebHostEnvironment environment)
+    {
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
     }
 
     /// <summary>

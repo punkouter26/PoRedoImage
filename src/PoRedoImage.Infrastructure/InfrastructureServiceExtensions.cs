@@ -59,7 +59,19 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IVisionServiceRouter, VisionServiceRouter>();
 
             services.AddSingleton<IGenerativeAiService, AzureOpenAiService>();
-            services.AddSingleton<IImageGenerationService, GeminiImagen3Service>();
+
+            // Image generation provider is switchable via the ImageGen:Provider feature flag:
+            //   "google"      → Gemini/Imagen (default)
+            //   "huggingface" → FLUX via HuggingFace Inference Providers (cheaper — see backlog).
+            // Both concretes register so a config flip needs no redeploy; the flag picks the active one.
+            services.AddSingleton<GeminiImagen3Service>();
+            services.AddSingleton<HuggingFaceImageGenerationService>();
+            var imageProvider = (configuration?["ImageGen:Provider"] ?? "google").Trim().ToLowerInvariant();
+            services.AddSingleton<IImageGenerationService>(sp => imageProvider switch
+            {
+                "huggingface" or "hf" => sp.GetRequiredService<HuggingFaceImageGenerationService>(),
+                _ => sp.GetRequiredService<GeminiImagen3Service>()
+            });
         }
 
         // Scoped services
@@ -102,6 +114,15 @@ public static class InfrastructureServiceExtensions
 
         // Named HttpClient for Gemini with standard resilience: retry, timeout, circuit-breaker
         services.AddHttpClient("GeminiApi")
+            .AddHttpMessageHandler<MockAiDelegatingHandler>()
+            .AddStandardResilienceHandler(options =>
+            {
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);
+                options.Retry.MaxRetryAttempts = 2;
+            });
+
+        // Named HttpClient for HuggingFace Inference Providers — same resilience + mock guardrail.
+        services.AddHttpClient("HuggingFaceApi")
             .AddHttpMessageHandler<MockAiDelegatingHandler>()
             .AddStandardResilienceHandler(options =>
             {

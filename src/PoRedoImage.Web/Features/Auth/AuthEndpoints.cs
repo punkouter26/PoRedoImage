@@ -70,7 +70,10 @@ public static class AuthEndpoints
                 roles = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray(),
                 returnUrlValid = safeReturn
             });
-        });
+        })
+        // Must be reachable anonymously: it is the client's auth-probe and returns its own 401
+        // body ({authenticated:false}) rather than triggering the FallbackPolicy login redirect.
+        .AllowAnonymous();
     }
 
     // ─── Shared handlers (legacy + canonical routes) ──────────────────────────

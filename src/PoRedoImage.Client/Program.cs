@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using PoRedoImage.Client.Http;
 using PoRedoImage.Client.Shared;
 using Radzen;
 using System.Net.Http.Json;
@@ -10,9 +11,17 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 // and hydrated here — no builder.RootComponents mount. Component preservation under
 // publish-trimming is handled by NOT marking this assembly IsTrimmable (see csproj).
 
+// Stable per-tab session identity; the handler stamps X-Session-ID / X-Correlation-ID (§6.9).
+builder.Services.AddSingleton<ClientRequestContext>();
+
 // HTTP client targeting the BFF host that served this app (same origin → cookies flow,
-// the WASM client never handles tokens).
-builder.Services.AddScoped(sp => new HttpClient
+// the WASM client never handles tokens). The correlation handler wraps the browser fetch
+// handler so every BFF call carries session + correlation headers for end-to-end tracing.
+builder.Services.AddScoped(sp => new HttpClient(
+    new CorrelationHeaderHandler(sp.GetRequiredService<ClientRequestContext>())
+    {
+        InnerHandler = new HttpClientHandler()
+    })
 {
     BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
     Timeout = TimeSpan.FromMinutes(4),

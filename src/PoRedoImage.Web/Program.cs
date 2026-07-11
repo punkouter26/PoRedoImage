@@ -17,6 +17,7 @@ using PoRedoImage.Web.Features.Diagnostics;
 using PoRedoImage.Web.Features.Idempotency;
 using PoRedoImage.Web.Features.ImageAnalysis;
 using PoRedoImage.Web.Features.MemeTemplates;
+using PoRedoImage.Web.Features.Pricing;
 using PoRedoImage.Web.Features.StyleDirector;
 using PoRedoImage.Web.Features.UserImages;
 using Radzen;
@@ -87,6 +88,10 @@ try
         .Bind(builder.Configuration.GetSection(StorageOptions.SectionName))
         .ValidateOnStart();
     builder.Services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
+
+    // Indicative AI per-image pricing surfaced to the client cost estimate (§ImageGen feature flag).
+    builder.Services.Configure<AiPricingOptions>(
+        builder.Configuration.GetSection(AiPricingOptions.SectionName));
 
     // Fail-fast secret validator (Po2Logic F7)
     builder.Services.AddHostedService<StartupSecretValidator>();
@@ -213,9 +218,9 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // OpenAPI + Scalar API documentation
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    // OpenAPI + Scalar API documentation (public — the FallbackPolicy would otherwise gate them)
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 
     // Health check endpoints
     app.MapHealthChecks("/health", new HealthCheckOptions
@@ -245,8 +250,8 @@ try
                 })
             }, options);
         }
-    });
-    app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false });
+    }).AllowAnonymous();
+    app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 
     // Minimal API endpoints (Vertical Slice)
     app.MapAuthEndpoints();
@@ -256,15 +261,20 @@ try
     app.MapUserImageEndpoints();
     app.MapMemeTemplateEndpoints();
     app.MapStyleDirectorEndpoints();
+    app.MapPricingEndpoints();
 
     // Redirect /favicon.ico → /favicon.png so browsers don't get a 404.
     app.MapGet("/favicon.ico", () => Results.Redirect("/favicon.png", permanent: true))
-        .ExcludeFromDescription();
+        .ExcludeFromDescription()
+        .AllowAnonymous();
 
-    app.MapStaticAssets();
+    // Static assets (WASM runtime, css/js) and the SPA host shell must load for anonymous users so the
+    // client-side login page can render; server-side data endpoints stay protected via RequireAuthorization.
+    app.MapStaticAssets().AllowAnonymous();
     app.MapRazorComponents<App>()
         .AddInteractiveWebAssemblyRenderMode()
-        .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly);
+        .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly)
+        .AllowAnonymous();
 
     app.Run();
 }

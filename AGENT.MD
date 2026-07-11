@@ -32,15 +32,11 @@ src/
 ├── PoRedoImage.Shared/       # DTOs + FluentValidation shared between WASM and API
 ├── PoRedoImage.Client/       # Blazor WASM SPA — Routes, Layout, Pages, Shared, Models, wwwroot
 └── PoRedoImage.Web/          # API/BFF host (App.razor host doc + Features/*/ endpoints)
-tests/                          # Target = 4 projects per spec; current state has 3 (E2EAPI + E2EUI
-                                # are merged in Tests.E2E). The 4-project split is tracked separately
-                                # (see ADR-022 / "Idea #1" in the audit output).
+tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI split is DONE.
 ├── PoRedoImage.Tests.Unit/        # xUnit + Moq — pure logic
 ├── PoRedoImage.Tests.Integration/ # xUnit + Testcontainers (Azurite) + WebApplicationFactory
-├── PoRedoImage.Tests.E2E/         # CURRENT: HTTP API smoke + C# Playwright UI under [LiveServerFact]
-└── … future split →
-    ├── PoRedoImage.Tests.E2E.ApiSmoke/  # pure HTTP API smoke (no Playwright dependency)
-    └── PoRedoImage.Tests.E2E.UI/        # C# Playwright browser tests (Playwright + Chromium install)
+├── PoRedoImage.Tests.E2E.ApiSmoke/ # pure HTTP API smoke (no Playwright dependency)
+└── PoRedoImage.Tests.E2E.UI/       # C# Playwright browser tests (Playwright + Chromium install)
 ```
 > Render model: only `.Client` ships to the browser, so every interactive component lives there.
 > `.Web` holds just `Components/App.razor` (host document) + `_Imports.razor`; it renders the Client's
@@ -53,7 +49,9 @@ tests/                          # Target = 4 projects per spec; current state ha
 3. **TreatWarningsAsErrors** and **Nullable` enabled globally.
 4. **Central Package Management** via `Directory.Packages.props` at root.
 5. **Zero-Waste Policy**: Immediately delete unused files/dead code.
-6. **BFF invariant**: Blazor WASM must never store or handle access tokens. The server authenticates via `HttpOnly`+`SameSite=Strict` cookies and serializes the principal (claims only) to the client via `AddAuthenticationStateSerialization` ↔ `AddAuthenticationStateDeserialization`. The `Microsoft.AspNetCore.Components.WebAssembly.Authentication` package IS referenced on `.Client` (it supplies `AddAuthenticationStateDeserialization`), but only the **safe, claims-only** extension is used — `AddOidcAuthentication()` and any token-handling API in that package are forbidden.
+6. **BFF invariant**: Blazor WASM must never store or handle access tokens. The server authenticates via `HttpOnly`+`SameSite=Strict` cookies (set in `AuthServiceExtensions.HardenCookie`; `Secure` is `Always` outside Development) and serializes the principal (claims only) to the client via `AddAuthenticationStateSerialization` ↔ `AddAuthenticationStateDeserialization`. The `Microsoft.AspNetCore.Components.WebAssembly.Authentication` package IS referenced on `.Client` (it supplies `AddAuthenticationStateDeserialization`), but only the **safe, claims-only** extension is used — `AddOidcAuthentication()` and any token-handling API in that package are forbidden.
+7. **Server-side authz is fail-closed (§4.5)**: `AuthorizationOptions.FallbackPolicy = RequireAuthenticatedUser`. Every endpoint requires auth unless it explicitly `.AllowAnonymous()` — the public set is the WASM host shell, `MapStaticAssets`, `/health`, `/alive`, favicon, OpenAPI/Scalar, all `/auth/*`, and `/api/diag/mock-status`. Client `[Authorize]` is UI-only. **Adding a new anonymous endpoint requires an explicit `.AllowAnonymous()`.**
+8. **Request correlation (§6.9)**: the WASM `CorrelationHeaderHandler` stamps `X-Session-ID` (stable per tab) + `X-Correlation-ID` (per request) on every BFF call; server `RequestContextMiddleware` reads, echoes, and pushes them into the Serilog LogContext.
 
 ## Auth Modes (BFF)
 - Cookie is the default auth + challenge scheme: an unauthenticated page hit redirects to `/login`
@@ -139,19 +137,17 @@ tests/                          # Target = 4 projects per spec; current state ha
 - **Mobile-first**: CSS clamp() and auto-fit grid
 
 ## Testing
-- **Target layout (spec §1)**: four projects — `Tests.Unit`, `Tests.Integration`, `Tests.E2E.ApiSmoke`
-  (pure HTTP), `Tests.E2E.UI` (C# Playwright). Current state has three: E2EAPI + E2EUI are merged into
-  `Tests.E2E` (see ADR-013). The 4-project split is the target — tracked in the audit output.
+- **Layout (spec §2.2)**: four projects — `Tests.Unit`, `Tests.Integration`, `Tests.E2E.ApiSmoke`
+  (pure HTTP), `Tests.E2E.UI` (C# Playwright). The E2EAPI/E2EUI split is complete.
 - **Unit** (`Tests.Unit`): xUnit + Moq. Pure logic, no I/O.
 - **Integration** (`Tests.Integration`): xUnit + `Microsoft.AspNetCore.Mvc.Testing` + Testcontainers
   (Azurite, non-AI mock data). Tests own their own throwaway Azurite container — the
   `docker-compose.yml` Azurite is for the local dev inner loop only (F5) and must never be touched
   by tests (see ADR-019).
-- **E2E API smoke** (target: `Tests.E2E.ApiSmoke`; currently inside `Tests.E2E`):
-  pure HTTP against a running instance, no browser.
-- **E2E UI** (target: `Tests.E2E.UI`; currently inside `Tests.E2E`): C# Playwright
-  browser tests; class names containing "Ui" identify the UI suite. `[LiveServerFact]` self-skips
-  when no live instance is reachable. Browsers install via the generated `playwright.ps1`.
+- **E2E API smoke** (`Tests.E2E.ApiSmoke`): pure HTTP against a running instance, no browser.
+- **E2E UI** (`Tests.E2E.UI`): C# Playwright browser tests; class names containing "Ui" identify the
+  UI suite. `[LiveServerFact]` self-skips when no live instance is reachable. Browsers install via the
+  generated `playwright.ps1`.
 - **Per-tier method ceilings** (100/50/25) are enforced by `TestCountCeilingTests`.
 - **CI/CD does NOT run tests** (project policy) — run suites locally or in a dedicated
   non-deploy workflow. `E2E_BASE_URL` overrides the target (default `http://localhost:5000`).
@@ -164,3 +160,20 @@ Three categories selectable from the Studio home page:
 1. **Remote** — Azure OpenAI (gpt-4o chat/vision) + Google Gemini (image generation)
 2. **Web Browser** — Models that run client-side via WebGPU/WebAssembly
 3. **Ollama** — Local models (dev only, requires Ollama running locally)
+
+## Image Generation Provider (feature flag)
+`IImageGenerationService` has two real implementations selected by the **`ImageGen:Provider`** flag
+(no redeploy needed — both register, the flag picks the active one):
+- **`google`** (default) → `GeminiImagen3Service` (Gemini/Imagen).
+- **`huggingface`** → `HuggingFaceImageGenerationService` — FLUX/Qwen via HuggingFace Inference Providers,
+  routed **fal-native** as `{BaseUrl}/{Provider}/{providerId}` with `{prompt, image_url?}` → `{images:[{url}]}`.
+  Text-to-image = **FLUX.1-schnell** (`fal-ai/flux/schnell`, ~$0.003/img); image-to-image = **Qwen-Image-Edit**
+  (`fal-ai/qwen-image-edit`, ~$0.02/img) — both NON-GATED (verified live 2026-07-11). FLUX.1-Kontext-dev is
+  higher quality but **gated** (needs license accept + a gated-repo-scoped token). NOTE: only `hf-inference`
+  uses the `/{provider}/models/{hf-id}` path with raw-byte responses; external providers (fal/replicate)
+  need their own `providerId` (from `…/api/models/{repo}?expand[]=inferenceProviderMapping`) + native body.
+  Set `HuggingFace:ApiKey` (token with the *Inference Providers* permission). Enabled in **Development**
+  (`appsettings.Development.json`); Production stays on `google` until validated there.
+- **Pricing UI**: `GET /api/pricing` returns the active provider + indicative per-image prices from the
+  `AiPricing` config section; the Bulk Generate page shows "≈ $X/image" plus a running session estimate.
+- Mock mode (`Mocks:UseMockAi=true`) still wins and swaps in `MockImagen3Service` for either provider.

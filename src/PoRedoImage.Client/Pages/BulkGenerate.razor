@@ -11,11 +11,23 @@
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
 <div class="container py-4 has-mobile-sticky-cta">
-    <FeatureLayout 
+    <FeatureLayout
         IconClass="bi-images"
         Title="Bulk Generate"
         Description="@("Upload a photo and generate 10 artistic variations. Use <PERSON> in prompts — AI replaces it with a description of your image.")"
         ModelBadge="Gemini 2.0 Flash (img2img)" />
+
+    @if (_pricing is not null)
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3 small text-secondary">
+            <span class="badge text-bg-light border"><i class="bi bi-cpu me-1"></i>@_pricing.ImageProviderLabel</span>
+            <span><i class="bi bi-cash-coin me-1"></i>≈ @FormatMoney(_pricing.ImageToImageUsd) / image (estimate)</span>
+            @if (_sessionEstimate > 0)
+            {
+                <span class="ms-sm-auto fw-semibold text-body"><i class="bi bi-receipt me-1"></i>Session est: @FormatMoney(_sessionEstimate)</span>
+            }
+        </div>
+    }
 
     <div class="row g-4">
         @* Left: Upload + Action Button *@
@@ -140,6 +152,13 @@
     private MyImagesGallery? _gallery;
     private BulkGallery? _bulkGallery;
     private CancellationTokenSource? _cts;
+    private AiPricingDto? _pricing;
+    private decimal _sessionEstimate;
+
+    private string FormatMoney(decimal v) =>
+        string.Equals(_pricing?.Currency, "USD", StringComparison.OrdinalIgnoreCase)
+            ? $"${v:0.####}"
+            : $"{v:0.####} {_pricing?.Currency}";
 
     private sealed record BulkSavedState(BulkGenerateImageResult[] Results);
 
@@ -151,6 +170,11 @@
         // Cross-page state: record this as the last visited feature route so
         // the Active Image Bar can deep-link back here.
         SessionService.RecordFeatureVisit("/bulk-generate");
+
+        // Active image-gen provider + indicative per-image pricing for the cost estimate.
+        // Non-critical: a failure just hides the pricing note.
+        try { _pricing = await Http.GetFromJsonAsync<AiPricingDto>("/api/pricing"); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load AI pricing estimate"); }
 
         if (SessionService.HasImage && _imagePreviewUrl is null)
         {
@@ -292,6 +316,7 @@
                     _results[i].Prompt = rawPrompt;
                     _results[i].ImageUrl = $"data:{varResult!.ContentType};base64,{varResult.ImageData}";
                     _completedCount++;
+                    _sessionEstimate += _pricing?.ImageToImageUsd ?? 0m;
                     _ = Audio.TickAsync();
                     // Fire-and-forget: save variation to gallery
                     if (_userId is not null)
@@ -492,6 +517,8 @@
             }
 
             _bulkGallery.EndReroll(index, payload.Variations);
+            // Re-rolls are billed at generation time regardless of which one the user accepts.
+            _sessionEstimate += (_pricing?.ImageToImageUsd ?? 0m) * payload.Succeeded;
             NotificationService.Notify(NotificationSeverity.Success, "Re-roll Ready",
                 $"{payload.Succeeded} of {payload.Requested} variations ready in {payload.ElapsedMs}ms.",
                 duration: 4000);

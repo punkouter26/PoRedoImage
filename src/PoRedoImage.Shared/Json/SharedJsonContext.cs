@@ -37,6 +37,7 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(BulkRerollResponse))]
 [JsonSerializable(typeof(BulkRerollVariation))]
 [JsonSerializable(typeof(ProblemDetailsDto))]
+[JsonSerializable(typeof(AiPricingDto))]
 [JsonSerializable(typeof(ImageBytes))]
 public partial class SharedJsonContext : JsonSerializerContext
 {

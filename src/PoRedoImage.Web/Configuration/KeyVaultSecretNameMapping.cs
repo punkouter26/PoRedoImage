@@ -28,7 +28,8 @@ public class KeyVaultSecretNameMapping : KeyVaultSecretManager
         ["PoRedoImage-AzureAd-ClientId"] = "AzureAd:ClientId",
         ["PoRedoImage-AzureAd-ClientSecret"] = "AzureAd:ClientSecret",
         ["PoRedoImage-Google-ApiKey"] = "Google:ApiKey",
-        ["PoRedoImage-Google-Imagen3Model"] = "Google:Imagen3Model"
+        ["PoRedoImage-Google-Imagen3Model"] = "Google:Imagen3Model",
+        ["PoRedoImage-HuggingFace-ApiKey"] = "HuggingFace:ApiKey"
     };
 
     public static IReadOnlyCollection<string> RequiredSecretNames => SecretMappings.Keys;
