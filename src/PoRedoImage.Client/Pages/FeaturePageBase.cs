@@ -155,13 +155,29 @@ public abstract class FeaturePageBase : ComponentBase
     /// Derives coarse tags from a local model's free-text description. Browser vision models emit
     /// prose, not a tag list, and the server's meme branch needs tags to caption from.
     /// </summary>
-    private static IReadOnlyList<string> ExtractTags(string description) =>
-        [.. description
+    /// <remarks>
+    /// This is a deliberately simple punctuation-and-length heuristic, not a tokenizer: short
+    /// filler words that happen to be 3+ letters (e.g. "with", "this", "from") will survive into
+    /// the tag list. That is an accepted simplification — a caption model tolerates a stray filler
+    /// word — not an oversight. If the heuristic yields nothing at all (terse captions like
+    /// "Cat." are common from browser vision models), the trimmed description itself is used as a
+    /// single fallback tag so <c>GenerateMemeCaptionAsync</c> is never invoked with zero grounding.
+    /// </remarks>
+    internal static IReadOnlyList<string> ExtractTags(string description)
+    {
+        var tags = description
             .Split([' ', ',', '.', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(w => w.Length > 3)
+            .Where(w => w.Length >= 3)
             .Select(w => w.ToLowerInvariant())
             .Distinct()
-            .Take(10)];
+            .Take(10)
+            .ToList();
+
+        if (tags.Count > 0) return tags;
+
+        var trimmed = description.Trim();
+        return trimmed.Length == 0 ? [] : [trimmed.ToLowerInvariant()];
+    }
 
     /// <summary>Surfaces local-inference progress through the existing progress UI.</summary>
     private void OnLocalProgress(LocalInferenceStatus status)
