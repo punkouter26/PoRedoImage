@@ -1,0 +1,96 @@
+@namespace PoRedoImage.Client.Shared
+@using PoRedoImage.Client.LocalAi
+@using PoRedoImage.Client.Models
+@implements IDisposable
+@inject LocalAiService LocalAi
+@inject AiSelectionState Selection
+
+@* One selector per capability. The categories are not interchangeable — Ollama and the browser
+   models cannot generate images — so a single global picker could never be correct. *@
+<fieldset class="ai-picker">
+    <legend class="ai-picker__legend">AI services</legend>
+
+    @foreach (var capability in AiServiceCatalog.All)
+    {
+        var options = AiServiceCatalog.OptionsFor(capability);
+        var single = options.Count == 1;
+        var selectId = $"ai-picker-{capability}";
+
+        <div class="ai-picker__row">
+            <label class="ai-picker__label" for="@selectId">@AiServiceCatalog.LabelFor(capability)</label>
+
+            <select id="@selectId"
+                    class="ai-picker__select"
+                    disabled="@single"
+                    title="@(single ? "Only provider configured for this capability" : null)"
+                    value="@Selection.Get(capability)"
+                    @onchange="@(e => OnSelected(capability, e.Value?.ToString()))">
+                @foreach (var group in options.GroupBy(o => o.Category))
+                {
+                    <optgroup label="@group.Key">
+                        @foreach (var option in group)
+                        {
+                            <option value="@option.Id">@option.DisplayName — @option.Hint</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+        </div>
+    }
+
+    @if (ShowsBrowserModel)
+    {
+        <p class="ai-picker__device" role="status">
+            @if (_browserUnsupported)
+            {
+                <span>
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                    This browser has no WebGPU adapter, so models run on the CPU — slow, but supported.
+                </span>
+            }
+            else
+            {
+                <span>
+                    <i class="bi bi-gpu-card me-1" aria-hidden="true"></i>
+                    WebGPU ready@(_capabilities?.HasShaderF16 == true ? " (shader-f16)" : "")@(_capabilities?.AdapterDescription is { Length: > 0 } d ? $" — {d}" : "")
+                </span>
+            }
+        </p>
+    }
+</fieldset>
+
+@code {
+    private DeviceCapabilities? _capabilities;
+    private bool _browserUnsupported;
+
+    // Only meaningful once a browser-executed model is actually chosen — showing GPU status while
+    // every capability is remote would be noise.
+    private bool ShowsBrowserModel =>
+        AiServiceCatalog.All.Any(c => Selection.GetOption(c).ExecutesInBrowser);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _capabilities = await LocalAi.GetCapabilitiesAsync();
+
+        // Not a blocker: DtypeChain prunes to wasm-capable variants and execution continues on the
+        // CPU. This only drives the warning text.
+        _browserUnsupported = !_capabilities.HasWebGpu;
+
+        Selection.OnChange += OnSelectionChanged;
+    }
+
+    private void OnSelected(AiCapability capability, string? providerId)
+    {
+        if (!string.IsNullOrEmpty(providerId))
+        {
+            Selection.Set(capability, providerId);
+        }
+    }
+
+    private void OnSelectionChanged() => InvokeAsync(StateHasChanged);
+
+    // Deliberately NOT IAsyncDisposable: LocalAiService is a DI-owned scoped service shared with
+    // every other component in this scope. Disposing it here would tear down its workers for them
+    // too. The container owns its lifetime. Only the event subscription is released.
+    public void Dispose() => Selection.OnChange -= OnSelectionChanged;
+}
