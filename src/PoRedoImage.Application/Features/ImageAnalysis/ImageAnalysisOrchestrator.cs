@@ -8,7 +8,7 @@ public sealed class ImageAnalysisOrchestrator(
     IVisionServiceRouter visionRouter,
     IGenerativeAiService aiService,
     IMemeGeneratorService memeService,
-    IImageGenerationService imagen3Service,
+    IImageGenerationRouter imageGenRouter,
     ILogger<ImageAnalysisOrchestrator> logger) : IImageAnalysisOrchestrator
 {
     public async Task<ImageAnalysisResponse> ProcessAsync(ImageAnalysisRequest request, CancellationToken ct = default)
@@ -21,11 +21,32 @@ public sealed class ImageAnalysisOrchestrator(
         var metrics = new ProcessingMetricsDto();
         var response = new ImageAnalysisResponse();
 
-        // Step 1 — Vision analysis (always runs). The backend (Azure vs local Ollama) is chosen
-        // per-request from the selected model id.
-        var visionService = visionRouter.Resolve(request.ModelId);
-        var (description, tags, confidence, analysisMs) = await visionService.AnalyzeAsync(imageBytes, ct);
-        metrics.ImageAnalysisTimeMs = analysisMs;
+        // Step 1 — Vision analysis. Skipped entirely when the client ran a browser-local model and
+        // supplied the result: re-running it would bill a metered API for work already done for free.
+        string description;
+        IReadOnlyList<string> tags;
+        double confidence;
+
+        if (!string.IsNullOrWhiteSpace(request.PrecomputedDescription))
+        {
+            description = request.PrecomputedDescription;
+            tags = request.PrecomputedTags ?? [];
+            // Local models emit no calibrated confidence; report 1.0 so downstream gating treats the
+            // result as usable, matching how OllamaVisionService already handles this.
+            confidence = 1.0;
+            metrics.ImageAnalysisTimeMs = 0;
+        }
+        else
+        {
+            var visionService = visionRouter.Resolve(request.ModelId);
+            var (visionDescription, visionTags, visionConfidence, analysisMs) =
+                await visionService.AnalyzeAsync(imageBytes, ct);
+            description = visionDescription;
+            tags = visionTags;
+            confidence = visionConfidence;
+            metrics.ImageAnalysisTimeMs = analysisMs;
+        }
+
         response.Tags = [.. tags];
         response.ConfidenceScore = confidence;
 
@@ -50,13 +71,15 @@ public sealed class ImageAnalysisOrchestrator(
             metrics.DescriptionTokensUsed = tokens;
             response.Description = enhanced;
 
-            if (!imagen3Service.IsConfigured)
+            var imageGenService = imageGenRouter.Resolve(request.ImageGenModelId);
+
+            if (!imageGenService.IsConfigured)
             {
                 throw new InvalidOperationException(
                     "Image generation is not configured. Set the Gemini API key (Google:ApiKey) via Key Vault or appsettings.");
             }
 
-            var (imgData, imgType, regenMs) = await imagen3Service.GenerateAsync(enhanced, ct);
+            var (imgData, imgType, regenMs) = await imageGenService.GenerateAsync(enhanced, ct);
 
             metrics.ImageRegenerationTimeMs = regenMs;
             response.RegeneratedImageData = Convert.ToBase64String(imgData);

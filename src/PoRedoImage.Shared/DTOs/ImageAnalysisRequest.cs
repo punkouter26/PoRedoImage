@@ -22,8 +22,25 @@ public class ImageAnalysisRequest
     public ProcessingMode Mode { get; set; } = ProcessingMode.ImageRegeneration;
 
     /// <summary>
-    /// Optional selected AI model id (e.g. "gpt-4o", "gemma4"). Routes the vision/analysis
-    /// step to the matching backend. Null/unknown falls back to the default Azure vision service.
+    /// Optional selected vision provider id (see <c>AiProviderIds</c>, e.g. "ollama:vision").
+    /// Null or unrecognised ids fall back to the default Azure vision service.
     /// </summary>
     public string? ModelId { get; set; }
+
+    /// <summary>
+    /// Optional selected image-generation provider id (see <c>AiProviderIds</c>). Null falls back to
+    /// the provider named by the <c>ImageGen:Provider</c> flag.
+    /// </summary>
+    public string? ImageGenModelId { get; set; }
+
+    /// <summary>
+    /// Description already produced by a browser-local vision model. When set, the server skips its
+    /// own vision step and uses this instead.
+    /// </summary>
+    public string? PrecomputedDescription { get; set; }
+
+    /// <summary>
+    /// Tags accompanying <see cref="PrecomputedDescription"/>. Ignored unless that is also set.
+    /// </summary>
+    public IReadOnlyList<string>? PrecomputedTags { get; set; }
 }

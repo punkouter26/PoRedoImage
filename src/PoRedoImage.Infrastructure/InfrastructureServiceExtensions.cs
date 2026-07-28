@@ -50,6 +50,8 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<MockImagen3Service>();
             services.AddSingleton<IImageGenerationService>(sp => sp.GetRequiredService<MockImagen3Service>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockImagen3Service>());
+            services.AddSingleton<IImageGenerationRouter>(sp =>
+                new SingleImageGenerationRouter(sp.GetRequiredService<IImageGenerationService>()));
 
             // Chat completion (Style Director reasoning): mock reports IsConfigured=false so the agents
             // deterministically use their heuristic path — zero network, stable test output.
@@ -82,11 +84,19 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<GeminiImagen3Service>();
             services.AddSingleton<HuggingFaceImageGenerationService>();
             var imageProvider = (configuration?[ConfigKeys.ImageGenProvider] ?? "google").Trim().ToLowerInvariant();
+
+            // Kept so callers that resolve the interface directly (health checks, other slices)
+            // still get the configured default.
             services.AddSingleton<IImageGenerationService>(sp => imageProvider switch
             {
                 "huggingface" or "hf" => sp.GetRequiredService<HuggingFaceImageGenerationService>(),
                 _ => sp.GetRequiredService<GeminiImagen3Service>()
             });
+
+            services.AddSingleton<IImageGenerationRouter>(sp => new ImageGenerationRouter(
+                sp.GetRequiredService<GeminiImagen3Service>(),
+                sp.GetRequiredService<HuggingFaceImageGenerationService>(),
+                imageProvider));
 
             // Chat completion powering the Style Director reasoning agents. HuggingFace Inference
             // Providers (OpenAI-compatible chat + a vision model) is the real-AI backend; when its

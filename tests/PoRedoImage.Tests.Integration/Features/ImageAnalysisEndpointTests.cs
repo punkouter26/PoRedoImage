@@ -189,7 +189,14 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
             ReplaceService<IVisionServiceRouter>(services, new SingleVisionServiceRouter(mockVision));
             ReplaceService<IGenerativeAiService>(services, CreateMockOpenAI());
             ReplaceService<IMemeGeneratorService>(services, CreateMockMemeGenerator());
-            ReplaceService<IImageGenerationService>(services, CreateMockImagen3());
+
+            var mockImagen3 = CreateMockImagen3();
+            ReplaceService<IImageGenerationService>(services, mockImagen3);
+            // Same reason as the vision router above: the orchestrator now resolves image generation
+            // through IImageGenerationRouter, never IImageGenerationService directly. Replacing only
+            // the interface would leave the real ImageGenerationRouter in place, which hands back the
+            // live GeminiImagen3Service and attempts a real network call.
+            ReplaceService<IImageGenerationRouter>(services, new SingleImageGenerationRouter(mockImagen3));
         });
 
         return base.CreateHost(builder);
@@ -355,7 +362,15 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
             // The orchestrator constructs all four AI services up front, so the remaining three must
             // resolve cleanly even though vision throws before they're invoked.
             MockedServicesWebApplicationFactory.ReplaceService<IGenerativeAiService>(services, Mock.Of<IGenerativeAiService>());
-            MockedServicesWebApplicationFactory.ReplaceService<IImageGenerationService>(services, Mock.Of<IImageGenerationService>());
+            var throwingTestImagen3 = Mock.Of<IImageGenerationService>();
+            MockedServicesWebApplicationFactory.ReplaceService<IImageGenerationService>(services, throwingTestImagen3);
+            // Same reason as the vision router above: the orchestrator resolves image generation
+            // through IImageGenerationRouter, a constructor dependency built eagerly along with the
+            // orchestrator — before vision even runs. Replacing only IImageGenerationService left the
+            // real ImageGenerationRouter in play, which tried to construct GeminiImagen3Service and
+            // tripped its Mocks:UseMockAi guard.
+            MockedServicesWebApplicationFactory.ReplaceService<IImageGenerationRouter>(
+                services, new SingleImageGenerationRouter(throwingTestImagen3));
             MockedServicesWebApplicationFactory.ReplaceService<IMemeGeneratorService>(services, Mock.Of<IMemeGeneratorService>());
         });
 
