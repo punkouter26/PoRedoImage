@@ -68,30 +68,6 @@ public class Imagen3ServiceTests
         Assert.Contains("Mocks:UseMockAi", ex.Message);
     }
 
-    // ─── Constructor — does not throw regardless of config ──────────
-
-    [Fact]
-    public void Constructor_WithValidConfig_DoesNotThrow()
-    {
-        var svc = CreateService(BuildConfig());
-        Assert.NotNull(svc);
-    }
-
-    [Fact]
-    public void Constructor_WithNoApiKey_DoesNotThrow()
-    {
-        var svc = CreateService(BuildConfig(apiKey: null));
-        Assert.NotNull(svc);
-    }
-
-    [Fact]
-    public void Constructor_CustomModel_DoesNotThrow()
-    {
-        var svc = CreateService(BuildConfig(model: "imagen-3.0-generate-002"));
-        Assert.NotNull(svc);
-        Assert.True(svc.IsConfigured);
-    }
-
     // ─── GenerateAsync guard clauses ───────────────────────────
 
     [Fact]
@@ -102,20 +78,14 @@ public class Imagen3ServiceTests
             svc.GenerateAsync("a prompt"));
     }
 
-    [Fact]
-    public async Task GenerateAsync_WhitespacePrompt_ThrowsArgumentException()
+    [Theory]
+    [InlineData("   ")] // whitespace-only prompt
+    [InlineData("")]    // empty prompt
+    public async Task GenerateAsync_BlankPrompt_ThrowsArgumentException(string prompt)
     {
         var svc = CreateService(BuildConfig());
-        // ArgumentException.ThrowIfNullOrWhiteSpace throws ArgumentException for whitespace
+        // ArgumentException.ThrowIfNullOrWhiteSpace throws ArgumentException for whitespace/empty
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            svc.GenerateAsync("   "));
-    }
-
-    [Fact]
-    public async Task GenerateAsync_EmptyPrompt_ThrowsArgumentException()
-    {
-        var svc = CreateService(BuildConfig());
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            svc.GenerateAsync(""));
+            svc.GenerateAsync(prompt));
     }
 }

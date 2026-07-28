@@ -7,75 +7,19 @@ namespace PoRedoImage.Tests.Unit.Features;
 /// </summary>
 public class DiagnosticsEndpointsTests
 {
-    [Fact]
-    public void MaskValue_NullValue_ReturnsNotSet()
+    [Theory]
+    [InlineData(null, "(not set)")]                          // null -> not set
+    [InlineData("", "(not set)")]                             // empty -> not set
+    [InlineData("abc", "***")]                                // short value -> fully masked
+    [InlineData("sk-abcdefghij123456", "sk-a***********3456")] // long value -> shows start and end
+    [InlineData("12345678", "********")]                       // exactly 8 chars -> fully masked
+    [InlineData("123456789", "12*****89")]                     // 9 chars -> partially masked (visibleStart=2, visibleEnd=2)
+    public void MaskValue_ReturnsExpectedMaskedForm(string? input, string expected)
     {
         // Act
-        var result = DiagnosticsEndpoints.MaskValue(null);
+        var result = DiagnosticsEndpoints.MaskValue(input);
 
         // Assert
-        Assert.Equal("(not set)", result);
-    }
-
-    [Fact]
-    public void MaskValue_EmptyString_ReturnsNotSet()
-    {
-        // Act
-        var result = DiagnosticsEndpoints.MaskValue("");
-
-        // Assert
-        Assert.Equal("(not set)", result);
-    }
-
-    [Fact]
-    public void MaskValue_ShortValue_FullyMasked()
-    {
-        // Act
-        var result = DiagnosticsEndpoints.MaskValue("abc");
-
-        // Assert
-        Assert.Equal("***", result);
-    }
-
-    [Fact]
-    public void MaskValue_LongValue_ShowsStartAndEnd()
-    {
-        // Arrange
-        var value = "sk-abcdefghij123456";
-
-        // Act
-        var result = DiagnosticsEndpoints.MaskValue(value);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.StartsWith("sk-a", result);
-        Assert.EndsWith("3456", result);
-        Assert.Contains("*", result);
-        Assert.Equal(value.Length, result.Length);
-    }
-
-    [Fact]
-    public void MaskValue_ExactlyEightChars_FullyMasked()
-    {
-        // Act
-        var result = DiagnosticsEndpoints.MaskValue("12345678");
-
-        // Assert
-        Assert.Equal("********", result);
-    }
-
-    [Fact]
-    public void MaskValue_NineChars_PartiallyMasked()
-    {
-        // Arrange — 9 chars, visibleStart = 2, visibleEnd = 2
-        var value = "123456789";
-
-        // Act
-        var result = DiagnosticsEndpoints.MaskValue(value);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(9, result.Length);
-        Assert.Contains("*", result);
+        Assert.Equal(expected, result);
     }
 }

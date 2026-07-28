@@ -47,31 +47,24 @@ public class OpenAiOptionsValidatorTests
         Assert.True(result.Succeeded);
     }
 
-    [Fact]
-    public void MissingEndpoint_Production_Fails()
+    [Theory]
+    [InlineData("endpoint", "OpenAI:Endpoint")]
+    [InlineData("key", "OpenAI:Key")]
+    [InlineData("deployment", "ChatCompletionsDeployment")]
+    public void MissingField_Production_Fails(string blankedField, string expectedFailureFragment)
     {
         var v = MakeValidator(isProduction: true);
-        var result = v.Validate(null, new OpenAiOptions { Endpoint = "", Key = "k", ChatCompletionsDeployment = "gpt-4o" });
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Endpoint"));
-    }
+        var options = new OpenAiOptions
+        {
+            Endpoint = blankedField == "endpoint" ? "" : "https://x.openai.azure.com/",
+            Key = blankedField == "key" ? "" : "k",
+            ChatCompletionsDeployment = blankedField == "deployment" ? "" : "gpt-4o",
+        };
 
-    [Fact]
-    public void MissingKey_Production_Fails()
-    {
-        var v = MakeValidator(isProduction: true);
-        var result = v.Validate(null, new OpenAiOptions { Endpoint = "https://x.openai.azure.com/", Key = "", ChatCompletionsDeployment = "gpt-4o" });
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Key"));
-    }
+        var result = v.Validate(null, options);
 
-    [Fact]
-    public void MissingDeployment_Production_Fails()
-    {
-        var v = MakeValidator(isProduction: true);
-        var result = v.Validate(null, new OpenAiOptions { Endpoint = "https://x.openai.azure.com/", Key = "k", ChatCompletionsDeployment = "" });
         Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("ChatCompletionsDeployment"));
+        Assert.Contains(result.Failures, f => f.Contains(expectedFailureFragment));
     }
 
     // ── New dev-policy contract: real AI in dev means real keys; no silent degradation. ──

@@ -31,18 +31,12 @@ public class ImageAnalysisEndpointTests : IClassFixture<MockedServicesWebApplica
 
     // ─── Validation tests ───────────────────────────────────────────
 
-    [Fact]
-    public async Task AnalyzeImage_EmptyImageData_Returns400()
+    [Theory]
+    [InlineData("")]                      // empty image data
+    [InlineData("not-valid-base64!!!")]   // invalid base64
+    public async Task AnalyzeImage_BadImageData_Returns400(string imageData)
     {
-        var request = new ImageAnalysisRequest { ImageData = "", ContentType = "image/png" };
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task AnalyzeImage_InvalidBase64_Returns400()
-    {
-        var request = new ImageAnalysisRequest { ImageData = "not-valid-base64!!!", ContentType = "image/png" };
+        var request = new ImageAnalysisRequest { ImageData = imageData, ContentType = "image/png" };
         var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

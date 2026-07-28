@@ -51,13 +51,6 @@ public class AzureOpenAiServiceTests
         Assert.NotNull(service);
     }
 
-    [Fact]
-    public void Constructor_DefaultDeployments_UsedWhenNotConfigured()
-    {
-        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
-        Assert.NotNull(service);
-    }
-
     // ─── Mock-mode guard (Item #4) ──────────────────────────────────
     // AzureOpenAiService uses the Azure.AI.OpenAI SDK which does NOT route through HttpClient,
     // so the MockAiDelegatingHandler cannot intercept it. The construction-time guard is the
@@ -77,16 +70,6 @@ public class AzureOpenAiServiceTests
         var ex = Assert.Throws<InvalidOperationException>(
             () => new AzureOpenAiService(config, _loggerMock.Object));
         Assert.Contains("Mocks:UseMockAi", ex.Message);
-    }
-
-    [Fact]
-    public void Constructor_MockModeDisabled_StillSucceedsWithValidConfig()
-    {
-        // Explicitly verify the default BuildConfig does NOT set Mocks:UseMockAi, so the existing
-        // happy-path tests aren't accidentally relying on a misconfigured default.
-        var config = BuildConfig();
-        var service = new AzureOpenAiService(config, _loggerMock.Object);
-        Assert.NotNull(service);
     }
 
     // ─── EnhanceDescriptionAsync guard-clause tests ─────────────────

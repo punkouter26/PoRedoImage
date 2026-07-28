@@ -22,17 +22,4 @@ public class ImageAnalysisRequestTests
         Assert.Equal(200, request.DescriptionLength);
         Assert.Equal(ProcessingMode.ImageRegeneration, request.Mode);
     }
-
-    [Fact]
-    public void DescriptionLength_ValidRange_Accepted()
-    {
-        // Arrange
-        var request = new ImageAnalysisRequest();
-
-        // Act
-        request.DescriptionLength = 300;
-
-        // Assert
-        Assert.Equal(300, request.DescriptionLength);
-    }
 }

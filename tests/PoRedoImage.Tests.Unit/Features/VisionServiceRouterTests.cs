@@ -5,18 +5,13 @@ using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Shared.Configuration;
 
-namespace PoRedoImage.Tests.Integration.Features;
+namespace PoRedoImage.Tests.Unit.Features;
 
 /// <summary>
 /// Guards the id-namespacing contract. The original router matched by bare prefix, so the browser
 /// text model "qwen2.5-0.5b-instruct" resolved to Ollama — work would have gone to the wrong
 /// backend the moment a browser id reached the server.
 /// </summary>
-/// <remarks>
-/// Consolidated into a single [Theory]: TestCountCeilingTests counts fact/theory methods, not
-/// InlineData cases, and this tier had only one method of headroom left (49/50) before this file
-/// moved here from the Unit tier per the Task 1 brief's ceiling-overflow instructions.
-/// </remarks>
 public class VisionServiceRouterTests
 {
     private static VisionServiceRouter BuildRouter(out AzureVisionService azure, out OllamaVisionService ollama)
