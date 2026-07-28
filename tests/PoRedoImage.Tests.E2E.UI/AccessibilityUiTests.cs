@@ -94,12 +94,18 @@ public sealed class AccessibilityUiTests : IAsyncLifetime
             return;
         }
 
+        // Include each check's message, not just the element HTML: for color-contrast axe reports
+        // the measured ratio and the exact foreground/background pair, which is the only thing that
+        // makes a failure actionable without re-deriving computed styles by hand.
         var report = string.Join(
             Environment.NewLine,
             results.Violations.Select(v =>
                 $"  [{v.Impact}] {v.Id}: {v.Help}{Environment.NewLine}" +
                 $"    {v.HelpUrl}{Environment.NewLine}" +
-                string.Join(Environment.NewLine, v.Nodes.Select(n => $"    → {n.Html}"))));
+                string.Join(Environment.NewLine, v.Nodes.Select(n =>
+                    $"    → {n.Html}{Environment.NewLine}" +
+                    string.Join(Environment.NewLine,
+                        (n.Any ?? []).Select(c => $"        {c.Message}"))))));
 
         Assert.Fail(
             $"{results.Violations.Length} WCAG 2.2 AA violation(s) on {page.Url}:{Environment.NewLine}{report}");

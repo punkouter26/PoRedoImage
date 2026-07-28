@@ -1,4 +1,4 @@
-/* ── Design Tokens ───────────────────────────────────────────────────── */
+﻿/* ── Design Tokens ───────────────────────────────────────────────────── */
 :root {
     /* Colors */
     --color-primary:       #052767;
@@ -10,7 +10,9 @@
     --color-surface-elevated: #f1f5f9;
     --color-bg:            #f8fafc;
     --color-body:          #1e293b;
-    --color-muted:         #64748b;
+    --color-muted:         #64748b;   /* 4.7:1 on --color-bg — safe for body text */
+    /* Dark surfaces ONLY (e.g. the #0f172a footer/nav). On a light background this is
+       ~2.9:1 and fails WCAG AA — use --color-muted there. */
     --color-muted-light:   #94a3b8;
     --color-focus-ring:    rgba(5,39,103,0.15);
     --color-success:       #16a34a;
@@ -286,7 +288,8 @@ a, .btn-link { color: var(--color-primary); }
 
 .drop-zone__formats {
     font-size: 0.78rem;
-    color: var(--color-muted-light);
+    /* --color-muted-light (#94a3b8) is ~2.9:1 on this light surface. Muted is 4.7:1. */
+    color: var(--color-muted);
     margin: 0;
 }
 
@@ -1682,7 +1685,7 @@ code { color: #c026d3; }
 }
 .gallery-bar__label {
     display: inline-flex; align-items: center; gap: 0.3rem;
-    flex: 0 0 auto; font-weight: 600; font-size: .9rem; color: #cbd5e1;
+    flex: 0 0 auto; font-weight: 600; font-size: .9rem; color: var(--color-body);
     white-space: nowrap;
 }
 .gallery-bar__count {
@@ -1697,11 +1700,11 @@ code { color: #c026d3; }
     padding: 2px 0; scrollbar-width: thin;
 }
 .gallery-bar__empty-hint {
-    flex: 1 1 auto; color: #9ca3af; font-size: .85rem;
+    flex: 1 1 auto; color: var(--color-muted); font-size: .85rem;
     display: inline-flex; align-items: center;
 }
 .gallery-bar__refresh {
-    flex: 0 0 auto; background: transparent; border: none; color: #9ca3af;
+    flex: 0 0 auto; background: transparent; border: none; color: var(--color-muted);
     cursor: pointer; border-radius: 8px; width: 32px; height: 32px;
     display: inline-flex; align-items: center; justify-content: center;
     transition: color .2s, background .2s;
@@ -1790,14 +1793,14 @@ code { color: #c026d3; }
     cursor: pointer; color: inherit; font-size: .9rem; transition: background .2s;
 }
 .description-accordion__toggle:hover { background: rgba(255,255,255,.1); }
-.description-accordion__meta { font-size: .78rem; color: #9ca3af; }
+.description-accordion__meta { font-size: .78rem; color: var(--color-muted); }
 .description-accordion__time { font-variant-numeric: tabular-nums; }
 .description-accordion__body { padding: 0.75rem 1rem; background: rgba(0,0,0,.1); }
 
 /* ── Studio home page ────────────────────────────────────── */
 .studio-hero { padding: 2rem 0 1rem; text-align: center; }
 .studio-hero h1 { font-size: 2rem; font-weight: 700; }
-.studio-hero p { color: #9ca3af; }
+.studio-hero p { color: var(--color-muted); }
 
 /* Two-column layout: upload left, feature cards right */
 .studio-body {
@@ -1829,7 +1832,7 @@ code { color: #c026d3; }
 .studio-feature-card--ready { border-color: #22c55e; }
 .studio-feature-card__icon { font-size: 1.6rem; }
 .studio-feature-card__title { font-weight: 700; font-size: 1rem; }
-.studio-feature-card__desc { font-size: .82rem; color: #9ca3af; flex: 1; }
+.studio-feature-card__desc { font-size: .82rem; color: var(--color-muted); flex: 1; }
 .studio-feature-card__cta { font-size: .82rem; font-weight: 600; color: var(--color-primary,#6366f1); margin-top: .25rem; }
 
 /* ── Drop zone micro-interactions ────────────────────────── */

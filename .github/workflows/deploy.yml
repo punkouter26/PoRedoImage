@@ -276,14 +276,16 @@ jobs:
                 echo "::error::/_framework/blazor.web.js returned HTTP $BOOTJS — WASM runtime assets are missing from the deploy."
                 exit 1
               fi
-              # The Client assembly must be present in the boot manifest. Publish-trimming
-              # previously stripped every component while still producing a 200 host page.
-              BOOT=$(curl -s "$BASE/_framework/blazor.boot.json" --max-time 20 || true)
-              if printf '%s' "$BOOT" | grep -q 'PoRedoImage.Client'; then
-                echo "==== Boot manifest contains PoRedoImage.Client ===="
-              else
-                echo "::error::PoRedoImage.Client is absent from _framework/blazor.boot.json — publish-trimming stripped the client assembly."
-                printf '%s' "$BOOT" | head -c 800; echo
+              # The Client assembly itself must be served. Publish-trimming previously stripped
+              # every component while still producing a 200 host page (see 30f3070).
+              # NOTE: do not probe _framework/blazor.boot.json — .NET 10 no longer emits it, and
+              # because the auth FallbackPolicy treats the missing path as an unknown route it
+              # answers 302-to-login rather than 404, which would make a grep-based check fail
+              # every deploy while looking like a trimming regression.
+              WASM=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/_framework/PoRedoImage.Client.wasm" --max-time 30 || echo 000)
+              echo "==== /_framework/PoRedoImage.Client.wasm: HTTP $WASM ===="
+              if [ "$WASM" != "200" ]; then
+                echo "::error::PoRedoImage.Client.wasm returned HTTP $WASM — the client assembly did not ship (publish-trimming or a failed client build)."
                 exit 1
               fi
 

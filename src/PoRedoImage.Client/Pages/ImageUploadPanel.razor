@@ -1,4 +1,4 @@
-@using Microsoft.AspNetCore.Components.Forms
+﻿@using Microsoft.AspNetCore.Components.Forms
 @using PoRedoImage.Client.Models
 
 <div class="upload-panel" @onkeydown="HandleKeyDown" tabindex="0" role="region" aria-label="Image upload">
@@ -70,7 +70,8 @@
             </div>
         }
 
-        <InputFile OnChange="@OnFileChange" class="drop-zone__input" accept=".jpg,.jpeg,.png" />
+        <InputFile OnChange="@OnFileChange" class="drop-zone__input" accept=".jpg,.jpeg,.png"
+                   aria-label="Upload an image (JPG or PNG, up to 20 MB)" />
     </div>
 
     @* ── Error ─────────────────────────────────────────────────────── *@

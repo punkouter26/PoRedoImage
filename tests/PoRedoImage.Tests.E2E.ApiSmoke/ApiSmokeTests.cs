@@ -114,16 +114,22 @@ public sealed class ApiSmokeTests : IClassFixture<E2EApiFixture>
     }
 
     [LiveServerFact]
-    public async Task Anonymous_home_request_redirects_to_login()
+    public async Task Anonymous_home_request_serves_the_wasm_host_shell()
     {
-        // Unauthenticated users must NOT see the studio — the BFF should
-        // redirect to /login.
+        // The host shell is deliberately anonymous (AGENT.MD rule 7): the server returns the
+        // document and the WASM router performs the /login redirect client-side. This test
+        // previously asserted a 302 from the server, which the BFF never emits for "/" — it only
+        // passed because the tier self-skips without a live instance. The redirect itself is
+        // covered by the E2E UI tier (LoginUiTests.*_Unauthenticated_home_redirects_to_login),
+        // which is the only place it is observable.
         var response = await _fixture.AnonymousClient.GetAsync("/");
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.NotNull(response.Headers.Location);
-        var loc = response.Headers.Location!.ToString();
-        Assert.Contains("/login", loc, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("blazor.web.js", body, StringComparison.OrdinalIgnoreCase);
+        // No authenticated content may leak into the anonymous shell.
+        Assert.DoesNotContain("GUEST LOGGED IN", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [LiveServerFact]

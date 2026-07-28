@@ -1,4 +1,4 @@
-/* ── App Shell ─────────────────────────────────────────── */
+﻿/* ── App Shell ─────────────────────────────────────────── */
 .app-header {
     position: sticky;
     top: 0;
@@ -145,7 +145,8 @@
 }
 
 .app-footer__center {
-    color: #334155;
+    /* #334155 on the #0f172a footer was ~1.5:1. Slate-300 gives ~11:1. */
+    color: #cbd5e1;
 }
 
 .app-footer__env-badge {
