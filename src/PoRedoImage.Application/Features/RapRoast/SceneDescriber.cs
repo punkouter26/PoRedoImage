@@ -1,40 +1,52 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Application.Features.RapRoast;
 
 /// <summary>
-/// Produces the detailed scene description the roast is written from.
+/// Produces the scene description the roast is written from, combining machine-extracted facts with
+/// a vision model's interpretation.
 /// </summary>
 /// <remarks>
-/// Azure Computer Vision alone is not enough here. Its Caption feature is region-limited, and when
-/// it is unavailable <c>AzureVisionService</c> synthesises a description by joining the top eight
-/// tags — "A photo showing person, clothing, food, man, indoor, fast food, wall, meal". That is a
-/// keyword list, not a scene, and a lyric writer given keywords can only produce generic bars.
+/// Azure Computer Vision alone is not enough. Its Caption feature is region-limited, and when it is
+/// unavailable <c>AzureVisionService</c> synthesises a description by joining the top eight tags —
+/// "A photo showing person, clothing, food, man, indoor, fast food, wall, meal". That is a keyword
+/// list, and a lyric writer given keywords can only produce generic bars.
 /// <para>
-/// So when a vision-capable chat model is configured this asks it for the specifics a roast
-/// actually needs — what someone is wearing, how they are standing, what is behind them, what is
-/// slightly off about the whole arrangement — and falls back to the tag-derived description only
-/// when no such model exists.
+/// The pipeline is therefore: <see cref="ISceneDetailProvider"/> supplies ground truth (OCR text,
+/// region captions, objects) → a vision-language model interprets the image <em>with those facts in
+/// hand</em> and returns a structured <see cref="SceneSnapshot"/> → optionally a second model is
+/// consulted and the two are merged. Each stage degrades independently; losing all of them returns
+/// the original tag-derived text rather than failing.
 /// </para>
 /// </remarks>
-public sealed class SceneDescriber(IChatCompletionService chat, ILogger<SceneDescriber> logger)
+public sealed class SceneDescriber(
+    IChatCompletionService chat,
+    ISceneDetailProvider sceneDetails,
+    IGenerativeAiService generativeAi,
+    IConfiguration configuration,
+    ILogger<SceneDescriber> logger)
 {
     private const string SystemPrompt =
-        "You are a scene describer feeding a comedy writer. Describe ONLY what is visibly in the "
-        + "image, in 4-6 sentences of concrete detail. Cover, in this order: what the person is "
-        + "wearing (specific garments, colours, fit, condition); their pose and what their hands "
-        + "are doing; their facial expression; the setting and what is on the walls or surfaces "
-        + "behind them; any objects, food, or props and their exact state; and finally the single "
-        + "most incongruous or funny detail in the frame. "
-        + "Be specific and literal — name things. Do NOT describe or infer race, ethnicity, skin "
-        + "tone, body size or weight, age, disability, or attractiveness. Do not speculate about "
-        + "who the person is. Do not write jokes; just report what is there.";
+        "You are a scene analyst feeding a comedy writer. Study the image and reply with MINIFIED "
+        + "JSON only — no prose, no markdown fences, no commentary.\n"
+        + "Schema: {\"outfit\":[\"specific garments with colour, fit and condition\"],"
+        + "\"pose\":\"body position and what the hands are doing\","
+        + "\"expression\":\"facial expression\","
+        + "\"setting\":\"where this is, including what is on the walls or surfaces behind\","
+        + "\"props\":[\"objects and food, with their exact state\"],"
+        + "\"text_in_image\":[\"text visible in the frame, verbatim\"],"
+        + "\"most_incongruous_detail\":\"the single funniest or most out-of-place thing present\"}\n"
+        + "Be specific and literal — name things precisely. Report only what is visible; do not "
+        + "invent. Do NOT describe or infer race, ethnicity, skin tone, body size or weight, age, "
+        + "disability, or attractiveness, and never include them in any field. Do not write jokes.";
 
     /// <summary>
-    /// Returns a rich description, or <paramref name="fallbackDescription"/> when no vision-capable
-    /// model is available.
+    /// Describes the image. Falls back through progressively simpler sources and only returns
+    /// <paramref name="fallbackDescription"/> when no model is available at all.
     /// </summary>
     public async Task<SceneDescription> DescribeAsync(
         byte[] image,
@@ -44,51 +56,165 @@ public sealed class SceneDescriber(IChatCompletionService chat, ILogger<SceneDes
     {
         ArgumentNullException.ThrowIfNull(image);
 
-        if (!chat.IsConfigured)
-        {
-            logger.LogInformation("No vision chat model configured — using the tag-derived description.");
-            return new SceneDescription(fallbackDescription, Detailed: false, 0);
-        }
-
         var sw = Stopwatch.StartNew();
 
-        try
-        {
-            // The tags come from the vision backend and are cheap corroboration — they help the
-            // model anchor on things it might otherwise gloss over, like the type of venue.
-            var user = tags.Count > 0
-                ? $"Detected labels (corroboration only, do not just repeat them): {string.Join(", ", tags)}.\n\nDescribe the image."
-                : "Describe the image.";
+        // Ground truth first — OCR in particular, because a language model will happily invent the
+        // text on a sign it cannot actually read.
+        var details = await SafeDetailsAsync(image, ct);
 
-            var result = await chat.CompleteAsync(SystemPrompt, user, image, ct);
+        if (!chat.IsConfigured)
+        {
             sw.Stop();
 
-            var text = result.Content.Trim();
-            if (string.IsNullOrWhiteSpace(text))
+            // Even with no vision model, OCR and objects beat a bare tag list.
+            if (details.HasAny)
             {
-                logger.LogWarning("Vision model returned an empty description; using the tag-derived one.");
-                return new SceneDescription(fallbackDescription, Detailed: false, sw.ElapsedMilliseconds);
+                logger.LogInformation("No vision model configured; describing from extracted detail alone.");
+                return new SceneDescription(
+                    $"{fallbackDescription}. {details.ToPromptBlock()}",
+                    Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds);
             }
 
-            logger.LogInformation(
-                "Scene described by vision model in {Elapsed}ms. Chars={Chars}, Tokens={Tokens}",
-                result.ElapsedMs, text.Length, result.TokensUsed);
+            logger.LogInformation("No vision model or scene detail available; using the tag-derived description.");
+            return new SceneDescription(
+                fallbackDescription, Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds);
+        }
 
-            return new SceneDescription(text, Detailed: true, sw.ElapsedMilliseconds);
+        var snapshot = await ExtractAsync(image, tags, details, ct);
+
+        if (SecondOpinionEnabled)
+        {
+            snapshot = await MergeSecondOpinionAsync(image, snapshot, ct);
+        }
+
+        sw.Stop();
+
+        if (!snapshot.HasSubstance)
+        {
+            logger.LogWarning("Vision model returned nothing usable; falling back to extracted detail.");
+            var text = details.HasAny ? $"{fallbackDescription}. {details.ToPromptBlock()}" : fallbackDescription;
+            return new SceneDescription(text, Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds);
+        }
+
+        return new SceneDescription(
+            snapshot.ToProse(), Detailed: true, snapshot, details, sw.ElapsedMilliseconds);
+    }
+
+    /// <summary>
+    /// Whether to consult a second vision model and merge. Off by default: it roughly doubles the
+    /// cost of the vision step for a marginal gain once OCR is supplying the facts.
+    /// </summary>
+    private bool SecondOpinionEnabled =>
+        configuration.GetValue<bool>(ConfigKeys.VisionSecondOpinion);
+
+    private async Task<SceneDetails> SafeDetailsAsync(byte[] image, CancellationToken ct)
+    {
+        try
+        {
+            return await sceneDetails.GetDetailsAsync(image, ct);
         }
         catch (Exception ex)
         {
-            // A vision failure must not lose the whole roast — the tag-derived description still
-            // produces bars, just blander ones.
-            sw.Stop();
-            logger.LogWarning(ex, "Vision description failed; falling back to the tag-derived description.");
-            return new SceneDescription(fallbackDescription, Detailed: false, sw.ElapsedMilliseconds);
+            logger.LogWarning(ex, "Scene detail extraction failed; continuing without it.");
+            return SceneDetails.Empty;
         }
+    }
+
+    private async Task<SceneSnapshot> ExtractAsync(
+        byte[] image, IReadOnlyList<string> tags, SceneDetails details, CancellationToken ct)
+    {
+        try
+        {
+            var user = BuildUserPrompt(tags, details);
+            var result = await chat.CompleteAsync(SystemPrompt, user, image, ct);
+
+            var snapshot = SceneSnapshot.Parse(result.Content);
+
+            // OCR is authoritative for text. If the model missed lines the reader found, add them —
+            // and prefer the read values over anything the model claims to have seen.
+            if (details.TextLines.Count > 0)
+            {
+                snapshot = snapshot with
+                {
+                    TextInImage = [.. details.TextLines
+                        .Concat(snapshot.TextInImage)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(12)],
+                };
+            }
+
+            logger.LogInformation(
+                "Scene extracted in {Elapsed}ms. Outfit={Outfit}, Props={Props}, Text={Text}, Tokens={Tokens}",
+                result.ElapsedMs, snapshot.Outfit.Count, snapshot.Props.Count,
+                snapshot.TextInImage.Count, result.TokensUsed);
+
+            return snapshot;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Vision extraction failed.");
+            return SceneSnapshot.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Consults the general vision service and folds anything new into the snapshot.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately additive only. The second model's free-text answer cannot be trusted to overwrite
+    /// structured slots, so it contributes a prop line the first pass may have missed and nothing else.
+    /// </remarks>
+    private async Task<SceneSnapshot> MergeSecondOpinionAsync(
+        byte[] image, SceneSnapshot snapshot, CancellationToken ct)
+    {
+        try
+        {
+            var second = (await generativeAi.DescribePersonAsync(image, ct)).Trim();
+            if (string.IsNullOrWhiteSpace(second)) return snapshot;
+
+            logger.LogInformation("Second-opinion vision pass returned {Chars} chars.", second.Length);
+
+            return snapshot with
+            {
+                Props = [.. snapshot.Props.Append($"second look: {second}").Take(12)],
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Second-opinion vision pass failed; keeping the primary snapshot.");
+            return snapshot;
+        }
+    }
+
+    private static string BuildUserPrompt(IReadOnlyList<string> tags, SceneDetails details)
+    {
+        var parts = new List<string>();
+
+        if (details.HasAny)
+        {
+            parts.Add(
+                "Machine-extracted facts about this image. Treat these as TRUE and incorporate them; "
+                + "the OCR text in particular is exact and must not be paraphrased or invented over:\n"
+                + details.ToPromptBlock());
+        }
+
+        if (tags.Count > 0)
+            parts.Add($"Detected labels (corroboration only, do not simply repeat them): {string.Join(", ", tags)}.");
+
+        parts.Add("Analyse the image and return the JSON object.");
+        return string.Join("\n\n", parts);
     }
 }
 
-/// <summary>A scene description and whether it came from a vision model or the tag fallback.</summary>
-/// <param name="Text">The description handed to the lyric writer.</param>
-/// <param name="Detailed">True when a vision model produced it.</param>
+/// <summary>The description handed to the lyric writer, plus how it was produced.</summary>
+/// <param name="Text">Prose description.</param>
+/// <param name="Detailed">True when a vision model produced a structured snapshot.</param>
+/// <param name="Snapshot">Structured slots; <see cref="SceneSnapshot.Empty"/> when unavailable.</param>
+/// <param name="Details">Machine-extracted ground truth.</param>
 /// <param name="ElapsedMs">Wall-clock time taken.</param>
-public sealed record SceneDescription(string Text, bool Detailed, long ElapsedMs);
+public sealed record SceneDescription(
+    string Text,
+    bool Detailed,
+    SceneSnapshot Snapshot,
+    SceneDetails Details,
+    long ElapsedMs);

@@ -77,5 +77,26 @@ public class RapRoastResponse
     /// </summary>
     public bool DescriptionIsDetailed { get; set; }
 
+    /// <summary>Structured scene slots, when a vision model produced them. Null otherwise.</summary>
+    public SceneSnapshotDto? Scene { get; set; }
+
     public long TotalMs { get; set; }
+}
+
+/// <summary>
+/// Wire shape of the structured scene read. Mirrors the Application-layer snapshot; Shared cannot
+/// reference Application, so the endpoint maps between them.
+/// </summary>
+public class SceneSnapshotDto
+{
+    public IReadOnlyList<string> Outfit { get; set; } = [];
+    public string? Pose { get; set; }
+    public string? Expression { get; set; }
+    public string? Setting { get; set; }
+    public IReadOnlyList<string> Props { get; set; } = [];
+
+    /// <summary>Text read from the image by OCR — exact, not inferred.</summary>
+    public IReadOnlyList<string> TextInImage { get; set; } = [];
+
+    public string? MostIncongruousDetail { get; set; }
 }

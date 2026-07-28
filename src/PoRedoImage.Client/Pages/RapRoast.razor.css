@@ -158,3 +158,48 @@
     font-size: 0.78rem;
     color: #475569;
 }
+
+/* Structured scene slots. A definition list is the correct semantic here — each label genuinely
+   describes its value — and it gives screen readers the pairing for free. */
+.scene-slots {
+    display: grid;
+    grid-template-columns: minmax(90px, auto) 1fr;
+    gap: 0.35rem 0.85rem;
+    margin: 0.5rem 0 0;
+    font-size: 0.82rem;
+}
+
+.scene-slots dt {
+    font-weight: 600;
+    color: #334155;
+}
+
+.scene-slots dd {
+    margin: 0;
+    color: #475569;
+}
+
+/* OCR lines are quoted verbatim from the image, so they get chip treatment to distinguish them
+   from the model's own words. */
+.scene-slots__chip {
+    display: inline-block;
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0.05rem 0.35rem;
+    margin: 0 0.25rem 0.25rem 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    color: #334155;
+}
+
+@media (max-width: 479px) {
+    .scene-slots {
+        grid-template-columns: 1fr;
+        gap: 0.1rem 0;
+    }
+
+    .scene-slots dd {
+        margin-bottom: 0.4rem;
+    }
+}

@@ -50,6 +50,7 @@ public sealed class RapRoastOrchestrator(
         {
             ImageDescription = description,
             DescriptionIsDetailed = scene.Detailed,
+            Scene = scene.Detailed ? Map(scene.Snapshot) : null,
         };
 
         // Steps 3 + 4 — write bars, then have them performed. A refusal from the music provider is
@@ -117,6 +118,18 @@ public sealed class RapRoastOrchestrator(
         response.TotalMs = total.ElapsedMilliseconds;
         return response;
     }
+
+    /// <summary>Maps the Application snapshot onto the wire DTO (Shared cannot see Application).</summary>
+    private static SceneSnapshotDto Map(SceneSnapshot s) => new()
+    {
+        Outfit = s.Outfit,
+        Pose = s.Pose,
+        Expression = s.Expression,
+        Setting = s.Setting,
+        Props = s.Props,
+        TextInImage = s.TextInImage,
+        MostIncongruousDetail = s.MostIncongruousDetail,
+    };
 
     /// <summary>Musical direction handed to the music model alongside the lyrics.</summary>
     private static string StylePrompt(RapStyle style) => style switch

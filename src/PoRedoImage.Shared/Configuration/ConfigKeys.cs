@@ -91,6 +91,13 @@ public static class ConfigKeys
     // ── Storage ─────────────────────────────────────────────────────────
     public const string StorageConnectionString = "Storage:ConnectionString";
 
+    // ── Vision ──────────────────────────────────────────────────────────
+    /// <summary>
+    /// Consult a second vision model and merge its answer into the scene snapshot. Off by default:
+    /// it roughly doubles the cost of the vision step for a marginal gain once OCR supplies facts.
+    /// </summary>
+    public const string VisionSecondOpinion = "Vision:SecondOpinion";
+
     // ── Feature flags ───────────────────────────────────────────────────
     public const string ImageGenProvider = "ImageGen:Provider";
     public const string MocksUseMockAi = "Mocks:UseMockAi";

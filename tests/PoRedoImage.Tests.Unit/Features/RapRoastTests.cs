@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using PoRedoImage.Application.Features.RapRoast;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Unit.Features;
@@ -174,9 +176,14 @@ public class RapRoastTests
 
         var orchestrator = new RapRoastOrchestrator(
             router.Object,
-            // Chat is unconfigured, so the describer returns the vision backend's text unchanged —
-            // these tests are about the refusal state machine, not the description.
-            new SceneDescriber(chat.Object, NullLogger<SceneDescriber>.Instance),
+            // Chat is unconfigured and no scene detail is available, so the describer returns the
+            // vision backend's text unchanged — these tests are about the refusal state machine.
+            new SceneDescriber(
+                chat.Object,
+                new NullSceneDetailProvider(),
+                Mock.Of<IGenerativeAiService>(),
+                new ConfigurationBuilder().Build(),
+                NullLogger<SceneDescriber>.Instance),
             new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance),
             music,
             NullLogger<RapRoastOrchestrator>.Instance);

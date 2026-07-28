@@ -117,7 +117,58 @@
 
                 <details class="roast-seen" open="@(!_result.DescriptionIsDetailed)">
                     <summary>What the AI saw</summary>
-                    <p class="mb-0 small">@_result.ImageDescription</p>
+
+                    @if (_result.Scene is { } scene)
+                    {
+                        @* Named slots rather than a paragraph — you can see at a glance whether the
+                           model actually read the scene, and which detail the bars leaned on. *@
+                        <dl class="scene-slots">
+                            @if (scene.TextInImage.Count > 0)
+                            {
+                                <dt>Text in frame</dt>
+                                <dd>
+                                    @foreach (var line in scene.TextInImage)
+                                    {
+                                        <span class="scene-slots__chip">@line</span>
+                                    }
+                                </dd>
+                            }
+                            @if (scene.Outfit.Count > 0)
+                            {
+                                <dt>Wearing</dt>
+                                <dd>@string.Join(", ", scene.Outfit)</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(scene.Pose))
+                            {
+                                <dt>Pose</dt>
+                                <dd>@scene.Pose</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(scene.Expression))
+                            {
+                                <dt>Expression</dt>
+                                <dd>@scene.Expression</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(scene.Setting))
+                            {
+                                <dt>Setting</dt>
+                                <dd>@scene.Setting</dd>
+                            }
+                            @if (scene.Props.Count > 0)
+                            {
+                                <dt>Props</dt>
+                                <dd>@string.Join(", ", scene.Props)</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(scene.MostIncongruousDetail))
+                            {
+                                <dt>Funniest detail</dt>
+                                <dd>@scene.MostIncongruousDetail</dd>
+                            }
+                        </dl>
+                    }
+                    else
+                    {
+                        <p class="mb-0 small">@_result.ImageDescription</p>
+                    }
                     @if (!_result.DescriptionIsDetailed)
                     {
                         <p class="roast-seen__thin mb-0">

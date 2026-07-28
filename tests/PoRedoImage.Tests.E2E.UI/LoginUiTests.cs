@@ -21,7 +21,38 @@ public sealed class LoginUiTests : IAsyncLifetime
     {
         _playwright = await Playwright.CreateAsync();
         _browser = await _playwright.Chromium.LaunchAsync(new() { Headless = true });
+
+        await WarmUpAsync();
     }
+
+    /// <summary>
+    /// Loads the app once and waits for the WASM runtime to boot before any test asserts.
+    /// </summary>
+    /// <remarks>
+    /// The first navigation after a rebuild pays for downloading and starting the WASM runtime,
+    /// which can outlast <c>NetworkIdle</c>. Tests that asserted immediately after it were
+    /// intermittently checking a page that had not finished hydrating — a flake that only appeared
+    /// on the first run after a build and vanished on re-run, which is the worst kind to chase.
+    /// Paying that cost once here makes every subsequent navigation hit a warm runtime.
+    /// </remarks>
+    private async Task WarmUpAsync()
+    {
+        await using var context = await _browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync(LiveServerFactAttribute.BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+            // The login form only renders once Blazor has hydrated, so its presence is the signal
+            // that the runtime is actually up rather than merely downloaded.
+            await page.WaitForSelectorAsync("a[href*='login'], .login-card, h1",
+                new() { Timeout = 30_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Warm-up is an optimisation. If it times out the tests still run and report honestly.
+        }
+    }
+
 
     public async Task DisposeAsync()
     {

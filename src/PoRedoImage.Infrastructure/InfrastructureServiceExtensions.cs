@@ -57,6 +57,9 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IChatCompletionService>(sp => sp.GetRequiredService<MockChatCompletionService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockChatCompletionService>());
 
+            // OCR / region captions are a real network call, so mock mode gets the null provider.
+            services.AddSingleton<ISceneDetailProvider, NullSceneDetailProvider>();
+
             services.AddSingleton<MockLyriaMusicService>();
             services.AddSingleton<IMusicGenerationService>(sp => sp.GetRequiredService<MockLyriaMusicService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockLyriaMusicService>());
@@ -94,6 +97,10 @@ public static class InfrastructureServiceExtensions
             // HuggingFace-hosted model with a live inference provider can do (stable-audio-3 is
             // instrumental and gated), so this stays on Google regardless of ImageGen:Provider.
             services.AddSingleton<IMusicGenerationService, LyriaMusicService>();
+
+            // OCR (Read), region captions (DenseCaptions), objects and people — the grounded facts
+            // the scene describer hands to the vision model so it does not have to guess them.
+            services.AddSingleton<ISceneDetailProvider, AzureSceneDetailService>();
         }
 
         // Scoped services
