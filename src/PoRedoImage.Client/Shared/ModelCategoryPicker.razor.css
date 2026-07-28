@@ -1,0 +1,72 @@
+﻿/* Scoped styles for ModelCategoryPicker. Colours are chosen to clear 4.5:1 on the tinted
+   selected-state fill as well as the page background — the axe gate checks both. */
+
+.model-category {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 12px);
+    padding: 0.9rem 1rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.model-category__legend {
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0 0.35rem;
+    width: auto;
+    margin-bottom: 0;
+}
+
+.model-category__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.5rem;
+}
+
+.model-category__option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.model-category__option:hover {
+    border-color: var(--color-border-hover, var(--color-primary));
+}
+
+/* The radio input is visually small, so the focus ring goes on the whole label. */
+.model-category__option:focus-within {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.model-category__option--selected {
+    border-color: var(--color-primary);
+    background: rgba(5, 39, 103, 0.06);
+}
+
+/* Degraded, not disabled: the option remains fully selectable — it just runs on the CPU. Styling
+   stays subtle so it reads as a caveat rather than an error. */
+.model-category__option--degraded {
+    border-style: dashed;
+}
+
+.model-category__name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.model-category__hint,
+.model-category__device {
+    font-size: 0.75rem;
+    /* Slate-600: clears the 4.5:1 floor on both the plain and tinted backgrounds. */
+    color: #475569;
+}
+
+.model-category__device {
+    margin: 0.75rem 0 0;
+    line-height: 1.5;
+}

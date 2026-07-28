@@ -31,6 +31,8 @@
     @* ── Upload zone + feature cards ──────────────────────────────── *@
     <div class="studio-body">
         <div class="studio-upload-col">
+            <ModelCategoryPicker @bind-Selected="_modelCategory" />
+
             <ImageUploadPanel
                 ShowDescriptionLength="false"
                 ShowProcessButton="false"
@@ -111,6 +113,7 @@
 </div>
 
 @code {
+    private ModelCategoryPicker.ModelCategory _modelCategory = ModelCategoryPicker.ModelCategory.Remote;
     private string? _previewUrl;
     private string? _error;
     private bool _hasImage => SessionService.HasImage;

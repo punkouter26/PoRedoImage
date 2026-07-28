@@ -93,6 +93,7 @@ tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI
 | `GET /api/meme-templates` | List meme templates |
 | `POST /api/meme-templates/render` | Render meme from template |
 | `POST /api/style-director/run` | 4-agent style director |
+| `POST /api/rap-roast` | Photo → roast lyrics + performed track (Lyria 3) |
 | `GET /auth/login/microsoft?returnUrl=…` | Microsoft OIDC challenge (canonical) |
 | `GET /auth/login/fake?email=…` | Dev/Test sign-in (canonical; GUEST or named user) |
 | `GET /auth/logout` | Sign out (canonical) |
@@ -158,7 +159,14 @@ tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI
 ## AI Models (Rule 14)
 Three categories selectable from the Studio home page:
 1. **Remote** — Azure OpenAI (gpt-4o chat/vision) + Google Gemini (image generation)
-2. **Web Browser** — Models that run client-side via WebGPU/WebAssembly
+2. **Web Browser** — Models that run client-side on a Web Worker via WebGPU (falling back to
+   WebAssembly). Implemented in `src/PoRedoImage.Client/LocalAi/`: `LocalModelRegistry` is the
+   catalog, `DtypeChain` owns the §5 dtype fallback (probe-time pruning against `shader-f16` /
+   WebGPU availability, then advance-on-failure through the pruned chain), and
+   `JsLocalInferenceRuntime` dispatches to one of two workers — WebLLM for text, transformers.js
+   for vision. Both workers speak the same postMessage protocol, and **all fallback policy lives
+   in C#** so two runtimes never become two policies. Selectable from the Studio page via
+   `ModelCategoryPicker`.
 3. **Ollama** — Local models (dev only, requires Ollama running locally)
 
 ## Image Generation Provider (feature flag)

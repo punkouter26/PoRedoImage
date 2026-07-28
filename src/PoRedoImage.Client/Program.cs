@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+﻿using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using PoRedoImage.Client.Http;
 using PoRedoImage.Client.Shared;
@@ -32,6 +32,10 @@ builder.Services.AddRadzenComponents();
 
 // Active-image session, persisted across feature pages for the browser session.
 builder.Services.AddScoped<ImageSessionService>();
+
+// Browser-native local AI (§5): model registry + dtype fallback chain, executed on a worker.
+// Scoped so each circuit disposes its workers and releases GPU memory.
+builder.Services.AddScoped<PoRedoImage.Client.LocalAi.LocalAiService>();
 
 // Procedural Web Audio micro-feedback (success / failure / tick). Zero asset cost —
 // every cue is synthesized via OscillatorNode + lowpass-filtered noise in wwwroot/js/audio.js.

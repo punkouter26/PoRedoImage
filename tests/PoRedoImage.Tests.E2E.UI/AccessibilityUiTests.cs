@@ -63,6 +63,11 @@ public sealed class AccessibilityUiTests : IAsyncLifetime
         // login page a second time and report a false pass for Studio.
         Assert.DoesNotContain("/login", page.Url, StringComparison.OrdinalIgnoreCase);
 
+        // The model picker renders only after LocalAiService probes the GPU over JS interop, so
+        // its presence also proves poLocalAiProbeDevice loaded and returned without throwing.
+        await Assertions.Expect(page.Locator("legend", new() { HasTextString = "AI model" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByText("Web Browser")).ToBeVisibleAsync();
+
         await AssertNoViolationsAsync(page);
     }
 

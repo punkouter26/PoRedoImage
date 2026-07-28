@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging.Abstractions;
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using PoRedoImage.Application.Features.RapRoast;
 using PoRedoImage.Domain.Interfaces;
@@ -37,41 +37,35 @@ public class RapRoastTests
     }
 
     [Fact]
-    public async Task Lyric_prompt_forbids_protected_characteristics()
+    public async Task Prompts_carry_the_guardrail_and_escalate_tone_on_the_softened_pass()
     {
         string? capturedSystem = null;
-        var chat = new Mock<IChatCompletionService>();
-        chat.SetupGet(c => c.IsConfigured).Returns(true);
-        chat.Setup(c => c.CompleteAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, byte[]?, CancellationToken>((sys, _, _, _) => capturedSystem = sys)
-            .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
-
-        var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
-        await writer.WriteAsync(Description, Tags, RapStyle.Trap, softened: false);
-
-        Assert.NotNull(capturedSystem);
-        foreach (var forbidden in (string[])["race", "disability", "body weight", "age", "religion"])
-        {
-            Assert.Contains(forbidden, capturedSystem, StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
-    [Fact]
-    public async Task Softened_pass_instructs_a_tamer_tone()
-    {
         var userPrompts = new List<string>();
+
         var chat = new Mock<IChatCompletionService>();
         chat.SetupGet(c => c.IsConfigured).Returns(true);
         chat.Setup(c => c.CompleteAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, byte[]?, CancellationToken>((_, user, _, _) => userPrompts.Add(user))
+            .Callback<string, string, byte[]?, CancellationToken>((sys, user, _, _) =>
+            {
+                capturedSystem = sys;
+                userPrompts.Add(user);
+            })
             .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
         await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, softened: false);
         await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, softened: true);
 
+        // The guardrail is what keeps the roast on choices rather than characteristics — and what
+        // keeps the music provider's safety filter from refusing the track outright.
+        Assert.NotNull(capturedSystem);
+        foreach (var forbidden in (string[])["race", "disability", "body weight", "age", "religion"])
+        {
+            Assert.Contains(forbidden, capturedSystem, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Only the retry pass tells the model it was already rejected.
         Assert.DoesNotContain("SECOND attempt", userPrompts[0], StringComparison.Ordinal);
         Assert.Contains("SECOND attempt", userPrompts[1], StringComparison.Ordinal);
     }
