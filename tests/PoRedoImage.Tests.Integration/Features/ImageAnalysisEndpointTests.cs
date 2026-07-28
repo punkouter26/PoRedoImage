@@ -11,6 +11,7 @@ using Moq;
 using PoRedoImage.Web.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services;
+using PoRedoImage.Shared.Configuration;
 using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Integration;
@@ -499,8 +500,15 @@ public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Pro
                 .ReturnsAsync((HuggingFaceMarkerBytes, "image/png", 500L));
 
             // The REAL router, not SingleImageGenerationRouter — this is the whole point of the test.
-            MockedServicesWebApplicationFactory.ReplaceService<IImageGenerationRouter>(
-                services, new ImageGenerationRouter(geminiSpy.Object, huggingFaceSpy.Object, configuredProvider: "huggingface"));
+            // Reads configuredProvider from IConfiguration (the actual ImageGen:Provider key set
+            // above) rather than a hardcoded literal, so this test is provably driven by that config
+            // value and not merely decorative — flipping the in-memory value to "google" must flip
+            // which marker bytes come back, not just be inert dead config.
+            services.RemoveAll<IImageGenerationRouter>();
+            services.AddSingleton<IImageGenerationRouter>(sp => new ImageGenerationRouter(
+                geminiSpy.Object,
+                huggingFaceSpy.Object,
+                sp.GetRequiredService<IConfiguration>()[ConfigKeys.ImageGenProvider]!));
         });
 
         return base.CreateHost(builder);

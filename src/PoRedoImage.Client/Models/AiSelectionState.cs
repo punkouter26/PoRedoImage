@@ -71,11 +71,22 @@ public sealed class AiSelectionState(HttpClient http)
     }
 
     /// <summary>
+    /// How long the seed fetch is allowed to run before it is abandoned in favour of degrading to
+    /// "no seeded default." <see cref="HttpClient.Timeout"/> defaults to 100 seconds (often
+    /// overridden higher for slow local-model endpoints elsewhere in this app), which would otherwise
+    /// let a black-holed <c>/api/pricing</c> call stall the request-build critical path for minutes
+    /// with no cancel affordance. This budget is internal to the seed fetch only — it does not affect
+    /// any other use of <paramref name="http"/>.
+    /// </summary>
+    private static readonly TimeSpan SeedBudget = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Seeds the image-generation default from the server's actually-configured provider
     /// (<c>GET api/pricing</c>). Idempotent — safe to call from multiple components; the first
     /// caller performs the fetch and every caller (concurrent or later) awaits the same result.
-    /// Never throws: any failure (network, non-success status, an unrecognised provider key) leaves
-    /// the seeded default at <c>null</c> rather than guessing.
+    /// Never throws: any failure (network, non-success status, an unrecognised provider key, or the
+    /// internal <see cref="SeedBudget"/> expiring) leaves the seeded default at <c>null</c> rather
+    /// than guessing.
     /// </summary>
     public Task EnsureInitializedAsync(CancellationToken ct = default) =>
         _ensureInitializedTask ??= SeedImageGenDefaultAsync(ct);
@@ -89,7 +100,16 @@ public sealed class AiSelectionState(HttpClient http)
     {
         try
         {
-            var pricing = await http.GetFromJsonAsync<AiPricingDto>("api/pricing", ct);
+            // Bound the fetch to SeedBudget regardless of the first caller's own token, so a slow or
+            // black-holed /api/pricing can never dominate this task's caller(s) for the full
+            // HttpClient.Timeout. Deliberately NOT applied via `.WaitAsync(ct)` on the cached task
+            // (that would surface as an unwrapped OperationCanceledException to callers, which the
+            // feature pages would mislabel as a first-run local-model download); the timeout lives
+            // entirely inside this try, so the existing catch below still swallows it into the same
+            // "seeding failed" degrade-to-null path as every other failure mode.
+            using var budget = new CancellationTokenSource(SeedBudget);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, budget.Token);
+            var pricing = await http.GetFromJsonAsync<AiPricingDto>("api/pricing", linked.Token);
             _seededImageGenProviderId = pricing?.ImageProvider switch
             {
                 "huggingface" => AiProviderIds.HuggingFaceFlux,

@@ -84,4 +84,70 @@ public class ImageAnalysisRequestValidatorTests
         };
         Assert.Empty(Validate(req));
     }
+
+    // ─── Finding 4: MaxCountAttribute / MaxItemLengthAttribute / StringLength boundaries ────────
+    //
+    // Precomputed* fields are client-supplied free text that flows verbatim into a metered model's
+    // prompt (see ImageAnalysisRequest's remarks); these two theories pin the exact boundary each
+    // attribute enforces: PrecomputedTags may hold at most 20 entries (MaxCountAttribute) of at most
+    // 100 characters each (MaxItemLengthAttribute), and PrecomputedDescription at most 4000
+    // characters (StringLengthAttribute).
+
+    private static ImageAnalysisRequest BaseRequest() => new()
+    {
+        ImageData = "data",
+        ContentType = "image/png",
+    };
+
+    [Theory]
+    [InlineData("TagCount")]
+    [InlineData("TagLength")]
+    [InlineData("DescriptionLength")]
+    public void PrecomputedFields_AtLimit_Passes(string scenario)
+    {
+        var req = BaseRequest();
+        switch (scenario)
+        {
+            case "TagCount":
+                req.PrecomputedTags = Enumerable.Repeat("tag", 20).ToList();
+                break;
+            case "TagLength":
+                req.PrecomputedTags = [new string('t', 100)];
+                break;
+            case "DescriptionLength":
+                req.PrecomputedDescription = new string('d', 4000);
+                break;
+        }
+
+        Assert.Empty(Validate(req));
+    }
+
+    [Theory]
+    [InlineData("TagCount")]
+    [InlineData("TagLength")]
+    [InlineData("DescriptionLength")]
+    public void PrecomputedFields_JustOverLimit_Fails(string scenario)
+    {
+        var req = BaseRequest();
+        string expectedMember;
+        switch (scenario)
+        {
+            case "TagCount":
+                req.PrecomputedTags = Enumerable.Repeat("tag", 21).ToList();
+                expectedMember = nameof(ImageAnalysisRequest.PrecomputedTags);
+                break;
+            case "TagLength":
+                req.PrecomputedTags = [new string('t', 101)];
+                expectedMember = nameof(ImageAnalysisRequest.PrecomputedTags);
+                break;
+            case "DescriptionLength":
+                req.PrecomputedDescription = new string('d', 4001);
+                expectedMember = nameof(ImageAnalysisRequest.PrecomputedDescription);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scenario));
+        }
+
+        Assert.Contains(Validate(req), r => r.MemberNames.Contains(expectedMember));
+    }
 }
