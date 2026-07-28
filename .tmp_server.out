@@ -1,1 +1,196 @@
 Using launch settings from src\PoRedoImage.Web\Properties\launchSettings.json...
+[19:19:44 INF]  All required AI secrets present. Validating AzureAd OIDC configuration… {"SourceContext": "PoRedoImage.Web.Configuration.StartupSecretValidator", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:44 INF]  AzureAd OIDC configuration valid (TenantId=common, CallbackPath=/signin-oidc). {"SourceContext": "PoRedoImage.Web.Configuration.StartupSecretValidator", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:44 ERR]  Hosting failed to start {"EventId": {"Id": 11, "Name": "HostedServiceStartupFaulted"}, "SourceContext": "Microsoft.Extensions.Hosting.Internal.Host", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.IO.IOException: Failed to bind to address http://127.0.0.1:4000: address already in use.
+ ---> Microsoft.AspNetCore.Connections.AddressInUseException: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+ ---> System.Net.Sockets.SocketException (10048): Only one usage of each socket address (protocol/network address/port) is normally permitted.
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sock[19:19:50 INF] eed23e3b-ef93-4d0c-be6e-534e2050423b HTTP GET /alive responded 200 in 2.0388 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q89:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q89:00000001", "ConnectionId": "0HNNCVQOJ8Q89", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 INF] 1d369a31-aeac-4378-b2e1-86115806d2f3 HTTP GET /auth/login/fake responded 302 in 12.4323 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8A:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8A:00000001", "ConnectionId": "0HNNCVQOJ8Q8A", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 INF] 71772bf7-2ab0-42f7-b8d5-1d378e9c19ab HTTP GET / responded 200 in 71.1066 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8A:00000002", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8A:00000002", "ConnectionId": "0HNNCVQOJ8Q8A", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 WRN] e665acde-8702-4ceb-96e2-b164f8b6ea6e Error response [7804ef13-3ca7-41c9-b16e-0848f66ddf71] 409 The specified container already exists. (00.0s)
+Server:Azurite-Blob/3.35.0
+x-ms-error-code:ContainerAlreadyExists
+x-ms-request-id:21055d8a-5359-41a4-92f0-bef435acf30a
+Date:Tue, 28 Jul 2026 23:19:50 GMT
+Connection:keep-alive
+Keep-Alive:REDACTED
+Transfer-Encoding:chunked
+Content-Type:application/xml
+ {"requestId": "7804ef13-3ca7-41c9-b16e-0848f66ddf71", "status": 409, "reasonPhrase": "The specified container already exists.", "headers": "Server:Azurite-Blob/3.35.0\r\nx-ms-error-code:ContainerAlreadyExists\r\nx-ms-request-id:21055d8a-5359-41a4-92f0-bef435acf30a\r\nDate:Tue, 28 Jul 2026 23:19:50 GMT\r\nConnection:keep-alive\r\nKeep-Alive:REDACTED\r\nTransfer-Encoding:chunked\r\nContent-Type:application/xml\r\n", "seconds": 0.013891, "EventId": {"Id": 8, "Name": "ErrorResponse"}, "SourceContext": "Azure.Core", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8B", "SessionId": "0HNNCVQOJ8Q8B:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 INF] e665acde-8702-4ceb-96e2-b164f8b6ea6e Saved user image blob dev|tester@local/b58c83c1faa949499430616d265bd9c2 (155343 bytes, tags=1) {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8B", "SessionId": "0HNNCVQOJ8Q8B:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 INF] e665acde-8702-4ceb-96e2-b164f8b6ea6e Saved user image metadata b58c83c1faa949499430616d265bd9c2 kind=Original {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8B", "SessionId": "0HNNCVQOJ8Q8B:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 INF] e665acde-8702-4ceb-96e2-b164f8b6ea6e Saved original image b58c83c1faa949499430616d265bd9c2 for user dev|tester@local {"SourceContext": "PoRedoImage.Application.Features.UserImages.UserImageService", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8B", "SessionId": "0HNNCVQOJ8Q8B:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 INF] e665acde-8702-4ceb-96e2-b164f8b6ea6e Idempotency cache populated for key 88888888-8888-7888-9888-888888888888 (user dev|tester@local, status=200, bytes=104) {"SourceContext": "PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8B", "SessionId": "0HNNCVQOJ8Q8B:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 ERR] e665acde-8702-4ceb-96e2-b164f8b6ea6e HTTP POST /api/user-images/original responded 500 in 166.9319 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8B:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8B:00000001", "ConnectionId": "0HNNCVQOJ8Q8B", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+[19:19:50 ERR]  An unhandled exception has occurred while executing the request. {"EventId": {"Id": 1, "Name": "UnhandledException"}, "SourceContext": "Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8B", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at PoRedoImage.Web.Features.Diagnostics.RequestContextMiddleware.InvokeAsync(HttpContext context) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Features\Diagnostics\RequestContextMiddleware.cs:line 46
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+[19:19:50 WRN]  The response has already started, the error page middleware will not be executed. {"EventId": {"Id": 2, "Name": "ResponseStarted"}, "SourceContext": "Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8B", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:50 ERR]  Connection id "0HNNCVQOJ8Q8B", Request id "0HNNCVQOJ8Q8B:00000001": An unhandled exception was thrown by the application. {"EventId": {"Id": 13, "Name": "ApplicationError"}, "SourceContext": "Microsoft.AspNetCore.Server.Kestrel", "RequestId": "0HNNCVQOJ8Q8B:00000001", "RequestPath": "/api/user-images/original", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at PoRedoImage.Web.Features.Diagnostics.RequestContextMiddleware.InvokeAsync(HttpContext context) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Features\Diagnostics\RequestContextMiddleware.cs:line 46
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+[19:19:51 INF] 43f015aa-7b9c-424e-b438-c8cd4bba79ab Idempotent replay for key 88888888-8888-7888-9888-888888888888 (user dev|tester@local) {"SourceContext": "PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter", "RequestId": "0HNNCVQOJ8Q8C:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8C", "SessionId": "0HNNCVQOJ8Q8C:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:51 INF] 43f015aa-7b9c-424e-b438-c8cd4bba79ab HTTP POST /api/user-images/original responded 200 in 3.6916 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8C:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8C:00000001", "ConnectionId": "0HNNCVQOJ8Q8C", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:56 INF] e19be95c-393c-44de-9279-3525ad1df85a HTTP GET /auth/login/fake responded 302 in 0.5047 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8D:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8D:00000001", "ConnectionId": "0HNNCVQOJ8Q8D", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:56 INF] d43367b3-4b5e-4065-8ca1-53875de6ee02 HTTP GET / responded 200 in 6.9571 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8D:00000002", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8D:00000002", "ConnectionId": "0HNNCVQOJ8Q8D", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:59 INF] 8e309863-c00f-4f36-a3e3-37d345fb749d Idempotent replay for key 88888888-8888-7888-9888-888888888888 (user dev|tester@local) {"SourceContext": "PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter", "RequestId": "0HNNCVQOJ8Q8E:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8E", "SessionId": "0HNNCVQOJ8Q8E:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:19:59 INF] 8e309863-c00f-4f36-a3e3-37d345fb749d HTTP POST /api/user-images/original responded 200 in 4.2614 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8E:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8E:00000001", "ConnectionId": "0HNNCVQOJ8Q8E", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] ebbb2d10-aedd-4cc1-82fa-1e12a7b645c5 Saved user image blob dev|tester@local/748d38bc56174c2c9c8f81d7c22a7bde (155343 bytes, tags=1) {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8F:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8F", "SessionId": "0HNNCVQOJ8Q8F:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] ebbb2d10-aedd-4cc1-82fa-1e12a7b645c5 Saved user image metadata 748d38bc56174c2c9c8f81d7c22a7bde kind=Original {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8F:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8F", "SessionId": "0HNNCVQOJ8Q8F:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] ebbb2d10-aedd-4cc1-82fa-1e12a7b645c5 Saved original image 748d38bc56174c2c9c8f81d7c22a7bde for user dev|tester@local {"SourceContext": "PoRedoImage.Application.Features.UserImages.UserImageService", "RequestId": "0HNNCVQOJ8Q8F:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8F", "SessionId": "0HNNCVQOJ8Q8F:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] ebbb2d10-aedd-4cc1-82fa-1e12a7b645c5 HTTP POST /api/user-images/original responded 200 in 33.4693 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8F:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8F:00000001", "ConnectionId": "0HNNCVQOJ8Q8F", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] c21fd209-8263-401b-bc99-80986fcdee8f Saved user image blob dev|tester@local/b1df54e67499431aaec606b145794183 (155343 bytes, tags=1) {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8G:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8G", "SessionId": "0HNNCVQOJ8Q8G:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] c21fd209-8263-401b-bc99-80986fcdee8f Saved user image metadata b1df54e67499431aaec606b145794183 kind=Original {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8G:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8G", "SessionId": "0HNNCVQOJ8Q8G:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] c21fd209-8263-401b-bc99-80986fcdee8f Saved original image b1df54e67499431aaec606b145794183 for user dev|tester@local {"SourceContext": "PoRedoImage.Application.Features.UserImages.UserImageService", "RequestId": "0HNNCVQOJ8Q8G:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8G", "SessionId": "0HNNCVQOJ8Q8G:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:02 INF] c21fd209-8263-401b-bc99-80986fcdee8f HTTP POST /api/user-images/original responded 200 in 16.3880 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8G:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8G:00000001", "ConnectionId": "0HNNCVQOJ8Q8G", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:05 INF] caf9bcff-665d-4cdc-9ab4-1a3365c713ff Saved user image blob dev|tester@local/34dc28fcd30e44a6b1490d0ee97f19ab (155343 bytes, tags=1) {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8H:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8H", "SessionId": "0HNNCVQOJ8Q8H:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:05 INF] caf9bcff-665d-4cdc-9ab4-1a3365c713ff Saved user image metadata 34dc28fcd30e44a6b1490d0ee97f19ab kind=Original {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8H:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8H", "SessionId": "0HNNCVQOJ8Q8H:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:05 INF] caf9bcff-665d-4cdc-9ab4-1a3365c713ff Saved original image 34dc28fcd30e44a6b1490d0ee97f19ab for user dev|tester@local {"SourceContext": "PoRedoImage.Application.Features.UserImages.UserImageService", "RequestId": "0HNNCVQOJ8Q8H:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8H", "SessionId": "0HNNCVQOJ8Q8H:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:05 INF] caf9bcff-665d-4cdc-9ab4-1a3365c713ff Idempotency cache populated for key 5bd4f6ec-5549-45be-8325-20087725de9a (user dev|tester@local, status=200, bytes=104) {"SourceContext": "PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter", "RequestId": "0HNNCVQOJ8Q8H:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8H", "SessionId": "0HNNCVQOJ8Q8H:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:05 ERR] caf9bcff-665d-4cdc-9ab4-1a3365c713ff HTTP POST /api/user-images/original responded 500 in 21.2320 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8H:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8H:00000001", "ConnectionId": "0HNNCVQOJ8Q8H", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+[19:20:05 ERR]  An unhandled exception has occurred while executing the request. {"EventId": {"Id": 1, "Name": "UnhandledException"}, "SourceContext": "Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware", "RequestId": "0HNNCVQOJ8Q8H:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8H", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at PoRedoImage.Web.Features.Diagnostics.RequestContextMiddleware.InvokeAsync(HttpContext context) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Features\Diagnostics\RequestContextMiddleware.cs:line 46
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+[19:20:05 WRN]  The response has already started, the error page middleware will not be executed. {"EventId": {"Id": 2, "Name": "ResponseStarted"}, "SourceContext": "Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware", "RequestId": "0HNNCVQOJ8Q8H:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8H", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:05 ERR]  Connection id "0HNNCVQOJ8Q8H", Request id "0HNNCVQOJ8Q8H:00000001": An unhandled exception was thrown by the application. {"EventId": {"Id": 13, "Name": "ApplicationError"}, "SourceContext": "Microsoft.AspNetCore.Server.Kestrel", "RequestId": "0HNNCVQOJ8Q8H:00000001", "RequestPath": "/api/user-images/original", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at PoRedoImage.Web.Features.Diagnostics.RequestContextMiddleware.InvokeAsync(HttpContext context) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Features\Diagnostics\RequestContextMiddleware.cs:line 46
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+[19:20:05 INF] dbbe6a15-19ef-494a-a45c-18dd47f271f3 Idempotent replay for key 5bd4f6ec-5549-45be-8325-20087725de9a (user dev|tester@local) {"SourceContext": "PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter", "RequestId": "0HNNCVQOJ8Q8I:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8I", "SessionId": "0HNNCVQOJ8Q8I:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:05 INF] dbbe6a15-19ef-494a-a45c-18dd47f271f3 HTTP POST /api/user-images/original responded 200 in 11.5299 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8I:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8I:00000001", "ConnectionId": "0HNNCVQOJ8Q8I", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:08 INF] 11728e81-0946-4246-af80-6e73926e45fd Saved user image blob dev|tester@local/58344f967cf34d6ea0f50ba27c1b8354 (155343 bytes, tags=1) {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8J:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8J", "SessionId": "0HNNCVQOJ8Q8J:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:08 INF] 11728e81-0946-4246-af80-6e73926e45fd Saved user image metadata 58344f967cf34d6ea0f50ba27c1b8354 kind=Original {"SourceContext": "PoRedoImage.Infrastructure.Repositories.AzureBlobUserImageRepository", "RequestId": "0HNNCVQOJ8Q8J:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8J", "SessionId": "0HNNCVQOJ8Q8J:00000001", "UserId": "anonymous", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:08 INF] 11728e81-0946-4246-af80-6e73926e45fd Saved original image 58344f967cf34d6ea0f50ba27c1b8354 for user dev|tester@local {"SourceContext": "PoRedoImage.Application.Features.UserImages.UserImageService", "RequestId": "0HNNCVQOJ8Q8J:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8J", "SessionId": "0HNNCVQOJ8Q8J:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:08 INF] 11728e81-0946-4246-af80-6e73926e45fd Idempotency cache populated for key 67c72d1f-5937-45e7-956c-53a54f7e3caa (user dev|tester@local, status=200, bytes=104) {"SourceContext": "PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter", "RequestId": "0HNNCVQOJ8Q8J:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8J", "SessionId": "0HNNCVQOJ8Q8J:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:08 ERR] 11728e81-0946-4246-af80-6e73926e45fd HTTP POST /api/user-images/original responded 500 in 16.0425 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8J:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8J:00000001", "ConnectionId": "0HNNCVQOJ8Q8J", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+[19:20:08 ERR]  An unhandled exception has occurred while executing the request. {"EventId": {"Id": 1, "Name": "UnhandledException"}, "SourceContext": "Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware", "RequestId": "0HNNCVQOJ8Q8J:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8J", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at PoRedoImage.Web.Features.Diagnostics.RequestContextMiddleware.InvokeAsync(HttpContext context) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Features\Diagnostics\RequestContextMiddleware.cs:line 46
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+[19:20:08 WRN]  The response has already started, the error page middleware will not be executed. {"EventId": {"Id": 2, "Name": "ResponseStarted"}, "SourceContext": "Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware", "RequestId": "0HNNCVQOJ8Q8J:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8J", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:08 ERR]  Connection id "0HNNCVQOJ8Q8J", Request id "0HNNCVQOJ8Q8J:00000001": An unhandled exception was thrown by the application. {"EventId": {"Id": 13, "Name": "ApplicationError"}, "SourceContext": "Microsoft.AspNetCore.Server.Kestrel", "RequestId": "0HNNCVQOJ8Q8J:00000001", "RequestPath": "/api/user-images/original", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+System.InvalidOperationException: StatusCode cannot be set because the response has already started.
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ThrowResponseAlreadyStartedException(String value)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.set_StatusCode(Int32 value)
+   at Microsoft.AspNetCore.Http.HttpResults.Ok`1.ExecuteAsync(HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Program.<>c.<<<Main>$>b__0_10>d.MoveNext() in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Program.cs:line 258
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at PoRedoImage.Web.Features.Diagnostics.RequestContextMiddleware.InvokeAsync(HttpContext context) in C:\Users\punko\Downloads\PoRedoImage\src\PoRedoImage.Web\Features\Diagnostics\RequestContextMiddleware.cs:line 46
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+[19:20:11 INF] ae2ac7f1-ce4b-4fa9-bf46-ef5fb3cd7748 Idempotent replay for key 67c72d1f-5937-45e7-956c-53a54f7e3caa (user dev|tester@local) {"SourceContext": "PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter", "RequestId": "0HNNCVQOJ8Q8K:00000001", "RequestPath": "/api/user-images/original", "ConnectionId": "0HNNCVQOJ8Q8K", "SessionId": "0HNNCVQOJ8Q8K:00000001", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:11 INF] ae2ac7f1-ce4b-4fa9-bf46-ef5fb3cd7748 HTTP POST /api/user-images/original responded 200 in 5.2267 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8K:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8K:00000001", "ConnectionId": "0HNNCVQOJ8Q8K", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:14 INF] bcf1d22d-6120-44e5-bedf-57b159253ed4 HTTP GET /api/user-images responded 200 in 61.8565 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8L:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8L:00000001", "ConnectionId": "0HNNCVQOJ8Q8L", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
+[19:20:18 INF] 027c9fe3-78d4-451c-97b2-7f0cdba4b2b0 HTTP GET /alive responded 200 in 0.3588 ms {"RequestHost": "localhost:4000", "RequestScheme": "http", "SourceContext": "Serilog.AspNetCore.RequestLoggingMiddleware", "SessionId": "0HNNCVQOJ8Q8M:00000001", "UserId": "anonymous", "RequestId": "0HNNCVQOJ8Q8M:00000001", "ConnectionId": "0HNNCVQOJ8Q8M", "Application": "PoRedoImage", "Environment": "Development", "MachineName": "MSI"}
