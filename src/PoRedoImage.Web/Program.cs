@@ -76,12 +76,6 @@ try
             new DefaultJsonTypeInfoResolver(),
             new SharedJsonContext());
         options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-        // Accept both numeric and string enum values on the wire so the Blazor WASM HttpClient
-        // (which defaults to System.Text.Json's Web defaults → numeric enums) AND curl/Postman/
-        // JS clients (which naturally send "Regeneration") can hit the same endpoints without
-        // a 400. The source-generated context for outgoing responses always emits as a number,
-        // so this only affects deserialisation.
-        options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 
     // ─── Strongly-typed options (Po2Logic R3) ──────────────────────────────────

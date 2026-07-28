@@ -15,9 +15,10 @@ namespace PoRedoImage.Web.Features.Idempotency;
 /// within the TTL return the cached 2xx response with <c>Idempotent-Replay: true</c>.
 /// </para>
 /// <para>
-/// The Minimal API Result is evaluated lazily — to capture its body for caching we have to
-/// swap <c>http.Response.Body</c> for an in-memory buffer BEFORE the inner pipeline runs,
-/// then on success copy the buffer to the original stream and stash the bytes for replays.
+/// The Minimal API IResult is evaluated lazily — to capture its body for caching we wrap the
+/// response stream in a <see cref="TeeStream"/> that copies every write through to the
+/// original socket AND into an in-memory buffer. The buffer is then stored in the cache so
+/// a replayed request can serve the exact same bytes back without re-running the endpoint.
 /// </para>
 /// </summary>
 public sealed class IdempotencyKeyFilter : IEndpointFilter
@@ -69,51 +70,32 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
             return Results.Empty; // already written
         }
 
-        // First call: redirect the response body into a buffering stream so the Minimal API
-        // IResult has somewhere to dump its lazy JSON, then snapshot it for the cache and
-        // copy the same bytes to the real socket.
+        // First call: install a TeeStream that mirrors every write to both the response
+        // socket (so the client sees the response normally) AND an in-memory buffer
+        // (so we can cache and replay the bytes later). Execute the IResult ourselves so
+        // it flows through the tee, then short-circuit the framework by returning
+        // Results.Empty (a no-op IResult that prevents it re-executing and overwriting our
+        // response).
         var originalBody = http.Response.Body;
-        await using var buffer = new MemoryStream();
-        http.Response.Body = buffer;
+        using var buffer = new MemoryStream();
+        http.Response.Body = new TeeStream(originalBody, buffer);
 
         object? result = null;
         try
         {
             result = await next(ctx);
-
-            // Minimal API IResults are LAZY — `await next()` only hands back the IResult, it
-            // doesn't run it. We must materialise it ourselves to capture the body for
-            // idempotent replay. Branch on the type so unit/integration tests still pass
-            // when they inject stubs.
             if (result is IResult iresult)
             {
                 await iresult.ExecuteAsync(http);
             }
-            else
-            {
-                // Non-IResult return value: leave for the framework to handle.
-                // Restore the original body so it actually reaches the socket.
-                http.Response.Body = originalBody;
-                return result;
-            }
         }
         finally
         {
-            // Restore the original stream irrespective of success/failure so subsequent
-            // middleware (request logging, etc.) sees a sane response.
             http.Response.Body = originalBody;
         }
 
         var statusCode = (result as IStatusCodeHttpResult)?.StatusCode ?? http.Response.StatusCode;
         var bodyText = ReadBuffer(buffer);
-
-        // Copy what the endpoint wrote into the buffer out to the real response. If we
-        // don't, the client sees an empty body even on success.
-        if (buffer.Length > 0)
-        {
-            buffer.Position = 0;
-            await buffer.CopyToAsync(originalBody, http.RequestAborted);
-        }
 
         if (statusCode is >= 200 and < 300 && bodyText is not null)
         {
@@ -121,6 +103,9 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
             _logger.LogInformation("Idempotency cache populated for key {Key} (user {UserId}, status={Status}, bytes={Bytes})",
                 key, userId, statusCode, bodyText.Length);
         }
+
+        // Tell the framework we already wrote the response so it doesn't try again.
+        return Results.Empty;
 
         return result;
     }
@@ -134,4 +119,62 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
     }
 
     private sealed record CachedResponse(int StatusCode, string? ContentType, string Body);
+
+    /// <summary>
+    /// Stream that wraps an underlying write target and a parallel capture target. Every
+    /// write goes to both. Reads and Flush are proxied to the underlying stream so the
+    /// response stays correctly chunked and the framework's lifecycle (headers, Content-Length,
+    /// etc.) flows naturally. Disposal of the underlying stream is left to the host — we
+    /// only dispose our capture buffer (via the using-statement on the call site).
+    /// </summary>
+    private sealed class TeeStream : Stream
+    {
+        private readonly Stream _sink;
+        private readonly Stream _capture;
+
+        public TeeStream(Stream sink, Stream capture)
+        {
+            _sink = sink;
+            _capture = capture;
+        }
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => _sink.Length;
+        public override long Position { get => _sink.Position; set => _sink.Position = value; }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            _sink.Write(buffer, offset, count);
+            _capture.Write(buffer, offset, count);
+        }
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await _sink.WriteAsync(buffer, cancellationToken);
+            await _capture.WriteAsync(buffer, cancellationToken);
+        }
+
+        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            await _sink.WriteAsync(buffer.AsMemory(offset, count), cancellationToken);
+            await _capture.WriteAsync(buffer.AsMemory(offset, count), cancellationToken);
+        }
+
+        public override void Flush()
+        {
+            _sink.Flush();
+            _capture.Flush();
+        }
+
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await _sink.FlushAsync(cancellationToken);
+            await _capture.FlushAsync(cancellationToken);
+        }
+    }
 }
