@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
+using PoRedoImage.Client.LocalAi;
 using PoRedoImage.Client.Models;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Client.Shared;
@@ -24,6 +25,7 @@ public abstract class FeaturePageBase : ComponentBase
     [Inject] protected NotificationService NotificationService { get; set; } = default!;
     [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
     [Inject] protected AiSelectionState AiSelection { get; set; } = default!;
+    [Inject] protected LocalAiService LocalAi { get; set; } = default!;
 
     private ILogger? _logger;
     protected ILogger Logger => _logger ??= LoggerFactory.CreateLogger(GetType());
@@ -112,7 +114,7 @@ public abstract class FeaturePageBase : ComponentBase
     /// taking the base64 image data (not raw bytes) because Task 6 runs browser-local vision inside
     /// the browser branch, deriving bytes from <paramref name="imageData"/> only when needed there.
     /// </remarks>
-    protected virtual Task<ImageAnalysisRequest> BuildAnalysisRequestAsync(
+    protected virtual async Task<ImageAnalysisRequest> BuildAnalysisRequestAsync(
         string imageData,
         string contentType,
         string fileName,
@@ -131,6 +133,51 @@ public abstract class FeaturePageBase : ComponentBase
             ImageGenModelId = AiSelection.Get(AiCapability.GenerateImage),
         };
 
-        return Task.FromResult(request);
+        if (!AiSelection.GetOption(AiCapability.AnalyzeImage).ExecutesInBrowser)
+        {
+            return request;
+        }
+
+        var imageBytes = Convert.FromBase64String(imageData);
+
+        var outcome = await LocalAi.DescribeImageAsync(
+            imageBytes,
+            prompt: "Describe this image and list its subjects.",
+            progress: new Progress<LocalInferenceStatus>(OnLocalProgress),
+            ct: ct);
+
+        request.PrecomputedDescription = outcome.Text;
+        request.PrecomputedTags = ExtractTags(outcome.Text);
+        return request;
+    }
+
+    /// <summary>
+    /// Derives coarse tags from a local model's free-text description. Browser vision models emit
+    /// prose, not a tag list, and the server's meme branch needs tags to caption from.
+    /// </summary>
+    private static IReadOnlyList<string> ExtractTags(string description) =>
+        [.. description
+            .Split([' ', ',', '.', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(w => w.Length > 3)
+            .Select(w => w.ToLowerInvariant())
+            .Distinct()
+            .Take(10)];
+
+    /// <summary>Surfaces local-inference progress through the existing progress UI.</summary>
+    private void OnLocalProgress(LocalInferenceStatus status)
+    {
+        var message = status.Stage switch
+        {
+            LocalStage.Probing => "Checking your device…",
+            LocalStage.Downloading => $"Downloading model… {status.LoadPercent ?? 0}%",
+            LocalStage.Loading => "Loading model…",
+            LocalStage.Running => "Analyzing on your device…",
+            _ => null,
+        };
+
+        if (message is null) return;
+
+        progressMessage = message;
+        InvokeAsync(StateHasChanged);
     }
 }

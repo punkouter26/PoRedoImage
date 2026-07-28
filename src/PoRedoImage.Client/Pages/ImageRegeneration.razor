@@ -94,13 +94,23 @@
             var base64Data = ExtractBase64(imagePreviewUrl);
 
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-            var request = await BuildAnalysisRequestAsync(
-                imageData: base64Data,
-                contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
-                fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
-                descriptionLength: descriptionLength,
-                mode: ProcessingMode.ImageRegeneration,
-                ct: cts.Token);
+            ImageAnalysisRequest request;
+            try
+            {
+                request = await BuildAnalysisRequestAsync(
+                    imageData: base64Data,
+                    contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                    fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
+                    descriptionLength: descriptionLength,
+                    mode: ProcessingMode.ImageRegeneration,
+                    ct: cts.Token);
+            }
+            catch (LocalInferenceException ex)
+            {
+                errorMessage = LocalAiErrorClassifier.Describe(ex.Failure);
+                isProcessing = false;
+                return;
+            }
 
             progressPercentage = 30;
             progressMessage = "Analyzing image...";

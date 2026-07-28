@@ -157,7 +157,13 @@ tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI
   `FakeAuthHandler` and `/auth/login/fake` (Dev+Test only) become available without dev-mode UI.
 
 ## AI Models (Rule 14)
-Three categories selectable from the Studio home page:
+Selection is **per-capability**, not a single three-way category choice: the Studio page's
+`AiServicePicker` offers one provider selector per AI capability (analyze image, generate image,
+enhance description, style director, scene detail, create audio), each populated from the models
+available in that capability's category. `AiProviderIds` (in `PoRedoImage.Shared.Configuration`)
+namespaces every provider id by where it executes — `remote:`, `ollama:`, `browser:` — so a
+selection stamped onto a request self-describes its execution location without a separate lookup.
+The three categories a given capability's models are drawn from:
 1. **Remote** — Azure OpenAI (gpt-4o chat/vision) + Google Gemini (image generation)
 2. **Web Browser** — Models that run client-side on a Web Worker via WebGPU (falling back to
    WebAssembly). Implemented in `src/PoRedoImage.Client/LocalAi/`: `LocalModelRegistry` is the
@@ -165,11 +171,20 @@ Three categories selectable from the Studio home page:
    WebGPU availability, then advance-on-failure through the pruned chain), and
    `JsLocalInferenceRuntime` dispatches to one of two workers — WebLLM for text, transformers.js
    for vision. Both workers speak the same postMessage protocol, and **all fallback policy lives
-   in C#** so two runtimes never become two policies. Selectable from the Studio page via
-   `AiServicePicker`, which offers one provider selector per AI capability (analyze image,
-   generate image, enhance description, style director, scene detail, create audio) rather than
-   a single three-way Remote/Web Browser/Ollama category choice.
+   in C#** so two runtimes never become two policies.
 3. **Ollama** — Local models (dev only, requires Ollama running locally)
+
+**Browser-local execution currently covers Analyze image only.** When the user picks a
+`browser:`-prefixed model for that capability, `FeaturePageBase.BuildAnalysisRequestAsync` runs
+`LocalAiService.DescribeImageAsync` in-browser and stamps the result onto
+`ImageAnalysisRequest.PrecomputedDescription`/`PrecomputedTags`; the server-side orchestrator then
+skips its own vision call entirely. A `LocalInferenceException` is surfaced to the user verbatim
+(no silent fallback to a metered remote provider — that would be a billing surprise for a user who
+deliberately picked a free on-device model). The other capabilities (enhance description, style
+director, scene detail, create audio, generate image) do not yet have a browser-local execution
+path; a `browser:` id for text (`AiProviderIds.BrowserQwen25`) exists but is deliberately not
+offered in the catalog. The original design spec proposed extending browser execution to
+description enhancement too, but that was deliberately dropped from scope.
 
 ## Image Generation Provider (feature flag)
 `IImageGenerationService` has two real implementations selected by the **`ImageGen:Provider`** flag
