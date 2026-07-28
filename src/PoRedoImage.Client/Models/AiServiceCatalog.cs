@@ -41,11 +41,12 @@ public static class AiServiceCatalog
 
         [AiCapability.GenerateImage] =
         [
-            // Neither hint claims to be "the" default: which one actually runs when nothing is
-            // picked is decided server-side by the ImageGen:Provider config flag (huggingface in
-            // both Dev and Prod today), seeded into the client via AiSelectionState.EnsureInitializedAsync.
-            new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image"),
-            new(AiProviderIds.HuggingFaceFlux, "FLUX.1-schnell", CategoryRemote, "HuggingFace, ~$0.003/image"),
+            // The provider that actually runs is decided server-side by the ImageGen:Provider
+            // config flag and seeded into the client via AiSelectionState.EnsureInitializedAsync.
+            // 2026-07: HuggingFace fal-ai has stopped routing FLUX/Qwen model ids (HTTP 400), so
+            // image generation through the HF router is no longer offered. The previous FLUX
+            // option has been removed; re-add it only after a live model id is verified.
+            new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image (only)"),
         ],
 
         // Single provider: browser-local text enhancement is unimplemented, so Qwen2.5 is not

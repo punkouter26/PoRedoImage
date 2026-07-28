@@ -87,16 +87,16 @@ public static class InfrastructureServiceExtensions
 
             // Kept so callers that resolve the interface directly (health checks, other slices)
             // still get the configured default.
-            services.AddSingleton<IImageGenerationService>(sp => imageProvider switch
-            {
-                "huggingface" or "hf" => sp.GetRequiredService<HuggingFaceImageGenerationService>(),
-                _ => sp.GetRequiredService<GeminiImagen3Service>()
-            });
+            // 2026-07: HuggingFace fal-ai image generation is currently broken (every fal-ai/{flux,
+            // qwen-image-edit} POST returns HTTP 400). ImageGen:Provider is retained as a config key
+            // for back-compat but the IImageGenerationService and router are pinned to Gemini until
+            // a live HF image model id is verified end-to-end. The HF service is still registered so
+            // a future swap is a single-line config change.
+            services.AddSingleton<IImageGenerationService>(sp =>
+                sp.GetRequiredService<GeminiImagen3Service>());
 
             services.AddSingleton<IImageGenerationRouter>(sp => new ImageGenerationRouter(
-                sp.GetRequiredService<GeminiImagen3Service>(),
-                sp.GetRequiredService<HuggingFaceImageGenerationService>(),
-                imageProvider));
+                sp.GetRequiredService<GeminiImagen3Service>()));
 
             // Chat completion powering the Style Director reasoning agents. HuggingFace Inference
             // Providers (OpenAI-compatible chat + a vision model) is the real-AI backend; when its

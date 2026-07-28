@@ -14,7 +14,15 @@ public sealed class UserImage
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public long SizeBytes { get; init; }
 
-    public static UserImage Create(string userId, string fileName, string contentType, UserImageKind kind, long sizeBytes) =>
+    /// <summary>
+    /// Optional content tags (e.g. from Azure Computer Vision: "portrait", "elderly"). Stored
+    /// as blob metadata so they ride along with the bytes but don't widen the table schema.
+    /// Empty when the image was uploaded as a raw original with no analysis run, or when the
+    /// analysis pipeline returned no tags.
+    /// </summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
+
+    public static UserImage Create(string userId, string fileName, string contentType, UserImageKind kind, long sizeBytes, IReadOnlyList<string>? tags = null) =>
         new()
         {
             Id = UserImageId.New(),
@@ -22,6 +30,7 @@ public sealed class UserImage
             FileName = fileName,
             ContentType = contentType,
             Kind = kind,
-            SizeBytes = sizeBytes
+            SizeBytes = sizeBytes,
+            Tags = tags ?? []
         };
 }

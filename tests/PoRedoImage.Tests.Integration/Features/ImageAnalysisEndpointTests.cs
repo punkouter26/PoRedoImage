@@ -505,10 +505,8 @@ public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Pro
             // value and not merely decorative — flipping the in-memory value to "google" must flip
             // which marker bytes come back, not just be inert dead config.
             services.RemoveAll<IImageGenerationRouter>();
-            services.AddSingleton<IImageGenerationRouter>(sp => new ImageGenerationRouter(
-                geminiSpy.Object,
-                huggingFaceSpy.Object,
-                sp.GetRequiredService<IConfiguration>()[ConfigKeys.ImageGenProvider]!));
+            services.AddSingleton<IImageGenerationRouter>(_ => new ImageGenerationRouter(
+                geminiSpy.Object));
         });
 
         return base.CreateHost(builder);

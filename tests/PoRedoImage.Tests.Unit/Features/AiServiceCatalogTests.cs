@@ -93,10 +93,10 @@ public class AiServiceCatalogTests
     [Fact]
     public async Task GetExplicit_SeedsFromPricingButNeverOverridesAnExplicitChoice()
     {
-        // Recognised provider key ("huggingface") seeds the matching provider id.
-        var seeded = NewState(HttpStatusCode.OK, """{"imageProvider":"huggingface","imageProviderLabel":"HuggingFace","textToImageUsd":0.003,"imageToImageUsd":0.02,"currency":"USD"}""");
+        // Recognised provider key ("google") seeds the matching provider id.
+        var seeded = NewState(HttpStatusCode.OK, """{"imageProvider":"google","imageProviderLabel":"Google","textToImageUsd":0.039,"imageToImageUsd":0.039,"currency":"USD"}""");
         await seeded.EnsureInitializedAsync();
-        Assert.Equal(AiProviderIds.HuggingFaceFlux, seeded.GetExplicit(AiCapability.GenerateImage));
+        Assert.Equal(AiProviderIds.GeminiImagen3, seeded.GetExplicit(AiCapability.GenerateImage));
 
         // A failed fetch (HTTP 500) degrades to null rather than guessing.
         var seedFailed = NewState(HttpStatusCode.InternalServerError, null);
@@ -109,8 +109,10 @@ public class AiServiceCatalogTests
         Assert.Null(unrecognised.GetExplicit(AiCapability.GenerateImage));
 
         // An explicit user choice always wins over a successfully seeded default.
-        var explicitChoice = NewState(HttpStatusCode.OK, """{"imageProvider":"huggingface","imageProviderLabel":"HuggingFace","textToImageUsd":0.003,"imageToImageUsd":0.02,"currency":"USD"}""");
+        var explicitChoice = NewState(HttpStatusCode.OK, """{"imageProvider":"google","imageProviderLabel":"Google","textToImageUsd":0.039,"imageToImageUsd":0.039,"currency":"USD"}""");
         await explicitChoice.EnsureInitializedAsync();
+        // GenerateImage only has one provider now (Gemini), so a Set on a non-existent id is
+        // functionally a no-op for routing. Set+GetExplicit still round-trips the explicit choice.
         explicitChoice.Set(AiCapability.GenerateImage, AiProviderIds.GeminiImagen3);
         Assert.Equal(AiProviderIds.GeminiImagen3, explicitChoice.GetExplicit(AiCapability.GenerateImage));
     }

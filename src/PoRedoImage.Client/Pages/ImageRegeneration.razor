@@ -153,7 +153,22 @@
                 }
                 else
                 {
-                    analysisResult = await httpResponse.Content.ReadFromJsonAsync<ImageAnalysisResponse>();
+                    // Server response is a multi-MB base64 payload; deserialising it via the
+                    // generated IJsonTypeInfoResolver can swallow an exception in Blazor WASM
+                    // (the response reads as success but the circuit never receives the typed
+                    // graph, leaving the progress spinner stuck). Read the raw body first, update
+                    // the progress bar through the circuit so the spinner doesn't get stuck,
+                    // then deserialize explicitly.
+                    progressPercentage = 85;
+                    progressMessage = "Decoding result…";
+                    try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+                    var rawJson = await httpResponse.Content.ReadAsStringAsync(cts.Token);
+                    progressPercentage = 92;
+                    progressMessage = "Rendering result…";
+                    try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+                    analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(
+                        rawJson,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                     if (analysisResult == null)
                         throw new InvalidOperationException("No response received from API.");
@@ -187,6 +202,9 @@
                 isComplete = string.IsNullOrEmpty(errorMessage);
                 if (string.IsNullOrEmpty(errorMessage))
                     NotificationService.Notify(NotificationSeverity.Success, "Done!", "Your regenerated image is ready.", duration: 4000);
+                // Force a re-render on the UI thread so the spinner can't get stuck if the
+                // deserialization of the 2 MB base64 response left the circuit waiting.
+                try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
                 try { StateHasChanged(); } catch (ObjectDisposedException) { }
             }
         }
@@ -195,6 +213,7 @@
             errorMessage = $"Error processing image: {ex.Message}";
             isProcessing = false;
             Logger.LogError(ex, "Error processing image");
+            try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
         }
     }
 

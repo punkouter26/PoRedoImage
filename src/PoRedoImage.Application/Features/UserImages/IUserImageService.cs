@@ -9,8 +9,8 @@ namespace PoRedoImage.Application.Features.UserImages;
 /// </summary>
 public interface IUserImageService
 {
-    Task<SaveImageResponse> SaveOriginalAsync(string userId, byte[] bytes, string contentType, string fileName, CancellationToken ct = default);
-    Task<SaveImageResponse> SaveResultAsync(string userId, byte[] bytes, string contentType, UserImageKind kind, CancellationToken ct = default);
+    Task<SaveImageResponse> SaveOriginalAsync(string userId, byte[] bytes, string contentType, string fileName, IReadOnlyList<string>? tags = null, CancellationToken ct = default);
+    Task<SaveImageResponse> SaveResultAsync(string userId, byte[] bytes, string contentType, UserImageKind kind, IReadOnlyList<string>? tags = null, CancellationToken ct = default);
     Task<IReadOnlyList<UserImageDto>> GetGalleryAsync(string userId, CancellationToken ct = default);
     Task<(byte[] Bytes, string ContentType)?> GetImageAsync(string userId, UserImageId imageId, CancellationToken ct = default);
 

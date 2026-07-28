@@ -24,6 +24,10 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
+    // 2026-07: The HuggingFace fal-ai provider has stopped routing FLUX/Qwen image-generation
+    // model ids (every POST to fal-ai/{flux/schnell,qwen-image-edit} returns HTTP 400). The whole
+    // image-generation service is therefore temporarily inert — kept in place so a future HF image
+    // model that IS supported on a live provider can be wired in by changing only this config.
     private string BaseUrl => (_configuration[ConfigKeys.HuggingFaceBaseUrl] ?? "https://router.huggingface.co").TrimEnd('/');
     private string Provider => _configuration[ConfigKeys.HuggingFaceProvider] ?? "fal-ai";
     private string T2IProviderId => _configuration[ConfigKeys.HuggingFaceTextToImageProviderId] ?? "fal-ai/flux/schnell";

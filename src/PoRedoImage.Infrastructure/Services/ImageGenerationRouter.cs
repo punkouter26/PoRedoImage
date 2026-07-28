@@ -12,19 +12,9 @@ namespace PoRedoImage.Infrastructure.Services;
 /// no-redeploy config flip working and makes this change additive.
 /// </remarks>
 public sealed class ImageGenerationRouter(
-    IImageGenerationService gemini,
-    IImageGenerationService huggingFace,
-    string configuredProvider) : IImageGenerationRouter
+    IImageGenerationService gemini) : IImageGenerationRouter
 {
-    private readonly bool _defaultIsHuggingFace =
-        configuredProvider is "huggingface" or "hf";
-
-    public IImageGenerationService Resolve(string? modelId) => modelId switch
-    {
-        AiProviderIds.HuggingFaceFlux => huggingFace,
-        AiProviderIds.GeminiImagen3 => gemini,
-        _ => _defaultIsHuggingFace ? huggingFace : gemini,
-    };
+    public IImageGenerationService Resolve(string? modelId) => gemini;
 }
 
 /// <summary>

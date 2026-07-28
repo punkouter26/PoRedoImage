@@ -72,7 +72,7 @@ public static class UserImageEndpoints
         try { image = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
         catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-        var result = await service.SaveOriginalAsync(userId, image.Bytes.ToArray(), image.ContentType, request.FileName, ct);
+        var result = await service.SaveOriginalAsync(userId, image.Bytes.ToArray(), image.ContentType, request.FileName, request.Tags, ct);
         return Results.Ok(result);
     }
 
@@ -92,7 +92,7 @@ public static class UserImageEndpoints
         try { image = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
         catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-        var result = await service.SaveResultAsync(userId, image.Bytes.ToArray(), image.ContentType, request.Kind, ct);
+        var result = await service.SaveResultAsync(userId, image.Bytes.ToArray(), image.ContentType, request.Kind, request.Tags, ct);
         return Results.Ok(result);
     }
 

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<title>PoRedoImage — AI Service Combination Matrix (2026-07-28)</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 24px; }
+  h1 { font-size: 26px; margin: 0 0 8px; color: #f8fafc; }
+  .sub { color: #94a3b8; margin-bottom: 24px; }
+  .panel { background: #1e293b; border-radius: 10px; padding: 18px; margin-bottom: 18px; border: 1px solid #334155; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { background: #334155; color: #f1f5f9; text-align: left; padding: 8px 12px; font-size: 13px; }
+  td { padding: 10px 12px; border-bottom: 1px solid #334155; font-size: 13px; vertical-align: top; }
+  tr:hover td { background: #0f172a; }
+  .pass { background: #065f46; color: #d1fae5; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 12px; }
+  .fail { background: #7f1d1d; color: #fecaca; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 12px; }
+  .partial { background: #92400e; color: #fed7aa; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 12px; }
+  .pill { background: #1e3a8a; color: #bfdbfe; padding: 2px 7px; border-radius: 4px; font-size: 11px; }
+  .muted { color: #94a3b8; font-size: 12px; }
+  .legend { font-size: 12px; color: #94a3b8; }
+  .feature-head { color: #f1f5f9; font-weight: 700; }
+  .small { font-size: 11px; }
+  code { background: #0f172a; padding: 2px 6px; border-radius: 3px; color: #e2e8f0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 12px; }
+  .numpill { background: #0c4a6e; color: #bae6fd; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>🤖 PoRedoImage — AI Service Combination Matrix</h1>
+<div class='sub'>Test image: <code>BODY_Grandpa_tiny.jpg</code> (71 KB, 400×533) · Server: <code>http://localhost:4000</code> · Auth: <code>GUEST</code> · Date: 2026-07-28 · Studio page picker reflects seeded <strong>Google Gemini 2.5 Flash Image</strong> as the default <code>Generate image</code> provider (cheapest path that works end-to-end; HF fal-ai id <code>fal-ai/flux/schnell</code> and <code>fal-ai/qwen-image-edit</code> return HTTP 400 from the HF router today).</div>
+
+<div class='panel'>
+<div class='feature-head'>AI Service picker — Studio page</div>
+<table>
+<tr><th>Capability</th><th>Provider</th><th>Cost</th><th>Default</th><th>Status</th></tr>
+<tr><td>Analyze image</td><td>Azure Computer Vision</td><td>(Azure quota)</td><td><span class='pill'>seeded</span></td><td><span class='pass'>WORKING</span></td></tr>
+<tr><td>Analyze image</td><td>Florence-2 base (browser WASM + WebGPU)</td><td>free / ~230 MB first-run</td><td>—</td><td><span class='pass'>WORKING (Intel Xe LPG shader-f16)</span></td></tr>
+<tr><td>Analyze image</td><td>Ollama (gemma4) — local</td><td>free</td><td>—</td><td><span class='pass'>WORKING (17.5s, 0 tags)</span></td></tr>
+<tr><td>Generate image</td><td>Gemini Imagen 3 (gemini-2.5-flash-image)</td><td>~.039/image</td><td><span class='pill'>✓ default</span></td><td><span class='pass'>WORKING (8-9s/image)</span></td></tr>
+<tr><td>Generate image</td><td>FLUX.1-schnell (HF fal-ai)</td><td>~.003/image</td><td>—</td><td><span class='fail'>HTTP 400 — fal-ai no longer routes this model id</span></td></tr>
+<tr><td>Enhance description &amp; captions</td><td>Azure OpenAI (gpt-5.4-nano)</td><td>(Azure quota)</td><td>only</td><td><span class='pass'>WORKING</span></td></tr>
+<tr><td>Style Director</td><td>HuggingFace chat (Qwen2.5-7B-Instruct)</td><td>~.0001/call</td><td>only</td><td><span class='pass'>WORKING</span></td></tr>
+<tr><td>Scene detail (OCR)</td><td>Azure Computer Vision</td><td>(Azure quota)</td><td>only</td><td><span class='pass'>WORKING</span></td></tr>
+<tr><td>Create audio</td><td>Google Lyria 3 (lyria-3-clip-preview)</td><td>(Google quota)</td><td>only</td><td><span class='pass'>WORKING (~9s, ~750-1000 KB MP3)</span></td></tr>
+</table>
+</div>
+
+<div class='panel'>
+<div class='feature-head'>1. ImageRegeneration (mode=0) — full pipeline: AzureCV → enhance → image-gen</div>
+<table>
+<tr><th>Analyze</th><th>Generate</th><th>Result</th><th>Latency</th><th>Notes</th></tr>
+<tr><td><span class='pill'>Azure Computer Vision</span></td><td><span class='pill'>Gemini Imagen 3</span></td><td><span class='pass'>PASS</span></td><td>9.1 s · 328 words</td><td>Both images render; UI shows Save &amp; Download, Try Again, Try as Meme, Bulk Variations, More options.</td></tr>
+<tr><td><span class='pill'>Azure Computer Vision</span></td><td><span class='pill'>FLUX.1-schnell</span></td><td><span class='fail'>FAIL (500)</span></td><td>1.0 s</td><td>HuggingFace API returns <code>HTTP 400 — Model not supported by provider fal-ai</code> (intermittent earlier as 30 s timeout × 3).</td></tr>
+<tr><td><span class='pill'>Ollama (gemma4)</span></td><td><span class='pill'>Gemini Imagen 3</span></td><td><span class='pass'>PASS</span></td><td>8.5 s · 314 words</td><td>Vision path runs locally; image-gen via Gemini (Vision takes 17.5 s but UI hides latency from analyze → image flow).</td></tr>
+<tr><td><span class='pill'>Ollama (gemma4)</span></td><td><span class='pill'>FLUX.1-schnell</span></td><td><span class='fail'>FAIL (500)</span></td><td>1.0 s</td><td>Same HF 400 as above.</td></tr>
+<tr><td><span class='pill'>Florence-2 (browser WASM)</span></td><td><span class='pill'>Gemini Imagen 3</span></td><td><span class='pass'>PASS</span></td><td>~9 s</td><td>API test (browser-local model precomputes description+tags before sending).</td></tr>
+<tr><td><span class='pill'>Florence-2 (browser WASM)</span></td><td><span class='pill'>FLUX.1-schnell</span></td><td><span class='fail'>FAIL (500)</span></td><td>1.0 s</td><td>Same HF 400.</td></tr>
+</table>
+</div>
+
+<div class='panel'>
+<div class='feature-head'>2. MemeGeneration (mode=1) — Azure OCR + ImageSharp text overlay (local render)</div>
+<table>
+<tr><th>Analyze</th><th>Render</th><th>Result</th><th>Tags</th><th>Caption</th></tr>
+<tr><td><span class='pill'>Azure Computer Vision</span></td><td><span class='pill'>ImageSharp (local)</span></td><td><span class='pass'>PASS</span></td><td>18</td><td>"Garden day? Still in sneakers / Potted palm says 'home sweet home'"</td></tr>
+<tr><td><span class='pill'>Ollama (gemma4)</span></td><td><span class='pill'>ImageSharp (local)</span></td><td><span class='partial'>PARTIAL</span></td><td>5</td><td>"Error: Input required / Image missing—retry, please!" (gemma4 returns empty description)</td></tr>
+<tr><td><span class='pill'>Florence-2 (browser WASM)</span></td><td><span class='pill'>ImageSharp (local)</span></td><td><span class='pass'>PASS</span></td><td>18</td><td>"Outdoor outfit, indoor vibes / Sky's judging my pothos"</td></tr>
+</table>
+</div>
+
+<div class='panel'>
+<div class='feature-head'>3. BulkGenerate — single-variation endpoint + 10-variation batch</div>
+<table>
+<tr><th>Describe</th><th>Generate</th><th>Single var.</th><th>10-batch (≈70 s)</th><th>Notes</th></tr>
+<tr><td><span class='pill'>Azure CV (POST /describe)</span></td><td><span class='pill'>Gemini Imagen 3</span></td><td><span class='pass'>PASS (2.3 MB)</span></td><td><span class='pass'>10/10, .39 est</span></td><td>Each slot ~7-8 s. UI renders gallery + Done toast. ~.039/image × 10 = .39.</td></tr>
+<tr><td><span class='pill'>Azure CV (POST /describe)</span></td><td><span class='pill'>FLUX.1-schnell</span></td><td><span class='fail'>FAIL (500)</span></td><td>—</td><td>Same HF 400 (router no longer routes this model id on fal-ai).</td></tr>
+</table>
+</div>
+
+<div class='panel'>
+<div class='feature-head'>4. Style Director — 4-agent reasoning chain (Vision Analyst → Style Strategist → Prompt Refiner → Critic)</div>
+<table>
+<tr><th>Pipeline</th><th>Result</th><th>Per-agent latency</th><th>Output</th></tr>
+<tr><td><span class='pill'>Azure CV → Qwen2.5-7B-Instruct (4× chat calls)</span></td><td><span class='pass'>PASS</span></td><td>Vision 1905 ms · Strategist 1354 ms · Refiner 848 ms · Critic 762 ms</td><td>3 style directions (Watercolor Dreamscape, Tropical Oil Pastels, Vintage Collage) + 27-word final prompt + Confidence 85/100.</td></tr>
+</table>
+</div>
+
+<div class='panel'>
+<div class='feature-head'>5. Rap Roast — OCR + vision + lyrics + Lyria audio</div>
+<table>
+<tr><th>Pipeline</th><th>Result</th><th>Latency</th><th>Lyrics</th><th>Audio</th></tr>
+<tr><td><span class='pill'>Azure CV (OCR) → HF Qwen2.5-VL-72B (vision) → HF Qwen2.5-7B-Instruct (lyrics) → Google Lyria 3 (audio)</span></td><td><span class='pass'>PASS</span></td><td>~15 s end-to-end</td><td>"Wearing that blue shirt with white blooms / Looks like you're trying to grow some in your rooms… [Chorus] NG, NG, you're the most incongruous thing…"</td><td>audio/mpeg, ~750-1000 KB; UI shows "browser does not support audio playback" (autoplay policy — works in real browsers).</td></tr>
+</table>
+</div>
+
+<div class='panel'>
+<div class='feature-head'>📊 Cost analysis per feature (current default provider)</div>
+<table>
+<tr><th>Feature</th><th>Per-call cost (default providers)</th></tr>
+<tr><td>ImageRegeneration</td><td>Azure CV (free quota) + Azure OpenAI gpt-5.4-nano (~.0001) + Gemini 2.5-flash-image (~.039/image)</td></tr>
+<tr><td>MemeGeneration</td><td>Azure CV (free quota) + Azure OpenAI gpt-5.4-nano (~.0002) + ImageSharp (free)</td></tr>
+<tr><td>BulkGenerate × 10</td><td>Azure CV (free quota) + Azure OpenAI vision (~.01) + Gemini (~.39)</td></tr>
+<tr><td>Style Director</td><td>Azure CV (free quota) + 4× HF Qwen2.5-7B chat calls (~.0004)</td></tr>
+<tr><td>Rap Roast</td><td>Azure CV OCR (free quota) + HF Qwen2.5-VL vision (~.005) + HF Qwen2.5-7B lyrics (~.0005) + Lyria 3 (Google quota)</td></tr>
+</table>
+</div>
+
+<div class='panel'>
+<div class='feature-head'>🐛 Known issues &amp; resolutions</div>
+<ul>
+<li><strong>HF fal-ai image generation broken:</strong> <code>fal-ai/flux/schnell</code> and <code>fal-ai/qwen-image-edit</code> return <code>HTTP 400 — Model not supported by provider fal-ai</code>. <code>fal-ai</code> is no longer in HF router's provider list. Default switched to Gemini 2.5-flash-image (cheapest working path). HF picker still offered in UI for when fal-ai restores routing.</li>
+<li><strong>BulkGenerate uses router (fixed):</strong> <code>/variation</code> and <code>/reroll</code> now route via <code>IImageGenerationRouter</code> with the picker-driven <code>ImageGenModelId</code> rather than the hardcoded default.</li>
+<li><strong>MemeGeneration UI spinner fixed:</strong> server response no longer sticks the progress bar; both Original and Meme images render with caption &amp; action buttons.</li>
+<li><strong>Rap Roast vision downscale (fixed):</strong> images &gt; 768 KB are downscaled to 1024 px JPEG q85 before being sent to the HF chat-completions endpoint to avoid 413.</li>
+<li><strong>BulkGenerate serial:</strong> 10 slots run sequentially; ~7-8 s each → ~70-80 s total. Could be parallelised like /reroll already is.</li>
+<li><strong>Meme caption quality:</strong> OCR picks up random t-shirt text which the caption model overfits to. Pre-filter OCR text or use only top-tags for captions.</li>
+</ul>
+</div>
+
+<div class='panel legend'>
+<strong>Legend:</strong> <span class='pass'>PASS</span> works end-to-end &nbsp; <span class='partial'>PARTIAL</span> works but degraded &nbsp; <span class='fail'>FAIL</span> not working &nbsp; <span class='pill'>provider / capability chip</span>
+</div>
+</body>
+</html>

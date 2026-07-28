@@ -112,7 +112,10 @@ public sealed class AiSelectionState(HttpClient http)
             var pricing = await http.GetFromJsonAsync<AiPricingDto>("api/pricing", linked.Token);
             _seededImageGenProviderId = pricing?.ImageProvider switch
             {
-                "huggingface" => AiProviderIds.HuggingFaceFlux,
+                // 2026-07: HuggingFace fal-ai image generation is broken on the upstream provider,
+                // so a "huggingface" price key is intentionally NOT mapped to any image-gen id —
+                // falling through to null lets the server-side router use its own configured
+                // default (which itself is pinned to Gemini).
                 "google" => AiProviderIds.GeminiImagen3,
                 _ => null, // Unrecognised provider key — do not guess.
             };

@@ -19,7 +19,6 @@ public static class AiProviderIds
     public const string AzureComputerVision = "remote:azure-cv";
     public const string AzureOpenAi = "remote:azure-openai";
     public const string GeminiImagen3 = "remote:gemini-imagen3";
-    public const string HuggingFaceFlux = "remote:hf-flux-schnell";
     public const string HuggingFaceChat = "remote:hf-chat";
     public const string GoogleLyria = "remote:google-lyria";
 

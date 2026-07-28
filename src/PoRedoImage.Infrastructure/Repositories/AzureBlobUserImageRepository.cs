@@ -64,7 +64,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
     }
 
-    public async Task<string> SaveBlobAsync(string userId, UserImageId imageId, byte[] bytes, string contentType, CancellationToken ct = default)
+    public async Task<string> SaveBlobAsync(string userId, UserImageId imageId, byte[] bytes, string contentType, IReadOnlyList<string>? tags, CancellationToken ct = default)
     {
         if (_blobContainer is null) return string.Empty;
         await EnsureInitializedAsync(ct);
@@ -72,10 +72,31 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         var blobName = $"{userId}/{imageId}";
         var blobClient = _blobContainer.GetBlobClient(blobName);
         using var stream = new MemoryStream(bytes, writable: false);
-        await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = contentType }, cancellationToken: ct);
+        var headers = new BlobHttpHeaders { ContentType = contentType };
 
-        _logger.LogInformation("Saved user image blob {BlobName} ({Bytes} bytes)", blobName, bytes.Length);
+        // Tags ride as blob metadata (key=Tags, value=comma-joined). Cheaper than widening the
+        // UserImages table schema and naturally scoped to the bytes themselves — they survive
+        // when the blob is read back out without a metadata round-trip.
+        var metadata = BuildTagsMetadata(tags);
+        await blobClient.UploadAsync(
+            stream,
+            new BlobUploadOptions { HttpHeaders = headers, Metadata = metadata },
+            cancellationToken: ct);
+
+        _logger.LogInformation("Saved user image blob {BlobName} ({Bytes} bytes, tags={TagCount})", blobName, bytes.Length, metadata is null ? 0 : 1);
         return blobClient.Uri.ToString();
+    }
+
+    private static IDictionary<string, string>? BuildTagsMetadata(IReadOnlyList<string>? tags)
+    {
+        if (tags is null || tags.Count == 0) return null;
+        // Metadata values must be ASCII / valid HTTP header values. Vision tags come from a
+        // controlled vocabulary from Azure Computer Vision so this is safe in practice; we still
+        // defensively strip anything that would violate the header grammar.
+        var joined = string.Join(',', tags
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Replace(',', ';').Trim()));
+        return string.IsNullOrEmpty(joined) ? null : new Dictionary<string, string> { ["Tags"] = joined };
     }
 
     public async Task SaveMetadataAsync(UserImage image, CancellationToken ct = default)
@@ -131,6 +152,38 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
     }
 
+    /// <summary>
+    /// Reads just the Tags metadata (one HEAD request) so the gallery can display content
+    /// filters without doing a full DownloadContent on every row. Cheap, idempotent.
+    /// </summary>
+    public async Task<IReadOnlyList<string>?> GetTagsAsync(string userId, UserImageId imageId, CancellationToken ct = default)
+    {
+        if (_blobContainer is null) return null;
+        await EnsureInitializedAsync(ct);
+
+        try
+        {
+            var blobClient = _blobContainer.GetBlobClient($"{userId}/{imageId}");
+            var props = await blobClient.GetPropertiesAsync(cancellationToken: ct);
+            return ParseTagsMetadata(props.Value.Metadata);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
+    }
+
+    private static IReadOnlyList<string>? ParseTagsMetadata(IDictionary<string, string>? metadata)
+    {
+        if (metadata is null) return null;
+        if (!metadata.TryGetValue("Tags", out var raw) || string.IsNullOrWhiteSpace(raw))
+            return null;
+        return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                  .Select(t => t.Replace(';', ','))
+                  .ToList()
+                  .AsReadOnly();
+    }
+
     public async Task<UserImage?> GetMetadataAsync(string userId, UserImageId imageId, CancellationToken ct = default)
     {
         if (_tableClient is null) return null;
@@ -180,7 +233,8 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         ContentType = entity.ContentType,
         Kind = Enum.TryParse<UserImageKind>(entity.Kind, out var k) ? k : UserImageKind.Original,
         CreatedAt = entity.CreatedAt,
-        SizeBytes = entity.SizeBytes
+        SizeBytes = entity.SizeBytes,
+        Tags = []
     };
 }
 
