@@ -126,6 +126,30 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         return (enhanced, tokens, elapsed);
     }
 
+    /// <summary>
+    /// Content guardrail for the meme caption, mirroring the Rap Roast slice's own guardrail.
+    /// </summary>
+    /// <remarks>
+    /// The tag list handed to this prompt is whatever Computer Vision saw, so it routinely names
+    /// the people in the photo ("boy", "toddler", "girl"). Asking a model to be funny about a bare
+    /// list of people, with nothing said about what the joke may target, is what Azure OpenAI's
+    /// prompt content-management policy rejects with <c>HTTP 400 (content_filter)</c> — and it is
+    /// also just the wrong product behaviour. Pointing the joke at the situation and the objects
+    /// rather than at anybody's person is the fix on both counts. Photos of children may still be
+    /// refused upstream; that is Azure's policy working as intended, and the endpoint now reports
+    /// it as an actionable 422 instead of an opaque 500.
+    ///
+    /// Deliberately NOT shared with <c>RoastLyricsWriter.Guardrail</c>: the wording differs, and
+    /// hoisting a slice's constant into common vocabulary is the cross-slice coupling §2 forbids.
+    /// </remarks>
+    private const string MemeGuardrail =
+        " Joke about the situation, the objects, and the absurdity of the scene — never about any "
+        + "person's appearance, body, age, or identity. "
+        + "Never reference or imply race, ethnicity, skin tone, disability, body weight or size, "
+        + "age, gender identity, sexual orientation, religion, or medical conditions. "
+        + "No slurs, no profanity, no sexual content, no insults directed at a person. "
+        + "If the elements describe children, keep it wholesome.";
+
     public async Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)>
         GenerateMemeCaptionAsync(IReadOnlyList<string> tags, CancellationToken ct = default)
     {
@@ -143,10 +167,11 @@ public sealed class AzureOpenAiService : IGenerativeAiService
             {"topText": "TOP CAPTION", "bottomText": "BOTTOM CAPTION"}
 
             Keep captions short (3-7 words each). Make it humorous and relatable.
+            {{MemeGuardrail}}
             """;
 
         var response = await _chatClient.CompleteChatAsync(
-            [new SystemChatMessage("You are a meme caption generator."), new UserChatMessage(prompt)],
+            [new SystemChatMessage("You are a meme caption generator." + MemeGuardrail), new UserChatMessage(prompt)],
             cancellationToken: ct);
 
         if (response.Value.Content.Count == 0)

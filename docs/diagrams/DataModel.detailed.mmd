@@ -1,0 +1,64 @@
+%% PoRedoImage — Persistence ERD (DETAILED)
+%% Azure Table Storage (metadata) + Azure Blob Storage (bytes). Azurite locally.
+%% Source: Infrastructure/Repositories/*.cs, Domain/Entities/*.cs
+erDiagram
+    USER ||--o{ USER_IMAGES : "owns (PartitionKey = userId)"
+    USER_IMAGES ||--|| USER_IMAGE_BLOB : "bytes at userId/imageId"
+    BULK_PROMPTS }o--|| PROMPT_PARTITION : "PartitionKey = 'prompts'"
+    MEME_TEMPLATE_CATALOG ||--o{ MEME_TEXT_ZONE : "declares"
+
+    USER {
+        string NameIdentifier PK "guest|GUEST######## or dev|email or Entra oid"
+        string Name "display name"
+        string Email "ClaimTypes.Email"
+        string Role "0..n role claims (X-Fake-Roles in Test)"
+    }
+
+    USER_IMAGES {
+        string PartitionKey PK "userId"
+        string RowKey PK "UserImageId (GUID)"
+        string FileName "original upload name"
+        string ContentType "image/jpeg default"
+        int Kind "0 Original 1 Regeneration 2 Meme 3 BulkVariation"
+        datetimeoffset CreatedAt "UTC"
+        long SizeBytes "byte length"
+        string Timestamp "Table Storage system column"
+        string ETag "optimistic concurrency"
+    }
+
+    USER_IMAGE_BLOB {
+        string Container PK "user-images"
+        string BlobName PK "{userId}/{imageId}"
+        binary Content "raw image bytes"
+        string ContentType "blob http header"
+    }
+
+    BULK_PROMPTS {
+        string PartitionKey PK "prompts"
+        string RowKey PK "GUID (natural identity)"
+        string Name "slot label"
+        string PromptText "the prompt body"
+        datetimeoffset CreatedAt "UTC"
+    }
+
+    PROMPT_PARTITION {
+        string Value PK "constant 'prompts' — single hot partition, small set"
+    }
+
+    MEME_TEMPLATE_CATALOG {
+        string Id PK "immutable catalog id"
+        string Name "display name"
+        string Description "picker subtitle"
+        string Category "grouping"
+        int RequiredZoneCount "number of text zones"
+        string Source "IN-MEMORY, served via HybridCache — never persisted"
+    }
+
+    MEME_TEXT_ZONE {
+        string Label PK "zone name"
+        double X "relative 0..1"
+        double Y "relative 0..1"
+        double MaxWidthRatio "wrap width"
+        double FontSizeRatio "scales with image height"
+        string Alignment "left center right"
+    }

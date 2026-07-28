@@ -90,11 +90,12 @@ public static class ImageAnalysisEndpoints
                 detail: "The image-generation model declined this request. Please try a different image or prompt.",
                 statusCode: 422, title: "Generation Declined");
         }
-        catch (ClientResultException ex) when (ex.Message.Contains("content_policy_violation"))
+        catch (ClientResultException ex) when (IsContentFiltered(ex.Message))
         {
-            logger.LogWarning(ex, "Image generation blocked by content policy");
+            logger.LogWarning(ex, "AI request blocked by content safety filters");
             return Results.Problem(
-                detail: "The image was blocked by content safety filters. Please try a different image.",
+                detail: "The AI declined this request — its content safety filters rejected either the "
+                    + "image or the caption it would have had to write. Please try a different image.",
                 statusCode: 422, title: "Content Policy Violation");
         }
         catch (ClientResultException ex) when (ex.Status == 401 || ex.Status == 403)
@@ -124,6 +125,23 @@ public static class ImageAnalysisEndpoints
             return Results.Problem(detail: "An error occurred while processing your image. Please try again.", statusCode: 500, title: "Processing Error");
         }
     }
+
+    /// <summary>
+    /// Whether an upstream chat/image failure is a content-safety refusal rather than a real fault.
+    /// </summary>
+    /// <remarks>
+    /// The two vendors report the same condition under different codes, and this endpoint talks to
+    /// both: <b>Azure</b> OpenAI returns <c>HTTP 400 (content_filter)</c> — the shape actually
+    /// observed when the meme-caption prompt is rejected — while <b>OpenAI.com</b> returns
+    /// <c>content_policy_violation</c>. Matching only the latter (the original guard clause) left
+    /// every Azure refusal falling through to the catch-all, so the caller saw an opaque HTTP 500
+    /// "An error occurred while processing your image" and had no idea a different photo would work.
+    /// Matched on the exception message because neither SDK surfaces the code as a typed member.
+    /// </remarks>
+    internal static bool IsContentFiltered(string? message) =>
+        message is not null
+        && (message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("content_policy_violation", StringComparison.OrdinalIgnoreCase));
 }
 
 

@@ -1,0 +1,99 @@
+%% PoRedoImage — Vertical Slice Boundaries (DETAILED)
+%% Derived from PoRedoImage.slnx + every .csproj ProjectReference.
+%% Rule: a slice owns its endpoint + DTO + validation. Slices never reference each other.
+flowchart TB
+
+    subgraph CLIENT["PoRedoImage.Client — Blazor WASM (browser)"]
+        direction TB
+        CPages["Pages/<br/>Studio · ImageRegeneration · MemeGeneration<br/>BulkGenerate · StyleDirector · RapRoast · Diag · Login"]
+        CShared["Shared/<br/>ImageSessionService · ModelCategoryPicker<br/>MockDataBanner · AudioFeedbackService"]
+        CHttp["Http/<br/>ClientRequestContext<br/>CorrelationHeaderHandler"]
+        CLocal["LocalAi/<br/>LocalModelRegistry · DtypeChain<br/>JsLocalInferenceRuntime · LocalAiService"]
+    end
+
+    subgraph WEB["PoRedoImage.Web — API / BFF host (Vertical Slices)"]
+        direction TB
+        SAuth["Features/Auth<br/>AuthEndpoints · AuthServiceExtensions · FakeAuthHandler"]
+        SImg["Features/ImageAnalysis<br/>ImageAnalysisEndpoints · OpenAIHealthCheck"]
+        SBulk["Features/BulkGenerate<br/>BulkGenerateEndpoints · Imagen3HealthCheck"]
+        SUser["Features/UserImages<br/>UserImageEndpoints"]
+        SMeme["Features/MemeTemplates<br/>MemeTemplateEndpoints"]
+        SStyle["Features/StyleDirector<br/>StyleDirectorEndpoints"]
+        SRap["Features/RapRoast<br/>RapRoastEndpoints"]
+        SPrice["Features/Pricing<br/>PricingEndpoints"]
+        SDiag["Features/Diagnostics<br/>DiagnosticsEndpoints · RequestContextMiddleware"]
+        SCross["Features/Shared + Features/Idempotency<br/>AuthorizationPolicies · ValidationFilter · IdempotencyKeyFilter"]
+    end
+
+    subgraph SHARED["PoRedoImage.Shared — wire contracts (referenced by BOTH sides)"]
+        direction LR
+        DTOs["DTOs/<br/>ImageAnalysisRequest/Response · BulkGenerateDtos · BulkRerollDtos<br/>MemeTemplateDtos · StyleDirectorDtos · RapRoastDtos<br/>UserImageDtos · AiPricingDtos · ProblemDetailsDto"]
+        Cfg["Configuration/ConfigKeys<br/>Json/SharedJsonContext (source-gen)"]
+    end
+
+    subgraph APP["PoRedoImage.Application — orchestration"]
+        AOrch["Features/<br/>ImageAnalysisOrchestrator · RapRoastOrchestrator<br/>SceneDescriber · RoastLyricsWriter · UserImageService"]
+        AAgents["Agents/StyleDirector/<br/>VisionAnalyst → StyleStrategist → PromptRefiner → Critic"]
+    end
+
+    subgraph DOMAIN["PoRedoImage.Domain — entities + interfaces (no dependencies)"]
+        DEnt["Entities/<br/>UserImage · UserImageId · UserImageKind<br/>BulkPrompt · MemeTemplate"]
+        DInt["Interfaces/<br/>IVisionService · IVisionServiceRouter · IChatCompletionService<br/>IGenerativeAiService · IImageGenerationService · IMusicGenerationService<br/>ISceneDetailProvider · IMemeGeneratorService · IMemeTemplateService<br/>IUserImageRepository · IBulkPromptRepository · IMockable"]
+    end
+
+    subgraph INFRA["PoRedoImage.Infrastructure — implementations + DI composition root"]
+        IRepo["Repositories/<br/>AzureTableBulkPromptRepository · AzureBlobUserImageRepository"]
+        ISvc["Services/<br/>AzureVisionService · AzureSceneDetailService · AzureOpenAiService<br/>GeminiImagen3Service · HuggingFaceImageGenerationService<br/>HuggingFaceChatCompletionService · LyriaMusicService<br/>OllamaVisionService · VisionServiceRouter · ImageSharpMemeGeneratorService"]
+        IMock["Services/Mocks/<br/>MockAiServices (IMockable) · MockAiDelegatingHandler"]
+    end
+
+    CPages --> CShared
+    CPages --> CLocal
+    CPages --> CHttp
+    CHttp -->|"HTTPS · HttpOnly cookie<br/>X-Session-ID + X-Correlation-ID"| SCross
+
+    CLIENT ==>|ProjectReference| SHARED
+    CLIENT ==>|ProjectReference| DOMAIN
+
+    SAuth --> SCross
+    SImg --> SCross
+    SBulk --> SCross
+    SUser --> SCross
+    SMeme --> SCross
+    SStyle --> SCross
+    SRap --> SCross
+    SPrice --> SCross
+    SDiag --> SCross
+
+    WEB ==>|ProjectReference| SHARED
+    WEB ==>|ProjectReference| INFRA
+    WEB ==>|"ProjectReference<br/>(hosts the WASM assembly)"| CLIENT
+
+    INFRA ==>|ProjectReference| APP
+    INFRA ==>|ProjectReference| DOMAIN
+    INFRA ==>|ProjectReference| SHARED
+    APP ==>|ProjectReference| DOMAIN
+    APP ==>|ProjectReference| SHARED
+    SHARED ==>|ProjectReference| DOMAIN
+
+    ISvc -.implements.-> DInt
+    IRepo -.implements.-> DInt
+    IMock -.implements.-> DInt
+    AOrch -.depends on abstractions.-> DInt
+    AAgents -.depends on abstractions.-> DInt
+
+    ISOLATION["ZERO leaky cross-slice edges:<br/>no Features/X references Features/Y.<br/>Shared vocabulary only via Features/Shared<br/>(AuthorizationPolicies) and PoRedoImage.Shared."]
+
+    SCross -.- ISOLATION
+
+    classDef slice fill:#eef6ff,stroke:#2c6fbb,stroke-width:1px,color:#0b2545
+    classDef contract fill:#fff7e6,stroke:#c98a00,stroke-width:1px,color:#4a3300
+    classDef domain fill:#f0f6ec,stroke:#4c8c2b,stroke-width:1px,color:#1d3a10
+    classDef infra fill:#fdf0f0,stroke:#b03a3a,stroke-width:1px,color:#4a1010
+    classDef note fill:#ffffff,stroke:#888,stroke-dasharray:4 3,color:#333
+
+    class SAuth,SImg,SBulk,SUser,SMeme,SStyle,SRap,SPrice,SDiag,SCross slice
+    class DTOs,Cfg contract
+    class DEnt,DInt domain
+    class IRepo,ISvc,IMock infra
+    class ISOLATION note

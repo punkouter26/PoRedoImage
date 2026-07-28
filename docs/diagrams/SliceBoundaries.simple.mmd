@@ -1,0 +1,26 @@
+%% PoRedoImage — Vertical Slice Boundaries (SIMPLE)
+flowchart TB
+    Client["PoRedoImage.Client<br/>Blazor WASM — router, layout, all pages"]
+    Web["PoRedoImage.Web<br/>BFF host — 9 vertical slices under Features/"]
+    Shared["PoRedoImage.Shared<br/>DTOs + ConfigKeys (both sides)"]
+    App["PoRedoImage.Application<br/>Orchestrators + Style Director agents"]
+    Infra["PoRedoImage.Infrastructure<br/>Azure / AI implementations + DI"]
+    Domain["PoRedoImage.Domain<br/>Entities + interfaces (zero dependencies)"]
+
+    Client -->|"HTTPS · cookie · correlation headers"| Web
+    Client --> Shared
+    Client --> Domain
+    Web --> Shared
+    Web --> Infra
+    Web --> Client
+    Infra --> App
+    Infra --> Domain
+    Infra --> Shared
+    App --> Domain
+    App --> Shared
+    Shared --> Domain
+
+    classDef c fill:#eef6ff,stroke:#2c6fbb,color:#0b2545
+    classDef d fill:#f0f6ec,stroke:#4c8c2b,color:#1d3a10
+    class Client,Web c
+    class Domain d
