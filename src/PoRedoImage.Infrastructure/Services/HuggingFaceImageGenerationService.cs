@@ -86,7 +86,17 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
     {
         var start = Stopwatch.GetTimestamp();
         var client = _httpClientFactory.CreateClient("HuggingFaceApi");
-        var url = $"{BaseUrl}/{Provider}/{providerId}";
+
+        // The HuggingFace Inference Providers router mounts fal-ai under
+        // {BaseUrl}/{provider}/{model}. The providerId values in appsettings include a
+        // "{provider}/" prefix (e.g. "fal-ai/qwen-image-edit") — pre-#374 the PostAsync URL
+        // builder concatenated Provider + providerId verbatim, producing "fal-ai/fal-ai/qwen-image-edit"
+        // which the router accepted for FLUX but hung on qwen-image-edit. Strip the leading
+        // provider segment here so callers can keep their config readable (provider/model form).
+        var normalizedProviderId = providerId.StartsWith(Provider + "/", StringComparison.OrdinalIgnoreCase)
+            ? providerId[(Provider.Length + 1)..]
+            : providerId;
+        var url = $"{BaseUrl}/{Provider}/{normalizedProviderId}";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new AuthenticationHeaderValue(

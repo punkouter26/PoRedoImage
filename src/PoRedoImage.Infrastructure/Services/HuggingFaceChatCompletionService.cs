@@ -6,6 +6,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Processing;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -60,14 +63,18 @@ public sealed class HuggingFaceChatCompletionService : IChatCompletionService
         var start = Stopwatch.GetTimestamp();
         var model = image is null ? ChatModel : VisionModel;
 
+        // Compress large images so the router's payload limit doesn't 413 the request. Only affects
+        // the vision branch — text-only prompts pass through untouched.
+        var visionInput = image is null ? null : CompressForVision(image, _logger);
+
         // OpenAI-compatible chat body. For the vision case the user turn carries a text part plus an
         // image_url data-URI part; otherwise the content is a plain string.
-        object userContent = image is null
+        object userContent = visionInput is null
             ? userPrompt
             : new object[]
             {
                 new { type = "text", text = userPrompt },
-                new { type = "image_url", image_url = new { url = ToDataUri(image) } },
+                new { type = "image_url", image_url = new { url = ToDataUri(visionInput) } },
             };
 
         var body = new
@@ -119,6 +126,51 @@ public sealed class HuggingFaceChatCompletionService : IChatCompletionService
     {
         var mime = bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8 ? "image/jpeg" : "image/png";
         return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+    }
+
+    /// <summary>
+    /// HuggingFace's chat-completions router rejects requests over a few MB with HTTP 413
+    /// (request entity too large). The original photos users upload are typically 3-5 MB,
+    /// well over that limit. Compress any input larger than ~768 KB down to a 1024-px-wide JPEG
+    /// so vision calls stay under the gateway's payload ceiling while preserving enough detail
+    /// for the model to read the scene. Skips re-encoding if the image is already small.
+    /// </summary>
+    internal static byte[] CompressForVision(byte[] source, ILogger logger)
+    {
+        const long largeThresholdBytes = 768 * 1024;
+        const int maxDimension = 1024;
+        const int quality = 85;
+
+        if (source is null || source.Length < largeThresholdBytes)
+            return source ?? Array.Empty<byte>();
+
+        try
+        {
+            using var input = new MemoryStream(source);
+            using var image = SixLabors.ImageSharp.Image.Load(input);
+            if (image.Width <= maxDimension && image.Height <= maxDimension)
+                return source;
+
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new Size(maxDimension, maxDimension),
+                Mode = ResizeMode.Max,
+            }));
+
+            using var output = new MemoryStream();
+            image.SaveAsJpeg(output, new JpegEncoder { Quality = quality });
+            var result = output.ToArray();
+            logger.LogInformation(
+                "HuggingFace vision input downscaled: {From} bytes → {To} bytes ({Pct}%), {W}x{H}",
+                source.Length, result.Length, (int)(100.0 * result.Length / source.Length),
+                image.Width, image.Height);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Image compression for vision failed; sending original bytes.");
+            return source;
+        }
     }
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];

@@ -20,7 +20,7 @@ public enum BulkGenerateStatus
 public record BulkDescribeRequest(string ImageData, string ContentType);
 public record BulkDescribeResponse(string Description);
 
-public record BulkVariationRequest(string ImageData, string ContentType, string Prompt);
+public record BulkVariationRequest(string ImageData, string ContentType, string Prompt, string? ImageGenModelId = null);
 public record BulkVariationResponse(string ImageData, string ContentType);
 
 /// <summary>Save the caller's 10 bulk-generation prompts. Shared so the WASM client and BFF agree on shape.</summary>

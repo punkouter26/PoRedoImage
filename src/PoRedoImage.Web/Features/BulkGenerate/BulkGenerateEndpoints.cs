@@ -88,19 +88,24 @@ public static class BulkGenerateEndpoints
         .WithName("DescribePerson")
         .WithSummary("Describe the primary person in an image for use in art-style prompts");
 
-        // Generate a single art-style variation using Gemini Imagen3 image-to-image.
-        aiGroup.MapPost("/variation", async (BulkVariationRequest request, IImageGenerationService imagen3) =>
+        // Generate a single art-style variation. Routed through IImageGenerationRouter so the
+        // client-side AI picker can choose Gemini Imagen 3 vs HuggingFace FLUX/Qwen per request.
+        // Resolves the configured default when no modelId is supplied (matches the legacy behaviour
+        // for callers that haven't adopted the picker yet).
+        aiGroup.MapPost("/variation", async (BulkVariationRequest request, IImageGenerationRouter router) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");
             if (string.IsNullOrWhiteSpace(request.Prompt))
                 return Results.BadRequest("Prompt is required.");
-            if (!imagen3.IsConfigured)
-                return Results.Problem("Gemini image generation is not configured.", statusCode: 503);
 
             ImageBytes imageBytes;
             try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
             catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
+
+            var imagen3 = router.Resolve(request.ImageGenModelId);
+            if (!imagen3.IsConfigured)
+                return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
 
             var (imgData, imgCt, _) = await imagen3.GenerateImageAsync(request.Prompt, imageBytes.Bytes.ToArray());
             return Results.Ok(new BulkVariationResponse(Convert.ToBase64String(imgData), imgCt));
@@ -110,8 +115,9 @@ public static class BulkGenerateEndpoints
 
         // Idea #11 — One-Tap Re-roll x3: spawn N parallel variations from a winning prompt.
         // Uses a deterministic seed hint so re-rolls are reproducible per session and
-        // visibly distinct from the winner, but stay close in style.
-        aiGroup.MapPost("/reroll", async (BulkRerollRequest request, IImageGenerationService imagen3, ILoggerFactory loggerFactory) =>
+        // visibly distinct from the winner, but stay close in style. Routed via the router
+        // so a client can pick a different image provider per re-roll.
+        aiGroup.MapPost("/reroll", async (BulkRerollRequest request, IImageGenerationRouter router, ILoggerFactory loggerFactory) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");
@@ -119,12 +125,14 @@ public static class BulkGenerateEndpoints
                 return Results.BadRequest("SeedPrompt is required.");
             if (request.Count is < 1 or > 10)
                 return Results.BadRequest("Count must be between 1 and 10.");
-            if (!imagen3.IsConfigured)
-                return Results.Problem("Gemini image generation is not configured.", statusCode: 503);
 
             ImageBytes imageBytes;
             try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
             catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
+
+            var imagen3 = router.Resolve(request.ImageGenModelId);
+            if (!imagen3.IsConfigured)
+                return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
 
             var rerollImageBytes = imageBytes.Bytes.ToArray();
 

@@ -7,6 +7,7 @@
 @inject ImageSessionService SessionService
 @inject NotificationService NotificationService
 @inject AudioFeedbackService Audio
+@inject PoRedoImage.Client.Models.AiSelectionState AiSelection
 
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
@@ -307,7 +308,7 @@
 
                     // True image-to-image via API: Gemini 2.0 Flash uses the uploaded photo as subject reference
                     var varResp = await Http.PostAsJsonAsync("/api/bulk-generate/variation",
-                        new BulkVariationRequest(Convert.ToBase64String(_imageBytes), _imageContentType, finalPrompt));
+                        new BulkVariationRequest(Convert.ToBase64String(_imageBytes), _imageContentType, finalPrompt, AiSelection.Get(AiCapability.GenerateImage)));
                     if (!varResp.IsSuccessStatusCode)
                         throw new InvalidOperationException($"Variation API returned {varResp.StatusCode}");
                     var varResult = await varResp.Content.ReadFromJsonAsync<BulkVariationResponse>();
@@ -498,7 +499,8 @@
                     ImageData: Convert.ToBase64String(_imageBytes),
                     ContentType: _imageContentType,
                     SeedPrompt: source.Prompt ?? string.Empty,
-                    Count: 3));
+                    Count: 3,
+                    ImageGenModelId: AiSelection.Get(AiCapability.GenerateImage)));
 
             if (!resp.IsSuccessStatusCode)
             {

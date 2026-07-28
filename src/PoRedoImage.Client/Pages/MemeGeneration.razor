@@ -274,7 +274,24 @@
                 }
                 else
                 {
-                    analysisResult = await httpResponse.Content.ReadFromJsonAsync<ImageAnalysisResponse>();
+                    // The response can carry a 700+ KB base64 meme + an optional regenerated image,
+                    // which approaches Blazor WASM's default deserialization budget. Bump the limit and
+                    // explicitly use System.Text.Json to keep behaviour deterministic across hosts.
+                    var jsonOpts = new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        MaxDepth = 64,
+                    };
+                    // ReadAsStringAsync first so we can show progress and avoid a stuck-progress state
+                    // when deserialization of a multi-MB payload takes a noticeable moment on the WASM side.
+                    progressPercentage = 85;
+                    progressMessage = "Decoding meme…";
+                    try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+                    var rawJson = await httpResponse.Content.ReadAsStringAsync(cts.Token);
+                    progressPercentage = 92;
+                    progressMessage = "Rendering result…";
+                    try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+                    analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(rawJson, jsonOpts);
                     if (analysisResult == null)
                         throw new InvalidOperationException("No response received from API.");
                     if (_userId is not null && !string.IsNullOrEmpty(analysisResult.MemeImageData))
@@ -299,6 +316,9 @@
                 isComplete = string.IsNullOrEmpty(errorMessage);
                 if (string.IsNullOrEmpty(errorMessage))
                     NotificationService.Notify(NotificationSeverity.Success, "Meme Ready!", "Your meme has been generated.", duration: 4000);
+                // Force a re-render on the UI thread so the spinner can't get stuck if the
+                // deserialization of the 13MB-base64 response left the circuit waiting.
+                try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
                 try { StateHasChanged(); } catch (ObjectDisposedException) { }
             }
         }
@@ -307,6 +327,7 @@
             errorMessage = $"Error generating meme: {ex.Message}";
             isProcessing = false;
             Logger.LogError(ex, "Error generating meme");
+            try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
         }
     }
 
