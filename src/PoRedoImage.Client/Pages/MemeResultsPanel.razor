@@ -36,6 +36,9 @@
             <button class="btn-result-primary" @onclick="OnDownloadMeme">
                 <i class="bi bi-download me-2"></i>Save &amp; Download Meme
             </button>
+            <button class="btn-result-secondary" @onclick="OnManualSave" title="Save the meme to My Images gallery">
+                <i class="bi bi-images me-2"></i>Save to My Images
+            </button>
         }
     </PrimaryAction>
     <AdditionalMoreOptions>
@@ -53,6 +56,7 @@
     [Parameter] public ImageAnalysisResponse? AnalysisResult { get; set; }
     [Parameter] public EventCallback OnDownloadOriginal { get; set; }
     [Parameter] public EventCallback OnDownloadMeme { get; set; }
+    [Parameter] public EventCallback OnManualSave { get; set; }
     [Parameter] public EventCallback OnStartOver { get; set; }
 }
 

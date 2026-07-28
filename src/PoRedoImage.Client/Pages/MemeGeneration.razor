@@ -117,6 +117,7 @@
             AnalysisResult="@analysisResult"
             OnDownloadOriginal="DownloadOriginal"
             OnDownloadMeme="DownloadMeme"
+            OnManualSave="ManualSaveMemeAsync"
             OnStartOver="StartOver" />
     }
 </div>
@@ -183,14 +184,17 @@
 
     private async Task AutoSaveMemeAsync(string memeBase64, string contentType)
     {
-        try
-        {
-            await Http.PostAsJsonAsync("/api/user-images/result",
-                new SaveResultRequest(memeBase64, contentType, UserImageKind.Meme));
-            if (_gallery is not null) await _gallery.LoadAsync();
-            NotificationService.Notify(NotificationSeverity.Info, "Saved", "Meme saved to My Images.", duration: 3000);
-        }
-        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save meme failed"); }
+        var tags = analysisResult?.Tags;
+        var savedId = await UserImageSave.SaveResultFromBase64Async(memeBase64, contentType, UserImageKind.Meme, tags);
+        if (savedId is not null && _gallery is not null)
+            await _gallery.LoadAsync();
+    }
+
+    private async Task ManualSaveMemeAsync()
+    {
+        if (analysisResult?.MemeImageData is null) return;
+        const string mime = "image/png";
+        await AutoSaveMemeAsync(analysisResult.MemeImageData, mime);
     }
 
     private async Task ProcessImage()

@@ -50,6 +50,7 @@
             ImageDescription="@imageDescription"
             OnDownloadOriginal="DownloadOriginal"
             OnDownloadRegenerated="DownloadRegenerated"
+            OnManualSave="ManualSaveResultAsync"
             OnStartOver="StartOver" />
     }
 </div>
@@ -68,15 +69,19 @@
 
     private async Task AutoSaveResultAsync(byte[] bytes, string contentType)
     {
-        try
-        {
-            var base64 = Convert.ToBase64String(bytes);
-            await Http.PostAsJsonAsync("/api/user-images/result",
-                new SaveResultRequest(base64, contentType, UserImageKind.Regeneration));
-            if (_gallery is not null) await _gallery.LoadAsync();
-            NotificationService.Notify(NotificationSeverity.Info, "Saved", "Result saved to My Images.", duration: 3000);
-        }
-        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save result failed"); }
+        // Vision tags from Azure Computer Vision ride along so the gallery can filter by
+        // content later. Keep them raw for now — the server side wraps them safely.
+        var tags = analysisResult?.Tags;
+        var savedId = await UserImageSave.SaveResultAsync(bytes, contentType, UserImageKind.Regeneration, tags);
+        if (savedId is not null && _gallery is not null)
+            await _gallery.LoadAsync();
+    }
+
+    private async Task ManualSaveResultAsync()
+    {
+        if (regeneratedImageUrl is null || analysisResult?.RegeneratedImageData is null) return;
+        var bytes = Convert.FromBase64String(analysisResult.RegeneratedImageData);
+        await AutoSaveResultAsync(bytes, analysisResult.RegeneratedImageContentType);
     }
 
     private async Task ProcessImage()

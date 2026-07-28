@@ -8,6 +8,7 @@
 @inject NotificationService NotificationService
 @inject AudioFeedbackService Audio
 @inject PoRedoImage.Client.Models.AiSelectionState AiSelection
+@inject PoRedoImage.Client.Services.UserImageSaveService UserImageSave
 
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
@@ -386,23 +387,20 @@
 
     private async Task AutoSaveOriginalAsync(byte[] bytes, string contentType, string fileName)
     {
-        try
-        {
-            await Http.PostAsJsonAsync("/api/user-images/original",
-                new SaveOriginalRequest(Convert.ToBase64String(bytes), contentType, fileName));
-            if (_gallery is not null) await InvokeAsync(_gallery.LoadAsync);
-        }
-        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save original failed"); }
+        // Idempotent save with a Retry-toast on failure. The fire-and-forget at the call site
+        // keeps the upload UI snappy; the toast handles the (rare) failure case without silently
+        // dropping the image like the old Http.PostAsJsonAsync version did.
+        var savedId = await UserImageSave.SaveOriginalAsync(bytes, contentType, fileName, tags: null);
+        if (savedId is not null && _gallery is not null)
+            await InvokeAsync(_gallery.LoadAsync);
     }
 
     private async Task AutoSaveVariationAsync(string imageData, string contentType)
     {
-        try
-        {
-            await Http.PostAsJsonAsync("/api/user-images/result",
-                new SaveResultRequest(imageData, contentType, UserImageKind.BulkVariation));
-        }
-        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save variation failed"); }
+        // Pass tags from the bulk pipeline's analysis (if any). For now this is empty — the
+        // /variation endpoint currently doesn't return a per-vision-tags payload, but
+        // threading the slot through here keeps the door open for the next pipeline iteration.
+        await UserImageSave.SaveResultFromBase64Async(imageData, contentType, UserImageKind.BulkVariation, tags: null);
     }
 
     private void ToggleFavorite(int index)

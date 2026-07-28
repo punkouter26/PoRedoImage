@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using PoRedoImage.Client.Http;
+using PoRedoImage.Client.Services;
 using PoRedoImage.Client.Shared;
 using Radzen;
 using System.Net.Http.Json;
@@ -44,6 +45,10 @@ builder.Services.AddScoped<PoRedoImage.Client.Models.AiSelectionState>();
 // Procedural Web Audio micro-feedback (success / failure / tick). Zero asset cost —
 // every cue is synthesized via OscillatorNode + lowpass-filtered noise in wwwroot/js/audio.js.
 builder.Services.AddScoped<AudioFeedbackService>();
+
+// Gallery saver (PO saves): idempotency-keyed POST + Radzen retry toast. Scoped per circuit
+// so each user session has its own retry handler (TaskCompletionSource held in notifications).
+builder.Services.AddScoped<UserImageSaveService>();
 
 // BFF auth (§2): the server serializes the authenticated principal (claims only, no tokens);
 // the client deserializes it into an AuthenticationStateProvider.

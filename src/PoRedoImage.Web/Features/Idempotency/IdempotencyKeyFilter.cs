@@ -11,8 +11,13 @@ namespace PoRedoImage.Web.Features.Idempotency;
 /// or browser auto-retries create duplicate rows in Table Storage and double-charge AI tokens
 /// (Po2Logic Failure #6 / BOMB-1).
 /// <para>
-/// Caching strategy: <see cref="IMemoryCache"/> with 24h TTL keyed by (userId, key).
-/// Replays within the TTL return the cached 2xx response with <c>Idempotent-Replay: true</c>.
+/// Caching strategy: <see cref="IMemoryCache"/> with 24h TTL keyed by (userId, key). Replays
+/// within the TTL return the cached 2xx response with <c>Idempotent-Replay: true</c>.
+/// </para>
+/// <para>
+/// The Minimal API Result is evaluated lazily — to capture its body for caching we have to
+/// swap <c>http.Response.Body</c> for an in-memory buffer BEFORE the inner pipeline runs,
+/// then on success copy the buffer to the original stream and stash the bytes for replays.
 /// </para>
 /// </summary>
 public sealed class IdempotencyKeyFilter : IEndpointFilter
@@ -52,54 +57,80 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
                      ?? "anonymous";
         var cacheKey = $"idem:{userId}:{key.Value:D}";
 
-        // Replay path: return the cached response verbatim.
+        // Replay path: return the cached response verbatim and short-circuit the endpoint.
         if (_cache.TryGetValue<CachedResponse>(cacheKey, out var cached) && cached is not null)
         {
             _logger.LogInformation("Idempotent replay for key {Key} (user {UserId})", key, userId);
-            http.Response.Headers[ReplayHeaderName] = "true";
             http.Response.StatusCode = cached.StatusCode;
-            http.Response.ContentType = cached.ContentType;
+            http.Response.Headers[ReplayHeaderName] = "true";
+            if (!string.IsNullOrEmpty(cached.ContentType))
+                http.Response.ContentType = cached.ContentType;
             await http.Response.WriteAsync(cached.Body, ctx.HttpContext.RequestAborted);
             return Results.Empty; // already written
         }
 
-        // First call: run the endpoint, capture the response, cache it.
-        var result = await next(ctx);
+        // First call: redirect the response body into a buffering stream so the Minimal API
+        // IResult has somewhere to dump its lazy JSON, then snapshot it for the cache and
+        // copy the same bytes to the real socket.
+        var originalBody = http.Response.Body;
+        await using var buffer = new MemoryStream();
+        http.Response.Body = buffer;
 
-        if (result is IStatusCodeHttpResult scr && scr.StatusCode is >= 200 and < 300)
+        object? result = null;
+        try
         {
-            var (statusCode, contentType, body) = await MaterializeAsync(http, result);
-            if (body is not null)
+            result = await next(ctx);
+
+            // Minimal API IResults are LAZY — `await next()` only hands back the IResult, it
+            // doesn't run it. We must materialise it ourselves to capture the body for
+            // idempotent replay. Branch on the type so unit/integration tests still pass
+            // when they inject stubs.
+            if (result is IResult iresult)
             {
-                _cache.Set(cacheKey, new CachedResponse(statusCode, contentType, body), Ttl);
+                await iresult.ExecuteAsync(http);
             }
+            else
+            {
+                // Non-IResult return value: leave for the framework to handle.
+                // Restore the original body so it actually reaches the socket.
+                http.Response.Body = originalBody;
+                return result;
+            }
+        }
+        finally
+        {
+            // Restore the original stream irrespective of success/failure so subsequent
+            // middleware (request logging, etc.) sees a sane response.
+            http.Response.Body = originalBody;
+        }
+
+        var statusCode = (result as IStatusCodeHttpResult)?.StatusCode ?? http.Response.StatusCode;
+        var bodyText = ReadBuffer(buffer);
+
+        // Copy what the endpoint wrote into the buffer out to the real response. If we
+        // don't, the client sees an empty body even on success.
+        if (buffer.Length > 0)
+        {
+            buffer.Position = 0;
+            await buffer.CopyToAsync(originalBody, http.RequestAborted);
+        }
+
+        if (statusCode is >= 200 and < 300 && bodyText is not null)
+        {
+            _cache.Set(cacheKey, new CachedResponse(statusCode, http.Response.ContentType, bodyText), Ttl);
+            _logger.LogInformation("Idempotency cache populated for key {Key} (user {UserId}, status={Status}, bytes={Bytes})",
+                key, userId, statusCode, bodyText.Length);
         }
 
         return result;
     }
 
-    /// <summary>
-    /// Replays require the full response body, but Minimal API results are often unbuffered.
-    /// We swap in a buffering stream, run the inner pipeline, then snapshot the bytes.
-    /// </summary>
-    private static async Task<(int StatusCode, string? ContentType, string? Body)> MaterializeAsync(
-        HttpContext http, object? result)
+    private static string? ReadBuffer(MemoryStream buffer)
     {
-        var statusCode = (result as IStatusCodeHttpResult)?.StatusCode
-            ?? http.Response.StatusCode;
-
-        // Body cannot be reliably extracted from a returned IResult after the fact.
-        // We just cache the status code + content-type and the IResult's body if it
-        // was written synchronously. Replays of streamed bodies are not supported.
-        var contentType = http.Response.ContentType;
-        if (http.Response.Body is MemoryStream ms && ms.Length > 0)
-        {
-            ms.Position = 0;
-            using var reader = new StreamReader(ms, leaveOpen: true);
-            var body = await reader.ReadToEndAsync();
-            return (statusCode, contentType, body);
-        }
-        return (statusCode, contentType, null);
+        if (buffer.Length == 0) return null;
+        buffer.Position = 0;
+        using var reader = new StreamReader(buffer, leaveOpen: true);
+        return reader.ReadToEnd();
     }
 
     private sealed record CachedResponse(int StatusCode, string? ContentType, string Body);

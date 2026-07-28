@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
 using PoRedoImage.Client.LocalAi;
 using PoRedoImage.Client.Models;
+using PoRedoImage.Client.Services;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Client.Shared;
 using Radzen;
@@ -26,6 +27,7 @@ public abstract class FeaturePageBase : ComponentBase
     [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
     [Inject] protected AiSelectionState AiSelection { get; set; } = default!;
     [Inject] protected LocalAiService LocalAi { get; set; } = default!;
+    [Inject] protected UserImageSaveService UserImageSave { get; set; } = default!;
 
     private ILogger? _logger;
     protected ILogger Logger => _logger ??= LoggerFactory.CreateLogger(GetType());
@@ -75,6 +77,10 @@ public abstract class FeaturePageBase : ComponentBase
 
         imagePreviewUrl = result!.PreviewUrl;
         SessionService.SetImage(result!.PreviewUrl, result.ContentType, selectedFile.Name, result.Bytes);
+        // Fire-and-forget has bitten us before: a transient 5xx silently produced a gallery
+        // with no entry. Delegate to UserImageSaveService which sends an Idempotency-Key and
+        // surfaces a Retry-button Radzen toast on failure. The _ = drop is intentional here
+        // because we don't want to block the upload UI waiting for storage.
         if (_userId is not null && result.Bytes is not null)
             _ = AutoSaveOriginalAsync(result.Bytes, result.ContentType, selectedFile.Name);
         StateHasChanged();
@@ -94,15 +100,16 @@ public abstract class FeaturePageBase : ComponentBase
     /// <summary>Called by HandleGalleryImage so derived pages can clear their own result state.</summary>
     protected virtual void OnGalleryImageSelected() { }
 
-    protected async Task AutoSaveOriginalAsync(byte[] bytes, string contentType, string fileName)
+    /// <summary>
+    /// Saves the just-uploaded original into the user's gallery via <see cref="UserImageSaveService"/>.
+    /// On failure the service surfaces a Radzen toast with a Retry button — no silent drops. Made
+    /// virtual so derived pages (MemeGeneration, BulkGenerate) can pass extra tags before save.
+    /// </summary>
+    protected virtual async Task AutoSaveOriginalAsync(byte[] bytes, string contentType, string fileName)
     {
-        try
-        {
-            await Http.PostAsJsonAsync("/api/user-images/original",
-                new SaveOriginalRequest(Convert.ToBase64String(bytes), contentType, fileName));
-            if (_gallery is not null) await _gallery.LoadAsync();
-        }
-        catch (Exception ex) { Logger.LogWarning(ex, "Auto-save original failed"); }
+        var savedId = await UserImageSave.SaveOriginalAsync(bytes, contentType, fileName, tags: null);
+        if (savedId is not null && _gallery is not null)
+            await _gallery.LoadAsync();
     }
 
     /// <summary>
