@@ -40,7 +40,8 @@ with the slice matrix, diagnostic charts, and a zero-waste audit.
 | [`CHANGELOG_SIMPLE.html`](CHANGELOG_SIMPLE.html) / [`CHANGELOG_DETAILED.html`](CHANGELOG_DETAILED.html) | Recent changes with +/- line counts, reasoning, and key snippets |
 | [`ROLES_MATRIX_SIMPLE.html`](ROLES_MATRIX_SIMPLE.html) / [`ROLES_MATRIX_DETAILED.html`](ROLES_MATRIX_DETAILED.html) | Identity types, the anonymous surface, and per-endpoint access |
 | [`diagnostic_history.json`](diagnostic_history.json) | Web-vitals sample store consumed by the dashboard (**empty** — no collector exists yet) |
-| [`diagrams/`](diagrams/) | 6 diagrams × simple/detailed, each as `.mmd` + `.svg` + standalone `.html` |
+| [`diagrams/AiModelMap.detailed.html`](diagrams/AiModelMap.detailed.html) | **Diagram**: task → Domain interface → model, colour-coded by verification status |
+| [`diagrams/`](diagrams/) | 7 diagrams × simple/detailed, each as `.mmd` + `.svg` + standalone `.html` |
 
 Regenerate the diagram SVG/HTML after editing any `.mmd`:
 
