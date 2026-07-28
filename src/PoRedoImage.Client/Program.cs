@@ -37,6 +37,10 @@ builder.Services.AddScoped<ImageSessionService>();
 // Scoped so each circuit disposes its workers and releases GPU memory.
 builder.Services.AddScoped<PoRedoImage.Client.LocalAi.LocalAiService>();
 
+// Per-capability provider selection (§ai-service-pickers): session-only, resets on reload so a
+// removed provider can never leave a stale selection stranded.
+builder.Services.AddScoped<PoRedoImage.Client.Models.AiSelectionState>();
+
 // Procedural Web Audio micro-feedback (success / failure / tick). Zero asset cost —
 // every cue is synthesized via OscillatorNode + lowpass-filtered noise in wwwroot/js/audio.js.
 builder.Services.AddScoped<AudioFeedbackService>();
