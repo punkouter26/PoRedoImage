@@ -1,4 +1,4 @@
-@page "/rap-roast"
+﻿@page "/rap-roast"
 @attribute [Authorize]
 @inherits FeaturePageBase
 @using System.Net.Http.Json
@@ -66,6 +66,16 @@
     {
         <div class="row justify-content-center">
             <div class="col-lg-8">
+                @* The photo the roast is about — without it the bars have no referent, and you
+                   cannot tell whether the AI actually saw what it claims to have seen. *@
+                @if (!string.IsNullOrEmpty(_roastedImageUrl))
+                {
+                    <figure class="roast-subject">
+                        <img src="@_roastedImageUrl" alt="The photo this roast is about" class="roast-subject__img" />
+                        <figcaption class="roast-subject__caption">The subject of this roast</figcaption>
+                    </figure>
+                }
+
                 @if (_result.AudioRefused)
                 {
                     <div class="roast-refused" role="status">
@@ -105,9 +115,18 @@
                     <pre class="roast-lyrics__text">@_result.Lyrics</pre>
                 </section>
 
-                <details class="roast-seen">
+                <details class="roast-seen" open="@(!_result.DescriptionIsDetailed)">
                     <summary>What the AI saw</summary>
                     <p class="mb-0 small">@_result.ImageDescription</p>
+                    @if (!_result.DescriptionIsDetailed)
+                    {
+                        <p class="roast-seen__thin mb-0">
+                            <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
+                            That's a keyword list, not a description — no vision model was available, so
+                            the bars are working from labels alone. Configure <code>HuggingFace:ApiKey</code>
+                            for a detailed read of the scene.
+                        </p>
+                    }
                 </details>
 
                 <div class="d-flex gap-2 mt-3">
@@ -123,6 +142,10 @@
 @code {
     private RapRoastResponse? _result;
     private RapStyle _style = RapStyle.BoomBap;
+
+    // Snapshotted when the roast is submitted, not read live: the session image can change while a
+    // result is on screen, which would leave the bars describing a photo that is no longer shown.
+    private string? _roastedImageUrl;
 
     private static readonly (RapStyle Value, string Label, string Hint)[] StyleOptions =
     [
@@ -157,6 +180,8 @@
             progressPercentage = 45;
             progressMessage = "Writing your bars…";
             StateHasChanged();
+
+            _roastedImageUrl = previewUrl;
 
             var request = new RapRoastRequest
             {
@@ -204,6 +229,7 @@
     private void Reset()
     {
         _result = null;
+        _roastedImageUrl = null;
         isComplete = false;
         errorMessage = null;
         StateHasChanged();

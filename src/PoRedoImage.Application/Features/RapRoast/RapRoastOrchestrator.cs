@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
@@ -16,6 +16,7 @@ public interface IRapRoastOrchestrator
 /// <inheritdoc />
 public sealed class RapRoastOrchestrator(
     IVisionServiceRouter visionRouter,
+    SceneDescriber sceneDescriber,
     RoastLyricsWriter lyricsWriter,
     IMusicGenerationService musicService,
     ILogger<RapRoastOrchestrator> logger) : IRapRoastOrchestrator
@@ -33,14 +34,25 @@ public sealed class RapRoastOrchestrator(
         var total = Stopwatch.StartNew();
         var imageBytes = Convert.FromBase64String(request.ImageData);
 
-        // Step 1 — vision. Routed exactly as the analyze pipeline is, so the roast honours whichever
-        // backend the caller selected.
+        // Step 1 — vision for tags. Routed exactly as the analyze pipeline is, so the roast honours
+        // whichever backend the caller selected.
         var vision = visionRouter.Resolve(request.ModelId);
-        var (description, tags, _, _) = await vision.AnalyzeAsync(imageBytes, ct);
+        var (baseDescription, tags, _, _) = await vision.AnalyzeAsync(imageBytes, ct);
 
-        var response = new RapRoastResponse { ImageDescription = description };
+        // Step 2 — a genuinely detailed scene description. The vision backend's own description is
+        // often just its top tags joined together (Azure's Caption feature is region-limited), and
+        // keywords produce generic bars. A vision-capable chat model gives the specifics a roast
+        // needs; without one this returns the tag-derived text unchanged.
+        var scene = await sceneDescriber.DescribeAsync(imageBytes, baseDescription, tags, ct);
+        var description = scene.Text;
 
-        // Steps 2 + 3 — write bars, then have them performed. A refusal from the music provider is
+        var response = new RapRoastResponse
+        {
+            ImageDescription = description,
+            DescriptionIsDetailed = scene.Detailed,
+        };
+
+        // Steps 3 + 4 — write bars, then have them performed. A refusal from the music provider is
         // an expected outcome for a roast, so it drives one softened rewrite rather than an error.
         RoastLyrics? lyrics = null;
         MusicGenerationResult? music = null;

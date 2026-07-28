@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace PoRedoImage.Shared.DTOs;
 
@@ -69,6 +69,13 @@ public class RapRoastResponse
 
     /// <summary>The image description the lyrics were written from — shown as "what the AI saw".</summary>
     public string ImageDescription { get; set; } = string.Empty;
+
+    /// <summary>
+    /// True when a vision model produced <see cref="ImageDescription"/>. False means it fell back to
+    /// the vision backend's tag-derived text, which yields noticeably blander lyrics — surfaced in
+    /// the UI so a generic roast is explainable rather than mysterious.
+    /// </summary>
+    public bool DescriptionIsDetailed { get; set; }
 
     public long TotalMs { get; set; }
 }

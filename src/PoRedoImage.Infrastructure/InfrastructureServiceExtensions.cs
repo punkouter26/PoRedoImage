@@ -112,6 +112,7 @@ public static class InfrastructureServiceExtensions
 
         // Rap Roast slice: lyric writer + orchestrator (Transient so scoped logger flows correctly,
         // matching the Style Director agent registrations below).
+        services.AddTransient<SceneDescriber>();
         services.AddTransient<RoastLyricsWriter>();
         services.AddScoped<IRapRoastOrchestrator, RapRoastOrchestrator>();
 

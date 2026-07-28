@@ -126,3 +126,35 @@
     cursor: pointer;
     color: var(--color-muted);
 }
+
+.roast-subject {
+    margin: 0 0 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 12px);
+    padding: 0.75rem;
+    text-align: center;
+}
+
+/* Capped by viewport height as well as width: a tall portrait photo would otherwise push the
+   audio player and the bars entirely below the fold. */
+.roast-subject__img {
+    max-width: 100%;
+    max-height: 340px;
+    width: auto;
+    border-radius: var(--radius-md, 8px);
+    display: block;
+    margin: 0 auto;
+}
+
+.roast-subject__caption {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #475569;
+}
+
+.roast-seen__thin {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: #475569;
+}
