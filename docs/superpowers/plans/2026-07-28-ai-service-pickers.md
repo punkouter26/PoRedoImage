@@ -10,6 +10,21 @@
 
 **Source spec:** `docs/superpowers/specs/2026-07-28-ai-service-pickers-design.md`
 
+## Amendments to the spec (decided 2026-07-28, before execution)
+
+1. **Qwen2.5 is not offered for Enhance description.** The spec listed it, but no task implements
+   browser-local text enhancement — the enhancement step runs server-side after vision, so routing it
+   to the browser needs a second round trip. Listing it would mean the dropdown asserts a capability
+   the code does not have. `EnhanceDescription` therefore has one provider and renders disabled.
+   Browser-local execution applies to **Analyze image only**. The `AiProviderIds.BrowserQwen25`
+   constant is still defined and still used by the Task 1 regression test.
+2. **Routing and DTO changes ship as one task** (Task 2), so every task builds and tests green on its
+   own.
+3. **Task 5 writes `BuildAnalysisRequestAsync` directly**, with the browser branch stubbed; Task 6
+   fills in the body. No method is written and then thrown away.
+
+Net effect: **six tasks**, four single-provider capabilities, two enabled dropdowns.
+
 ## Global Constraints
 
 - **.NET 10**, pinned via `global.json`. `<LangVersion>latest</LangVersion>` (C# 14).
@@ -20,6 +35,7 @@
 - **All interactive components live in `src/PoRedoImage.Client/`.** Never set `RenderMode.InteractiveServer`.
 - **BFF invariant** — no tokens in WASM. This plan sends only model ids, never credentials.
 - **`.Shared` must be trim-safe** (`EnableTrimAnalyzer`). Use plain records, const strings, and explicit properties — no reflection-driven binding.
+- **Every task must build and test green on its own.** No task may leave the tree broken for a later task to fix.
 - **Test tier ceilings (100/50/25)** are enforced by `TestCountCeilingTests` in each tier. **The Unit tier is close to its 100-method ceiling.** After adding unit tests, run the guardrail; if it fails, move the router tests to the Integration tier rather than deleting coverage.
 - **Build and test commands:**
   - `dotnet build PoRedoImage.slnx`
@@ -78,7 +94,7 @@ Fixes the collision where `qwen2.5-0.5b-instruct` (a browser model) is routed to
 
 **Interfaces:**
 - Consumes: nothing (first task)
-- Produces: `AiProviderIds` static class with const string ids and `IsOllama(string?)` / `IsBrowser(string?)` predicates. Tasks 2, 4, 5, 6 all reference these constants.
+- Produces: `AiProviderIds` static class with const string ids and `IsOllama(string?)` / `IsBrowser(string?)` predicates. Tasks 2, 3, 4, 5 all reference these constants.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -143,6 +159,10 @@ public class VisionServiceRouterTests
 }
 ```
 
+> Verify `OllamaVisionService`'s real constructor signature before writing this — read
+> `src/PoRedoImage.Infrastructure/Services/OllamaVisionService.cs` and match its parameter order
+> exactly. Same for `AzureVisionService`.
+
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```powershell
@@ -186,6 +206,12 @@ public static class AiProviderIds
 
     // Browser (WebGPU / WebAssembly, executed client-side)
     public const string BrowserFlorence2 = "browser:florence2-base";
+
+    /// <summary>
+    /// Browser text model. Not currently offered in the catalog — browser-local text enhancement is
+    /// unimplemented — but defined here because <c>VisionServiceRouter</c> must provably not mistake
+    /// it for an Ollama id.
+    /// </summary>
     public const string BrowserQwen25 = "browser:qwen2.5-0.5b-instruct";
 
     /// <summary>True when the id names the local Ollama service.</summary>
@@ -200,7 +226,7 @@ public static class AiProviderIds
 
 - [ ] **Step 4: Tighten the router**
 
-Replace the body of `src/PoRedoImage.Infrastructure/Services/VisionServiceRouter.cs`:
+Replace the whole of `src/PoRedoImage.Infrastructure/Services/VisionServiceRouter.cs`:
 
 ```csharp
 using PoRedoImage.Domain.Interfaces;
@@ -242,13 +268,16 @@ dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~VisionServ
 
 Expected: PASS — 3 passed.
 
-- [ ] **Step 6: Verify the tier ceiling still holds**
+- [ ] **Step 6: Build and check the tier ceiling**
 
 ```powershell
+dotnet build PoRedoImage.slnx
 dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~TestCountCeiling"
 ```
 
-Expected: PASS. If it FAILS with "exceeding the ceiling of 100", move `VisionServiceRouterTests` to `tests/PoRedoImage.Tests.Integration/` and rerun both tiers.
+Expected: build succeeds with 0 warnings; ceiling test PASSES. If the ceiling FAILS with "exceeding
+the ceiling of 100", move `VisionServiceRouterTests` to `tests/PoRedoImage.Tests.Integration/` and
+rerun both tiers.
 
 - [ ] **Step 7: Commit**
 
@@ -261,24 +290,25 @@ git commit -m "fix(ai): namespace provider ids and stop prefix-guessing in Visio
 
 ---
 
-## Task 2: Per-request image-generation routing
+## Task 2: Per-request image-generation routing and precomputed vision
 
-`IImageGenerationService` is currently bound to one singleton at startup by the `ImageGen:Provider`
-flag. This adds a router so the client can choose per request, while preserving the flag as the
-fallback.
+Adds the router, the three DTO fields, and the orchestrator branch together, so the tree builds and
+tests green at the end of this task.
 
 **Files:**
 - Create: `src/PoRedoImage.Domain/Interfaces/IImageGenerationRouter.cs`
 - Create: `src/PoRedoImage.Infrastructure/Services/ImageGenerationRouter.cs`
-- Modify: `src/PoRedoImage.Infrastructure/InfrastructureServiceExtensions.cs` (mock branch ~line 36-66; real branch ~line 82-89)
+- Modify: `src/PoRedoImage.Infrastructure/InfrastructureServiceExtensions.cs` (mock branch ~lines 36-66; real branch ~lines 82-89)
+- Modify: `src/PoRedoImage.Shared/DTOs/ImageAnalysisRequest.cs`
 - Modify: `src/PoRedoImage.Application/Features/ImageAnalysis/ImageAnalysisOrchestrator.cs`
 - Test: `tests/PoRedoImage.Tests.Unit/Features/ImageGenerationRouterTests.cs`
+- Test: `tests/PoRedoImage.Tests.Integration/Features/PrecomputedVisionTests.cs`
 
 **Interfaces:**
 - Consumes: `AiProviderIds.GeminiImagen3`, `AiProviderIds.HuggingFaceFlux` (Task 1)
-- Produces: `IImageGenerationRouter.Resolve(string? modelId) → IImageGenerationService`. Task 3 injects this into the orchestrator.
+- Produces: `IImageGenerationRouter.Resolve(string? modelId) → IImageGenerationService`; `ImageAnalysisRequest.ImageGenModelId`, `.PrecomputedDescription`, `.PrecomputedTags`. Tasks 5 and 6 populate those fields.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing router test**
 
 Create `tests/PoRedoImage.Tests.Unit/Features/ImageGenerationRouterTests.cs`:
 
@@ -327,7 +357,7 @@ public class ImageGenerationRouterTests
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [ ] **Step 2: Run it to verify it fails**
 
 ```powershell
 dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~ImageGenerationRouterTests"
@@ -399,7 +429,7 @@ public sealed class SingleImageGenerationRouter(IImageGenerationService service)
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [ ] **Step 5: Run the router tests to verify they pass**
 
 ```powershell
 dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~ImageGenerationRouterTests"
@@ -407,10 +437,40 @@ dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~ImageGener
 
 Expected: PASS — 5 passed (3 theory cases + 2 facts).
 
-- [ ] **Step 6: Register both routers in DI**
+- [ ] **Step 6: Add the DTO fields**
+
+In `src/PoRedoImage.Shared/DTOs/ImageAnalysisRequest.cs`, replace the `ModelId` doc comment and
+append three properties after it:
+
+```csharp
+    /// <summary>
+    /// Optional selected vision provider id (see <c>AiProviderIds</c>, e.g. "ollama:vision").
+    /// Null or unrecognised ids fall back to the default Azure vision service.
+    /// </summary>
+    public string? ModelId { get; set; }
+
+    /// <summary>
+    /// Optional selected image-generation provider id (see <c>AiProviderIds</c>). Null falls back to
+    /// the provider named by the <c>ImageGen:Provider</c> flag.
+    /// </summary>
+    public string? ImageGenModelId { get; set; }
+
+    /// <summary>
+    /// Description already produced by a browser-local vision model. When set, the server skips its
+    /// own vision step and uses this instead.
+    /// </summary>
+    public string? PrecomputedDescription { get; set; }
+
+    /// <summary>
+    /// Tags accompanying <see cref="PrecomputedDescription"/>. Ignored unless that is also set.
+    /// </summary>
+    public IReadOnlyList<string>? PrecomputedTags { get; set; }
+```
+
+- [ ] **Step 7: Register both routers in DI**
 
 In `src/PoRedoImage.Infrastructure/InfrastructureServiceExtensions.cs`, inside the **mock branch**
-(`if (useMockAi)`), immediately after the existing `MockImagen3Service` registration, add:
+(`if (useMockAi)`), after the existing `MockImagen3Service` registration, add:
 
 ```csharp
             services.AddSingleton<IImageGenerationRouter>(sp =>
@@ -439,93 +499,12 @@ with:
                 imageProvider));
 ```
 
-- [ ] **Step 7: Switch the orchestrator to the router**
+- [ ] **Step 8: Write the failing integration test**
 
-In `src/PoRedoImage.Application/Features/ImageAnalysis/ImageAnalysisOrchestrator.cs`, change the
-primary constructor parameter `IImageGenerationService imagen3Service` to
-`IImageGenerationRouter imageGenRouter`, and replace both uses inside `ProcessAsync`:
-
-```csharp
-            var imageGenService = imageGenRouter.Resolve(request.ImageGenModelId);
-
-            if (!imageGenService.IsConfigured)
-            {
-                throw new InvalidOperationException(
-                    "Image generation is not configured. Set the Gemini API key (Google:ApiKey) via Key Vault or appsettings.");
-            }
-
-            var (imgData, imgType, regenMs) = await imageGenService.GenerateAsync(enhanced, ct);
-```
-
-> `request.ImageGenModelId` does not exist yet — it is added in Task 3. Build will fail until then;
-> that is expected and is why Steps 8-9 build only after Task 3. Proceed to Step 8.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add src/PoRedoImage.Domain/Interfaces/IImageGenerationRouter.cs \
-        src/PoRedoImage.Infrastructure/Services/ImageGenerationRouter.cs \
-        src/PoRedoImage.Infrastructure/InfrastructureServiceExtensions.cs \
-        src/PoRedoImage.Application/Features/ImageAnalysis/ImageAnalysisOrchestrator.cs \
-        tests/PoRedoImage.Tests.Unit/Features/ImageGenerationRouterTests.cs
-git commit -m "feat(ai): add per-request image generation routing"
-```
-
----
-
-## Task 3: Request DTO fields and the precomputed-vision branch
-
-Adds the three fields the client needs and lets the orchestrator skip its vision step when the
-browser already produced a description. Completes the build broken at the end of Task 2.
-
-**Files:**
-- Modify: `src/PoRedoImage.Shared/DTOs/ImageAnalysisRequest.cs`
-- Modify: `src/PoRedoImage.Application/Features/ImageAnalysis/ImageAnalysisOrchestrator.cs:24-31`
-- Test: `tests/PoRedoImage.Tests.Integration/Features/PrecomputedVisionTests.cs`
-
-**Interfaces:**
-- Consumes: `IImageGenerationRouter` (Task 2)
-- Produces: `ImageAnalysisRequest.ImageGenModelId`, `.PrecomputedDescription`, `.PrecomputedTags`. Tasks 6 and 7 populate these.
-
-- [ ] **Step 1: Add the DTO fields**
-
-Append to `src/PoRedoImage.Shared/DTOs/ImageAnalysisRequest.cs`, inside the class after `ModelId`:
-
-```csharp
-    /// <summary>
-    /// Optional selected image-generation provider id (see <c>AiProviderIds</c>). Null falls back to
-    /// the provider named by the <c>ImageGen:Provider</c> flag.
-    /// </summary>
-    public string? ImageGenModelId { get; set; }
-
-    /// <summary>
-    /// Description already produced by a browser-local vision model. When set, the server skips its
-    /// own vision step and uses this instead.
-    /// </summary>
-    public string? PrecomputedDescription { get; set; }
-
-    /// <summary>
-    /// Tags accompanying <see cref="PrecomputedDescription"/>. Ignored unless that is also set.
-    /// </summary>
-    public IReadOnlyList<string>? PrecomputedTags { get; set; }
-```
-
-Also update the `ModelId` doc comment to point at the new vocabulary:
-
-```csharp
-    /// <summary>
-    /// Optional selected vision provider id (see <c>AiProviderIds</c>, e.g. "ollama:vision").
-    /// Null or unrecognised ids fall back to the default Azure vision service.
-    /// </summary>
-    public string? ModelId { get; set; }
-```
-
-- [ ] **Step 2: Write the failing integration test**
-
-Create `tests/PoRedoImage.Tests.Integration/Features/PrecomputedVisionTests.cs`. Follow the existing
-fixture pattern in that project — read `tests/PoRedoImage.Tests.Integration/AzuriteContainerFixture.cs`
-and one neighbouring test class first to match how the `WebApplicationFactory` and fake auth headers
-are set up, then write:
+Create `tests/PoRedoImage.Tests.Integration/Features/PrecomputedVisionTests.cs`. **Read
+`tests/PoRedoImage.Tests.Integration/AzuriteContainerFixture.cs` and one neighbouring test class
+first**, then match their fixture type, authenticated-client helper, and test-image constant exactly
+— do not invent new helpers if equivalents exist:
 
 ```csharp
 using System.Net;
@@ -538,16 +517,16 @@ namespace PoRedoImage.Tests.Integration.Features;
 /// When the browser has already run vision locally, the server must not run it again — otherwise a
 /// user who chose a free on-device model still pays for a metered Azure call.
 /// </summary>
-public class PrecomputedVisionTests(PoRedoImageWebFactory factory) : IClassFixture<PoRedoImageWebFactory>
+public class PrecomputedVisionTests(/* fixture type from neighbouring tests */)
 {
     [Fact]
     public async Task Analyze_WithPrecomputedDescription_SkipsVisionAndReportsZeroAnalysisTime()
     {
-        var client = factory.CreateAuthenticatedClient();
+        var client = /* authenticated client, per neighbouring tests */;
 
         var request = new ImageAnalysisRequest
         {
-            ImageData = TestImages.OnePixelPngBase64,
+            ImageData = /* base64 test image constant used by neighbouring tests */,
             ContentType = "image/png",
             FileName = "test.png",
             Mode = ProcessingMode.MemeGeneration,
@@ -566,11 +545,7 @@ public class PrecomputedVisionTests(PoRedoImageWebFactory factory) : IClassFixtu
 }
 ```
 
-> Replace `PoRedoImageWebFactory`, `CreateAuthenticatedClient()`, and `TestImages.OnePixelPngBase64`
-> with the actual fixture type, auth helper, and image constant used by the neighbouring tests in
-> `tests/PoRedoImage.Tests.Integration/`. Do not invent new helpers if equivalents already exist.
-
-- [ ] **Step 3: Run the test to verify it fails**
+- [ ] **Step 9: Run it to verify it fails**
 
 ```powershell
 dotnet test tests/PoRedoImage.Tests.Integration --filter "FullyQualifiedName~PrecomputedVisionTests"
@@ -578,10 +553,11 @@ dotnet test tests/PoRedoImage.Tests.Integration --filter "FullyQualifiedName~Pre
 
 Expected: FAIL — `ImageAnalysisTimeMs` is non-zero because the vision service still runs.
 
-- [ ] **Step 4: Add the orchestrator branch**
+- [ ] **Step 10: Update the orchestrator**
 
-In `src/PoRedoImage.Application/Features/ImageAnalysis/ImageAnalysisOrchestrator.cs`, replace the
-Step 1 block (currently lines 24-31):
+In `src/PoRedoImage.Application/Features/ImageAnalysis/ImageAnalysisOrchestrator.cs`, change the
+primary-constructor parameter `IImageGenerationService imagen3Service` to
+`IImageGenerationRouter imageGenRouter`, then replace the Step 1 vision block (currently lines 24-31):
 
 ```csharp
         // Step 1 — Vision analysis. Skipped entirely when the client ran a browser-local model and
@@ -614,43 +590,46 @@ Step 1 block (currently lines 24-31):
         response.ConfidenceScore = confidence;
 ```
 
-- [ ] **Step 5: Build the solution**
+and replace the image-generation block in the regeneration branch:
+
+```csharp
+            var imageGenService = imageGenRouter.Resolve(request.ImageGenModelId);
+
+            if (!imageGenService.IsConfigured)
+            {
+                throw new InvalidOperationException(
+                    "Image generation is not configured. Set the Gemini API key (Google:ApiKey) via Key Vault or appsettings.");
+            }
+
+            var (imgData, imgType, regenMs) = await imageGenService.GenerateAsync(enhanced, ct);
+```
+
+- [ ] **Step 11: Build and run both tiers**
 
 ```powershell
 dotnet build PoRedoImage.slnx
-```
-
-Expected: `Build succeeded. 0 Warning(s) 0 Error(s)` — this also clears the Task 2 break.
-
-- [ ] **Step 6: Run the test to verify it passes**
-
-```powershell
-dotnet test tests/PoRedoImage.Tests.Integration --filter "FullyQualifiedName~PrecomputedVisionTests"
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Run both server tiers for regressions**
-
-```powershell
 dotnet test tests/PoRedoImage.Tests.Unit
 dotnet test tests/PoRedoImage.Tests.Integration
 ```
 
-Expected: all PASS, including the ceiling guardrails.
+Expected: `Build succeeded. 0 Warning(s) 0 Error(s)`; all tests PASS including the ceiling guardrails.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
-git add src/PoRedoImage.Shared/DTOs/ImageAnalysisRequest.cs \
+git add src/PoRedoImage.Domain/Interfaces/IImageGenerationRouter.cs \
+        src/PoRedoImage.Infrastructure/Services/ImageGenerationRouter.cs \
+        src/PoRedoImage.Infrastructure/InfrastructureServiceExtensions.cs \
+        src/PoRedoImage.Shared/DTOs/ImageAnalysisRequest.cs \
         src/PoRedoImage.Application/Features/ImageAnalysis/ImageAnalysisOrchestrator.cs \
+        tests/PoRedoImage.Tests.Unit/Features/ImageGenerationRouterTests.cs \
         tests/PoRedoImage.Tests.Integration/Features/PrecomputedVisionTests.cs
-git commit -m "feat(ai): accept precomputed vision output and skip the server vision step"
+git commit -m "feat(ai): per-request image generation routing and precomputed vision input"
 ```
 
 ---
 
-## Task 4: Client catalog and selection state
+## Task 3: Client catalog and selection state
 
 **Files:**
 - Create: `src/PoRedoImage.Client/Models/AiCapability.cs`
@@ -662,7 +641,10 @@ git commit -m "feat(ai): accept precomputed vision output and skip the server vi
 
 **Interfaces:**
 - Consumes: `AiProviderIds` (Task 1), `LocalModelRegistry` (existing)
-- Produces: `AiCapability` enum; `AiProviderOption(string Id, string DisplayName, string Category, string Hint, bool ExecutesInBrowser)`; `AiServiceCatalog.OptionsFor(AiCapability)`, `.DefaultFor(AiCapability)`, `.All`; `AiSelectionState.Get(AiCapability)`, `.Set(AiCapability, string)`, `.OnChange` event. Tasks 5, 6, 7 consume these.
+- Produces: `AiCapability` enum; `AiProviderOption(string Id, string DisplayName, string Category, string Hint, bool ExecutesInBrowser)`; `AiServiceCatalog.All`, `.OptionsFor()`, `.DefaultFor()`, `.Find()`, `.LabelFor()`; `AiSelectionState.Get()`, `.GetOption()`, `.Set()`, `.OnChange`. Tasks 4, 5, 6 consume these.
+
+**Note:** `EnhanceDescription` has exactly one provider — see Amendment 1. Browser-local execution is
+Analyze image only.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -694,13 +676,26 @@ public class AiServiceCatalogTests
     [Fact]
     public void SingleProviderCapabilities_HaveExactlyOneOption()
     {
+        // EnhanceDescription is single-provider: browser-local text enhancement is unimplemented,
+        // so offering Qwen2.5 here would claim a capability the code does not have.
+        Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.EnhanceDescription));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.StyleDirector));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.SceneDetail));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.CreateAudio));
     }
 
     [Fact]
-    public void BrowserOptions_MirrorTheLocalModelRegistry()
+    public void AnalyzeImage_IsTheOnlyCapabilityWithABrowserOption()
+    {
+        var withBrowser = AiServiceCatalog.All
+            .Where(c => AiServiceCatalog.OptionsFor(c).Any(o => o.ExecutesInBrowser))
+            .ToList();
+
+        Assert.Equal([AiCapability.AnalyzeImage], withBrowser);
+    }
+
+    [Fact]
+    public void BrowserOption_MirrorsTheLocalModelRegistry()
     {
         var florence = LocalModelRegistry.DefaultFor(LocalCapability.Vision);
         Assert.NotNull(florence);
@@ -846,10 +841,11 @@ public static class AiServiceCatalog
             new(AiProviderIds.HuggingFaceFlux, "FLUX.1-schnell", CategoryRemote, "HuggingFace, ~$0.003/image"),
         ],
 
+        // Single provider: browser-local text enhancement is unimplemented, so Qwen2.5 is not
+        // offered here. Re-add it only alongside a working client-side execution path.
         [AiCapability.EnhanceDescription] =
         [
-            new(AiProviderIds.AzureOpenAi, "Azure OpenAI", CategoryRemote, "Fastest, uses your API quota"),
-            BrowserOption(AiProviderIds.BrowserQwen25, LocalCapability.Text),
+            new(AiProviderIds.AzureOpenAi, "Azure OpenAI", CategoryRemote, "Only provider configured"),
         ],
 
         [AiCapability.StyleDirector] =
@@ -947,14 +943,15 @@ In `src/PoRedoImage.Client/Program.cs`, immediately after the existing
 builder.Services.AddScoped<PoRedoImage.Client.Models.AiSelectionState>();
 ```
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [ ] **Step 8: Build and run the tests**
 
 ```powershell
+dotnet build PoRedoImage.slnx
 dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~AiServiceCatalogTests"
 dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~TestCountCeiling"
 ```
 
-Expected: 4 passed, then the ceiling guardrail PASS. If the ceiling fails, move
+Expected: build clean; 5 catalog tests PASS; ceiling guardrail PASSES. If the ceiling fails, move
 `VisionServiceRouterTests` and `ImageGenerationRouterTests` to the Integration tier.
 
 - [ ] **Step 9: Commit**
@@ -967,18 +964,18 @@ git commit -m "feat(ai): add per-capability provider catalog and session selecti
 
 ---
 
-## Task 5: The picker component
+## Task 4: The picker component
 
 **Files:**
 - Create: `src/PoRedoImage.Client/Shared/AiServicePicker.razor`
 - Create: `src/PoRedoImage.Client/Shared/AiServicePicker.razor.css`
 - Delete: `src/PoRedoImage.Client/Shared/ModelCategoryPicker.razor`
 - Delete: `src/PoRedoImage.Client/Shared/ModelCategoryPicker.razor.css`
-- Modify: `src/PoRedoImage.Client/Pages/Studio.razor:34` and `:116`
+- Modify: `src/PoRedoImage.Client/Pages/Studio.razor` (line 34 and line 116)
 - Test: `tests/PoRedoImage.Tests.E2E.UI/AiServicePickerUiTests.cs`
 
 **Interfaces:**
-- Consumes: `AiCapability`, `AiServiceCatalog`, `AiSelectionState` (Task 4), `LocalAiService` (existing)
+- Consumes: `AiCapability`, `AiServiceCatalog`, `AiSelectionState` (Task 3), `LocalAiService` (existing)
 - Produces: `<AiServicePicker />` — takes no parameters; reads and writes `AiSelectionState` via DI.
 
 - [ ] **Step 1: Create the component**
@@ -989,6 +986,7 @@ Create `src/PoRedoImage.Client/Shared/AiServicePicker.razor`:
 @namespace PoRedoImage.Client.Shared
 @using PoRedoImage.Client.LocalAi
 @using PoRedoImage.Client.Models
+@implements IDisposable
 @inject LocalAiService LocalAi
 @inject AiSelectionState Selection
 
@@ -1025,7 +1023,7 @@ Create `src/PoRedoImage.Client/Shared/AiServicePicker.razor`:
         </div>
     }
 
-    @if (_showsBrowserModel)
+    @if (ShowsBrowserModel)
     {
         <p class="ai-picker__device" role="status">
             @if (_browserUnsupported)
@@ -1052,7 +1050,7 @@ Create `src/PoRedoImage.Client/Shared/AiServicePicker.razor`:
 
     // Only meaningful once a browser-executed model is actually chosen — showing GPU status while
     // every capability is remote would be noise.
-    private bool _showsBrowserModel =>
+    private bool ShowsBrowserModel =>
         AiServiceCatalog.All.Any(c => Selection.GetOption(c).ExecutesInBrowser);
 
     protected override async Task OnInitializedAsync()
@@ -1082,9 +1080,6 @@ Create `src/PoRedoImage.Client/Shared/AiServicePicker.razor`:
     public void Dispose() => Selection.OnChange -= OnSelectionChanged;
 }
 ```
-
-> Add `@implements IDisposable` directly beneath the `@inject` lines so the `Dispose` method above is
-> actually invoked by the framework.
 
 - [ ] **Step 2: Create the stylesheet**
 
@@ -1158,7 +1153,7 @@ Create `src/PoRedoImage.Client/Shared/AiServicePicker.razor.css`:
 
 - [ ] **Step 3: Swap the component on Studio**
 
-In `src/PoRedoImage.Client/Pages/Studio.razor`, replace line 34:
+In `src/PoRedoImage.Client/Pages/Studio.razor`, replace line 34 with:
 
 ```razor
             <AiServicePicker />
@@ -1188,9 +1183,10 @@ reference was missed — fix it before continuing.
 
 - [ ] **Step 6: Write the E2E UI test**
 
-Create `tests/PoRedoImage.Tests.E2E.UI/AiServicePickerUiTests.cs`. Read
-`tests/PoRedoImage.Tests.E2E.UI/LoginUiTests.cs` first for the sign-in helper and base-URL handling,
-then write (class name contains "Ui" so the ceiling test partitions it correctly):
+Create `tests/PoRedoImage.Tests.E2E.UI/AiServicePickerUiTests.cs`. **Read
+`tests/PoRedoImage.Tests.E2E.UI/LoginUiTests.cs` first** for the sign-in helper, base-URL handling,
+and `[LiveServerFact]` usage, then match them. Class name must contain "Ui" so the ceiling test
+partitions it into the UI tier.
 
 ```csharp
 using Microsoft.Playwright;
@@ -1216,14 +1212,13 @@ public sealed class AiServicePickerUiTests : IAsyncLifetime
     public async Task Studio_renders_a_selector_per_capability_with_single_provider_ones_disabled()
     {
         var page = await _browser.NewPageAsync();
-        await SignInAsGuestAsync(page);
-        await page.GotoAsync(BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
+        // sign in + navigate to Studio, per LoginUiTests
 
-        var selects = page.Locator(".ai-picker__select");
-        await Assertions.Expect(selects).ToHaveCountAsync(6);
+        await Assertions.Expect(page.Locator(".ai-picker__select")).ToHaveCountAsync(6);
 
         await Assertions.Expect(page.Locator("#ai-picker-AnalyzeImage")).ToBeEnabledAsync();
         await Assertions.Expect(page.Locator("#ai-picker-GenerateImage")).ToBeEnabledAsync();
+        await Assertions.Expect(page.Locator("#ai-picker-EnhanceDescription")).ToBeDisabledAsync();
         await Assertions.Expect(page.Locator("#ai-picker-StyleDirector")).ToBeDisabledAsync();
         await Assertions.Expect(page.Locator("#ai-picker-SceneDetail")).ToBeDisabledAsync();
         await Assertions.Expect(page.Locator("#ai-picker-CreateAudio")).ToBeDisabledAsync();
@@ -1237,9 +1232,6 @@ public sealed class AiServicePickerUiTests : IAsyncLifetime
 }
 ```
 
-> Replace `BaseUrl` and `SignInAsGuestAsync` with the actual helpers used in `LoginUiTests.cs`
-> (`E2E_BASE_URL` defaults to `http://localhost:4000`; sign-in goes through `/auth/login/fake`).
-
 - [ ] **Step 7: Run the UI test against a live instance**
 
 ```powershell
@@ -1250,7 +1242,7 @@ dotnet test tests/PoRedoImage.Tests.E2E.UI --filter "FullyQualifiedName~AiServic
 ```
 
 Expected: PASS. `[LiveServerFact]` self-skips if no instance is reachable — a *skipped* result means
-the server was not running, not that the test passed.
+the server was not running, not that the test passed. Report which you got.
 
 - [ ] **Step 8: Commit**
 
@@ -1264,34 +1256,35 @@ git commit -m "feat(ai): replace ModelCategoryPicker with per-capability AiServi
 
 ---
 
-## Task 6: Send remote selections with each request
+## Task 5: Send selections with each request
 
-Makes the two remote-provider dropdowns actually route work. Browser-local execution is Task 7.
+Adds the async request builder — with the browser branch present but not yet doing local inference —
+and routes both feature pages through it.
 
 **Files:**
 - Modify: `src/PoRedoImage.Client/Pages/FeaturePageBase.cs`
-- Modify: `src/PoRedoImage.Client/Pages/ImageRegeneration.razor:96-112`
-- Modify: `src/PoRedoImage.Client/Pages/MemeGeneration.razor:217-233`
+- Modify: `src/PoRedoImage.Client/Pages/ImageRegeneration.razor` (~lines 96-112)
+- Modify: `src/PoRedoImage.Client/Pages/MemeGeneration.razor` (~lines 217-233)
 
 **Interfaces:**
-- Consumes: `AiSelectionState`, `AiCapability` (Task 4); `ImageAnalysisRequest.ImageGenModelId` (Task 3)
-- Produces: `FeaturePageBase.BuildAnalysisRequest(string imageData, string contentType, string fileName, int descriptionLength, ProcessingMode mode) → ImageAnalysisRequest`. Task 7 extends this method.
+- Consumes: `AiSelectionState`, `AiCapability` (Task 3); `ImageAnalysisRequest.ImageGenModelId` (Task 2)
+- Produces: `FeaturePageBase.BuildAnalysisRequestAsync(byte[] imageBytes, string imageData, string contentType, string fileName, int descriptionLength, ProcessingMode mode, CancellationToken ct) → Task<ImageAnalysisRequest>`. Task 6 fills in its browser branch — **the signature must not change**.
 
-- [ ] **Step 1: Add the injected state and request builder**
+- [ ] **Step 1: Add the injected state and async request builder**
 
-In `src/PoRedoImage.Client/Pages/FeaturePageBase.cs`, add to the `[Inject]` block:
-
-```csharp
-    [Inject] protected AiSelectionState AiSelection { get; set; } = default!;
-```
-
-Add the `using` at the top:
+In `src/PoRedoImage.Client/Pages/FeaturePageBase.cs`, add the `using`:
 
 ```csharp
 using PoRedoImage.Client.Models;
 ```
 
-Then add this method to the class:
+add to the `[Inject]` block:
+
+```csharp
+    [Inject] protected AiSelectionState AiSelection { get; set; } = default!;
+```
+
+and add this method to the class:
 
 ```csharp
     /// <summary>
@@ -1299,119 +1292,10 @@ Then add this method to the class:
     /// </summary>
     /// <remarks>
     /// Centralised here rather than duplicated in ImageRegeneration and MemeGeneration: both pages
-    /// build the same request and would otherwise drift the moment a new field is added.
+    /// build the same request and would otherwise drift the moment a new field is added. Async and
+    /// taking the raw bytes because Task 6 runs browser-local vision inside the browser branch.
     /// </remarks>
-    protected ImageAnalysisRequest BuildAnalysisRequest(
-        string imageData,
-        string contentType,
-        string fileName,
-        int descriptionLength,
-        ProcessingMode mode) => new()
-        {
-            ImageData = imageData,
-            ContentType = contentType,
-            FileName = fileName,
-            DescriptionLength = descriptionLength,
-            Mode = mode,
-            ModelId = AiSelection.Get(AiCapability.AnalyzeImage),
-            ImageGenModelId = AiSelection.Get(AiCapability.GenerateImage),
-        };
-```
-
-- [ ] **Step 2: Use the builder in ImageRegeneration**
-
-In `src/PoRedoImage.Client/Pages/ImageRegeneration.razor`, replace the `new ImageAnalysisRequest { ... }`
-object initializer at line 96 with a call to the builder, passing the same values that initializer
-used:
-
-```csharp
-            var request = BuildAnalysisRequest(
-                imageData: base64,
-                contentType: selectedFile!.ContentType,
-                fileName: selectedFile.Name,
-                descriptionLength: descriptionLength,
-                mode: ProcessingMode.ImageRegeneration);
-```
-
-> Match the local variable names already in that method — read the surrounding lines and substitute
-> the existing image-data, content-type, file-name, and description-length expressions verbatim.
-
-- [ ] **Step 3: Use the builder in MemeGeneration**
-
-Apply the same replacement at `src/PoRedoImage.Client/Pages/MemeGeneration.razor:217`, with
-`mode: ProcessingMode.MemeGeneration`.
-
-- [ ] **Step 4: Build**
-
-```powershell
-dotnet build PoRedoImage.slnx
-```
-
-Expected: `Build succeeded. 0 Warning(s) 0 Error(s)`.
-
-- [ ] **Step 5: Verify the selection reaches the server**
-
-Start the app, sign in as GUEST, open Studio, set **Generate image** to *FLUX.1-schnell*, upload an
-image, and run a regeneration. Confirm in the server log that the HuggingFace provider handled it:
-
-```powershell
-dotnet run --project src/PoRedoImage.Web
-```
-
-Expected: the request log shows the HuggingFace image-generation path, not Gemini.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/PoRedoImage.Client/Pages/FeaturePageBase.cs \
-        src/PoRedoImage.Client/Pages/ImageRegeneration.razor \
-        src/PoRedoImage.Client/Pages/MemeGeneration.razor
-git commit -m "feat(ai): send per-capability provider selections with analysis requests"
-```
-
----
-
-## Task 7: Browser-local execution path
-
-When Analyze image is set to a browser model, run it client-side and post the result instead of
-asking the server to do vision.
-
-**Files:**
-- Modify: `src/PoRedoImage.Client/Pages/FeaturePageBase.cs`
-
-**Interfaces:**
-- Consumes: `BuildAnalysisRequest` (Task 6); `LocalAiService.DescribeImageAsync`, `LocalInferenceOutcome`, `LocalInferenceException`, `LocalAiErrorClassifier` (existing); `ImageAnalysisRequest.PrecomputedDescription` / `.PrecomputedTags` (Task 3)
-- Produces: nothing consumed by later tasks — this is the final task.
-
-- [ ] **Step 1: Inject the local runtime**
-
-In `src/PoRedoImage.Client/Pages/FeaturePageBase.cs`, add to the `[Inject]` block:
-
-```csharp
-    [Inject] protected LocalAiService LocalAi { get; set; } = default!;
-```
-
-and the `using`:
-
-```csharp
-using PoRedoImage.Client.LocalAi;
-```
-
-- [ ] **Step 2: Make the request builder async and run local inference**
-
-Replace the `BuildAnalysisRequest` method added in Task 6 with:
-
-```csharp
-    /// <summary>
-    /// Builds an analysis request carrying the session's provider selections, running vision
-    /// in-browser first when the user picked a browser-executed model.
-    /// </summary>
-    /// <remarks>
-    /// A local failure is surfaced, never silently retried against the remote provider: quietly
-    /// switching from a free on-device model to a metered API is a billing surprise, so the user
-    /// decides.
-    /// </remarks>
-    protected async Task<ImageAnalysisRequest> BuildAnalysisRequestAsync(
+    protected virtual Task<ImageAnalysisRequest> BuildAnalysisRequestAsync(
         byte[] imageBytes,
         string imageData,
         string contentType,
@@ -1431,6 +1315,91 @@ Replace the `BuildAnalysisRequest` method added in Task 6 with:
             ImageGenModelId = AiSelection.Get(AiCapability.GenerateImage),
         };
 
+        return Task.FromResult(request);
+    }
+```
+
+- [ ] **Step 2: Route ImageRegeneration through the builder**
+
+In `src/PoRedoImage.Client/Pages/ImageRegeneration.razor`, replace the
+`new ImageAnalysisRequest { ... }` object initializer (~line 96) with:
+
+```csharp
+            var request = await BuildAnalysisRequestAsync(
+                imageBytes: /* existing raw bytes variable */,
+                imageData: /* existing base64 variable */,
+                contentType: selectedFile!.ContentType,
+                fileName: selectedFile.Name,
+                descriptionLength: /* existing description-length expression */,
+                mode: ProcessingMode.ImageRegeneration,
+                ct: cts.Token);
+```
+
+> Read the surrounding method and substitute the actual local variable names and expressions the
+> existing initializer used. If the method has no raw-bytes variable, derive it with
+> `Convert.FromBase64String(...)` on the existing base64 value rather than re-reading the file.
+
+- [ ] **Step 3: Route MemeGeneration through the builder**
+
+Apply the same replacement at `src/PoRedoImage.Client/Pages/MemeGeneration.razor` (~line 217), with
+`mode: ProcessingMode.MemeGeneration`.
+
+- [ ] **Step 4: Build and run the client-side tests**
+
+```powershell
+dotnet build PoRedoImage.slnx
+dotnet test tests/PoRedoImage.Tests.Unit
+```
+
+Expected: `Build succeeded. 0 Warning(s) 0 Error(s)`; all unit tests PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/PoRedoImage.Client/Pages/FeaturePageBase.cs \
+        src/PoRedoImage.Client/Pages/ImageRegeneration.razor \
+        src/PoRedoImage.Client/Pages/MemeGeneration.razor
+git commit -m "feat(ai): send per-capability provider selections with analysis requests"
+```
+
+---
+
+## Task 6: Browser-local execution path
+
+Fills in the browser branch of `BuildAnalysisRequestAsync`: when Analyze image is set to a browser
+model, run it client-side and post the result so the server skips its vision step.
+
+**Files:**
+- Modify: `src/PoRedoImage.Client/Pages/FeaturePageBase.cs`
+- Modify: `src/PoRedoImage.Client/Pages/ImageRegeneration.razor`
+- Modify: `src/PoRedoImage.Client/Pages/MemeGeneration.razor`
+- Modify: `AGENT.MD`
+
+**Interfaces:**
+- Consumes: `BuildAnalysisRequestAsync` (Task 5); `LocalAiService.DescribeImageAsync`, `LocalInferenceStatus`, `LocalStage`, `LocalInferenceException`, `LocalAiErrorClassifier` (existing); `ImageAnalysisRequest.PrecomputedDescription` / `.PrecomputedTags` (Task 2)
+- Produces: nothing consumed by later tasks — this is the final task.
+
+- [ ] **Step 1: Inject the local runtime**
+
+In `src/PoRedoImage.Client/Pages/FeaturePageBase.cs`, add the `using`:
+
+```csharp
+using PoRedoImage.Client.LocalAi;
+```
+
+and to the `[Inject]` block:
+
+```csharp
+    [Inject] protected LocalAiService LocalAi { get; set; } = default!;
+```
+
+- [ ] **Step 2: Fill in the browser branch**
+
+In the same file, replace the `return Task.FromResult(request);` line at the end of
+`BuildAnalysisRequestAsync` with the browser branch, and change the method from
+`protected virtual Task<...>` to `protected virtual async Task<...>`:
+
+```csharp
         if (!AiSelection.GetOption(AiCapability.AnalyzeImage).ExecutesInBrowser)
         {
             return request;
@@ -1445,8 +1414,11 @@ Replace the `BuildAnalysisRequest` method added in Task 6 with:
         request.PrecomputedDescription = outcome.Text;
         request.PrecomputedTags = ExtractTags(outcome.Text);
         return request;
-    }
+```
 
+and add these two members to the class:
+
+```csharp
     /// <summary>
     /// Derives coarse tags from a local model's free-text description. Browser vision models emit
     /// prose, not a tag list, and the server's meme branch needs tags to caption from.
@@ -1462,39 +1434,37 @@ Replace the `BuildAnalysisRequest` method added in Task 6 with:
     /// <summary>Surfaces local-inference progress through the existing progress UI.</summary>
     private void OnLocalProgress(LocalInferenceStatus status)
     {
-        progressMessage = status.Stage switch
+        var message = status.Stage switch
         {
             LocalStage.Probing => "Checking your device…",
             LocalStage.Downloading => $"Downloading model… {status.LoadPercent ?? 0}%",
             LocalStage.Loading => "Loading model…",
             LocalStage.Running => "Analyzing on your device…",
-            _ => progressMessage,
+            _ => null,
         };
 
+        if (message is null) return;
+
+        SetProgressMessage(message);
         InvokeAsync(StateHasChanged);
     }
 ```
 
-> `progressMessage` is the existing progress field on `FeaturePageBase`. Read the class first and use
-> its actual field name; if the base exposes a progress-setting method instead, call that.
+> `SetProgressMessage` stands in for whatever this base class already uses to drive the progress UI.
+> **Read `FeaturePageBase.cs` first** and assign to its existing progress field directly, or call its
+> existing progress method. Do not add a new progress mechanism.
 
-- [ ] **Step 3: Handle local failure at the call sites**
+- [ ] **Step 3: Handle local failure at both call sites**
 
-In both `ImageRegeneration.razor` and `MemeGeneration.razor`, wrap the builder call so a local
-failure is reported rather than crashing the page:
+In `ImageRegeneration.razor` and `MemeGeneration.razor`, wrap the builder call so a local failure is
+reported instead of crashing the page:
 
 ```csharp
             ImageAnalysisRequest request;
             try
             {
                 request = await BuildAnalysisRequestAsync(
-                    imageBytes: fileBytes,
-                    imageData: base64,
-                    contentType: selectedFile!.ContentType,
-                    fileName: selectedFile.Name,
-                    descriptionLength: descriptionLength,
-                    mode: ProcessingMode.ImageRegeneration,
-                    ct: cts.Token);
+                    /* same arguments as Task 5 */);
             }
             catch (LocalInferenceException ex)
             {
@@ -1504,43 +1474,31 @@ failure is reported rather than crashing the page:
             }
 ```
 
-> Use `ProcessingMode.MemeGeneration` in `MemeGeneration.razor`. Read
-> `src/PoRedoImage.Client/LocalAi/LocalAiErrorClassifier.cs` and call its actual public method — if it
-> exposes a different name than `Describe`, use that and keep the message user-facing.
+> **Read `src/PoRedoImage.Client/LocalAi/LocalAiErrorClassifier.cs`** and call its actual public
+> method — if it is named something other than `Describe`, use the real name. Likewise use the real
+> error/processing field names from `FeaturePageBase`. The message must be user-facing.
+>
+> Do **not** fall back to the remote provider on failure. Silently switching from a free on-device
+> model to a metered API is a billing surprise; the user decides.
 
-- [ ] **Step 4: Build**
+- [ ] **Step 4: Build and run every tier**
 
 ```powershell
 dotnet build PoRedoImage.slnx
-```
-
-Expected: `Build succeeded. 0 Warning(s) 0 Error(s)`.
-
-- [ ] **Step 5: Verify the local path end to end**
-
-Start the app, sign in, set **Analyze image** to *Florence-2 base*, upload an image, and run a
-regeneration.
-
-Expected: the progress UI shows the download and analysis stages; the browser network panel shows
-**no** call to Azure Computer Vision; the response's `ImageAnalysisTimeMs` is `0`.
-
-- [ ] **Step 6: Run every tier**
-
-```powershell
 dotnet test tests/PoRedoImage.Tests.Unit
 dotnet test tests/PoRedoImage.Tests.Integration
 dotnet test tests/PoRedoImage.Tests.E2E.ApiSmoke
-dotnet test tests/PoRedoImage.Tests.E2E.UI
 ```
 
-Expected: all PASS, including all four ceiling guardrails.
+Expected: build clean; all tests PASS including the ceiling guardrails.
 
-- [ ] **Step 7: Update the architecture doc**
+- [ ] **Step 5: Update the architecture doc**
 
-In `AGENT.MD`, update the **AI Models (Rule 14)** section to describe per-capability selection
-replacing the three-way category picker, and note the `AiProviderIds` namespacing scheme.
+In `AGENT.MD`, update the **AI Models (Rule 14)** section: per-capability selection replaces the
+three-way category picker, note the `AiProviderIds` namespacing scheme, and state that browser-local
+execution currently covers Analyze image only.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/PoRedoImage.Client/Pages/FeaturePageBase.cs \
@@ -1558,33 +1516,26 @@ git commit -m "feat(ai): run vision in-browser when a browser model is selected"
 
 | Spec requirement | Task |
 |---|---|
-| Six selectors, one per capability | 5 |
-| `<optgroup>` grouping by category | 5 |
-| Single-provider capabilities disabled with explanatory title | 5 |
-| Browser models included where they can serve | 4 (catalog), 7 (execution) |
-| Session-only, no localStorage | 4 |
-| Replaces `ModelCategoryPicker` on Studio | 5 |
-| `AiServiceCatalog` derives browser entries from `LocalModelRegistry` | 4 |
-| `AiSelectionState` scoped | 4 |
+| Six selectors, one per capability | 4 |
+| `<optgroup>` grouping by category | 4 |
+| Single-provider capabilities disabled with explanatory title | 4 |
+| Browser models included where they can serve (Analyze image — see Amendment 1) | 3 (catalog), 6 (execution) |
+| Session-only, no localStorage | 3 |
+| Replaces `ModelCategoryPicker` on Studio | 4 |
+| `AiServiceCatalog` derives browser entries from `LocalModelRegistry` | 3 |
+| `AiSelectionState` scoped | 3 |
 | Id namespacing + router tightening | 1 |
 | `ImageGenerationRouter` with config-flag fallback | 2 |
 | Mock mode single-service router | 2 |
-| Three new DTO fields | 3 |
-| Precomputed-vision branch, confidence 1.0 | 3 |
-| No silent fallback on local failure | 7 |
-| Unit / Integration / E2E UI coverage | 1, 2, 3, 4, 5 |
+| Three new DTO fields | 2 |
+| Precomputed-vision branch, confidence 1.0 | 2 |
+| No silent fallback on local failure | 6 |
+| Unit / Integration / E2E UI coverage | 1, 2, 3, 4 |
 
-No gaps.
+**Deviation from spec:** Amendment 1 — Qwen2.5 is not offered for Enhance description. Recorded at
+the top of this plan and reflected in the Task 3 catalog, its tests, and the Task 4 UI test.
 
-**Known deviation from the spec:** the spec lists Qwen2.5 as an Enhance-description option, and Task 4
-includes it in the catalog. Task 7 implements browser execution for **Analyze image only**.
-`LocalAiService.CompleteTextAsync` exists and the wiring is symmetric, but the enhancement step runs
-server-side *after* vision, so routing it to the browser requires a second round trip. Selecting
-Qwen2.5 for Enhance description therefore falls through to Azure OpenAI until that is built. Flagged
-here rather than hidden — it needs either a follow-up task or removal from the catalog.
-
-**Type consistency:** `AiProviderOption.ExecutesInBrowser` is used identically in Tasks 4, 5, 7.
-`AiSelectionState.Get`/`GetOption`/`Set` match across Tasks 4-7. `IImageGenerationRouter.Resolve`
-matches between Tasks 2 and 3. `BuildAnalysisRequest` (Task 6) is deliberately superseded by
-`BuildAnalysisRequestAsync` (Task 7) — Task 7 Step 2 says "replace", and Task 7 Step 3 updates both
-call sites.
+**Type consistency:** `AiProviderOption.ExecutesInBrowser` is used identically in Tasks 3, 4, 6.
+`AiSelectionState.Get`/`GetOption`/`Set` match across Tasks 3-6. `IImageGenerationRouter.Resolve`
+matches within Task 2. `BuildAnalysisRequestAsync`'s signature is fixed in Task 5 and unchanged in
+Task 6 — only its body grows.
