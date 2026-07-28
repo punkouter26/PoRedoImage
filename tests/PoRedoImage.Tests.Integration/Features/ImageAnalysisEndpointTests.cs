@@ -377,3 +377,132 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
         return base.CreateHost(builder);
     }
 }
+
+// ─── Real per-request router seam ────────────────────────────────────────────
+//
+// Final whole-branch review, finding #1 (Critical): every WebApplicationFactory above replaces
+// IImageGenerationRouter with SingleImageGenerationRouter, which always hands back one pre-picked
+// service regardless of what ImageGenModelId says. That is exactly why the underlying defect —
+// the client always sending an explicit Gemini id, silently making the ImageGen:Provider config
+// flag unreachable for the main flow — survived six per-task reviews: no test anywhere composed
+// "the request shape the client actually builds" (ImageGenModelId = null) with "the real
+// ImageGenerationRouter resolving the ImageGen:Provider fallback". The factory below registers the
+// real ImageGenerationRouter class (not a stub) over two distinguishable mock IImageGenerationService
+// instances, so a regression that makes the client stamp an explicit id back onto the request would
+// flip which marker bytes come back out — failing this test rather than passing unnoticed.
+
+public class RealImageGenerationRouterTests : IClassFixture<RealImageGenRouterWebApplicationFactory>
+{
+    private readonly HttpClient _client;
+
+    public RealImageGenerationRouterTests(RealImageGenRouterWebApplicationFactory factory)
+    {
+        _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task AnalyzeImage_NullImageGenModelId_RealRouterUsesConfiguredProvider_NotGemini()
+    {
+        var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        var request = new ImageAnalysisRequest
+        {
+            ImageData = Convert.ToBase64String(imageBytes),
+            ContentType = "image/png",
+            Mode = ProcessingMode.ImageRegeneration,
+            DescriptionLength = 200,
+            // The exact shape FeaturePageBase.BuildAnalysisRequestAsync sends when nothing has been
+            // explicitly picked and seeding did not override it — see AiSelectionState.GetExplicit.
+            ImageGenModelId = null,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+        var regeneratedBytes = Convert.FromBase64String(
+            doc.RootElement.GetProperty("regeneratedImageData").GetString()!);
+
+        // ImageGen:Provider=huggingface is configured on this factory (matching both real
+        // appsettings files); a null id must resolve through the REAL router to HuggingFace, never
+        // fall through to Gemini.
+        Assert.Equal(RealImageGenRouterWebApplicationFactory.HuggingFaceMarkerBytes, regeneratedBytes);
+        Assert.NotEqual(RealImageGenRouterWebApplicationFactory.GeminiMarkerBytes, regeneratedBytes);
+    }
+}
+
+/// <summary>
+/// WebApplicationFactory that mirrors <see cref="MockedServicesWebApplicationFactory"/> for
+/// everything except image generation, where it wires the REAL <see cref="ImageGenerationRouter"/>
+/// (configured with <c>ImageGen:Provider=huggingface</c>) over two distinguishable mock
+/// <see cref="IImageGenerationService"/> instances, instead of the usual
+/// <see cref="SingleImageGenerationRouter"/> stub.
+/// </summary>
+public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Program>
+{
+    /// <summary>Bytes the Gemini-arm mock returns — must never come back for a null model id.</summary>
+    internal static readonly byte[] GeminiMarkerBytes = [0xEE, 0xEE, 0xEE, 0xEE];
+
+    /// <summary>Bytes the HuggingFace-arm mock returns — the configured provider's expected output.</summary>
+    internal static readonly byte[] HuggingFaceMarkerBytes = [0xAA, 0xAA, 0xAA, 0xAA];
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.UseEnvironment(PoEnvironments.Test);
+
+        builder.ConfigureAppConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["KeyVault:Uri"] = "",
+                ["AZURE_KEY_VAULT_ENDPOINT"] = "",
+                ["ComputerVision:Endpoint"] = "https://test.cognitiveservices.azure.com/",
+                ["ComputerVision:ApiKey"] = "test-key",
+                ["OpenAI:Endpoint"] = "https://test.openai.azure.com/",
+                ["OpenAI:Key"] = "test-key",
+                ["ApplicationInsights:ConnectionString"] = "",
+                ["Storage:ConnectionString"] = "",
+                ["Google:ApiKey"] = "test-key",
+                ["Mocks:UseMockAi"] = "true",
+                // The value under test: both real appsettings files set this to huggingface today.
+                ["ImageGen:Provider"] = "huggingface",
+            });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            MockedServicesWebApplicationFactory.AddTestAuth(services);
+
+            var mockVision = new Mock<IVisionService>();
+            mockVision.Setup(s => s.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("A test description", (IReadOnlyList<string>)new List<string> { "cat" }, 0.92, 150L));
+            MockedServicesWebApplicationFactory.ReplaceService<IVisionService>(services, mockVision.Object);
+            MockedServicesWebApplicationFactory.ReplaceService<IVisionServiceRouter>(
+                services, new SingleVisionServiceRouter(mockVision.Object));
+
+            var mockOpenAi = new Mock<IGenerativeAiService>();
+            mockOpenAi.Setup(s => s.EnhanceDescriptionAsync(
+                    It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(("An enhanced detailed description of the image", 120, 250L));
+            MockedServicesWebApplicationFactory.ReplaceService<IGenerativeAiService>(services, mockOpenAi.Object);
+
+            // The two arms the real router picks between. Only their generated bytes differ, so a
+            // test assertion on the response body proves which one actually ran.
+            var geminiSpy = new Mock<IImageGenerationService>();
+            geminiSpy.SetupGet(s => s.IsConfigured).Returns(true);
+            geminiSpy.Setup(s => s.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((GeminiMarkerBytes, "image/png", 500L));
+
+            var huggingFaceSpy = new Mock<IImageGenerationService>();
+            huggingFaceSpy.SetupGet(s => s.IsConfigured).Returns(true);
+            huggingFaceSpy.Setup(s => s.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((HuggingFaceMarkerBytes, "image/png", 500L));
+
+            // The REAL router, not SingleImageGenerationRouter — this is the whole point of the test.
+            MockedServicesWebApplicationFactory.ReplaceService<IImageGenerationRouter>(
+                services, new ImageGenerationRouter(geminiSpy.Object, huggingFaceSpy.Object, configuredProvider: "huggingface"));
+        });
+
+        return base.CreateHost(builder);
+    }
+}

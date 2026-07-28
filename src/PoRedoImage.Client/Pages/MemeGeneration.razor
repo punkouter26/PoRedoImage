@@ -214,7 +214,12 @@
 
             var base64Data = ExtractBase64(imagePreviewUrl);
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            // The local step (§ai-service-pickers finding #3) gets its own, more generous budget:
+            // first-run browser-local inference includes a ~230 MB model download plus WASM/WebGPU
+            // load, which a 3-minute budget shared with the HTTP call could exhaust on a slow
+            // connection. The 3-minute HTTP CTS below is created only once the request is built, so
+            // it covers just the round trip it was originally scoped to.
+            using var localCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
             ImageAnalysisRequest request;
             try
             {
@@ -224,12 +229,25 @@
                     fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
                     descriptionLength: 350,
                     mode: ProcessingMode.MemeGeneration,
-                    ct: cts.Token);
+                    ct: localCts.Token);
             }
             catch (LocalInferenceException ex)
             {
                 errorMessage = LocalAiErrorClassifier.Describe(ex.Failure);
                 isProcessing = false;
+                progressPercentage = 0;
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                // LocalInferenceSession deliberately rethrows OperationCanceledException unwrapped
+                // (it is not a LocalInferenceException), so it must be caught here explicitly rather
+                // than falling through to the generic catch below — which would skip this reset and
+                // leave the progress bar frozen.
+                errorMessage = "On-device model setup took too long, likely the first-run model "
+                    + "download. Try again on a faster connection, or pick a remote provider in AI services.";
+                isProcessing = false;
+                progressPercentage = 0;
                 return;
             }
 
@@ -237,6 +255,7 @@
             progressMessage = "Analyzing image...";
             StateHasChanged();
 
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
             try
             {
                 var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, cts.Token);

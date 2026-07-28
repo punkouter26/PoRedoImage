@@ -41,7 +41,10 @@ public static class AiServiceCatalog
 
         [AiCapability.GenerateImage] =
         [
-            new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Default provider"),
+            // Neither hint claims to be "the" default: which one actually runs when nothing is
+            // picked is decided server-side by the ImageGen:Provider config flag (huggingface in
+            // both Dev and Prod today), seeded into the client via AiSelectionState.EnsureInitializedAsync.
+            new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image"),
             new(AiProviderIds.HuggingFaceFlux, "FLUX.1-schnell", CategoryRemote, "HuggingFace, ~$0.003/image"),
         ],
 

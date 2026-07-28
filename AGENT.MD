@@ -186,21 +186,36 @@ path; a `browser:` id for text (`AiProviderIds.BrowserQwen25`) exists but is del
 offered in the catalog. The original design spec proposed extending browser execution to
 description enhancement too, but that was deliberately dropped from scope.
 
-## Image Generation Provider (feature flag)
-`IImageGenerationService` has two real implementations selected by the **`ImageGen:Provider`** flag
-(no redeploy needed — both register, the flag picks the active one):
-- **`google`** (default) → `GeminiImagen3Service` (Gemini/Imagen).
-- **`huggingface`** → `HuggingFaceImageGenerationService` — FLUX/Qwen via HuggingFace Inference Providers,
-  routed **fal-native** as `{BaseUrl}/{Provider}/{providerId}` with `{prompt, image_url?}` → `{images:[{url}]}`.
-  Text-to-image = **FLUX.1-schnell** (`fal-ai/flux/schnell`, ~$0.003/img); image-to-image = **Qwen-Image-Edit**
+## Image Generation Provider (feature flag + per-request router)
+`IImageGenerationService` has two real implementations, both registered so a config flip needs no
+redeploy: `GeminiImagen3Service` (Gemini/Imagen) and `HuggingFaceImageGenerationService` (FLUX/Qwen via
+HuggingFace Inference Providers). Which one actually runs a given request is decided in two layers:
+- **`ImageGen:Provider`** (`"google"` or `"huggingface"`) is the server-side default — read once at
+  startup in `InfrastructureServiceExtensions` and baked into `IImageGenerationRouter` as its
+  fallback. **`appsettings.Development.json` and `appsettings.Production.json` both currently set
+  `huggingface`** — neither environment defaults to Google today.
+- **`IImageGenerationRouter.Resolve(ImageAnalysisRequest.ImageGenModelId)`** (in
+  `PoRedoImage.Infrastructure.Services.ImageGenerationRouter`) is what the orchestrator actually calls.
+  A recognised id (`AiProviderIds.GeminiImagen3` / `HuggingFaceFlux`) picks that provider directly;
+  `null` or an unrecognised id falls through to the `ImageGen:Provider` default above. The picker on
+  the client (`AiServicePicker` / `AiCapability.GenerateImage`) lets a user pick explicitly, and
+  `AiSelectionState.EnsureInitializedAsync` seeds the *un*-picked case from `GET /api/pricing` so the
+  client's default and the server's configured default agree — degrading to sending no id at all
+  (`GetExplicit` returns `null`) if that seed fetch fails, rather than guessing.
+- HuggingFace is routed **fal-native** as `{BaseUrl}/{Provider}/{providerId}` with
+  `{prompt, image_url?}` → `{images:[{url}]}`. Text-to-image = **FLUX.1-schnell**
+  (`fal-ai/flux/schnell`, ~$0.003/img); image-to-image = **Qwen-Image-Edit**
   (`fal-ai/qwen-image-edit`, ~$0.02/img) — both NON-GATED (verified live 2026-07-11). FLUX.1-Kontext-dev is
   higher quality but **gated** (needs license accept + a gated-repo-scoped token). NOTE: only `hf-inference`
   uses the `/{provider}/models/{hf-id}` path with raw-byte responses; external providers (fal/replicate)
   need their own `providerId` (from `…/api/models/{repo}?expand[]=inferenceProviderMapping`) + native body.
-  Set `HuggingFace:ApiKey` (token with the *Inference Providers* permission). Enabled in **Development**
-  (`appsettings.Development.json`); Production stays on `google` until validated there.
+  Set `HuggingFace:ApiKey` (token with the *Inference Providers* permission). Google/Gemini costs
+  roughly 13× more per image (~$0.039 vs ~$0.003), so an id or config value that resolves to Gemini
+  when HuggingFace was intended is a real cost (or hard-failure, if `Google:ApiKey` is unset) bug, not
+  just a labeling one.
 - **Pricing UI**: `GET /api/pricing` returns the active provider + indicative per-image prices from the
   `AiPricing` config section; the Bulk Generate page shows "≈ $X/image" plus a running session estimate.
+  This is also the seed source for the client's per-request default (above).
 - Mock mode (`Mocks:UseMockAi=true`) still wins and swaps in `MockImagen3Service` for either provider.
 
 ---

@@ -76,6 +76,11 @@
         // CPU. This only drives the warning text.
         _browserUnsupported = !_capabilities.HasWebGpu;
 
+        // Seeds the Generate image default from the server's actually-configured provider, so the
+        // dropdown shows the provider that will actually run rather than the catalog's fixed first
+        // entry. Idempotent — a feature page may have already triggered this fetch.
+        await Selection.EnsureInitializedAsync();
+
         Selection.OnChange += OnSelectionChanged;
     }
 

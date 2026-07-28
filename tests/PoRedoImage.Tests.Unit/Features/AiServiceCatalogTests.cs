@@ -58,7 +58,9 @@ public class AiServiceCatalogTests
     [Fact]
     public void SelectionState_ReturnsCatalogDefaultUntilOverridden()
     {
-        var state = new AiSelectionState();
+        // HttpClient is only ever touched by EnsureInitializedAsync, which this test never calls —
+        // a plain instance (no BaseAddress) is enough to satisfy the constructor.
+        var state = new AiSelectionState(new HttpClient());
 
         Assert.Equal(AiProviderIds.AzureComputerVision, state.Get(AiCapability.AnalyzeImage));
 
@@ -93,5 +95,13 @@ public class AiServiceCatalogTests
                 AiCapability.CreateAudio,
             ],
             AiServiceCatalog.All);
+
+        // Closes the catalog/enum drift hole: the hardcoded list above passes even if a new
+        // AiCapability member is added to the enum and to Catalog but forgotten here — it would
+        // simply render nothing. Comparing against Enum.GetValues (order-independent; order is
+        // already pinned above) catches that.
+        Assert.Equal(
+            Enum.GetValues<AiCapability>().ToHashSet(),
+            AiServiceCatalog.All.ToHashSet());
     }
 }

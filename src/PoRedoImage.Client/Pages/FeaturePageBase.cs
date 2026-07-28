@@ -122,6 +122,8 @@ public abstract class FeaturePageBase : ComponentBase
         ProcessingMode mode,
         CancellationToken ct = default)
     {
+        await AiSelection.EnsureInitializedAsync(ct);
+
         var request = new ImageAnalysisRequest
         {
             ImageData = imageData,
@@ -130,7 +132,9 @@ public abstract class FeaturePageBase : ComponentBase
             DescriptionLength = descriptionLength,
             Mode = mode,
             ModelId = AiSelection.Get(AiCapability.AnalyzeImage),
-            ImageGenModelId = AiSelection.Get(AiCapability.GenerateImage),
+            // Never a guess: null degrades to the server's own ImageGen:Provider fallback rather
+            // than stamping a provider id this client is not confident is actually configured.
+            ImageGenModelId = AiSelection.GetExplicit(AiCapability.GenerateImage),
         };
 
         if (!AiSelection.GetOption(AiCapability.AnalyzeImage).ExecutesInBrowser)
@@ -140,9 +144,13 @@ public abstract class FeaturePageBase : ComponentBase
 
         var imageBytes = Convert.FromBase64String(imageData);
 
+        // Florence-2 is task-token driven (<CAPTION>, <MORE_DETAILED_CAPTION>, <OD>, ...), not an
+        // instruction-following model — a free-form sentence puts it out of distribution. Passing
+        // null (not a sentence) lets transformers-worker.js apply its own task-token default; do not
+        // "helpfully" replace this with prose.
         var outcome = await LocalAi.DescribeImageAsync(
             imageBytes,
-            prompt: "Describe this image and list its subjects.",
+            prompt: null,
             progress: new Progress<LocalInferenceStatus>(OnLocalProgress),
             ct: ct);
 

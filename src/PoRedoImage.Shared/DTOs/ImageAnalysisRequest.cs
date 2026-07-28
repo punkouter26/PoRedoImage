@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using PoRedoImage.Shared.Validation;
 
 namespace PoRedoImage.Shared.DTOs;
 
@@ -37,10 +38,24 @@ public class ImageAnalysisRequest
     /// Description already produced by a browser-local vision model. When set, the server skips its
     /// own vision step and uses this instead.
     /// </summary>
+    /// <remarks>
+    /// This is client-supplied free text that flows verbatim into <c>EnhanceDescriptionAsync</c> /
+    /// <c>GenerateMemeCaptionAsync</c> as prompt tokens on a metered model. The endpoint is
+    /// authenticated and rate-limited, but a field that becomes billable tokens should still carry a
+    /// cap rather than being unbounded.
+    /// </remarks>
+    [StringLength(4000)]
     public string? PrecomputedDescription { get; set; }
 
     /// <summary>
     /// Tags accompanying <see cref="PrecomputedDescription"/>. Ignored unless that is also set.
     /// </summary>
+    /// <remarks>
+    /// The client's <c>FeaturePageBase.ExtractTags</c> (the only real producer) caps at 10, so 20
+    /// leaves headroom without being unbounded; <see cref="MaxItemLengthAttribute"/> bounds each
+    /// entry's length since <see cref="MaxCountAttribute"/> only caps the list's count.
+    /// </remarks>
+    [MaxCount(20)]
+    [MaxItemLength(100)]
     public IReadOnlyList<string>? PrecomputedTags { get; set; }
 }
