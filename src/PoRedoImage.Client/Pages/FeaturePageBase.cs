@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
+using PoRedoImage.Client.Models;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Client.Shared;
 using Radzen;
@@ -22,6 +23,7 @@ public abstract class FeaturePageBase : ComponentBase
     [Inject] protected ILoggerFactory LoggerFactory { get; set; } = default!;
     [Inject] protected NotificationService NotificationService { get; set; } = default!;
     [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] protected AiSelectionState AiSelection { get; set; } = default!;
 
     private ILogger? _logger;
     protected ILogger Logger => _logger ??= LoggerFactory.CreateLogger(GetType());
@@ -99,5 +101,36 @@ public abstract class FeaturePageBase : ComponentBase
             if (_gallery is not null) await _gallery.LoadAsync();
         }
         catch (Exception ex) { Logger.LogWarning(ex, "Auto-save original failed"); }
+    }
+
+    /// <summary>
+    /// Builds an analysis request carrying the session's provider selections.
+    /// </summary>
+    /// <remarks>
+    /// Centralised here rather than duplicated in ImageRegeneration and MemeGeneration: both pages
+    /// build the same request and would otherwise drift the moment a new field is added. Async and
+    /// taking the base64 image data (not raw bytes) because Task 6 runs browser-local vision inside
+    /// the browser branch, deriving bytes from <paramref name="imageData"/> only when needed there.
+    /// </remarks>
+    protected virtual Task<ImageAnalysisRequest> BuildAnalysisRequestAsync(
+        string imageData,
+        string contentType,
+        string fileName,
+        int descriptionLength,
+        ProcessingMode mode,
+        CancellationToken ct = default)
+    {
+        var request = new ImageAnalysisRequest
+        {
+            ImageData = imageData,
+            ContentType = contentType,
+            FileName = fileName,
+            DescriptionLength = descriptionLength,
+            Mode = mode,
+            ModelId = AiSelection.Get(AiCapability.AnalyzeImage),
+            ImageGenModelId = AiSelection.Get(AiCapability.GenerateImage),
+        };
+
+        return Task.FromResult(request);
     }
 }

@@ -93,22 +93,21 @@
 
             var base64Data = ExtractBase64(imagePreviewUrl);
 
-            var request = new ImageAnalysisRequest
-            {
-                ImageData = base64Data,
-                ContentType = selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
-                FileName = selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
-                DescriptionLength = descriptionLength,
-                Mode = ProcessingMode.ImageRegeneration
-            };
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            var request = await BuildAnalysisRequestAsync(
+                imageData: base64Data,
+                contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
+                descriptionLength: descriptionLength,
+                mode: ProcessingMode.ImageRegeneration,
+                ct: cts.Token);
 
             progressPercentage = 30;
-            progressMessage = "Analyzing image with Azure Computer Vision...";
+            progressMessage = "Analyzing image...";
             StateHasChanged();
 
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
                 var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, cts.Token);
 
                 if (!httpResponse.IsSuccessStatusCode)
