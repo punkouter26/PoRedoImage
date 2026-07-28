@@ -166,7 +166,9 @@ Three categories selectable from the Studio home page:
    `JsLocalInferenceRuntime` dispatches to one of two workers — WebLLM for text, transformers.js
    for vision. Both workers speak the same postMessage protocol, and **all fallback policy lives
    in C#** so two runtimes never become two policies. Selectable from the Studio page via
-   `ModelCategoryPicker`.
+   `AiServicePicker`, which offers one provider selector per AI capability (analyze image,
+   generate image, enhance description, style director, scene detail, create audio) rather than
+   a single three-way Remote/Web Browser/Ollama category choice.
 3. **Ollama** — Local models (dev only, requires Ollama running locally)
 
 ## Image Generation Provider (feature flag)

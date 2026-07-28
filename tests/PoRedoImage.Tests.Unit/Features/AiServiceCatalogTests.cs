@@ -66,6 +66,18 @@ public class AiServiceCatalogTests
         Assert.Equal(AiProviderIds.BrowserFlorence2, state.Get(AiCapability.AnalyzeImage));
     }
 
+    [Theory]
+    [InlineData(AiCapability.AnalyzeImage, "Analyze image")]
+    [InlineData(AiCapability.GenerateImage, "Generate image")]
+    [InlineData(AiCapability.EnhanceDescription, "Enhance description & captions")]
+    [InlineData(AiCapability.StyleDirector, "Style Director")]
+    [InlineData(AiCapability.SceneDetail, "Scene detail (OCR)")]
+    [InlineData(AiCapability.CreateAudio, "Create audio")]
+    public void LabelFor_ReturnsTheRowHeading(AiCapability capability, string expected)
+    {
+        Assert.Equal(expected, AiServiceCatalog.LabelFor(capability));
+    }
+
     [Fact]
     public void All_ListsEveryCapability_InRenderOrder()
     {
