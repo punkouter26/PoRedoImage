@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
@@ -19,6 +19,7 @@ using PoRedoImage.Web.Features.Idempotency;
 using PoRedoImage.Web.Features.ImageAnalysis;
 using PoRedoImage.Web.Features.MemeTemplates;
 using PoRedoImage.Web.Features.Pricing;
+using PoRedoImage.Web.Features.RapRoast;
 using PoRedoImage.Web.Features.StyleDirector;
 using PoRedoImage.Web.Features.UserImages;
 using Radzen;
@@ -302,6 +303,7 @@ try
     app.MapUserImageEndpoints();
     app.MapMemeTemplateEndpoints();
     app.MapStyleDirectorEndpoints();
+    app.MapRapRoastEndpoints();
     app.MapPricingEndpoints();
 
     // Redirect /favicon.ico → /favicon.png so browsers don't get a 404.

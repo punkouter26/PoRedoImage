@@ -1,10 +1,11 @@
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Infrastructure.Services.Mocks;
 using PoRedoImage.Web.Configuration;
 
@@ -84,12 +85,20 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // before the factory's in-memory config is applied — so a ConfigureServices override is
             // the only reliable way to guarantee no integration test can spend a live token.
             services.RemoveAll<IVisionService>();
+            services.RemoveAll<IVisionServiceRouter>();
             services.RemoveAll<IGenerativeAiService>();
             services.RemoveAll<IImageGenerationService>();
 
             services.AddSingleton<MockVisionService>();
             services.AddSingleton<IVisionService>(sp => sp.GetRequiredService<MockVisionService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockVisionService>());
+
+            // Every orchestrator resolves vision through the ROUTER, never IVisionService directly.
+            // Replacing only the latter left the real VisionServiceRouter in place, which handed back
+            // the live AzureVisionService and made a genuine outbound call to Azure — the exact
+            // budget-guardrail hole this factory exists to close.
+            services.AddSingleton<IVisionServiceRouter>(sp =>
+                new SingleVisionServiceRouter(sp.GetRequiredService<MockVisionService>()));
 
             services.AddSingleton<MockGenerativeAiService>();
             services.AddSingleton<IGenerativeAiService>(sp => sp.GetRequiredService<MockGenerativeAiService>());
@@ -98,6 +107,23 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton<MockImagen3Service>();
             services.AddSingleton<IImageGenerationService>(sp => sp.GetRequiredService<MockImagen3Service>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockImagen3Service>());
+
+            // Music generation for the Rap Roast slice. Without this the real LyriaMusicService is
+            // constructed (Mocks:UseMockAi lands after the builder phase) — it would report
+            // IsConfigured=false and degrade rather than call out, but registering the mock keeps
+            // the guarantee explicit rather than incidental.
+            // Chat completion backs the roast lyric writer (and the Style Director agents). The real
+            // HuggingFace implementation throws on construction when Mocks:UseMockAi is set, so it
+            // must be swapped here rather than relying on the builder-phase flag.
+            services.RemoveAll<IChatCompletionService>();
+            services.AddSingleton<MockChatCompletionService>();
+            services.AddSingleton<IChatCompletionService>(sp => sp.GetRequiredService<MockChatCompletionService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockChatCompletionService>());
+
+            services.RemoveAll<IMusicGenerationService>();
+            services.AddSingleton<MockLyriaMusicService>();
+            services.AddSingleton<IMusicGenerationService>(sp => sp.GetRequiredService<MockLyriaMusicService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockLyriaMusicService>());
         });
 
         return base.CreateHost(builder);

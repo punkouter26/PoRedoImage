@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services.Mocks;
 
@@ -32,8 +32,18 @@ public sealed class BudgetGuardrailTests : IClassFixture<CustomWebApplicationFac
         using var scope = _factory.Services.CreateScope();
         var mocks = scope.ServiceProvider.GetServices<IMockable>().ToList();
 
-        // All three AI boundaries should surface a banner reason.
-        Assert.Equal(3, mocks.Count);
+        // Every mocked AI boundary must surface a banner reason. Asserted as a set rather than a
+        // count so adding a boundary is a deliberate edit here, not a mystery off-by-one.
+        Assert.Equal(
+            new[]
+            {
+                "Chat completion (mock)",
+                "Computer Vision (mock)",
+                "Imagen3 image-gen (mock)",
+                "Lyria music-gen (mock)",
+                "OpenAI text (mock)",
+            },
+            mocks.Select(m => m.MockReason).Distinct().OrderBy(r => r, StringComparer.Ordinal));
         Assert.All(mocks, m => Assert.False(string.IsNullOrWhiteSpace(m.MockReason)));
     }
 

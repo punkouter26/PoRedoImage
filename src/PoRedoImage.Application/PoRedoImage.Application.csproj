@@ -16,4 +16,11 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
+  <!-- Mirrors the Infrastructure project: lets the test tiers assert on internal invariants
+       (e.g. RapRoastOrchestrator.MaxMusicAttempts) without widening the public surface. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="PoRedoImage.Tests.Unit" />
+    <InternalsVisibleTo Include="PoRedoImage.Tests.Integration" />
+  </ItemGroup>
+
 </Project>

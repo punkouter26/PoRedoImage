@@ -79,3 +79,48 @@ public sealed class MockImagen3Service : IImageGenerationService, IMockable
         GenerateImageAsync(string prompt, byte[] imageBytes, int seed, CancellationToken ct = default)
         => Task.FromResult((PixelPng, "image/png", 1L));
 }
+
+/// <summary>
+/// Canned music generation — returns a tiny silent MP3 and never calls Google Lyria.
+/// </summary>
+/// <remarks>
+/// Registered against <see cref="IMusicGenerationService"/>, the interface the orchestrator
+/// actually resolves. The audit found the opposite mistake elsewhere: mocking a concrete service
+/// while the caller went through a router meant the real backend was still being hit.
+/// </remarks>
+public sealed class MockLyriaMusicService : IMusicGenerationService, IMockable
+{
+    public string MockReason => "Lyria music-gen (mock)";
+
+    public bool IsConfigured => true;
+
+    // Minimal silent MP3 frame — enough for an <audio> element to load without any upstream call.
+    private static readonly byte[] SilentMp3 = Convert.FromBase64String(
+        "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADwAAB"
+        + "pAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
+        + "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV");
+
+    public Task<MusicGenerationResult> GenerateAsync(
+        string lyrics, string stylePrompt, CancellationToken ct = default)
+        => Task.FromResult(new MusicGenerationResult(SilentMp3, "audio/mpeg", 1L));
+}
+
+/// <summary>
+/// Music service that always reports a safety refusal. Not registered by default — it exists so the
+/// orchestrator's soften-and-retry path can be exercised without a network call.
+/// </summary>
+public sealed class AlwaysRefusingMusicService : IMusicGenerationService, IMockable
+{
+    public string MockReason => "Lyria music-gen (always refuses)";
+
+    public bool IsConfigured => true;
+
+    public int AttemptCount { get; private set; }
+
+    public Task<MusicGenerationResult> GenerateAsync(
+        string lyrics, string stylePrompt, CancellationToken ct = default)
+    {
+        AttemptCount++;
+        return Task.FromResult(MusicGenerationResult.FromRefusal(1L, "Blocked by safety filters."));
+    }
+}

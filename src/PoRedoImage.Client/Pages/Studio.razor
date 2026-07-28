@@ -1,4 +1,4 @@
-@page "/"
+﻿@page "/"
 @inject ImageSessionService SessionService
 @inject NavigationManager Nav
 
@@ -69,6 +69,17 @@
                     <div>
                         <div class="studio-feature-card__title">Bulk Generate</div>
                         <p class="studio-feature-card__desc">Generate up to 10 artistic variations at once via Gemini 2.0 Flash.</p>
+                    </div>
+                    <span class="studio-feature-card__cta">
+                        @(_hasImage ? "Process now →" : "Try it →")
+                    </span>
+                </a>
+
+                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/rap-roast">
+                    <span class="studio-feature-card__icon">🎤</span>
+                    <div>
+                        <div class="studio-feature-card__title">Rap Roast</div>
+                        <p class="studio-feature-card__desc">AI writes a roast verse about your photo, then performs it over a beat.</p>
                     </div>
                     <span class="studio-feature-card__cta">
                         @(_hasImage ? "Process now →" : "Try it →")

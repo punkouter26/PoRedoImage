@@ -1,4 +1,4 @@
-namespace PoRedoImage.Shared.Configuration;
+﻿namespace PoRedoImage.Shared.Configuration;
 
 /// <summary>
 /// Every configuration key the solution reads, in one place (§1 "Zero magic strings").
@@ -63,6 +63,12 @@ public static class ConfigKeys
     // ── Google (Gemini / Imagen) ────────────────────────────────────────
     public const string GoogleApiKey = "Google:ApiKey";
     public const string GoogleImagen3Model = "Google:Imagen3Model";
+
+    /// <summary>
+    /// Lyria music model id. Lyria performs supplied lyrics, unlike instrumental text-to-audio
+    /// models. Defaults to the 30-second clip model.
+    /// </summary>
+    public const string GoogleLyriaModel = "Google:LyriaModel";
 
     // ── HuggingFace Inference Providers ─────────────────────────────────
     public const string HuggingFaceApiKey = "HuggingFace:ApiKey";

@@ -67,6 +67,26 @@ public sealed class AccessibilityUiTests : IAsyncLifetime
     }
 
     [LiveServerFact]
+    public async Task Rap_roast_page_has_no_WCAG_AA_violations()
+    {
+        await using var context = await _browser.CreateContextAsync(PlaywrightViewports.DesktopLandscape());
+        var page = await context.NewPageAsync();
+
+        await page.GotoAsync(
+            $"{LiveServerFactAttribute.BaseUrl}/dev-login?email=guest@guest.local",
+            new() { WaitUntil = WaitUntilState.NetworkIdle });
+        await page.GotoAsync(
+            $"{LiveServerFactAttribute.BaseUrl}/rap-roast",
+            new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        Assert.DoesNotContain("/login", page.Url, StringComparison.OrdinalIgnoreCase);
+        // The radio-group fieldset and the audio player are the parts most likely to regress here.
+        await Assertions.Expect(page.Locator("legend")).ToContainTextAsync("Beat style");
+
+        await AssertNoViolationsAsync(page);
+    }
+
+    [LiveServerFact]
     public async Task Studio_page_has_no_WCAG_AA_violations_on_mobile_portrait()
     {
         // Mobile portrait is the project's primary form factor and collapses the nav, so it can

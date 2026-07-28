@@ -962,7 +962,9 @@ code { color: #c026d3; }
     border-radius: 6px;
     padding: 0.2rem 0.6rem;
     font-size: 0.8rem;
-    color: #a5b4fc;
+    /* #a5b4fc (indigo-300) was 1.68:1 against this tinted chip background — it was chosen for a
+       dark surface. Indigo-800 gives ~8:1 and keeps the same hue family. */
+    color: #3730a3;
     white-space: nowrap;
 }
 .feature-how-it-works__arrow { color: #475569; font-size: 0.75rem; }

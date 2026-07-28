@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
 
@@ -38,6 +38,8 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(BulkRerollVariation))]
 [JsonSerializable(typeof(ProblemDetailsDto))]
 [JsonSerializable(typeof(AiPricingDto))]
+[JsonSerializable(typeof(RapRoastRequest))]
+[JsonSerializable(typeof(RapRoastResponse))]
 [JsonSerializable(typeof(ImageBytes))]
 public partial class SharedJsonContext : JsonSerializerContext
 {

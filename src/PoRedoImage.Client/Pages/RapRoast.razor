@@ -1,0 +1,211 @@
+@page "/rap-roast"
+@attribute [Authorize]
+@inherits FeaturePageBase
+@using System.Net.Http.Json
+
+<PageTitle>Rap Roast — PoRedoImage</PageTitle>
+
+<div class="container py-4">
+    <FeatureLayout
+        IconClass="bi-mic-fill"
+        Title="Rap Roast"
+        Description="Upload a photo and AI writes a roast verse, then performs it over a beat."
+        Steps="@(new[] {
+            ("bi-upload", "Upload photo"),
+            ("bi-pencil", "AI writes the bars"),
+            ("bi-music-note-beamed", "Hear the track")
+        })" />
+
+    @if (!isProcessing && !isComplete)
+    {
+        <div class="row justify-content-center">
+            <div class="col-lg-7 col-md-9">
+                <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
+
+                <ImageUploadPanel
+                    ShowDescriptionLength="false"
+                    ButtonLabel="Roast It"
+                    ButtonIcon="bi-mic-fill"
+                    ImagePreviewUrl="@imagePreviewUrl"
+                    ErrorMessage="@errorMessage"
+                    CanProcess="@canProcessImage"
+                    OnFileChange="LoadFile"
+                    OnProcessClicked="RoastAsync" />
+
+                <fieldset class="roast-style mt-3">
+                    <legend class="roast-style__legend">Beat style</legend>
+                    <div class="roast-style__options">
+                        @foreach (var option in StyleOptions)
+                        {
+                            <label class="roast-style__option @(_style == option.Value ? "roast-style__option--selected" : "")">
+                                <input type="radio" name="rap-style" value="@option.Value"
+                                       checked="@(_style == option.Value)"
+                                       @onchange="@(() => _style = option.Value)" />
+                                <span class="roast-style__name">@option.Label</span>
+                                <span class="roast-style__hint">@option.Hint</span>
+                            </label>
+                        }
+                    </div>
+                </fieldset>
+
+                <p class="roast-disclaimer">
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                    Roasts stay on styling, pose and vibe — never on appearance traits like race,
+                    body size, age or disability. Best used on photos of yourself and friends.
+                </p>
+            </div>
+        </div>
+    }
+
+    @if (isProcessing)
+    {
+        <ProcessingProgressBar Percentage="progressPercentage" Message="@progressMessage" />
+    }
+
+    @if (isComplete && _result is not null)
+    {
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                @if (_result.AudioRefused)
+                {
+                    <div class="roast-refused" role="status">
+                        <i class="bi bi-volume-mute me-2" aria-hidden="true"></i>
+                        <div>
+                            <strong>The music model declined this one.</strong>
+                            <p class="mb-0 small">
+                                Your bars are below — the track just didn't get made.
+                                @if (!string.IsNullOrWhiteSpace(_result.RefusalReason))
+                                {
+                                    <span class="d-block text-break">@_result.RefusalReason</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="roast-player">
+                        <audio controls preload="metadata" class="roast-player__audio"
+                               src="@($"data:{_result.AudioContentType};base64,{_result.AudioData}")">
+                            Your browser does not support audio playback.
+                        </audio>
+                    </div>
+                }
+
+                @if (_result.LyricsSoftened)
+                {
+                    <p class="roast-softened small" role="status">
+                        <i class="bi bi-emoji-smile me-1" aria-hidden="true"></i>
+                        The first draft was too spicy for the music model, so this is the friendlier cut.
+                    </p>
+                }
+
+                <section class="roast-lyrics" aria-label="Roast lyrics">
+                    <h2 class="roast-lyrics__heading">The bars</h2>
+                    <pre class="roast-lyrics__text">@_result.Lyrics</pre>
+                </section>
+
+                <details class="roast-seen">
+                    <summary>What the AI saw</summary>
+                    <p class="mb-0 small">@_result.ImageDescription</p>
+                </details>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-primary" @onclick="Reset">
+                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Roast another
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private RapRoastResponse? _result;
+    private RapStyle _style = RapStyle.BoomBap;
+
+    private static readonly (RapStyle Value, string Label, string Hint)[] StyleOptions =
+    [
+        (RapStyle.BoomBap, "Boom-bap", "90s, dusty drums"),
+        (RapStyle.Trap, "Trap", "808s, hi-hat rolls"),
+        (RapStyle.OldSchool, "Old-school", "Funk break, horns"),
+    ];
+
+    protected override void OnGalleryImageSelected() => _result = null;
+
+    private async Task RoastAsync()
+    {
+        if (!canProcessImage) return;
+
+        isProcessing = true;
+        isComplete = false;
+        errorMessage = null;
+        _result = null;
+        progressPercentage = 15;
+        progressMessage = "Looking at your photo…";
+        StateHasChanged();
+
+        try
+        {
+            var previewUrl = imagePreviewUrl ?? SessionService.PreviewUrl;
+            if (string.IsNullOrEmpty(previewUrl))
+            {
+                errorMessage = "No image loaded.";
+                return;
+            }
+
+            progressPercentage = 45;
+            progressMessage = "Writing your bars…";
+            StateHasChanged();
+
+            var request = new RapRoastRequest
+            {
+                ImageData = ExtractBase64(previewUrl),
+                ContentType = SessionService.ContentType ?? "image/png",
+                Style = _style,
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/rap-roast", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = response.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.TooManyRequests =>
+                        "You're roasting faster than the beat. Give it a minute and try again.",
+                    System.Net.HttpStatusCode.BadRequest =>
+                        "That image couldn't be read. Try a JPG or PNG.",
+                    _ => "The roast pipeline failed. Please try again.",
+                };
+                Logger.LogWarning("Rap roast failed: {Status}", response.StatusCode);
+                return;
+            }
+
+            progressPercentage = 85;
+            progressMessage = "Cutting the track…";
+            StateHasChanged();
+
+            _result = await response.Content.ReadFromJsonAsync<RapRoastResponse>();
+            isComplete = _result is not null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Rap roast request failed");
+            errorMessage = "Something went wrong making your track. Please try again.";
+        }
+        finally
+        {
+            isProcessing = false;
+            progressPercentage = 100;
+            StateHasChanged();
+        }
+    }
+
+    private void Reset()
+    {
+        _result = null;
+        isComplete = false;
+        errorMessage = null;
+        StateHasChanged();
+    }
+}

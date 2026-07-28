@@ -4,6 +4,7 @@ using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Agents;
 using PoRedoImage.Application.Agents.StyleDirector;
 using PoRedoImage.Application.Features.ImageAnalysis;
+using PoRedoImage.Application.Features.RapRoast;
 using PoRedoImage.Application.Features.UserImages;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Repositories;
@@ -55,6 +56,10 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<MockChatCompletionService>();
             services.AddSingleton<IChatCompletionService>(sp => sp.GetRequiredService<MockChatCompletionService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockChatCompletionService>());
+
+            services.AddSingleton<MockLyriaMusicService>();
+            services.AddSingleton<IMusicGenerationService>(sp => sp.GetRequiredService<MockLyriaMusicService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockLyriaMusicService>());
         }
         else
         {
@@ -84,6 +89,11 @@ public static class InfrastructureServiceExtensions
             // Providers (OpenAI-compatible chat + a vision model) is the real-AI backend; when its
             // token is absent the agents fall back to their heuristics (IsConfigured guards this).
             services.AddSingleton<IChatCompletionService, HuggingFaceChatCompletionService>();
+
+            // Music generation for the Rap Roast slice. Lyria performs supplied lyrics, which no
+            // HuggingFace-hosted model with a live inference provider can do (stable-audio-3 is
+            // instrumental and gated), so this stays on Google regardless of ImageGen:Provider.
+            services.AddSingleton<IMusicGenerationService, LyriaMusicService>();
         }
 
         // Scoped services
@@ -99,6 +109,11 @@ public static class InfrastructureServiceExtensions
 
         // Application layer orchestrator
         services.AddScoped<IImageAnalysisOrchestrator, ImageAnalysisOrchestrator>();
+
+        // Rap Roast slice: lyric writer + orchestrator (Transient so scoped logger flows correctly,
+        // matching the Style Director agent registrations below).
+        services.AddTransient<RoastLyricsWriter>();
+        services.AddScoped<IRapRoastOrchestrator, RapRoastOrchestrator>();
 
         // Idea #1 — Agentic Style Director: 4-agent sequential workflow.
         // Registered as transient so per-request scoped DI services (logger) flow correctly.
