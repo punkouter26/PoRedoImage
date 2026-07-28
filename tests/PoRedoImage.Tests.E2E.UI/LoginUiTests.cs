@@ -1,4 +1,4 @@
-using Microsoft.Playwright;
+﻿using Microsoft.Playwright;
 
 namespace PoRedoImage.Tests.E2E.UI;
 
@@ -38,6 +38,11 @@ public sealed class LoginUiTests : IAsyncLifetime
         var page = await context.NewPageAsync();
         await page.GotoAsync(LiveServerFactAttribute.BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
 
+        // The redirect is performed by the WASM router AFTER boot, and NetworkIdle can settle
+        // before that — on a cold first load the assertion used to fire while the URL was still
+        // "/", which made this test intermittently fail for no real reason. Wait for the
+        // navigation itself rather than assuming it has already happened.
+        await page.WaitForURLAsync("**/login**", new() { Timeout = 15_000 });
         Assert.Contains("/login", page.Url, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -64,6 +69,11 @@ public sealed class LoginUiTests : IAsyncLifetime
         var page = await context.NewPageAsync();
         await page.GotoAsync(LiveServerFactAttribute.BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
 
+        // The redirect is performed by the WASM router AFTER boot, and NetworkIdle can settle
+        // before that — on a cold first load the assertion used to fire while the URL was still
+        // "/", which made this test intermittently fail for no real reason. Wait for the
+        // navigation itself rather than assuming it has already happened.
+        await page.WaitForURLAsync("**/login**", new() { Timeout = 15_000 });
         Assert.Contains("/login", page.Url, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -90,6 +100,11 @@ public sealed class LoginUiTests : IAsyncLifetime
         var page = await context.NewPageAsync();
         await page.GotoAsync(LiveServerFactAttribute.BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
 
+        // The redirect is performed by the WASM router AFTER boot, and NetworkIdle can settle
+        // before that — on a cold first load the assertion used to fire while the URL was still
+        // "/", which made this test intermittently fail for no real reason. Wait for the
+        // navigation itself rather than assuming it has already happened.
+        await page.WaitForURLAsync("**/login**", new() { Timeout = 15_000 });
         Assert.Contains("/login", page.Url, StringComparison.OrdinalIgnoreCase);
     }
 
