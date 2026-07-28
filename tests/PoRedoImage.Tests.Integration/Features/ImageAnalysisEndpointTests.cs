@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Moq;
 using PoRedoImage.Web.Configuration;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.Integration;
@@ -184,7 +185,14 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
             AddTestAuth(services);
 
             // Remove real service registrations and replace with mocks (zero network, zero tokens).
-            ReplaceService<IVisionService>(services, CreateMockComputerVision());
+            var mockVision = CreateMockComputerVision();
+            ReplaceService<IVisionService>(services, mockVision);
+
+            // The orchestrator resolves vision through IVisionServiceRouter, never IVisionService
+            // directly. Mocks:UseMockAi is applied too late to affect builder-phase registration, so
+            // the real VisionServiceRouter survives and Resolve() hands back the live
+            // AzureVisionService — which attempted a real call, got 401, and surfaced as 503.
+            ReplaceService<IVisionServiceRouter>(services, new SingleVisionServiceRouter(mockVision));
             ReplaceService<IGenerativeAiService>(services, CreateMockOpenAI());
             ReplaceService<IMemeGeneratorService>(services, CreateMockMemeGenerator());
             ReplaceService<IImageGenerationService>(services, CreateMockImagen3());
@@ -344,6 +352,11 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
                 .Setup(s => s.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new HttpRequestException("Simulated Azure CV outage"));
             MockedServicesWebApplicationFactory.ReplaceService<IVisionService>(services, throwingMock.Object);
+            // Same reason as in MockedServicesWebApplicationFactory: the orchestrator goes through
+            // the router, so replacing only IVisionService left the real AzureVisionService in play
+            // and the test saw its 401 (surfaced as 503) instead of the simulated outage.
+            MockedServicesWebApplicationFactory.ReplaceService<IVisionServiceRouter>(
+                services, new SingleVisionServiceRouter(throwingMock.Object));
 
             // The orchestrator constructs all four AI services up front, so the remaining three must
             // resolve cleanly even though vision throws before they're invoked.

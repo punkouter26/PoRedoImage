@@ -1,11 +1,12 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Options;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Configuration;
 
 /// <summary>
 /// Strongly-typed binding for the <c>OpenAI:</c> configuration section. Replaces the
-/// 6× duplicated <c>IConfiguration["OpenAI:Key"]</c> magic strings across
+/// 6× duplicated <c>IConfiguration[ConfigKeys.OpenAiKey]</c> magic strings across
 /// <see cref="Infrastructure.Services.AzureOpenAiService"/>, health checks, and
 /// diagnostics (R3 in Po2Logic refactor queue).
 /// <para>
@@ -55,7 +56,7 @@ public sealed class OpenAiOptionsValidator : IValidateOptions<OpenAiOptions>
         // If real services aren't wired (mock mode forced), the bound options are never consumed.
         // Skipping the check here keeps the offline / CI path bootable while still producing loud,
         // actionable failures when someone WANTS real AI but forgot the keys.
-        if (_configuration.GetValue<bool>("Mocks:UseMockAi"))
+        if (_configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
         {
             _logger.LogInformation(
                 "Mocks:UseMockAi=true — OpenAI key validation skipped. Real Azure OpenAI is not wired.");

@@ -1,6 +1,7 @@
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Web.Configuration;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.Pricing;
 
@@ -14,7 +15,7 @@ public static class PricingEndpoints
     {
         app.MapGet("/api/pricing", (IConfiguration config, IOptions<AiPricingOptions> pricing) =>
         {
-            var provider = (config["ImageGen:Provider"] ?? "google").Trim().ToLowerInvariant();
+            var provider = (config[ConfigKeys.ImageGenProvider] ?? "google").Trim().ToLowerInvariant();
             var key = provider is "hf" ? "huggingface" : provider;
             var p = pricing.Value.Providers.GetValueOrDefault(key);
 

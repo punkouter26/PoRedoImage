@@ -1,10 +1,11 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using PoRedoImage.Application.Features.ImageAnalysis;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
-using PoRedoImage.Web.Features;
+using PoRedoImage.Web.Features.Shared;
 using System.ClientModel;
 using Azure;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.ImageAnalysis;
 
@@ -32,10 +33,10 @@ public static class ImageAnalysisEndpoints
 
         group.MapGet("/health", (IConfiguration config) =>
         {
-            var cvHealthy = !string.IsNullOrEmpty(config["ComputerVision:Endpoint"])
-                            && !string.IsNullOrEmpty(config["ComputerVision:ApiKey"]);
-            var oaiHealthy = !string.IsNullOrEmpty(config["OpenAI:Endpoint"])
-                             && !string.IsNullOrEmpty(config["OpenAI:Key"]);
+            var cvHealthy = !string.IsNullOrEmpty(config[ConfigKeys.ComputerVisionEndpoint])
+                            && !string.IsNullOrEmpty(config[ConfigKeys.ComputerVisionApiKey]);
+            var oaiHealthy = !string.IsNullOrEmpty(config[ConfigKeys.OpenAiEndpoint])
+                             && !string.IsNullOrEmpty(config[ConfigKeys.OpenAiKey]);
             var status = cvHealthy && oaiHealthy ? "Healthy" : "Degraded";
             return Results.Ok(new
             {

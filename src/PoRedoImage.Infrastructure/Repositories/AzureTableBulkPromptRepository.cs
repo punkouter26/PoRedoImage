@@ -1,9 +1,10 @@
-using Azure;
+﻿using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Repositories;
 
@@ -23,7 +24,7 @@ public sealed class AzureTableBulkPromptRepository : IBulkPromptRepository
     public AzureTableBulkPromptRepository(IConfiguration configuration, ILogger<AzureTableBulkPromptRepository> logger)
     {
         _logger = logger;
-        var connectionString = configuration["Storage:ConnectionString"];
+        var connectionString = configuration[ConfigKeys.StorageConnectionString];
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             _tableClient = new TableServiceClient(connectionString).GetTableClient(TableName);

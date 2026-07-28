@@ -105,6 +105,9 @@
     color: #94a3b8 !important;
     font-size: 0.85rem;
     font-weight: 500;
+    /* Bounds the truncation applied by .text-truncate — long email addresses would
+       otherwise push Sign-out off the nav bar. */
+    max-width: 200px;
 }
 
 

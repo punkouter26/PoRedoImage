@@ -1,9 +1,10 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -21,7 +22,7 @@ public sealed class OllamaVisionService(
     IConfiguration configuration,
     ILogger<OllamaVisionService> logger) : IVisionService
 {
-    private string Model => configuration["Ollama:VisionModel"] ?? "gemma4";
+    private string Model => configuration[ConfigKeys.OllamaVisionModel] ?? "gemma4";
 
     public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs)>
         AnalyzeAsync(byte[] imageData, CancellationToken ct = default)

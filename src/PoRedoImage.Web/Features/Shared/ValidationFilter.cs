@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace PoRedoImage.Web.Features;
+namespace PoRedoImage.Web.Features.Shared;
 
 /// <summary>
 /// Generic endpoint filter that runs DataAnnotations validation on the first argument of type <typeparamref name="T"/>.

@@ -1,4 +1,5 @@
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.ImageAnalysis;
 
@@ -22,8 +23,8 @@ public sealed class OpenAIHealthCheck : IHealthCheck
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = _configuration["OpenAI:Endpoint"];
-        var apiKey = _configuration["OpenAI:Key"];
+        var endpoint = _configuration[ConfigKeys.OpenAiEndpoint];
+        var apiKey = _configuration[ConfigKeys.OpenAiKey];
 
         // Distinguish "secret not configured" / "App Service KV reference not yet resolved" /
         // "endpoint broken". In Production, an unresolved @Microsoft.KeyVault(...) reference

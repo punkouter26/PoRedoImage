@@ -1,4 +1,4 @@
-using Azure.Extensions.AspNetCore.Configuration.Secrets;
+﻿using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenTelemetry;
@@ -8,6 +8,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Configuration;
 
@@ -34,8 +35,8 @@ public static class HostBootstrapExtensions
     /// </summary>
     public static WebApplicationBuilder AddPoRedoImageKeyVault(this WebApplicationBuilder builder)
     {
-        var keyVaultEndpoint = builder.Configuration["KeyVault:Uri"]
-            ?? builder.Configuration["AZURE_KEY_VAULT_ENDPOINT"];
+        var keyVaultEndpoint = builder.Configuration[ConfigKeys.KeyVaultUri]
+            ?? builder.Configuration[ConfigKeys.AzureKeyVaultEndpoint];
 
         // Explicit opt-outs: never throw on missing endpoint when dev "really" wants offline,
         // either by configuring the mock mode or by leaving the endpoint empty (test fixtures).
@@ -46,7 +47,7 @@ public static class HostBootstrapExtensions
                 "Skipping KV load; secrets must come from another provider or Mocks:UseMockAi must be true.");
             return builder;
         }
-        if (builder.Configuration.GetValue<bool>("Mocks:UseMockAi"))
+        if (builder.Configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
         {
             Log.Information(
                 "Mocks:UseMockAi=true — skipping Key Vault load (real AI services are not wired).");
@@ -89,7 +90,7 @@ public static class HostBootstrapExtensions
             {
                 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Storage:ConnectionString"] = "UseDevelopmentStorage=true"
+                    [ConfigKeys.StorageConnectionString] = "UseDevelopmentStorage=true"
                 });
             }
         }
@@ -200,7 +201,7 @@ public static class HostBootstrapExtensions
         //     60-min/day CPU budget (see ADR-015). Up/down visibility comes from the heartbeat metric.
         var samplingRatio = builder.Environment.IsDevelopment()
             ? 1.0
-            : builder.Configuration.GetValue<double?>("ApplicationInsights:SamplingRatio") ?? 0.1;
+            : builder.Configuration.GetValue<double?>(ConfigKeys.ApplicationInsightsSamplingRatio) ?? 0.1;
 
         otelBuilder.UseAzureMonitor(options =>
         {
@@ -240,20 +241,20 @@ public static class HostBootstrapExtensions
 
         static string? ResolveRaw(IConfiguration config)
         {
-            var connectionString = config["APPLICATIONINSIGHTS_CONNECTION_STRING"]
-                ?? config["ApplicationInsights:ConnectionString"];
+            var connectionString = config[ConfigKeys.AppInsightsConnectionStringEnv]
+                ?? config[ConfigKeys.ApplicationInsightsConnectionString];
             if (!string.IsNullOrWhiteSpace(connectionString))
             {
                 return connectionString;
             }
 
-            var instrumentationKey = config["APPINSIGHTS_INSTRUMENTATIONKEY"];
+            var instrumentationKey = config[ConfigKeys.AppInsightsInstrumentationKeyEnv];
             if (!string.IsNullOrWhiteSpace(instrumentationKey))
             {
                 return $"InstrumentationKey={instrumentationKey}";
             }
 
-            return config["ApplicationInsights:StagingConnectionString"];
+            return config[ConfigKeys.ApplicationInsightsStagingConnectionString];
         }
     }
 }

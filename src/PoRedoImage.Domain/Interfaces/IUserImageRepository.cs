@@ -1,4 +1,4 @@
-using PoRedoImage.Domain.Entities;
+﻿using PoRedoImage.Domain.Entities;
 
 namespace PoRedoImage.Domain.Interfaces;
 
@@ -9,7 +9,7 @@ namespace PoRedoImage.Domain.Interfaces;
 public interface IUserImageRepository
 {
     /// <summary>Saves raw image bytes to blob storage. Returns the blob URL (or opaque id path).</summary>
-    Task<string> SaveBlobAsync(string userId, string imageId, byte[] bytes, string contentType, CancellationToken ct = default);
+    Task<string> SaveBlobAsync(string userId, UserImageId imageId, byte[] bytes, string contentType, CancellationToken ct = default);
 
     /// <summary>Saves image metadata to table storage.</summary>
     Task SaveMetadataAsync(UserImage image, CancellationToken ct = default);
@@ -18,11 +18,11 @@ public interface IUserImageRepository
     Task<IReadOnlyList<UserImage>> GetByUserAsync(string userId, CancellationToken ct = default);
 
     /// <summary>Returns the raw bytes + content-type for a single image. Returns null if not found or access denied.</summary>
-    Task<(byte[] Bytes, string ContentType)?> GetBlobAsync(string userId, string imageId, CancellationToken ct = default);
+    Task<(byte[] Bytes, string ContentType)?> GetBlobAsync(string userId, UserImageId imageId, CancellationToken ct = default);
 
     /// <summary>Returns metadata for a single image. Returns null if not found.</summary>
-    Task<UserImage?> GetMetadataAsync(string userId, string imageId, CancellationToken ct = default);
+    Task<UserImage?> GetMetadataAsync(string userId, UserImageId imageId, CancellationToken ct = default);
 
     /// <summary>Deletes a user image (blob bytes + metadata). No-op if not found.</summary>
-    Task DeleteAsync(string userId, string imageId, CancellationToken ct = default);
+    Task DeleteAsync(string userId, UserImageId imageId, CancellationToken ct = default);
 }

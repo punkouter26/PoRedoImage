@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 
 namespace PoRedoImage.Tests.Integration;
@@ -35,7 +35,9 @@ public class DiagnosticsEndpointTests : IClassFixture<CustomWebApplicationFactor
 
         // Assert
         Assert.True(doc.RootElement.TryGetProperty("Environment", out var env));
-        Assert.Equal("Development", env.GetString());
+        // The integration tier runs as PoEnvironments.Test (set by the factory), not Development —
+        // Development is reserved for the local F5 inner loop.
+        Assert.Equal("Test", env.GetString());
     }
 
     [Fact]

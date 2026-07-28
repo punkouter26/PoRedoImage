@@ -88,6 +88,9 @@ public class KeyVaultSecretNameMappingTests
             "PoRedoImage-AzureAd-ClientSecret",
             "PoRedoImage-Google-ApiKey",
             "PoRedoImage-Google-Imagen3Model",
+            // Added alongside the HuggingFace image-generation provider (346339b); this
+            // expectation was not updated at the time, so the assertion had been failing since.
+            "PoRedoImage-HuggingFace-ApiKey",
         };
 
         Assert.Equal(expected.OrderBy(x => x), KeyVaultSecretNameMapping.RequiredSecretNames.OrderBy(x => x));

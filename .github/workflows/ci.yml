@@ -33,3 +33,32 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore ${{ env.SOLUTION_PATH }}
       - run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -c Release
+
+      # Unit tier: pure logic, no I/O — runs in ~1s.
+      - name: Unit tests
+        run: >-
+          dotnet test tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj
+          --no-build -c Release --logger "trx;LogFileName=unit.trx"
+
+      # Integration tier: Testcontainers spins up its own throwaway Azurite (ADR-019),
+      # and ubuntu-latest runners ship with Docker, so this needs no service container.
+      # ASPNETCORE_ENVIRONMENT=Test enables FakeAuthHandler without dev-mode UI.
+      - name: Integration tests
+        env:
+          ASPNETCORE_ENVIRONMENT: Test
+        run: >-
+          dotnet test tests/PoRedoImage.Tests.Integration/PoRedoImage.Tests.Integration.csproj
+          --no-build -c Release --logger "trx;LogFileName=integration.trx"
+
+      # The E2E tiers are deliberately absent: both target a running instance
+      # (ApiSmoke via E2E_BASE_URL, UI via Playwright browsers) and self-skip when
+      # none is reachable, so running them here would report green without testing
+      # anything. They run against the deployed app in deploy.yml's smoke stage.
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+          if-no-files-found: warn

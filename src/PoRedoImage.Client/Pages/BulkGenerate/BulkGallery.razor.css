@@ -284,3 +284,7 @@
     object-fit: cover;
     display: block;
 }
+/* Status pill for a not-yet-started slot. Sized here rather than inline (NET_RULES §4). */
+.bulk-slot__status--queued {
+    font-size: 0.72rem;
+}

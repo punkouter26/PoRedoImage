@@ -1,8 +1,9 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.Auth;
 
@@ -13,7 +14,11 @@ public static class AuthServiceExtensions
     /// identity to be on the <c>Diagnostics:AdminEmails</c> allow-list (fail-closed: an empty list
     /// denies everyone). In non-Production any authenticated user may read diagnostics.
     /// </summary>
-    public const string DiagnosticsPolicy = "DiagnosticsAccess";
+    /// <remarks>
+    /// The name itself lives in <see cref="Shared.AuthorizationPolicies"/> so consuming slices
+    /// depend on the shared vocabulary rather than on this slice (§2 slice autonomy).
+    /// </remarks>
+    public const string DiagnosticsPolicy = Shared.AuthorizationPolicies.Diagnostics;
 
     private static void AddPoRedoImageAuthorization(
         IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
@@ -33,7 +38,7 @@ public static class AuthServiceExtensions
 
                 if (environment.IsProduction())
                 {
-                    var admins = (configuration["Diagnostics:AdminEmails"] ?? string.Empty)
+                    var admins = (configuration[ConfigKeys.DiagnosticsAdminEmails] ?? string.Empty)
                         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
                     // Fail closed: with no configured admins, nobody can read prod diagnostics.
@@ -58,7 +63,7 @@ public static class AuthServiceExtensions
         // When Auth:EnableFakeAuth=true (and NOT Production), the entire auth pipeline is the
         // header-driven FakeAuthHandler — callers assume an identity via X-Fake-User / X-Fake-Roles.
         // This is the BFF local bypass used by headless Playwright golden-path suites.
-        var enableFakeAuth = configuration.GetValue<bool>("Auth:EnableFakeAuth");
+        var enableFakeAuth = configuration.GetValue<bool>(ConfigKeys.AuthEnableFakeAuth);
         if (enableFakeAuth && !environment.IsProduction())
         {
             services.AddAuthentication(FakeAuthHandler.SchemeName)
@@ -69,10 +74,26 @@ public static class AuthServiceExtensions
             return services;
         }
 
-        var clientId = configuration["AzureAd:ClientId"];
+        var clientId = configuration[ConfigKeys.AzureAdClientId];
         var hasOidc = !string.IsNullOrWhiteSpace(clientId);
 
-        if (environment.IsDevelopment() && !hasOidc)
+        // Production must never silently degrade to cookie-only — that would drop the identity
+        // provider entirely. Fail loudly, and with a message that names the missing setting: the
+        // previous behaviour was an opaque ArgumentException from deep inside the OIDC handler.
+        if (!hasOidc && environment.IsProduction())
+        {
+            throw new InvalidOperationException(
+                $"{ConfigKeys.AzureAdClientId} is required in Production. It resolves from the " +
+                "PoRedoImage-AzureAd-ClientId Key Vault secret; an empty value usually means the " +
+                "@Microsoft.KeyVault(...) App Setting reference did not resolve (check the managed " +
+                "identity's Key Vault Secrets User grant).");
+        }
+
+        // Cookie-only whenever OIDC is not configured outside Production. This was previously gated
+        // on IsDevelopment() alone, so the Test environment fell through to the OIDC branch and
+        // constructed the handler with an empty ClientId — which threw and broke the entire
+        // integration suite.
+        if (!hasOidc)
         {
             services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(options =>
@@ -85,7 +106,7 @@ public static class AuthServiceExtensions
         }
         else
         {
-            var tenantId = configuration["AzureAd:TenantId"] ?? "common";
+            var tenantId = configuration[ConfigKeys.AzureAdTenantId] ?? "common";
             services.AddAuthentication(options =>
             {
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -105,11 +126,11 @@ public static class AuthServiceExtensions
             {
                 options.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
                 options.ClientId = clientId;
-                options.ClientSecret = configuration["AzureAd:ClientSecret"];
+                options.ClientSecret = configuration[ConfigKeys.AzureAdClientSecret];
                 options.ResponseType = "code";
                 options.SaveTokens = false;
-                options.CallbackPath = configuration["AzureAd:CallbackPath"] ?? "/signin-oidc";
-                options.SignedOutCallbackPath = configuration["AzureAd:SignedOutCallbackPath"] ?? "/signout-oidc";
+                options.CallbackPath = configuration[ConfigKeys.AzureAdCallbackPath] ?? "/signin-oidc";
+                options.SignedOutCallbackPath = configuration[ConfigKeys.AzureAdSignedOutCallbackPath] ?? "/signout-oidc";
                 options.Scope.Add("openid");
                 options.Scope.Add("profile");
                 options.Scope.Add("email");
@@ -131,7 +152,7 @@ public static class AuthServiceExtensions
                 // the multi-tenant + personal-account behavior the user asked for ("all MS outlook
                 // accounts / common authority") while rejecting malformed/unexpected issuer strings
                 // that an unvalidated Authority setting could otherwise produce.
-                var allowedTenants = configuration["AzureAd:AllowedTenantIds"]?
+                var allowedTenants = configuration[ConfigKeys.AzureAdAllowedTenantIds]?
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 if (allowedTenants?.Length > 0)
                 {

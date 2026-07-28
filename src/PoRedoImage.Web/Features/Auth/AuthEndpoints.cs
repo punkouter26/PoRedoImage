@@ -1,7 +1,8 @@
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.Auth;
 
@@ -86,7 +87,7 @@ public static class AuthEndpoints
             && !returnUrl.StartsWith("//"))
             ? returnUrl : "/";
 
-        var clientId = context.RequestServices.GetRequiredService<IConfiguration>()["AzureAd:ClientId"];
+        var clientId = context.RequestServices.GetRequiredService<IConfiguration>()[ConfigKeys.AzureAdClientId];
         var hasOidc = !string.IsNullOrWhiteSpace(clientId);
 
         if (env.IsDevelopment() && !hasOidc)

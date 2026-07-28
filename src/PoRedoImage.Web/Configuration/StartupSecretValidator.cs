@@ -1,5 +1,6 @@
-using PoRedoImage.Web.Features.Diagnostics;
+﻿using PoRedoImage.Web.Features.Diagnostics;
 using Microsoft.Extensions.Options;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Configuration;
 
@@ -31,7 +32,7 @@ public sealed class StartupSecretValidator : IHostedService
         // Mock-mode opt-out: real services aren't wired, so AI key validation is unnecessary.
         // Keeps the offline / CI path bootable while still producing loud, actionable failures
         // when someone WANTS real AI but forgot the keys.
-        if (_configuration.GetValue<bool>("Mocks:UseMockAi"))
+        if (_configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
         {
             _logger.LogInformation(
                 "Mocks:UseMockAi=true — AI secret validation skipped. Mock services wired; no live keys required.");
@@ -40,10 +41,10 @@ public sealed class StartupSecretValidator : IHostedService
 
         var required = new[]
         {
-            ("OpenAI:Endpoint",         _configuration["OpenAI:Endpoint"]),
-            ("OpenAI:Key",              _configuration["OpenAI:Key"]),
-            ("OpenAI:ChatCompletionsDeployment", _configuration["OpenAI:ChatCompletionsDeployment"]),
-            ("Google:ApiKey",           _configuration["Google:ApiKey"]),
+            ("OpenAI:Endpoint",         _configuration[ConfigKeys.OpenAiEndpoint]),
+            ("OpenAI:Key",              _configuration[ConfigKeys.OpenAiKey]),
+            ("OpenAI:ChatCompletionsDeployment", _configuration[ConfigKeys.OpenAiChatCompletionsDeployment]),
+            ("Google:ApiKey",           _configuration[ConfigKeys.GoogleApiKey]),
         };
 
         var missing = required.Where(kv => string.IsNullOrWhiteSpace(kv.Item2)).ToList();
@@ -100,10 +101,10 @@ public sealed class StartupSecretValidator : IHostedService
     private void ValidateOpenIdConnectConfig()
     {
         // FakeAuth replaces the whole pipeline; nothing to validate.
-        if (_configuration.GetValue<bool>("Auth:EnableFakeAuth"))
+        if (_configuration.GetValue<bool>(ConfigKeys.AuthEnableFakeAuth))
             return;
 
-        var clientId = _configuration["AzureAd:ClientId"];
+        var clientId = _configuration[ConfigKeys.AzureAdClientId];
         var hasOidc = !string.IsNullOrWhiteSpace(clientId);
 
         // Dev without a ClientId registers cookie-only auth (see AuthServiceExtensions) and is
@@ -120,7 +121,7 @@ public sealed class StartupSecretValidator : IHostedService
                 "Set it via Key Vault (PoRedoImage-AzureAd-ClientId) or `dotnet user-secrets set \"AzureAd:ClientId\" --project src/PoRedoImage.Web`.");
         }
 
-        var tenantId = _configuration["AzureAd:TenantId"];
+        var tenantId = _configuration[ConfigKeys.AzureAdTenantId];
         var isReservedTenant = tenantId is "common" or "consumers" or "organizations";
         var isGuidTenant = !string.IsNullOrWhiteSpace(tenantId) && Guid.TryParse(tenantId, out _);
         if (string.IsNullOrWhiteSpace(tenantId) || (!isReservedTenant && !isGuidTenant))
@@ -131,7 +132,7 @@ public sealed class StartupSecretValidator : IHostedService
                 "The user spec mandates 'common' authority for all MS outlook accounts.");
         }
 
-        var callbackPath = _configuration["AzureAd:CallbackPath"] ?? "/signin-oidc";
+        var callbackPath = _configuration[ConfigKeys.AzureAdCallbackPath] ?? "/signin-oidc";
         if (callbackPath.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
         {
             failures.Add(

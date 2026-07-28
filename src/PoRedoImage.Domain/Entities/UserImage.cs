@@ -7,7 +7,7 @@ namespace PoRedoImage.Domain.Entities;
 public sealed class UserImage
 {
     public string UserId { get; init; } = string.Empty;
-    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public UserImageId Id { get; init; } = UserImageId.New();
     public string FileName { get; init; } = string.Empty;
     public string ContentType { get; init; } = "image/jpeg";
     public UserImageKind Kind { get; init; } = UserImageKind.Original;
@@ -17,7 +17,7 @@ public sealed class UserImage
     public static UserImage Create(string userId, string fileName, string contentType, UserImageKind kind, long sizeBytes) =>
         new()
         {
-            Id = Guid.NewGuid().ToString("N"),
+            Id = UserImageId.New(),
             UserId = userId,
             FileName = fileName,
             ContentType = contentType,

@@ -1,10 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -22,11 +23,11 @@ public sealed class HuggingFaceChatCompletionService : IChatCompletionService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
-    private string BaseUrl => (_configuration["HuggingFace:BaseUrl"] ?? "https://router.huggingface.co").TrimEnd('/');
-    private string ChatModel => _configuration["HuggingFace:ChatModel"] ?? "Qwen/Qwen2.5-7B-Instruct";
-    private string VisionModel => _configuration["HuggingFace:VisionModel"] ?? "Qwen/Qwen2.5-VL-72B-Instruct";
+    private string BaseUrl => (_configuration[ConfigKeys.HuggingFaceBaseUrl] ?? "https://router.huggingface.co").TrimEnd('/');
+    private string ChatModel => _configuration[ConfigKeys.HuggingFaceChatModel] ?? "Qwen/Qwen2.5-7B-Instruct";
+    private string VisionModel => _configuration[ConfigKeys.HuggingFaceVisionModel] ?? "Qwen/Qwen2.5-VL-72B-Instruct";
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration["HuggingFace:ApiKey"]);
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration[ConfigKeys.HuggingFaceApiKey]);
 
     public HuggingFaceChatCompletionService(
         IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<HuggingFaceChatCompletionService> logger)
@@ -36,7 +37,7 @@ public sealed class HuggingFaceChatCompletionService : IChatCompletionService
         _configuration = configuration;
 
         // Mirror the other real AI services: never let a real provider construct under mock mode.
-        if (configuration.GetValue<bool>("Mocks:UseMockAi"))
+        if (configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
             throw new InvalidOperationException(
                 "HuggingFaceChatCompletionService was constructed while Mocks:UseMockAi=true — DI should "
                 + "have resolved MockChatCompletionService. Blocking to guarantee zero live token spend.");
@@ -82,7 +83,7 @@ public sealed class HuggingFaceChatCompletionService : IChatCompletionService
 
         var client = _httpClientFactory.CreateClient("HuggingFaceApi");
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/v1/chat/completions");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _configuration["HuggingFace:ApiKey"] ?? string.Empty);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _configuration[ConfigKeys.HuggingFaceApiKey] ?? string.Empty);
         request.Content = JsonContent.Create(body);
 
         using var response = await client.SendAsync(request, ct);

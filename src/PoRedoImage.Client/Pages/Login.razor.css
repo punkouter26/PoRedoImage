@@ -2,6 +2,8 @@
 
 .login-page {
     background: radial-gradient(ellipse 90% 80% at 50% -10%, rgba(5,39,103,0.18), transparent);
+    /* Vertically centres the card in the viewport without inline styles (NET_RULES §4). */
+    min-height: 80vh;
 }
 
 .login-card {

@@ -1,5 +1,6 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services.Mocks;
 
@@ -22,7 +23,7 @@ public sealed class MockAiDelegatingHandler : DelegatingHandler
 
     public MockAiDelegatingHandler(IConfiguration configuration, ILogger<MockAiDelegatingHandler> logger)
     {
-        _useMockAi = configuration.GetValue<bool>("Mocks:UseMockAi");
+        _useMockAi = configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi);
         _logger = logger;
     }
 

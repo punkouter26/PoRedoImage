@@ -211,10 +211,15 @@ jobs:
           package: webapp.zip
 
       - name: Verify deployment (health smoke test)
-        # Asserts three things post-deploy:
+        # Asserts the NET_RULES §6 post-deploy checks:
         #   1. HTTP 200 from /health — app started, BFF pipeline up, no Unhealthy checks.
         #   2. /api/diag/mock-status returns 200 anonymous (drives the WASM "USING MOCK DATA" banner).
         #   3. /api/diag/ returns 401 or 403 anonymous — endpoint is gating correctly.
+        #   4. Blazor render tree initialises — the host document emits a webassembly
+        #      component marker, blazor.web.js is served, and the Client assembly is in
+        #      the boot manifest (regression guard for the publish-trimming bug that
+        #      stripped every component, see 30f3070).
+        #   5. No anonymous response leaks unmasked configuration.
         #
         # Mid-loop restart (attempt 5): if still 503'ing after 4 tries, RBAC propagation was
         # slower than the pre-deploy 75s wait. Restarting forces the platform to re-resolve
@@ -250,7 +255,57 @@ jobs:
                 echo "::error::Anonymous /api/diag/ returned HTTP $DIAG_CODE — expected 401/403. The DiagnosticsPolicy is not gating."
                 exit 1
               fi
-              echo "Post-deploy smoke OK (health + diag gating)."
+
+              # ---- 4. Blazor render tree initialisation -------------------------------
+              # Global InteractiveWebAssembly with prerender disabled still emits a
+              # component marker comment in the host document. Its absence means <Routes>
+              # never rendered — the app would serve a blank page with a 200.
+              ROOT=$(curl -s "$BASE/" --max-time 20 || true)
+              if ! printf '%s' "$ROOT" | grep -q 'blazor.web.js'; then
+                echo "::error::Host document does not reference blazor.web.js — the WASM boot script was not emitted."
+                exit 1
+              fi
+              if ! printf '%s' "$ROOT" | grep -qi 'Blazor:.*webassembly'; then
+                echo "::error::Host document contains no webassembly component marker — the Blazor render tree did not initialise."
+                printf '%s' "$ROOT" | head -c 1500; echo
+                exit 1
+              fi
+              BOOTJS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/_framework/blazor.web.js" --max-time 20 || echo 000)
+              echo "==== /_framework/blazor.web.js: HTTP $BOOTJS ===="
+              if [ "$BOOTJS" != "200" ]; then
+                echo "::error::/_framework/blazor.web.js returned HTTP $BOOTJS — WASM runtime assets are missing from the deploy."
+                exit 1
+              fi
+              # The Client assembly must be present in the boot manifest. Publish-trimming
+              # previously stripped every component while still producing a 200 host page.
+              BOOT=$(curl -s "$BASE/_framework/blazor.boot.json" --max-time 20 || true)
+              if printf '%s' "$BOOT" | grep -q 'PoRedoImage.Client'; then
+                echo "==== Boot manifest contains PoRedoImage.Client ===="
+              else
+                echo "::error::PoRedoImage.Client is absent from _framework/blazor.boot.json — publish-trimming stripped the client assembly."
+                printf '%s' "$BOOT" | head -c 800; echo
+                exit 1
+              fi
+
+              # ---- 5. Masked-configuration safety ------------------------------------
+              # /api/diag/ is auth-gated in Production, so the pipeline cannot retrieve the
+              # masked payload itself (MaskValue's contract is covered by the unit +
+              # integration tiers). What it CAN prove is the inverse: no anonymous surface
+              # leaks raw configuration. Scan every anonymous body collected above.
+              LEAKS=0
+              for BODY in "$JSON" "$MOCK" "$DIAG" "$ROOT"; do
+                # Live secret shapes: Key Vault refs, storage AccountKey, AAD client secrets.
+                if printf '%s' "$BODY" | grep -qiE 'AccountKey=[A-Za-z0-9+/]{20,}|"(ClientSecret|ApiKey|Key)"\s*:\s*"[A-Za-z0-9._~-]{20,}"|InstrumentationKey=[0-9a-f-]{30,}'; then
+                  LEAKS=1
+                fi
+              done
+              if [ "$LEAKS" != "0" ]; then
+                echo "::error::An anonymous response contained what looks like unmasked secret material. Masking is not being applied."
+                exit 1
+              fi
+              echo "==== No unmasked configuration found on anonymous surfaces ===="
+
+              echo "Post-deploy smoke OK (health + diag gating + Blazor render tree + masking)."
               exit 0
             fi
             sleep 18

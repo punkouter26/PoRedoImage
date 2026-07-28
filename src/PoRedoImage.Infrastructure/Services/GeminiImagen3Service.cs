@@ -1,9 +1,10 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -18,20 +19,20 @@ public sealed class GeminiImagen3Service : IImageGenerationService
     private readonly IConfiguration _configuration;
     private readonly string _model;
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration["Google:ApiKey"]);
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration[ConfigKeys.GoogleApiKey]);
 
     public GeminiImagen3Service(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<GeminiImagen3Service> logger)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
-        _model = configuration["Google:Imagen3Model"] ?? "gemini-2.0-flash-exp-image-generation";
+        _model = configuration[ConfigKeys.GoogleImagen3Model] ?? "gemini-2.0-flash-exp-image-generation";
 
         // Defense-in-depth budget guardrail. The MockAiDelegatingHandler sits on the GeminiApi
         // named HttpClient and would also block this path, but failing here at construction
         // surfaces the misconfiguration immediately instead of at the first call. Mirrors the
         // AzureOpenAiService guard for consistency.
-        if (configuration.GetValue<bool>("Mocks:UseMockAi"))
+        if (configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
         {
             throw new InvalidOperationException(
                 "GeminiImagen3Service was constructed while Mocks:UseMockAi=true. The DI container "
@@ -55,13 +56,13 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         ArgumentNullException.ThrowIfNull(imageBytes);
 
-        _logger.LogInformation("Calling Gemini API (img2img). Model={Model}", _model);
+        _logger.GeminiImg2ImgStarting(_model);
         var start = Stopwatch.GetTimestamp();
 
         var (imageData, contentType) = await GenerateWithGeminiAsync(prompt, imageBytes, seed: 0, ct);
 
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Gemini API img2img complete in {Elapsed}ms. Size={Size} bytes", elapsed, imageData.Length);
+        _logger.GeminiImg2ImgComplete(elapsed, imageData.Length);
         return (imageData, contentType, elapsed);
     }
 
@@ -82,14 +83,13 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         ArgumentNullException.ThrowIfNull(imageBytes);
         ArgumentOutOfRangeException.ThrowIfNegative(seed);
 
-        _logger.LogInformation("Calling Gemini API (img2img re-roll). Model={Model}, Seed={Seed}", _model, seed);
+        _logger.GeminiRerollStarting(_model, seed);
         var start = Stopwatch.GetTimestamp();
 
         var (imageData, contentType) = await GenerateWithGeminiAsync(prompt, imageBytes, seed, ct);
 
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Gemini API re-roll complete in {Elapsed}ms. Seed={Seed}, Size={Size} bytes",
-            elapsed, seed, imageData.Length);
+        _logger.GeminiRerollComplete(elapsed, seed, imageData.Length);
         return (imageData, contentType, elapsed);
     }
 
@@ -101,7 +101,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
 
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        _logger.LogInformation("Calling Gemini API. Model={Model}", _model);
+        _logger.GeminiStarting(_model);
         var start = Stopwatch.GetTimestamp();
 
         var (imageData, contentType) = _model.StartsWith("gemini-", StringComparison.OrdinalIgnoreCase)
@@ -109,7 +109,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
             : await GenerateWithImagenAsync(prompt, ct);
 
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Gemini API complete in {Elapsed}ms. Size={Size} bytes", elapsed, imageData.Length);
+        _logger.GeminiComplete(elapsed, imageData.Length);
         return (imageData, contentType, elapsed);
     }
 
@@ -175,19 +175,19 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent";
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         // Re-read API key from IConfiguration to pick up Key Vault rotated secrets (singleton lifetime)
-        request.Headers.Add("x-goog-api-key", _configuration["Google:ApiKey"] ?? string.Empty);
+        request.Headers.Add("x-goog-api-key", _configuration[ConfigKeys.GoogleApiKey] ?? string.Empty);
         request.Content = JsonContent.Create(body);
         using var response = await client.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("Gemini API error {Status}: {Body}", (int)response.StatusCode, errorBody);
+            _logger.GeminiError((int)response.StatusCode, errorBody);
             throw new InvalidOperationException($"Gemini API returned {(int)response.StatusCode}: {errorBody}");
         }
 
         var rawJson = await response.Content.ReadAsStringAsync(ct);
-        _logger.LogDebug("Gemini raw response: {Body}", rawJson);
+        _logger.GeminiRawResponse(rawJson);
 
         using var json = JsonDocument.Parse(rawJson);
 
@@ -249,7 +249,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         var url = $"https://us-central1-aiplatform.googleapis.com/v1/projects/*/locations/us-central1/publishers/google/models/{_model}:predict";
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
-            "Bearer", _configuration["Google:ApiKey"] ?? string.Empty);
+            "Bearer", _configuration[ConfigKeys.GoogleApiKey] ?? string.Empty);
         request.Content = JsonContent.Create(body);
         using var response = await client.SendAsync(request, ct);
 

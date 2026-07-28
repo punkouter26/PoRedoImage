@@ -168,6 +168,19 @@ try
     // DI registration follows Dependency Inversion Principle (SOLID-D)
     builder.Services.AddPoRedoImageInfrastructure(builder.Configuration);
 
+    // ─── Correlation on the outbound leg (§3) ──────────────────────────
+    // RequestContextMiddleware handles browser → BFF. This closes the chain for BFF → downstream
+    // so one correlation id spans the whole path. Infrastructure is a plain (non-ASP.NET) project
+    // and cannot see IHttpContextAccessor, so the named clients it registered are re-opened here
+    // by name — AddHttpClient with an existing name appends to that client's configuration.
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddTransient<OutboundCorrelationHandler>();
+    foreach (var aiClient in new[] { "Ollama", "GeminiApi", "HuggingFaceApi" })
+    {
+        builder.Services.AddHttpClient(aiClient)
+            .AddHttpMessageHandler<OutboundCorrelationHandler>();
+    }
+
     // ImageSessionService is a client-side (WASM) concern now — registered in the Client host.
 
     // ─── Authentication & Authorization ─────────────────────────────────

@@ -1,10 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -31,7 +32,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         // service uses the Azure.AI.OpenAI SDK, which is NOT routed through HttpClient — so a
         // future regression that wires a real client while mock mode is on would bypass the
         // handler and silently spend a live token. Fail loud here instead.
-        if (configuration.GetValue<bool>("Mocks:UseMockAi"))
+        if (configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
         {
             throw new InvalidOperationException(
                 "AzureOpenAiService was constructed while Mocks:UseMockAi=true. The DI container "
@@ -40,7 +41,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
                 + "Blocking construction to guarantee zero live token spend in test/dev paths.");
         }
 
-        var endpoint = configuration["OpenAI:Endpoint"];
+        var endpoint = configuration[ConfigKeys.OpenAiEndpoint];
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             _configurationError = "OpenAI:Endpoint is not configured.";
@@ -50,8 +51,8 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         }
 
         // Chat/text only — image generation is handled exclusively by Gemini (IImageGenerationService).
-        var chatDeployment = configuration["OpenAI:ChatCompletionsDeployment"] ?? "gpt-4o";
-        var apiKey = configuration["OpenAI:Key"];
+        var chatDeployment = configuration[ConfigKeys.OpenAiChatCompletionsDeployment] ?? "gpt-4o";
+        var apiKey = configuration[ConfigKeys.OpenAiKey];
 
         var (client, cred) = BuildClientWithCredential(endpoint, apiKey);
         _chatKeyCredential = cred;
@@ -77,7 +78,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
 
     private void RefreshCredentials()
     {
-        var chatKey = _configuration["OpenAI:Key"];
+        var chatKey = _configuration[ConfigKeys.OpenAiKey];
         if (!string.IsNullOrWhiteSpace(chatKey)) _chatKeyCredential?.Update(chatKey);
     }
 
@@ -90,7 +91,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(targetLength, 0);
 
         RefreshCredentials();
-        _logger.LogInformation("Enhancing description. TargetLength={Length}", targetLength);
+        _logger.EnhanceStarting(targetLength);
         var start = Stopwatch.GetTimestamp();
 
         var prompt = $"""
@@ -121,7 +122,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         var enhanced = response.Value.Content[0].Text.Trim();
         var tokens = response.Value.Usage.TotalTokenCount;
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Description enhanced in {Elapsed}ms. Tokens={Tokens}", elapsed, tokens);
+        _logger.EnhanceComplete(elapsed, tokens);
         return (enhanced, tokens, elapsed);
     }
 
@@ -132,7 +133,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         ArgumentNullException.ThrowIfNull(tags);
 
         RefreshCredentials();
-        _logger.LogInformation("Generating meme caption from {Count} tags", tags.Count);
+        _logger.MemeCaptionStarting(tags.Count);
         var start = Stopwatch.GetTimestamp();
 
         var prompt = $$"""
@@ -172,7 +173,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         var top = json.RootElement.GetProperty("topText").GetString() ?? "";
         var bottom = json.RootElement.GetProperty("bottomText").GetString() ?? "";
 
-        _logger.LogInformation("Meme caption generated in {Elapsed}ms", elapsed);
+        _logger.MemeCaptionComplete(elapsed);
         return (top, bottom, tokens, elapsed);
     }
 
@@ -181,7 +182,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
 
         RefreshCredentials();
-        _logger.LogInformation("Describing person via GPT-4o vision. Size={Size} bytes", imageData.Length);
+        _logger.DescribePersonStarting(imageData.Length);
         var start = Stopwatch.GetTimestamp();
 
         var base64 = Convert.ToBase64String(imageData);
@@ -204,7 +205,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
             throw new InvalidOperationException("OpenAI returned an empty response for person description.");
         var description = response.Value.Content[0].Text.Trim().TrimEnd('.');
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("Person described in {Elapsed}ms: {Description}", elapsed, description);
+        _logger.DescribePersonComplete(elapsed, description);
         return description;
     }
 

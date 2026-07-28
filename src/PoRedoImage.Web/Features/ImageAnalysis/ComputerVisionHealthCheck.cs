@@ -1,4 +1,5 @@
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.ImageAnalysis;
 
@@ -22,8 +23,8 @@ public sealed class ComputerVisionHealthCheck : IHealthCheck
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = _configuration["ComputerVision:Endpoint"];
-        var apiKey = _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
+        var endpoint = _configuration[ConfigKeys.ComputerVisionEndpoint];
+        var apiKey = _configuration[ConfigKeys.ComputerVisionApiKey] ?? _configuration[ConfigKeys.ComputerVisionKeyLegacy];
 
         // See OpenAIHealthCheck: an unresolved @Microsoft.KeyVault(...) reference is the
         // cold-start race where the app process started before the platform populated

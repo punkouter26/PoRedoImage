@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Agents;
@@ -9,6 +9,7 @@ using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Repositories;
 using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Infrastructure.Services.Mocks;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure;
 
@@ -28,7 +29,7 @@ public static class InfrastructureServiceExtensions
     public static IServiceCollection AddPoRedoImageInfrastructure(
         this IServiceCollection services, IConfiguration? configuration = null)
     {
-        var useMockAi = configuration?.GetValue<bool>("Mocks:UseMockAi") ?? false;
+        var useMockAi = configuration?.GetValue<bool>(ConfigKeys.MocksUseMockAi) ?? false;
 
         // Domain service implementations (Singleton: clients own long-lived HTTP/SDK resources)
         if (useMockAi)
@@ -72,7 +73,7 @@ public static class InfrastructureServiceExtensions
             // Both concretes register so a config flip needs no redeploy; the flag picks the active one.
             services.AddSingleton<GeminiImagen3Service>();
             services.AddSingleton<HuggingFaceImageGenerationService>();
-            var imageProvider = (configuration?["ImageGen:Provider"] ?? "google").Trim().ToLowerInvariant();
+            var imageProvider = (configuration?[ConfigKeys.ImageGenProvider] ?? "google").Trim().ToLowerInvariant();
             services.AddSingleton<IImageGenerationService>(sp => imageProvider switch
             {
                 "huggingface" or "hf" => sp.GetRequiredService<HuggingFaceImageGenerationService>(),
@@ -115,7 +116,7 @@ public static class InfrastructureServiceExtensions
 
         // Named HttpClient for local Ollama (image-to-text via gemma4 etc.).
         // Long timeout: first call may load the model into memory; no retries (local, fail fast).
-        var ollamaEndpoint = configuration?["Ollama:Endpoint"] ?? "http://localhost:11434";
+        var ollamaEndpoint = configuration?[ConfigKeys.OllamaEndpoint] ?? "http://localhost:11434";
         services.AddHttpClient("Ollama", c =>
         {
             c.BaseAddress = new Uri(ollamaEndpoint);

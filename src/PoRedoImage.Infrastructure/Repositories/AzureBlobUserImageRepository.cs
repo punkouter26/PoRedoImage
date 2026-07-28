@@ -1,4 +1,4 @@
-using Azure;
+﻿using Azure;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Repositories;
 
@@ -30,7 +31,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
     public AzureBlobUserImageRepository(IConfiguration configuration, ILogger<AzureBlobUserImageRepository> logger)
     {
         _logger = logger;
-        var connectionString = configuration["Storage:ConnectionString"];
+        var connectionString = configuration[ConfigKeys.StorageConnectionString];
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             _blobContainer = new BlobServiceClient(connectionString).GetBlobContainerClient(ContainerName);
@@ -63,7 +64,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
     }
 
-    public async Task<string> SaveBlobAsync(string userId, string imageId, byte[] bytes, string contentType, CancellationToken ct = default)
+    public async Task<string> SaveBlobAsync(string userId, UserImageId imageId, byte[] bytes, string contentType, CancellationToken ct = default)
     {
         if (_blobContainer is null) return string.Empty;
         await EnsureInitializedAsync(ct);
@@ -85,7 +86,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         var entity = new UserImageTableEntity
         {
             PartitionKey = image.UserId,
-            RowKey = image.Id,
+            RowKey = image.Id.Value,
             FileName = image.FileName,
             ContentType = image.ContentType,
             Kind = image.Kind.ToString(),
@@ -112,7 +113,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         return results.OrderByDescending(i => i.CreatedAt).ToList().AsReadOnly();
     }
 
-    public async Task<(byte[] Bytes, string ContentType)?> GetBlobAsync(string userId, string imageId, CancellationToken ct = default)
+    public async Task<(byte[] Bytes, string ContentType)?> GetBlobAsync(string userId, UserImageId imageId, CancellationToken ct = default)
     {
         if (_blobContainer is null) return null;
         await EnsureInitializedAsync(ct);
@@ -130,14 +131,14 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
     }
 
-    public async Task<UserImage?> GetMetadataAsync(string userId, string imageId, CancellationToken ct = default)
+    public async Task<UserImage?> GetMetadataAsync(string userId, UserImageId imageId, CancellationToken ct = default)
     {
         if (_tableClient is null) return null;
         await EnsureInitializedAsync(ct);
 
         try
         {
-            var entity = await _tableClient.GetEntityAsync<UserImageTableEntity>(userId, imageId, cancellationToken: ct);
+            var entity = await _tableClient.GetEntityAsync<UserImageTableEntity>(userId, imageId.Value, cancellationToken: ct);
             return MapToDomain(entity.Value);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
@@ -146,7 +147,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
     }
 
-    public async Task DeleteAsync(string userId, string imageId, CancellationToken ct = default)
+    public async Task DeleteAsync(string userId, UserImageId imageId, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct);
 
@@ -160,7 +161,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         {
             try
             {
-                await _tableClient.DeleteEntityAsync(userId, imageId, cancellationToken: ct);
+                await _tableClient.DeleteEntityAsync(userId, imageId.Value, cancellationToken: ct);
             }
             catch (RequestFailedException ex) when (ex.Status == 404)
             {
@@ -174,7 +175,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
     private static UserImage MapToDomain(UserImageTableEntity entity) => new()
     {
         UserId = entity.PartitionKey,
-        Id = entity.RowKey,
+        Id = UserImageId.Parse(entity.RowKey),
         FileName = entity.FileName,
         ContentType = entity.ContentType,
         Kind = Enum.TryParse<UserImageKind>(entity.Kind, out var k) ? k : UserImageKind.Original,

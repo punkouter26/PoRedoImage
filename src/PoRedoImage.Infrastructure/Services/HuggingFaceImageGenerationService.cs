@@ -1,10 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -23,12 +24,12 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
-    private string BaseUrl => (_configuration["HuggingFace:BaseUrl"] ?? "https://router.huggingface.co").TrimEnd('/');
-    private string Provider => _configuration["HuggingFace:Provider"] ?? "fal-ai";
-    private string T2IProviderId => _configuration["HuggingFace:TextToImageProviderId"] ?? "fal-ai/flux/schnell";
-    private string I2IProviderId => _configuration["HuggingFace:ImageToImageProviderId"] ?? "fal-ai/qwen-image-edit";
+    private string BaseUrl => (_configuration[ConfigKeys.HuggingFaceBaseUrl] ?? "https://router.huggingface.co").TrimEnd('/');
+    private string Provider => _configuration[ConfigKeys.HuggingFaceProvider] ?? "fal-ai";
+    private string T2IProviderId => _configuration[ConfigKeys.HuggingFaceTextToImageProviderId] ?? "fal-ai/flux/schnell";
+    private string I2IProviderId => _configuration[ConfigKeys.HuggingFaceImageToImageProviderId] ?? "fal-ai/qwen-image-edit";
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration["HuggingFace:ApiKey"]);
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration[ConfigKeys.HuggingFaceApiKey]);
 
     public HuggingFaceImageGenerationService(
         IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<HuggingFaceImageGenerationService> logger)
@@ -38,7 +39,7 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
         _configuration = configuration;
 
         // Mirror the Gemini guard: never let a real provider construct under mock mode.
-        if (configuration.GetValue<bool>("Mocks:UseMockAi"))
+        if (configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
             throw new InvalidOperationException(
                 "HuggingFaceImageGenerationService was constructed while Mocks:UseMockAi=true — DI should "
                 + "have resolved MockImagen3Service. Blocking to guarantee zero live token spend.");
@@ -66,7 +67,7 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
         var body = new Dictionary<string, object> { ["prompt"] = prompt, ["image_url"] = dataUri };
         if (seed > 0) body["seed"] = seed;
 
-        _logger.LogInformation("Calling HuggingFace (img2img). Provider={Provider}/{Model}, Seed={Seed}", Provider, I2IProviderId, seed);
+        _logger.HuggingFaceImg2ImgStarting(Provider, I2IProviderId, seed);
         return await PostAsync(I2IProviderId, body, ct);
     }
 
@@ -76,7 +77,7 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
         EnsureConfigured();
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        _logger.LogInformation("Calling HuggingFace (text2img). Provider={Provider}/{Model}", Provider, T2IProviderId);
+        _logger.HuggingFaceText2ImgStarting(Provider, T2IProviderId);
         return await PostAsync(T2IProviderId, new Dictionary<string, object> { ["prompt"] = prompt }, ct);
     }
 
@@ -89,20 +90,20 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new AuthenticationHeaderValue(
-            "Bearer", _configuration["HuggingFace:ApiKey"] ?? string.Empty);
+            "Bearer", _configuration[ConfigKeys.HuggingFaceApiKey] ?? string.Empty);
         request.Content = JsonContent.Create(body);
 
         using var response = await client.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("HuggingFace API error {Status}: {Body}", (int)response.StatusCode, errorBody);
+            _logger.HuggingFaceError((int)response.StatusCode, errorBody);
             throw new InvalidOperationException($"HuggingFace API returned {(int)response.StatusCode}: {errorBody}");
         }
 
         var (data, contentType) = await ReadImageAsync(response, client, ct);
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-        _logger.LogInformation("HuggingFace API complete in {Elapsed}ms. Size={Size} bytes", elapsed, data.Length);
+        _logger.HuggingFaceComplete(elapsed, data.Length);
         return (data, contentType, elapsed);
     }
 

@@ -1,9 +1,10 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Azure;
 using Azure.AI.Vision.ImageAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services;
 
@@ -20,16 +21,16 @@ public sealed class AzureVisionService : IVisionService
     private readonly float _minTagConfidence;
     private readonly string? _configurationError;
 
-    private string? CurrentKey => _configuration["ComputerVision:ApiKey"] ?? _configuration["ComputerVision:Key"];
+    private string? CurrentKey => _configuration[ConfigKeys.ComputerVisionApiKey] ?? _configuration[ConfigKeys.ComputerVisionKeyLegacy];
 
     public AzureVisionService(IConfiguration configuration, ILogger<AzureVisionService> logger)
     {
         _logger = logger;
         _configuration = configuration;
 
-        var endpoint = configuration["ComputerVision:Endpoint"];
+        var endpoint = configuration[ConfigKeys.ComputerVisionEndpoint];
         var key = CurrentKey;
-        _minTagConfidence = configuration.GetValue<float>("ComputerVision:MinTagConfidence", 0.6f);
+        _minTagConfidence = configuration.GetValue<float>(ConfigKeys.ComputerVisionMinTagConfidence, 0.6f);
 
         if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(key))
         {
@@ -68,7 +69,7 @@ public sealed class AzureVisionService : IVisionService
         if (!string.IsNullOrWhiteSpace(CurrentKey) && _credential is not null)
             _credential.Update(CurrentKey);
 
-        _logger.LogInformation("Analyzing image via Azure Computer Vision. Size={Size} bytes", imageData.Length);
+        _logger.VisionAnalysisStarting(imageData.Length);
         var start = Stopwatch.GetTimestamp();
 
         // Try with Caption first. Caption is only available in certain Azure regions (e.g. eastus, westeurope).
@@ -88,12 +89,12 @@ public sealed class AzureVisionService : IVisionService
                 .ToList() ?? [];
 
             var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-            _logger.LogInformation("Vision analysis complete in {Elapsed}ms (with caption)", elapsed);
+            _logger.VisionAnalysisComplete(elapsed);
             return (description, tags.AsReadOnly(), confidence, elapsed);
         }
         catch (Azure.RequestFailedException ex) when (ex.Status == 400 && ex.Message.Contains("Caption"))
         {
-            _logger.LogWarning("Caption not supported in this region — retrying with Tags only");
+            _logger.VisionCaptionUnsupported();
 
             var response = await _client!.AnalyzeAsync(
                 BinaryData.FromBytes(imageData),
@@ -111,7 +112,7 @@ public sealed class AzureVisionService : IVisionService
                 : "No description available";
 
             var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
-            _logger.LogInformation("Vision analysis complete in {Elapsed}ms (tags-only fallback)", elapsed);
+            _logger.VisionAnalysisCompleteTagsOnly(elapsed);
             return (description, tags.AsReadOnly(), 0, elapsed);
         }
     }

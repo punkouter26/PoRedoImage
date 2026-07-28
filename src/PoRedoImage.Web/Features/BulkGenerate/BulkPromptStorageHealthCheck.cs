@@ -1,5 +1,6 @@
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Azure.Data.Tables;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.BulkGenerate;
 
@@ -14,7 +15,7 @@ public class BulkPromptStorageHealthCheck : IHealthCheck
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        var connectionString = _configuration["Storage:ConnectionString"];
+        var connectionString = _configuration[ConfigKeys.StorageConnectionString];
 
         // Detect an UNRESOLVED Key Vault reference. App Service returns the literal
         // "@Microsoft.KeyVault(...)" string when the platform could not resolve the

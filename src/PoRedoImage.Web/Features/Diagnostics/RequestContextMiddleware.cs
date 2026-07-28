@@ -10,8 +10,12 @@ namespace PoRedoImage.Web.Features.Diagnostics;
 /// </summary>
 public sealed class RequestContextMiddleware
 {
-    private const string CorrelationHeader = "X-Correlation-ID";
-    private const string SessionHeader = "X-Session-ID";
+    /// <summary>Correlation header name, shared with <see cref="OutboundCorrelationHandler"/>.</summary>
+    public const string CorrelationHeader = "X-Correlation-ID";
+
+    /// <summary>Session header name, shared with <see cref="OutboundCorrelationHandler"/>.</summary>
+    public const string SessionHeader = "X-Session-ID";
+
     private readonly RequestDelegate _next;
 
     public RequestContextMiddleware(RequestDelegate next) => _next = next;
@@ -28,7 +32,10 @@ public sealed class RequestContextMiddleware
 
         context.Response.Headers[CorrelationHeader] = correlationId;
         context.Response.Headers[SessionHeader] = sessionId;
+        // Both land in Items so OutboundCorrelationHandler can re-stamp them on downstream
+        // calls without re-deriving the fallbacks (§3 "through all HTTP calls").
         context.Items[CorrelationHeader] = correlationId;
+        context.Items[SessionHeader] = sessionId;
 
         var userId = context.User?.Identity?.Name ?? "anonymous";
 

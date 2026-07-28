@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using PoRedoImage.Application.Features.UserImages;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Shared.DTOs;
@@ -105,11 +105,12 @@ public static class UserImageEndpoints
         var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null) return Results.Unauthorized();
 
-        // Sanitize id — only allow hex GUIDs (32 hex chars, no separators)
-        if (string.IsNullOrWhiteSpace(id) || id.Length > 64 || !System.Text.RegularExpressions.Regex.IsMatch(id, @"^[a-fA-F0-9]+$"))
+        // UserImageId.TryParse is the single definition of a well-formed id — stricter than the
+        // ad-hoc regex it replaces, which accepted any hex string up to 64 chars.
+        if (!UserImageId.TryParse(id, out var imageId))
             return Results.BadRequest("Invalid image id.");
 
-        var result = await service.GetImageAsync(userId, id, ct);
+        var result = await service.GetImageAsync(userId, imageId, ct);
         if (result is null) return Results.NotFound();
 
         return Results.File(result.Value.Bytes, result.Value.ContentType);
@@ -124,10 +125,10 @@ public static class UserImageEndpoints
         var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null) return Results.Unauthorized();
 
-        if (string.IsNullOrWhiteSpace(id) || id.Length > 64 || !System.Text.RegularExpressions.Regex.IsMatch(id, @"^[a-fA-F0-9]+$"))
+        if (!UserImageId.TryParse(id, out var imageId))
             return Results.BadRequest("Invalid image id.");
 
-        var deleted = await service.DeleteImageAsync(userId, id, ct);
+        var deleted = await service.DeleteImageAsync(userId, imageId, ct);
         return deleted ? Results.NoContent() : Results.NotFound();
     }
 }

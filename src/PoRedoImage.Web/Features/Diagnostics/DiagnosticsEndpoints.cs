@@ -1,6 +1,7 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using PoRedoImage.Domain.Interfaces;
-using PoRedoImage.Web.Features.Auth;
+using PoRedoImage.Web.Features.Shared;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.Diagnostics;
 
@@ -15,10 +16,10 @@ public static partial class DiagnosticsEndpoints
     {
         // In Production this requires a Diagnostics:AdminEmails-listed identity (fail-closed); in
         // non-Production any authenticated user. Prevents arbitrary signed-in users from reading the
-        // (masked) infra topology in prod. See AuthServiceExtensions.DiagnosticsPolicy.
+        // (masked) infra topology in prod. Policy behaviour lives in AuthServiceExtensions.
         var group = app.MapGroup("/api/diag")
             .WithTags("Diagnostics")
-            .RequireAuthorization(AuthServiceExtensions.DiagnosticsPolicy);
+            .RequireAuthorization(AuthorizationPolicies.Diagnostics);
 
         group.MapGet("/", GetDiagnostics)
             .WithName("GetDiagnostics")
@@ -68,18 +69,18 @@ public static partial class DiagnosticsEndpoints
             },
             ["Configuration"] = new Dictionary<string, string?>
             {
-                ["KeyVault:Uri"] = MaskValue(configuration["KeyVault:Uri"]),
-                ["AZURE_KEY_VAULT_ENDPOINT"] = MaskValue(configuration["AZURE_KEY_VAULT_ENDPOINT"]),
-                ["AzureAd:TenantId"] = MaskValue(configuration["AzureAd:TenantId"]),
-                ["AzureAd:ClientId"] = MaskValue(configuration["AzureAd:ClientId"]),
-                ["ComputerVision:Endpoint"] = MaskValue(configuration["ComputerVision:Endpoint"]),
-                ["ComputerVision:ApiKey"] = MaskValue(configuration["ComputerVision:ApiKey"]),
-                ["ComputerVision:MinTagConfidence"] = configuration["ComputerVision:MinTagConfidence"],
-                ["OpenAI:Endpoint"] = MaskValue(configuration["OpenAI:Endpoint"]),
-                ["OpenAI:Key"] = MaskValue(configuration["OpenAI:Key"]),
-                ["OpenAI:ChatCompletionsDeployment"] = configuration["OpenAI:ChatCompletionsDeployment"],
-                ["ApplicationInsights:ConnectionString"] = MaskValue(configuration["ApplicationInsights:ConnectionString"]),
-                ["Storage:ConnectionString"] = MaskValue(configuration["Storage:ConnectionString"])
+                [ConfigKeys.KeyVaultUri] = MaskValue(configuration[ConfigKeys.KeyVaultUri]),
+                [ConfigKeys.AzureKeyVaultEndpoint] = MaskValue(configuration[ConfigKeys.AzureKeyVaultEndpoint]),
+                [ConfigKeys.AzureAdTenantId] = MaskValue(configuration[ConfigKeys.AzureAdTenantId]),
+                [ConfigKeys.AzureAdClientId] = MaskValue(configuration[ConfigKeys.AzureAdClientId]),
+                [ConfigKeys.ComputerVisionEndpoint] = MaskValue(configuration[ConfigKeys.ComputerVisionEndpoint]),
+                [ConfigKeys.ComputerVisionApiKey] = MaskValue(configuration[ConfigKeys.ComputerVisionApiKey]),
+                [ConfigKeys.ComputerVisionMinTagConfidence] = configuration[ConfigKeys.ComputerVisionMinTagConfidence],
+                [ConfigKeys.OpenAiEndpoint] = MaskValue(configuration[ConfigKeys.OpenAiEndpoint]),
+                [ConfigKeys.OpenAiKey] = MaskValue(configuration[ConfigKeys.OpenAiKey]),
+                [ConfigKeys.OpenAiChatCompletionsDeployment] = configuration[ConfigKeys.OpenAiChatCompletionsDeployment],
+                [ConfigKeys.ApplicationInsightsConnectionString] = MaskValue(configuration[ConfigKeys.ApplicationInsightsConnectionString]),
+                [ConfigKeys.StorageConnectionString] = MaskValue(configuration[ConfigKeys.StorageConnectionString])
             }
         };
 

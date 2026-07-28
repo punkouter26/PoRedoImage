@@ -1,5 +1,6 @@
-using Azure.Security.KeyVault.Secrets;
+﻿using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.Diagnostics;
 
@@ -23,7 +24,7 @@ public sealed class KeyVaultHealthCheck : IHealthCheck
         // Resolve the endpoint the same way Program.cs does (KeyVault:Uri is set in Development,
         // AZURE_KEY_VAULT_ENDPOINT in Production), so dev correctly reports Key Vault as active and
         // confirms it is serving real secrets via DefaultAzureCredential (az login / VS).
-        var endpoint = _configuration["KeyVault:Uri"] ?? _configuration["AZURE_KEY_VAULT_ENDPOINT"];
+        var endpoint = _configuration[ConfigKeys.KeyVaultUri] ?? _configuration[ConfigKeys.AzureKeyVaultEndpoint];
         if (string.IsNullOrWhiteSpace(endpoint))
             return HealthCheckResult.Degraded(
                 "No Key Vault endpoint configured (KeyVault:Uri / AZURE_KEY_VAULT_ENDPOINT). "
