@@ -1,28 +1,23 @@
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Infrastructure.Services;
 
 /// <summary>
-/// Routes the vision/analysis step to a local Ollama model when the selected model id is a known
-/// local model, otherwise to the default Azure Computer Vision backend.
+/// Routes the vision/analysis step to the local Ollama service when the selected id is
+/// <c>ollama:</c>-namespaced, otherwise to the default Azure Computer Vision backend.
 /// </summary>
+/// <remarks>
+/// Matching is an explicit namespace check, not a model-name prefix guess. The previous rule
+/// treated any id starting with "qwen" as Ollama, which collides with the browser text model
+/// <c>browser:qwen2.5-0.5b-instruct</c>. Browser ids resolve to Azure here because a browser
+/// selection is executed client-side and should never have reached the server at all — falling back
+/// to the default backend is the safe reading of an id this router should not have seen.
+/// </remarks>
 public sealed class VisionServiceRouter(AzureVisionService azure, OllamaVisionService ollama) : IVisionServiceRouter
 {
-    public IVisionService Resolve(string? modelId) => IsLocalModel(modelId) ? ollama : azure;
-
-    /// <summary>
-    /// Local (Ollama) vision models. Matched by id so the UI catalog and this router stay decoupled.
-    /// </summary>
-    private static bool IsLocalModel(string? modelId)
-    {
-        if (string.IsNullOrWhiteSpace(modelId)) return false;
-        var id = modelId.Trim().ToLowerInvariant();
-        return id.StartsWith("gemma", StringComparison.Ordinal)
-            || id.StartsWith("llama", StringComparison.Ordinal)
-            || id.StartsWith("llava", StringComparison.Ordinal)
-            || id.StartsWith("qwen", StringComparison.Ordinal)
-            || id.StartsWith("ollama", StringComparison.Ordinal);
-    }
+    public IVisionService Resolve(string? modelId) =>
+        AiProviderIds.IsOllama(modelId) ? ollama : azure;
 }
 
 /// <summary>
