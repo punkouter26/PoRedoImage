@@ -17,14 +17,14 @@ param storageAccountName string = 'stporedoimage26'
 @description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
 param storageLocation string = 'eastus'
 
-@description('App Service Plan name — Basic B1 Linux plan in this resource group. Must match EXPECTED_PLAN in .github/workflows/deploy.yml')
-param appServicePlanName string = 'asp-poredoimage-b1'
+@description('Name of the shared App Service Plan to bind the web app to. Lives in the PoShared RG (consolidation target — see ADR-031). New deploys bind here; the legacy in-RG plans (asp-poredoimage-b1 / asp-poredoimage-f1) remain bound to the existing live site until a manual cross-stamp migration is performed.')
+param appServicePlanName string = 'asp-PoShared-b1'
 
-@description('App Service Plan SKU tier. Default is B1 (Basic, ~$13/mo) because the F1 free tier caps CPU at 60 min/day and the cold-start budget made every dev-day deploy burn into the quota. Pass "F1" to revert (NOT recommended for daily deploy cadence).')
-param appServicePlanSkuName string = 'B1'
+@description('Resource group that owns the shared App Service Plan. Defaults to PoShared (the consolidation target).')
+param appServicePlanResourceGroup string = 'PoShared'
 
-@description('App Service Plan region — westus2. East US has no free-tier (F1) Linux VM quota on this subscription, so the plan and web app both live in westus2.')
-param appServicePlanLocation string = 'westus2'
+@description('Region the web app is deployed into. Must match the home stamp of the shared App Service Plan. New plan is westus2; if the shared plan moves regions, update this.')
+param webAppLocation string = 'westus2'
 
 @description('Key Vault endpoint in the PoShared resource group')
 param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
@@ -113,42 +113,39 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
   }
 }
 
-// ─── App Service Plan ───────────────────────────────────────────────────────
-// Basic B1 Linux plan, owned by this resource group. Lives in westus2 because the
-// subscription has no free-tier (F1) Linux VM quota in eastus (the RG region).
-// NOTE: B1 Basic supports Always On and has no daily CPU cap (F1 caps at 60 min/day and
-// burned the quota in a single dev-day). Cost ~$13/mo. The plan binding is asserted
-// post-deploy in CI. The legacy F1 plan (asp-poredoimage-f1) still exists in the RG
-// from a previous config and is now empty — set appServicePlanSkuName="F1" to revert.
-resource appServicePlan 'Microsoft.Web/serverfarms@2024-04-01' = {
+// ─── App Service Plan (existing, shared) ───────────────────────────────────
+// The web app is bound to a SHARED App Service Plan (asp-PoShared-b1) owned by the
+// PoShared resource group — consolidating the per-app B1 plans into one shared
+// capacity pool (see ADR-031). This template only references the existing plan; it
+// does NOT create, update, or delete it. The plan's home stamp is fixed by Azure at
+// creation time, so the live poredoimage-web instance (still bound to its original
+// in-RG plan on a different stamp) cannot be migrated without either an `az webapp
+// clone` (new hostname) or a destroy+recreate. New deploys of a fresh web app to
+// this template land on the shared plan.
+resource sharedAppServicePlan 'Microsoft.Web/serverfarms@2024-04-01' existing = {
   name: appServicePlanName
-  location: appServicePlanLocation
-  kind: 'linux'
-  sku: {
-    name: appServicePlanSkuName
-    tier: appServicePlanSkuName == 'F1' ? 'Free' : 'Basic'
-  }
-  properties: {
-    reserved: true // reserved == true marks this as a Linux plan
-  }
+  scope: resourceGroup(appServicePlanResourceGroup)
 }
 
 // ─── App Service ────────────────────────────────────────────────────────────
-// Bound to the App Service Plan (B1 Basic by default) above. System-assigned
-// managed identity is enabled for Key Vault access.
+// Bound to the SHARED App Service Plan (asp-PoShared-b1 in RG PoShared) referenced
+// above. System-assigned managed identity is enabled for Key Vault access. Note:
+// for the existing live site, ARM keeps the existing serverFarmId if the live site
+// is already bound to a different plan — see the shared-plan comment above for the
+// stamp-affinity caveat that blocks automated re-parenting.
 resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   name: appServiceName
-  location: appServicePlanLocation // must match the App Service Plan region
+  location: webAppLocation
   kind: 'app,linux'
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
-    serverFarmId: appServicePlan.id
+    serverFarmId: sharedAppServicePlan.id
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
-      alwaysOn: appServicePlanSkuName != 'F1' // Always On requires B1+; off for F1 (deploy fails otherwise)
+      alwaysOn: true // Shared plan is B1 Basic (Always On supported); off only for F1 (n/a now)
       appCommandLine: 'dotnet /home/site/wwwroot/PoRedoImage.Web.dll'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
