@@ -1,0 +1,46 @@
+stateDiagram-v2
+  direction TB
+
+  [*] --> ShellRequested
+
+  state "Shell requested" as ShellRequested
+  state "WASM boot mask" as Booting
+  state "Anonymous" as Anon
+  state "Authenticated" as Authed
+  state "Access denied" as Denied
+
+  ShellRequested --> Booting : MapRazorComponents(App)<br/>.AllowAnonymous()
+
+  state Booting {
+    direction TB
+    [*] --> Framework
+    Framework : /_framework/* forced AllowAnonymous
+    Framework : (else fallback policy 302s the boot<br/>manifest and the app never boots)
+    Framework --> Hydrate
+    Hydrate : AddAuthenticationStateSerialization →<br/>AddAuthenticationStateDeserialization
+    Hydrate : claims only, never tokens
+    Hydrate --> [*]
+  }
+
+  Booting --> Anon : no auth cookie
+  Booting --> Authed : cookie valid,<br/>principal deserialized
+
+  state "Engine selection (startup)" as Engine
+  [*] --> Engine
+  Engine : Auth:EnableFakeAuth &amp;&amp; !Production → FakeAuthHandler
+  Engine : AzureAd:ClientId set → Cookie + OpenIdConnect
+  Engine : otherwise (non-prod) → Cookie only
+  Engine : Production without ClientId → throws at startup
+
+  Anon --> Challenging : navigate to [Authorize] page<br/>or GET /challenge-microsoft
+  state "Challenging" as Challenging
+  Challenging --> Authed : OIDC code flow →<br/>/signin-oidc → cookie issued
+  Challenging --> Anon : user cancels
+
+  Anon --> Authed : GET /auth/login/fake<br/>(Dev GUEST only)
+  Anon --> Anon : /api/* → 401 (never a 302)
+
+  Authed --> Denied : /api/diag in Production and<br/>email not in Diagnostics:AdminEmails
+  Denied --> Authed : allow-list updated
+  Authed --> Anon : GET /auth/logout<br/>cookie + OIDC sign-out
+  Authed --> Anon : cookie expires

@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture Audit — PoRedoImage</title>
+<meta name="description" content="C4 models, vertical-slice mapping and request flow for the PoRedoImage Blazor WASM + Minimal API solution.">
+<!--@STYLE-->
+</head>
+<body>
+
+<header class="plate">
+  <div class="wrap plate__inner">
+    <div>
+      <p class="plate__no">Report 02 · Architecture</p>
+      <h1>Six projects, nine slices, one host</h1>
+      <p class="plate__sub">A globally-interactive Blazor WebAssembly UI in front of a Minimal-API
+        backend-for-frontend, arranged in onion layers and cut vertically by feature. This is where each
+        boundary actually falls.</p>
+      <div class="plate__meta">
+        <span>Scope <b>PoRedoImage.slnx · src/**</b></span>
+        <span>Target <b>net10.0</b></span>
+        <span>Commit <b>dc027f3</b></span>
+        <span>Scanned <b>2026-07-28</b></span>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="theme-toggle" type="button">Dark theme</button>
+    </div>
+  </div>
+</header>
+
+<!--@RAIL:ARCHITECTURE_REPORT.html-->
+
+<main class="wrap">
+
+  <section class="sec" id="summary">
+    <div class="sec__head"><span class="sec__n">01</span><h2>Shape of the solution</h2><p>from the solution file and csproj graph</p></div>
+    <div class="tiles">
+      <div class="tile tile--accent"><span class="tile__k">Projects</span><span class="tile__v">6</span><span class="tile__n">Domain · Shared · Application · Infrastructure · Client · Web</span></div>
+      <div class="tile"><span class="tile__k">Endpoint slices</span><span class="tile__v">9</span><span class="tile__n">Minimal-API <code>MapGroup</code> families under <code>/api</code> and <code>/auth</code></span></div>
+      <div class="tile"><span class="tile__k">Routable pages</span><span class="tile__v">10</span><span class="tile__n">All <code>@page</code> components in the Client assembly</span></div>
+      <div class="tile"><span class="tile__k">Render mode</span><span class="tile__v" style="font-size:1.05rem;letter-spacing:-.01em">Global<br>Interactive WASM</span><span class="tile__n">Prerender disabled — the client owns the only DI container</span></div>
+      <div class="tile"><span class="tile__k">Health checks</span><span class="tile__v">5</span><span class="tile__n">All tagged <code>ready</code>; <code>/alive</code> runs none</span></div>
+    </div>
+
+    <div class="note note--accent">
+      <span class="note__k">The defining constraint</span>
+      <strong>The whole UI runs in the browser.</strong> <code>PoRedoImage.Web</code> is an API and BFF host that
+      also happens to serve the shell. Prerendering is deliberately off: the WASM client owns the only DI container
+      holding <code>IWebAssemblyHostEnvironment</code>, <code>ImageSessionService</code> and the deserialized auth
+      state, so a server-side prerender pass could not resolve them. Every architectural decision below follows from
+      that one.
+    </div>
+  </section>
+
+  <section class="sec" id="c4-1">
+    <div class="sec__head"><span class="sec__n">02</span><h2>C4 Level 1 — system context</h2><p>who and what this system talks to</p></div>
+    <div class="card">
+      <div class="card__head"><h3>External dependencies</h3><span class="src src--head">DOCS/_src/diagrams/c4-context.mmd</span></div>
+      <div class="dgm"><!--@SVG:c4-context--></div>
+      <p class="cap">Ollama is drawn dashed: it is a development-only path, reached only when the selected provider
+        id carries the <code>ollama:</code> namespace.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="c4-2">
+    <div class="sec__head"><span class="sec__n">03</span><h2>C4 Level 2 — containers</h2><p>assembly and process boundaries</p></div>
+    <p class="lede">Two runtimes, one origin. The WASM assembly is downloaded by the browser and executes there;
+      the host assembly executes on the server. They share exactly one project — <code>PoRedoImage.Shared</code> —
+      and communicate over same-origin HTTP with a cookie the client cannot read.</p>
+    <div class="card">
+      <div class="card__head"><h3>Container diagram</h3><span class="chip chip--accent chip--flat">also exported as architecture.svg</span><span class="src src--head">_src/diagrams/architecture.mmd</span></div>
+      <div class="dgm"><!--@SVG:architecture--></div>
+    </div>
+  </section>
+
+  <section class="sec" id="c4-3">
+    <div class="sec__head"><span class="sec__n">04</span><h2>C4 Level 3 — slice interaction</h2><p>endpoints, filters, orchestrators, ports</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Inside the BFF host</h3><span class="src src--head">src/PoRedoImage.Web/Features/</span></div>
+      <div class="dgm"><!--@SVG:c4-component--></div>
+      <p class="cap">Slices never reference each other. Where a policy name must be shared —
+        <code>/api/diag</code> requires a policy the Auth slice defines — the <em>name</em> lives in
+        <code>Features/Shared/AuthorizationPolicies.cs</code> so both sides depend on shared vocabulary rather than
+        on one another.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="slices">
+    <div class="sec__head"><span class="sec__n">05</span><h2>Vertical slice matrix</h2><p>page → route → orchestrator</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Blazor pages mapped to Minimal-API groups</h3><span class="src src--head">Client/Pages/*.razor · Web/Features/*Endpoints.cs</span></div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th scope="col">Page</th><th scope="col">Route</th><th scope="col">API group</th><th scope="col">Operations</th><th scope="col">Application layer</th><th scope="col">Cross-cutting</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Studio.razor</b></td><td><code>/</code></td>
+              <td><span class="dim">none — navigation only</span></td>
+              <td><span class="dim">—</span></td>
+              <td><code>ImageSessionService</code> <span class="dim">(client)</span></td>
+              <td><span class="chip chip--mute">Authorize (inherited)</span></td>
+            </tr>
+            <tr>
+              <td><b>ImageRegeneration.razor</b></td><td><code>/image-regeneration</code></td>
+              <td><code>/api/images</code></td>
+              <td><code>POST /analyze</code>, <code>GET /health</code></td>
+              <td><code>ImageAnalysisOrchestrator</code></td>
+              <td><span class="chip chip--ok">Authorize</span> <span class="chip chip--accent">Rate limit</span> <span class="chip chip--accent">Validation</span></td>
+            </tr>
+            <tr>
+              <td><b>MemeGeneration.razor</b></td><td><code>/meme-generation</code></td>
+              <td><code>/api/images</code> · <code>/api/meme-templates</code></td>
+              <td><code>POST /analyze</code> (Mode = MemeGeneration), <code>GET /</code>, <code>GET /{id}</code>, <code>POST /render</code></td>
+              <td><code>ImageAnalysisOrchestrator</code> → <code>IMemeGeneratorService</code></td>
+              <td><span class="chip chip--ok">Authorize</span> <span class="chip chip--accent">HybridCache</span></td>
+            </tr>
+            <tr>
+              <td><b>BulkGenerate.razor</b><br><span class="dim">+ BulkGallery, BulkImageModal, BulkPromptEditor</span></td>
+              <td><code>/bulk-generate</code></td>
+              <td><code>/api/bulk-generate</code> <span class="dim">(two groups)</span></td>
+              <td><code>GET/POST /prompts</code> · <code>POST /describe</code>, <code>/variation</code>, <code>/reroll</code></td>
+              <td><code>IBulkPromptRepository</code>, <code>IImageGenerationRouter</code></td>
+              <td><span class="chip chip--ok">Authorize</span> <span class="chip chip--accent">Idempotency</span> <span class="chip chip--accent">Rate limit</span></td>
+            </tr>
+            <tr>
+              <td><b>StyleDirector.razor</b></td><td><code>/style-director</code></td>
+              <td><code>/api/style-director</code></td><td><code>POST /run</code></td>
+              <td><code>StyleDirectorWorkflow</code> — 4 sequential agents</td>
+              <td><span class="chip chip--ok">Authorize</span></td>
+            </tr>
+            <tr>
+              <td><b>RapRoast.razor</b></td><td><code>/rap-roast</code></td>
+              <td><code>/api/rap-roast</code></td><td><code>POST /</code></td>
+              <td><code>RapRoastOrchestrator</code> → <code>SceneDescriber</code>, <code>RoastLyricsWriter</code></td>
+              <td><span class="chip chip--ok">Authorize</span> <span class="chip chip--accent">Rate limit</span> <span class="chip chip--accent">Validation</span></td>
+            </tr>
+            <tr>
+              <td><b>Diag.razor</b></td><td><code>/diag</code></td>
+              <td><code>/api/diag</code></td><td><code>GET /</code>, <code>GET /mock-status</code></td>
+              <td><span class="dim">none — reads config + health directly</span></td>
+              <td><span class="chip chip--crit">DiagnosticsAccess policy</span></td>
+            </tr>
+            <tr>
+              <td><b>Login.razor</b></td><td><code>/login</code></td>
+              <td><code>/auth/*</code></td>
+              <td><code>/auth/login/microsoft</code>, <code>/auth/login/fake</code>, <code>/auth/logout</code>, <code>/auth/me</code></td>
+              <td><span class="dim">—</span></td>
+              <td><span class="chip chip--mute">AllowAnonymous</span></td>
+            </tr>
+            <tr>
+              <td><b>NotFound.razor</b></td><td><code>/not-found</code></td>
+              <td><span class="dim">—</span></td><td><span class="dim">—</span></td><td><span class="dim">—</span></td>
+              <td><span class="chip chip--mute">AllowAnonymous</span></td>
+            </tr>
+            <tr>
+              <td><b>Error.razor</b></td><td><code>/Error</code></td>
+              <td><span class="dim">—</span></td><td><span class="dim">—</span></td><td><span class="dim">—</span></td>
+              <td><span class="chip chip--warn">Authorize (inherited)</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Two API groups share the <code>/api/bulk-generate</code> prefix on purpose: the prompt-CRUD group
+        carries <code>RequireAuthorization</code> plus the idempotency filter, while the AI group carries the rate
+        limiter. Splitting them keeps a cheap prompt save out of the AI budget.
+        <code>/api/pricing</code> is mapped directly, without a group.</p>
+    </div>
+
+    <div class="note note--warn">
+      <span class="note__k">Observation</span>
+      <code>Error.razor</code> carries no <code>[AllowAnonymous]</code>, so it inherits the assembly-wide
+      <code>[Authorize]</code> from <code>_Imports.razor</code>. An unauthenticated user hitting an error is
+      redirected to <code>/login</code> rather than shown the error page. That is coherent with the forced-login
+      posture, but it does mean the error page is unreachable in exactly the state most likely to produce one.
+    </div>
+  </section>
+
+  <section class="sec" id="flow">
+    <div class="sec__head"><span class="sec__n">06</span><h2>Request flow</h2><p>browser action to provider and back</p></div>
+    <div class="card">
+      <div class="card__head"><h3><code>POST /api/images/analyze</code></h3><span class="src src--head">_src/diagrams/request-flow.mmd</span></div>
+      <div class="dgm dgm--wide"><!--@SVG:request-flow--></div>
+    </div>
+
+    <div class="grid2" style="margin-top:1rem">
+      <div class="card">
+        <div class="card__head"><h3>Middleware order (as registered)</h3><span class="src src--head">Web/Program.cs</span></div>
+        <div class="card__body">
+          <dl class="defs">
+            <div><dt>1 · Exception</dt><dd>Non-Development only: <code>UseExceptionHandler("/Error")</code> + HSTS</dd></div>
+            <div><dt>2 · Status pages</dt><dd>Re-execute to <code>/not-found</code> — <strong>only for non-<code>/api</code> paths</strong>, so API callers keep their real 4xx/5xx instead of a 302</dd></div>
+            <div><dt>3 · HTTPS</dt><dd>Redirect skipped in Development so the E2E suite on <code>http://localhost:4000</code> sees real status codes</dd></div>
+            <div><dt>4 · Request context</dt><dd>Correlation + session ids into headers, <code>HttpContext.Items</code> and the Serilog <code>LogContext</code></dd></div>
+            <div><dt>5 · Request logging</dt><dd>One structured entry per request with timing and status</dd></div>
+            <div><dt>6 · Rate limiter</dt><dd>Policy <code>ai-endpoints</code>, 429 on rejection</dd></div>
+            <div><dt>7 · Antiforgery</dt><dd>Before authentication</dd></div>
+            <div><dt>8 · Authentication</dt><dd>Cookie, or Cookie + OIDC, or FakeAuth</dd></div>
+            <div><dt>9 · Framework opt-out</dt><dd>Tags <code>/_framework</code> endpoints <code>AllowAnonymous</code> before the fallback policy sees them</dd></div>
+            <div><dt>10 · Authorization</dt><dd>Fail-closed fallback policy</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Why step 9 exists</h3><span class="chip chip--crit chip--flat">blank-page class of bug</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.88rem">Most WASM boot assets are static files, covered by
+            <code>MapStaticAssets().AllowAnonymous()</code>. The runtime-generated boot manifest
+            (<code>resource-collection.js</code>) is <strong>not</strong> a static asset, so that opt-out misses it.</p>
+          <p style="font-size:.88rem">The fail-closed fallback policy would then 302 it to <code>/login</code>. The
+            browser follows the redirect, receives login HTML where it expected a JS module, fails the
+            subresource-integrity check, and never boots — a blank page with no useful error.</p>
+          <p style="font-size:.88rem;margin-bottom:0">The middleware re-tags any <code>/_framework</code> endpoint that
+            lacks an explicit authorization opt-out. Routing has already matched by that point, so the rewrite is
+            precise: every endpoint without the <code>/_framework</code> prefix stays fail-closed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="platform">
+    <div class="sec__head"><span class="sec__n">07</span><h2>Platform decisions worth knowing</h2><p>set once in Program.cs and Directory.Build.props</p></div>
+    <div class="grid3">
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">JSON</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">Source-generated serialization via <code>SharedJsonContext</code>,
+        combined <em>after</em> the default reflection resolver so anonymous types (health responses) still work.
+        Reflection-free and trim-safe on the DTO path.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">Options</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem"><code>OpenAiOptions</code> and <code>StorageOptions</code> bind with
+        <code>ValidateOnStart</code> and a custom <code>IValidateOptions&lt;T&gt;</code>, so Key Vault rotation stays
+        hot-reloadable while missing required fields fail at boot.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">Resilience</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">The BFF's own client and both AI clients use the standard handler.
+        The circuit-breaker sampling window is set to 4 minutes — deliberately ≥ 2× the 2-minute attempt timeout,
+        which the handler requires.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">Build</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem"><code>TreatWarningsAsErrors</code> with
+        <code>NuGetAuditMode=all</code> and <code>NuGetAuditLevel=low</code>. Vulnerability warnings are
+        <strong>not</strong> suppressed — a vulnerable dependency breaks the build.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">Versioning</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">MinVer derives assembly versions from git tags; no version number
+        is checked into a project file.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">Caching</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem"><code>HybridCache</code> gives an L1 tier with stampede
+        protection — consumed today only by the immutable meme-template catalog; the L2 tier activates when a
+        distributed cache is registered.</p>
+      </div></div>
+    </div>
+  </section>
+
+</main>
+
+<footer><div class="wrap">
+  <p>PoRedoImage architecture audit · report 02 of 8 · generated from commit dc027f3 on 2026-07-28</p>
+  <p>Diagrams compiled offline to SVG with mermaid-cli; one pass per theme.</p>
+</div></footer>
+
+<!--@SHELL-->
+</body>
+</html>

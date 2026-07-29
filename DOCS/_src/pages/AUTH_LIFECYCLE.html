@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth Lifecycle Audit — PoRedoImage</title>
+<meta name="description" content="Authentication engine selection, BFF cookie handshake, correlation propagation and the WASM boot mask.">
+<!--@STYLE-->
+</head>
+<body>
+
+<header class="plate">
+  <div class="wrap plate__inner">
+    <div>
+      <p class="plate__no">Report 04 · Auth Lifecycle</p>
+      <h1>Three engines, one cookie, zero tokens in the browser</h1>
+      <p class="plate__sub">Which authentication pipeline gets built is decided once at startup by configuration and
+        environment. Everything downstream — the handshake, the boot mask, the 401-not-302 rule — follows from that
+        choice.</p>
+      <div class="plate__meta">
+        <span>Scope <b>Web/Features/Auth · Program.cs · Client/Http</b></span>
+        <span>Commit <b>dc027f3</b></span>
+        <span>Scanned <b>2026-07-28</b></span>
+      </div>
+    </div>
+    <div class="toolbar"><button class="btn" id="theme-toggle" type="button">Dark theme</button></div>
+  </div>
+</header>
+
+<!--@RAIL:AUTH_LIFECYCLE.html-->
+
+<main class="wrap">
+
+  <section class="sec" id="summary">
+    <div class="sec__head"><span class="sec__n">01</span><h2>Posture</h2><p>defaults, and what they fail to</p></div>
+    <div class="tiles">
+      <div class="tile tile--accent"><span class="tile__k">Default policy</span><span class="tile__v" style="font-size:1.15rem;letter-spacing:-.01em">Fail&#8209;closed</span><span class="tile__n"><code>FallbackPolicy = RequireAuthenticatedUser</code> — an un-annotated endpoint is protected, never open</span></div>
+      <div class="tile"><span class="tile__k">Auth engines</span><span class="tile__v">3</span><span class="tile__n">FakeAuth · Cookie-only · Cookie + OIDC</span></div>
+      <div class="tile tile--ok"><span class="tile__k">Tokens in the browser</span><span class="tile__v">0</span><span class="tile__n"><code>SaveTokens = false</code>; the client receives serialized claims only</span></div>
+      <div class="tile"><span class="tile__k">Anonymous opt-outs</span><span class="tile__v">6</span><span class="tile__n">Static assets · <code>/_framework</code> · <code>/health</code> · <code>/alive</code> · <code>/auth/*</code> · OpenAPI &amp; Scalar</span></div>
+      <div class="tile tile--warn"><span class="tile__k">Prod guardrails</span><span class="tile__v">3</span><span class="tile__n">FakeAuth throws · missing ClientId throws · diagnostics allow-list defaults to deny</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="engine">
+    <div class="sec__head"><span class="sec__n">02</span><h2>The auth engine switch</h2><p>evaluated once, in <code>AddPoRedoImageAuth</code></p></div>
+    <p class="lede">Three mutually exclusive branches. The order matters: the fake-auth bypass is checked first and
+      returns early, so when it is active no cookie or OIDC handler is ever registered.</p>
+
+    <div class="card">
+      <div class="card__head"><h3>Selection order</h3><span class="src src--head">Features/Auth/AuthServiceExtensions.cs</span></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">#</th><th scope="col">Condition</th><th scope="col">Pipeline built</th><th scope="col">Identity source</th><th scope="col">Used by</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="num">1</td>
+              <td><code>Auth:EnableFakeAuth = true</code><br><b>and not Production</b></td>
+              <td><code>FakeAuthHandler</code> only — returns early</td>
+              <td><code>X-Fake-User</code> header, optional <code>X-Fake-Roles</code> (comma-separated)</td>
+              <td>Headless Playwright golden-path suites</td>
+            </tr>
+            <tr>
+              <td class="num">2</td>
+              <td><code>AzureAd:ClientId</code> is set</td>
+              <td>Cookie + OpenIdConnect</td>
+              <td>Microsoft Entra ID, authorization-code flow</td>
+              <td>Production and any configured environment</td>
+            </tr>
+            <tr>
+              <td class="num">3</td>
+              <td>No <code>ClientId</code>, <b>and not Production</b></td>
+              <td>Cookie only</td>
+              <td><code>/auth/login/fake</code> GUEST sign-in</td>
+              <td>Local F5 loop and the integration test host</td>
+            </tr>
+            <tr>
+              <td class="num">—</td>
+              <td>No <code>ClientId</code> <b>in Production</b></td>
+              <td><span class="chip chip--crit">Throws at startup</span></td>
+              <td>—</td>
+              <td>Never reached in a healthy deployment</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Branch 3 was previously gated on <code>IsDevelopment()</code> alone. That let the Test
+        environment fall through to the OIDC branch and construct the handler with an empty <code>ClientId</code>,
+        which threw and took down the entire integration suite — the reason the condition is now
+        <em>not Production</em> rather than <em>is Development</em>.</p>
+    </div>
+
+    <div class="grid2" style="margin-top:1rem">
+      <div class="card">
+        <div class="card__head"><h3>FakeAuth — how it is fenced off</h3><span class="chip chip--warn chip--flat">Header-driven identity</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.88rem">A request authenticates itself by sending
+            <code>X-Fake-User</code>. Any caller can therefore assume any identity and any role set — which is
+            exactly what makes it useful for tests and catastrophic in production.</p>
+          <dl class="defs">
+            <div><dt>Fence 1</dt><dd>Registration is guarded by <code>!environment.IsProduction()</code>.</dd></div>
+            <div><dt>Fence 2</dt><dd>The handler's <strong>constructor throws</strong> in Production — defence in depth, so even a misconfigured registration cannot start the app.</dd></div>
+            <div><dt>Graceful absence</dt><dd>No <code>X-Fake-User</code> header returns <code>NoResult</code>, so anonymous endpoints still serve and protected ones return 401 — identical to the real pipeline.</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Entra ID token validation</h3><span class="src src--head">AddOpenIdConnect</span></div>
+        <div class="card__body">
+          <dl class="defs">
+            <div><dt>Authority</dt><dd><code>login.microsoftonline.com/{tenant}/v2.0</code>, tenant defaulting to <code>common</code></dd></div>
+            <div><dt>Flow</dt><dd><code>response_type=code</code>, scopes <code>openid profile email</code>, claims fetched from the userinfo endpoint</dd></div>
+            <div><dt>Tokens</dt><dd><code>SaveTokens = false</code> — nothing is persisted into the cookie</dd></div>
+            <div><dt>Issuer — allow-list set</dt><dd><code>AzureAd:AllowedTenantIds</code> pins <code>ValidIssuers</code> to those tenants exactly</dd></div>
+            <div><dt>Issuer — allow-list absent</dt><dd>A custom validator accepts any issuer that both starts <code>https://login.microsoftonline.com/</code> and ends <code>/v2.0</code>, and throws otherwise. This keeps multi-tenant and personal-account sign-in working while still rejecting malformed issuer strings.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="states">
+    <div class="sec__head"><span class="sec__n">03</span><h2>State diagram</h2><p>including the WASM boot mask</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Authentication states and transitions</h3><span class="src src--head">_src/diagrams/auth-state.mmd</span></div>
+      <div class="dgm dgm--wide"><!--@SVG:auth-state--></div>
+      <p class="cap">The <em>boot mask</em> is the window between the shell being served and the WASM runtime
+        hydrating the deserialized principal. During it there is no <code>AuthenticationState</code> at all — which
+        is why the boot assets must load anonymously.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="handshake">
+    <div class="sec__head"><span class="sec__n">04</span><h2>Handshake &amp; correlation</h2><p>cookie issue, then header propagation</p></div>
+    <div class="card">
+      <div class="card__head"><h3>BFF handshake</h3><span class="src src--head">_src/diagrams/auth-handshake.mmd</span></div>
+      <div class="dgm dgm--wide"><!--@SVG:auth-handshake--></div>
+    </div>
+
+    <div class="grid2" style="margin-top:1rem">
+      <div class="card">
+        <div class="card__head"><h3>Cookie hardening</h3><span class="src src--head">HardenCookie()</span></div>
+        <div class="card__body">
+          <dl class="defs">
+            <div><dt>HttpOnly</dt><dd><strong>true</strong> — never readable by WASM or JavaScript. This is the property the whole BFF model rests on.</dd></div>
+            <div><dt>SameSite</dt><dd><strong>Strict</strong> — not sent on cross-site navigations. The OIDC nonce and correlation cookies keep their own <code>SameSite=None; Secure</code> defaults so the handshake still completes.</dd></div>
+            <div><dt>Secure</dt><dd><code>Always</code> outside Development; <code>SameAsRequest</code> locally so the <code>http://localhost:4000</code> F5 loop works.</dd></div>
+            <div><dt>Login path</dt><dd><code>/login</code>. Access-denied goes to <code>/access-denied</code> under OIDC and to <code>/login</code> under cookie-only.</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Correlation chain</h3><span class="chip chip--accent chip--flat">browser → BFF → provider</span></div>
+        <div class="card__body">
+          <dl class="defs">
+            <div><dt>Client stamps</dt><dd><code>X-Session-ID</code> — stable per browser tab. <code>X-Correlation-ID</code> — fresh per request. Existing headers are <strong>never overwritten</strong>, so a caller correlating its own retry keeps its id.</dd></div>
+            <div><dt>Server reads</dt><dd><code>RequestContextMiddleware</code> takes both, generates fallbacks (a GUID; <code>TraceIdentifier</code> for session), echoes them in the response, and stores them in <code>HttpContext.Items</code>.</dd></div>
+            <div><dt>Logging</dt><dd><code>CorrelationId</code>, <code>UserId</code> and <code>SessionId</code> are pushed into the Serilog <code>LogContext</code> for the whole request scope.</dd></div>
+            <div><dt>Outbound leg</dt><dd><code>OutboundCorrelationHandler</code> re-stamps both headers on the <code>Ollama</code>, <code>GeminiApi</code> and <code>HuggingFaceApi</code> named clients — re-opened by name in <code>Program.cs</code> because <code>Infrastructure</code> is a plain project and cannot see <code>IHttpContextAccessor</code>.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="rules">
+    <div class="sec__head"><span class="sec__n">05</span><h2>Two rules that keep the SPA working</h2><p>both are load-bearing</p></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card__head"><h3>API callers get 401, never 302</h3><span class="chip chip--ok chip--flat">enforced in two places</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.88rem">A WASM <code>fetch</code> follows redirects transparently. Without
+            this rule a call to a protected route would silently receive login HTML with status 200 and fail in a way
+            that is very hard to diagnose.</p>
+          <dl class="defs">
+            <div><dt>Cookie handler</dt><dd><code>OnRedirectToLogin</code> → sets 401 when the path starts <code>/api</code>, otherwise redirects normally.</dd></div>
+            <div><dt>OIDC handler</dt><dd><code>OnRedirectToIdentityProvider</code> → sets 401 and calls <code>HandleResponse()</code> for <code>/api</code> paths, suppressing the jump to Microsoft.</dd></div>
+            <div><dt>Status-code pages</dt><dd><code>UseStatusCodePagesWithReExecute</code> is wrapped in <code>UseWhen(!path.StartsWith("/api"))</code>, so an API 404 stays a 404.</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>The <code>/_framework</code> opt-out</h3><span class="chip chip--crit chip--flat">without it: blank page</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.88rem">The whole UI — including <code>/login</code> — is Interactive
+            WebAssembly and cannot boot without its runtime assets. Most are static files covered by
+            <code>MapStaticAssets().AllowAnonymous()</code>.</p>
+          <p style="font-size:.88rem">The runtime-generated boot manifest
+            <code>resource-collection.js</code> is <strong>not</strong> a static asset, so the fail-closed fallback
+            policy 302s it to <code>/login</code>. The browser follows, gets HTML instead of a JS module, fails the
+            subresource-integrity check, and renders nothing.</p>
+          <p style="font-size:.88rem;margin-bottom:0">The mitigation re-tags any <code>/_framework</code> endpoint
+            lacking an explicit <code>IAllowAnonymous</code> — after routing has matched, before authorization
+            evaluates. Everything without that prefix stays fail-closed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="routes">
+    <div class="sec__head"><span class="sec__n">06</span><h2>Auth endpoints</h2><p>all anonymous by necessity</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Route inventory</h3><span class="src src--head">Features/Auth/AuthEndpoints.cs</span></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">Route</th><th scope="col">Purpose</th><th scope="col">Environment</th><th scope="col">Authorization</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /auth/login/microsoft</code></td><td>Begin the OIDC challenge</td><td>Any with <code>ClientId</code></td><td><span class="chip chip--mute">AllowAnonymous</span></td></tr>
+            <tr><td><code>GET /challenge-microsoft</code></td><td>Legacy alias for the same challenge</td><td>Any with <code>ClientId</code></td><td><span class="chip chip--mute">AllowAnonymous</span></td></tr>
+            <tr><td><code>GET /auth/login/fake</code></td><td>GUEST sign-in — issues a cookie for a supplied email or guest id</td><td><span class="chip chip--warn">Non-Production</span></td><td><span class="chip chip--mute">AllowAnonymous</span></td></tr>
+            <tr><td><code>GET /dev-login</code></td><td>Legacy alias for GUEST sign-in</td><td><span class="chip chip--warn">Non-Production</span></td><td><span class="chip chip--mute">AllowAnonymous</span></td></tr>
+            <tr><td><code>GET /auth/logout</code></td><td>Cookie sign-out, plus OIDC sign-out when configured</td><td>Any</td><td><span class="chip chip--mute">AllowAnonymous</span></td></tr>
+            <tr><td><code>GET /logout</code></td><td>Legacy alias for sign-out</td><td>Any</td><td><span class="chip chip--mute">AllowAnonymous</span></td></tr>
+            <tr><td><code>GET /auth/me</code></td><td>Report the current principal to the client</td><td>Any</td><td><span class="chip chip--mute">AllowAnonymous</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">All seven must be anonymous — a sign-in route that required authentication could never be
+        reached. The <em>environment</em> column is the real control on the two GUEST routes.</p>
+    </div>
+
+    <div class="note note--warn">
+      <span class="note__k">Worth reviewing</span>
+      Each auth route exists twice: a namespaced <code>/auth/*</code> form and a bare legacy alias
+      (<code>/dev-login</code>, <code>/challenge-microsoft</code>, <code>/logout</code>). Both sets are live. Retiring
+      the aliases once nothing links to them would halve this table and remove three anonymous routes from the
+      surface.
+    </div>
+  </section>
+
+</main>
+
+<footer><div class="wrap">
+  <p>PoRedoImage auth-lifecycle audit · report 04 of 8 · generated from commit dc027f3 on 2026-07-28</p>
+  <p>State and sequence diagrams compiled offline; both themes rendered separately.</p>
+</div></footer>
+
+<!--@SHELL-->
+</body>
+</html>

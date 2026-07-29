@@ -1,0 +1,50 @@
+---
+title: C4 Level 2 — Container & Assembly Boundaries
+---
+flowchart TB
+  browser["<b>Browser</b>"]
+
+  subgraph wasm["PoRedoImage.Client — WebAssembly (runs in the browser)"]
+    direction TB
+    pages["Feature pages<br/><small>Studio · ImageRegeneration · MemeGeneration<br/>BulkGenerate · StyleDirector · RapRoast · Diag</small>"]
+    localai["LocalAi runtime<br/><small>Florence-2 via transformers.js<br/>Qwen2.5 via WebLLM · WebGPU→wasm chain</small>"]
+    corr["CorrelationHeaderHandler<br/><small>X-Session-ID · X-Correlation-ID</small>"]
+    authsp["AuthenticationStateProvider<br/><small>deserialized claims — never tokens</small>"]
+  end
+
+  subgraph host["PoRedoImage.Web — BFF host (ASP.NET Core, .NET 10)"]
+    direction TB
+    mw["Middleware pipeline<br/><small>RequestContext → RateLimiter → Antiforgery<br/>→ Authn → _framework AllowAnonymous → Authz</small>"]
+    slices["Minimal-API vertical slices<br/><small>9 MapGroups under /api</small>"]
+    hc["Health checks<br/><small>key-vault · computer-vision · openai<br/>table-storage · imagen3</small>"]
+  end
+
+  subgraph core["Application + Domain (framework-free)"]
+    direction TB
+    orch["Orchestrators<br/><small>ImageAnalysis · RapRoast · StyleDirector workflow</small>"]
+    ifaces["Domain interfaces<br/><small>IVisionService · IGenerativeAiService<br/>IImageGenerationRouter · IChatCompletionService …</small>"]
+  end
+
+  subgraph infra["PoRedoImage.Infrastructure — adapters"]
+    direction TB
+    real["Live adapters<br/><small>AzureOpenAi · AzureVision · AzureSceneDetail<br/>GeminiImagen3 · Lyria · HuggingFace · Ollama</small>"]
+    mocks["Mock adapters<br/><small>Mocks:UseMockAi — IMockable, zero network</small>"]
+    repos["Repositories<br/><small>AzureBlobUserImage · AzureTableBulkPrompt</small>"]
+  end
+
+  shared["PoRedoImage.Shared<br/><small>DTOs · ConfigKeys · AiProviderIds · JSON source-gen</small>"]
+
+  browser --> wasm
+  pages --> corr
+  corr -->|"same-origin fetch, cookie flows"| mw
+  mw --> slices
+  slices --> orch
+  orch --> ifaces
+  ifaces -.->|"DI binds one"| real
+  ifaces -.->|"DI binds one"| mocks
+  slices --> repos
+  wasm -.-> shared
+  host -.-> shared
+  infra -.-> shared
+  pages --> localai
+  authsp -.->|"serialized principal"| mw

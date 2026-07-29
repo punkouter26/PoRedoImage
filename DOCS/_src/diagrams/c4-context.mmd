@@ -1,0 +1,29 @@
+flowchart TB
+  person["Signed-in user<br/><small>Microsoft Entra account, or GUEST in Dev</small>"]
+
+  subgraph sys["PoRedoImage"]
+    app["Blazor WASM Studio + BFF host<br/><small>PoRedoImage.Web — .NET 10</small>"]
+  end
+
+  entra["Microsoft Entra ID<br/><small>OIDC code flow, /signin-oidc</small>"]
+  acv["Azure AI Vision<br/><small>tags · caption · OCR · dense captions</small>"]
+  aoai["Azure OpenAI<br/><small>gpt-5.4-nano chat completions</small>"]
+  goog["Google Generative Language<br/><small>Gemini 2.5 Flash Image · Lyria 3</small>"]
+  hf["HuggingFace Router<br/><small>Qwen2.5 chat + Qwen2.5-VL vision</small>"]
+  ollama["Ollama<br/><small>localhost:11434 — dev only</small>"]
+  stor["Azure Storage<br/><small>Blob: user-images · Table: UserImages, BulkPrompts</small>"]
+  kv["Azure Key Vault<br/><small>secrets, 30-min refresh</small>"]
+  appi["Application Insights<br/><small>Serilog + OpenTelemetry</small>"]
+
+  person -->|"HTTPS · HttpOnly cookie"| app
+  app -->|"OIDC challenge"| entra
+  app --> acv
+  app --> aoai
+  app --> goog
+  app --> hf
+  app -.->|"dev only"| ollama
+  app --> stor
+  app --> kv
+  app --> appi
+
+  classDef edge fill:none,stroke-dasharray:3 3

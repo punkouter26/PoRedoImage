@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roles &amp; Permissions Matrix — PoRedoImage</title>
+<meta name="description" content="Interactive access-control matrix evaluating anonymous, user, admin and system principals against every endpoint, gateway and UI route.">
+<!--@STYLE-->
+<style>
+  .rolebar {
+    display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
+    padding: .75rem .9rem; margin-bottom: 1.25rem;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; box-shadow: var(--shadow);
+  }
+  .rolebar__k {
+    font-family: var(--mono); font-size: .64rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3); margin-right: .3rem;
+  }
+  .rolebar .btn { font-size: .7rem; }
+  .rolebar__env { margin-left: auto; display: flex; gap: .4rem; align-items: center; }
+
+  .verdict { display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; white-space: nowrap; }
+  .verdict::before {
+    content: ""; width: 9px; height: 9px; border-radius: 2px; flex: none;
+    background: var(--_c); box-shadow: 0 0 0 2px var(--surface);
+  }
+  /* Shape is carried by the glyph, not by colour alone. */
+  .v-allow  { --_c: var(--ok);   color: var(--ok-ink); }
+  .v-deny   { --_c: var(--crit); color: var(--crit-ink); }
+  .v-cond   { --_c: var(--warn); color: var(--warn-ink); }
+  .v-na     { --_c: var(--ink-3); color: var(--ink-3); }
+  .verdict b { font-weight: 650; }
+  .verdict small { color: var(--ink-3); font-weight: 400; }
+
+  td.cell { text-align: left; }
+  tr[data-hit="1"] td { background: var(--accent-wash) !important; }
+</style>
+</head>
+<body>
+
+<header class="plate">
+  <div class="wrap plate__inner">
+    <div>
+      <p class="plate__no">Report 07 · Roles &amp; Permissions</p>
+      <h1>Who can reach what</h1>
+      <p class="plate__sub">This application has exactly one authorization <em>policy</em> and no role checks at all.
+        That is a finding, not an omission in this report — and the matrix below shows precisely where role-based
+        control would attach if it were added.</p>
+      <div class="plate__meta">
+        <span>Scope <b>Web/Features/**Endpoints.cs · Client/Pages/*.razor · _Imports.razor</b></span>
+        <span>Commit <b>dc027f3</b></span>
+        <span>Scanned <b>2026-07-28</b></span>
+      </div>
+    </div>
+    <div class="toolbar"><button class="btn" id="theme-toggle" type="button">Dark theme</button></div>
+  </div>
+</header>
+
+<!--@RAIL:ROLES_PERMISSIONS_MATRIX.html-->
+
+<main class="wrap">
+
+  <section class="sec" id="finding">
+    <div class="sec__head"><span class="sec__n">01</span><h2>The authorization model</h2><p>as implemented, not as assumed</p></div>
+
+    <div class="tiles">
+      <div class="tile tile--accent"><span class="tile__k">Named policies</span><span class="tile__v">1</span><span class="tile__n"><code>DiagnosticsAccess</code> — the only policy in the codebase</span></div>
+      <div class="tile tile--warn"><span class="tile__k">Role requirements</span><span class="tile__v">0</span><span class="tile__n">No <code>RequireRole</code>, no <code>[Authorize(Roles=…)]</code>, no <code>AuthorizeView Roles</code></span></div>
+      <div class="tile"><span class="tile__k">Protected API groups</span><span class="tile__v">8</span><span class="tile__n">Of 9 — plus the fail-closed fallback catching anything unannotated</span></div>
+      <div class="tile"><span class="tile__k">Anonymous routes</span><span class="tile__v">12</span><span class="tile__n">7 auth routes, 2 health, 2 docs, 1 mock-status</span></div>
+      <div class="tile tile--ok"><span class="tile__k">Ownership checks</span><span class="tile__v">1</span><span class="tile__n">Gallery images are partitioned by the caller's own <code>NameIdentifier</code></span></div>
+    </div>
+
+    <div class="note note--warn">
+      <span class="note__k">Principal finding</span>
+      <strong>Authorization here is binary — authenticated or not — with one email allow-list on top.</strong>
+      <code>FakeAuthHandler</code> can mint role claims from <code>X-Fake-Roles</code>, and the rate limiter reads
+      <code>NameIdentifier</code>, but <em>nothing in the application ever tests a role claim</em>. The
+      <code>User</code>, <code>Admin</code> and <code>System</code> columns below therefore evaluate identically
+      everywhere except <code>/api/diag</code>, where the discriminator is a configured email list rather than a
+      role. Toggling the principal in the matrix makes that collapse visible.
+    </div>
+  </section>
+
+  <section class="sec" id="matrix">
+    <div class="sec__head"><span class="sec__n">02</span><h2>Access control grid</h2><p>pick a principal and an environment</p></div>
+
+    <div class="rolebar" role="group" aria-label="Evaluation context">
+      <span class="rolebar__k">Principal</span>
+      <button class="btn" data-role="anon" type="button" aria-pressed="false">Anonymous</button>
+      <button class="btn" data-role="user" type="button" aria-pressed="true">User</button>
+      <button class="btn" data-role="admin" type="button" aria-pressed="false">Admin</button>
+      <button class="btn" data-role="system" type="button" aria-pressed="false">System</button>
+      <span class="rolebar__env">
+        <span class="rolebar__k">Environment</span>
+        <button class="btn" data-env="dev" type="button" aria-pressed="false">Development</button>
+        <button class="btn" data-env="prod" type="button" aria-pressed="true">Production</button>
+      </span>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <h3>Minimal-API endpoints</h3>
+        <span id="sum-api" class="chip chip--mute chip--flat">—</span>
+        <span class="src src--head">Web/Features/**Endpoints.cs</span>
+      </div>
+      <div class="scroll scroll--wide">
+        <table>
+          <thead><tr>
+            <th scope="col">Route</th><th scope="col">Method</th><th scope="col">Guard as written</th>
+            <th scope="col">Verdict</th><th scope="col">Reason</th>
+          </tr></thead>
+          <tbody data-grid="api">
+            <tr data-guard="authed"><td><code>/api/images/analyze</code></td><td>POST</td><td><code>RequireAuthorization</code> + rate limit + validation</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/images/health</code></td><td>GET</td><td>Group default — fallback policy</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/bulk-generate/prompts</code></td><td>GET · POST</td><td><code>RequireAuthorization</code> + idempotency</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/bulk-generate/describe</code></td><td>POST</td><td>Rate limit; fallback policy supplies authn</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/bulk-generate/variation</code></td><td>POST</td><td>Rate limit; fallback policy supplies authn</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/bulk-generate/reroll</code></td><td>POST</td><td>Rate limit; fallback policy supplies authn</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="owner"><td><code>/api/user-images</code></td><td>GET</td><td><code>RequireAuthorization</code> + idempotency</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="owner"><td><code>/api/user-images/original</code></td><td>POST</td><td><code>RequireAuthorization</code> + idempotency</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="owner"><td><code>/api/user-images/result</code></td><td>POST</td><td><code>RequireAuthorization</code> + idempotency</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="owner"><td><code>/api/user-images/{id}</code></td><td>GET · DELETE</td><td><code>RequireAuthorization</code> + idempotency</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/meme-templates</code></td><td>GET</td><td><code>RequireAuthorization</code> + HybridCache</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/meme-templates/{id}</code></td><td>GET</td><td><code>RequireAuthorization</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/meme-templates/render</code></td><td>POST</td><td><code>RequireAuthorization</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/style-director/run</code></td><td>POST</td><td><code>RequireAuthorization</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/rap-roast</code></td><td>POST</td><td><code>RequireAuthorization</code> + rate limit + validation</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/api/pricing</code></td><td>GET</td><td>No explicit guard — <b>fallback policy applies</b></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="diag"><td><code>/api/diag</code></td><td>GET</td><td><code>RequireAuthorization(DiagnosticsAccess)</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/api/diag/mock-status</code></td><td>GET</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap"><code>/api/pricing</code> is the fallback policy's most useful demonstration: it carries no
+        authorization call of its own, yet is protected — which is the whole point of a fail-closed default.</p>
+    </div>
+
+    <div class="card" style="margin-top:1rem">
+      <div class="card__head">
+        <h3>BFF gateways &amp; infrastructure routes</h3>
+        <span id="sum-bff" class="chip chip--mute chip--flat">—</span>
+        <span class="src src--head">Program.cs · Features/Auth</span>
+      </div>
+      <div class="scroll scroll--wide">
+        <table>
+          <thead><tr><th scope="col">Route</th><th scope="col">Purpose</th><th scope="col">Guard as written</th><th scope="col">Verdict</th><th scope="col">Reason</th></tr></thead>
+          <tbody data-grid="bff">
+            <tr data-guard="anon"><td><code>/health</code></td><td>Readiness — 5 named checks</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/alive</code></td><td>Liveness — runs no checks</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/openapi/*</code></td><td>OpenAPI document</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/scalar/*</code></td><td>Scalar API reference UI</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/_framework/*</code></td><td>WASM runtime + boot manifest</td><td>Static assets, plus a middleware opt-out for the generated manifest</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/auth/login/microsoft</code></td><td>OIDC challenge</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="devonly"><td><code>/auth/login/fake</code></td><td>GUEST sign-in</td><td><code>AllowAnonymous</code>, non-Production only</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/auth/logout</code></td><td>Sign-out</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/auth/me</code></td><td>Report current principal</td><td><code>AllowAnonymous</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="fakeauth"><td><code>X-Fake-User</code> header</td><td>Assume any identity and role set</td><td>Registration gated on <code>Auth:EnableFakeAuth</code>; constructor throws in Production</td><td class="cell"></td><td class="reason dim"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem">
+      <div class="card__head">
+        <h3>UI navigation &amp; routes</h3>
+        <span id="sum-ui" class="chip chip--mute chip--flat">—</span>
+        <span class="src src--head">Client/Pages/*.razor · Client/_Imports.razor</span>
+      </div>
+      <div class="scroll scroll--wide">
+        <table>
+          <thead><tr><th scope="col">Route</th><th scope="col">Component</th><th scope="col">Guard as written</th><th scope="col">Verdict</th><th scope="col">Reason</th></tr></thead>
+          <tbody data-grid="ui">
+            <tr data-guard="authed"><td><code>/</code></td><td>Studio</td><td>Inherits <code>[Authorize]</code> from <code>_Imports.razor</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/image-regeneration</code></td><td>ImageRegeneration</td><td>Explicit <code>[Authorize]</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/meme-generation</code></td><td>MemeGeneration</td><td>Explicit <code>[Authorize]</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/bulk-generate</code></td><td>BulkGenerate</td><td>Explicit <code>[Authorize]</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/style-director</code></td><td>StyleDirector</td><td>Explicit <code>[Authorize]</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/rap-roast</code></td><td>RapRoast</td><td>Explicit <code>[Authorize]</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="diag"><td><code>/diag</code></td><td>Diag</td><td><code>[Authorize]</code> in the UI; the data it renders is policy-gated</td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="authed"><td><code>/Error</code></td><td>Error</td><td>Inherits <code>[Authorize]</code> — <b>no opt-out</b></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/login</code></td><td>Login</td><td><code>[AllowAnonymous]</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+            <tr data-guard="anon"><td><code>/not-found</code></td><td>NotFound</td><td><code>[AllowAnonymous]</code></td><td class="cell"></td><td class="reason dim"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Client-side authorization is presentation only — <code>AuthorizeRouteView</code> renders
+        <code>RedirectToLogin</code> for an unauthorized route. Every protected route's data comes from an API
+        endpoint that enforces the same rule server-side, so bypassing the UI check gains nothing.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="depth">
+    <div class="sec__head"><span class="sec__n">03</span><h2>Beyond the binary</h2><p>controls that are not authorization but act like it</p></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card__head"><h3>Ownership — the real access control</h3><span class="chip chip--ok chip--flat">enforced server-side</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.87rem">The gallery is the one place a user's data is separated from
+            another's, and it does not use a role. Every <code>/api/user-images</code> handler reads
+            <code>ClaimTypes.NameIdentifier</code> from the caller and returns <code>Unauthorized</code> if it is
+            absent.</p>
+          <dl class="defs">
+            <div><dt>Blob layout</dt><dd><code>user-images/{userId}/{imageId}</code></dd></div>
+            <div><dt>Table layout</dt><dd>PartitionKey = <code>userId</code>, RowKey = <code>imageId</code></dd></div>
+            <div><dt>Container access</dt><dd><code>PublicAccessType.None</code> — bytes are proxied through the API, never served directly from storage</dd></div>
+            <div><dt>Effect</dt><dd>Ownership is <strong>structural</strong>: another user's id produces a different partition, so a cross-user read is not merely denied, it addresses nothing.</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>The diagnostics allow-list</h3><span class="chip chip--warn chip--flat">the only privilege tier</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.87rem">In Production, <code>DiagnosticsAccess</code> requires a claim
+            matching <code>Diagnostics:AdminEmails</code>. Outside Production, any authenticated user passes.</p>
+          <dl class="defs">
+            <div><dt>Claim types checked</dt><dd><code>Email</code>, <code>Name</code>, <code>email</code>, <code>preferred_username</code> — four, because different issuers populate different ones</dd></div>
+            <div><dt>Comparison</dt><dd>Case-insensitive membership in the configured list</dd></div>
+            <div><dt>Empty list</dt><dd><strong>Denies everyone.</strong> The assertion requires <code>admins.Length &gt; 0</code> before any claim is examined — fail-closed by construction, not by configuration discipline.</dd></div>
+            <div><dt>Why it matters</dt><dd>The endpoint exposes masked infrastructure topology. Masked is not secret-free: knowing which Key Vault and tenant are in play is useful to an attacker.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="note note--accent">
+      <span class="note__k">If roles were introduced</span>
+      The wiring already exists. <code>FakeAuthHandler</code> emits <code>ClaimTypes.Role</code> from
+      <code>X-Fake-Roles</code>, so the E2E suite could drive role scenarios today. Entra ID app roles would arrive
+      in the same claim type through OIDC. The change is narrow: add policies beside <code>DiagnosticsAccess</code>
+      in <code>AddPoRedoImageAuthorization</code>, name them in
+      <code>Features/Shared/AuthorizationPolicies.cs</code>, and attach them per group — the pattern
+      <code>/api/diag</code> already demonstrates end to end.
+    </div>
+  </section>
+
+</main>
+
+<footer><div class="wrap">
+  <p>PoRedoImage roles &amp; permissions audit · report 07 of 8 · generated from commit dc027f3 on 2026-07-28</p>
+  <p>Verdicts are computed from the guards as written in source; no runtime probing was performed.</p>
+</div></footer>
+
+<!--@SHELL-->
+<script>
+/* ── Matrix evaluation ──────────────────────────────────────────────────────
+   Each row declares the guard actually written in source; the verdict is derived
+   from (guard, principal, environment). Deriving rather than hard-coding is the
+   point — it is what makes the "all three roles behave identically" finding
+   visible instead of merely asserted.                                       */
+var state = { role: 'user', env: 'prod' };
+
+var RULES = {
+  anon:     function () { return ['allow', 'Explicitly anonymous']; },
+  authed:   function (r) {
+    return r === 'anon'
+      ? ['deny', 'Fallback policy requires an authenticated user — 401 on /api, redirect elsewhere']
+      : ['allow', 'Any authenticated principal; no role is examined'];
+  },
+  owner:    function (r) {
+    return r === 'anon'
+      ? ['deny', 'Fallback policy requires an authenticated user']
+      : ['allow', 'Allowed, but scoped to the caller’s own NameIdentifier partition'];
+  },
+  diag:     function (r, e) {
+    if (r === 'anon') return ['deny', 'DiagnosticsAccess requires an authenticated user'];
+    if (e === 'dev')  return ['allow', 'Non-Production — any authenticated user may read diagnostics'];
+    return r === 'admin'
+      ? ['cond', 'Production — only if the email is on Diagnostics:AdminEmails; empty list denies everyone']
+      : ['deny', 'Production — identity is not on the Diagnostics:AdminEmails allow-list'];
+  },
+  devonly:  function (r, e) {
+    return e === 'dev'
+      ? ['allow', 'GUEST sign-in is registered outside Production']
+      : ['deny', 'Route is not registered in Production']; },
+  fakeauth: function (r, e) {
+    return e === 'dev'
+      ? ['cond', 'Active only when Auth:EnableFakeAuth is true — grants any identity and role set']
+      : ['deny', 'Handler constructor throws in Production; registration is gated as well']; }
+};
+
+var LABEL = {
+  allow: ['v-allow', 'Allowed'],
+  deny:  ['v-deny',  'Denied'],
+  cond:  ['v-cond',  'Conditional'],
+  na:    ['v-na',    'n/a']
+};
+
+function evaluate() {
+  var counts = {};
+  document.querySelectorAll('tbody[data-grid]').forEach(function (body) {
+    var grid = body.dataset.grid;
+    counts[grid] = { allow: 0, deny: 0, cond: 0, total: 0 };
+    body.querySelectorAll('tr').forEach(function (row) {
+      var res = RULES[row.dataset.guard](state.role, state.env);
+      var verdict = res[0], reason = res[1];
+      var meta = LABEL[verdict];
+      row.querySelector('.cell').innerHTML =
+        '<span class="verdict ' + meta[0] + '"><b>' + meta[1] + '</b></span>';
+      row.querySelector('.reason').textContent = reason;
+      counts[grid][verdict]++;
+      counts[grid].total++;
+    });
+  });
+
+  var fmt = function (c) { return c.allow + ' allowed · ' + c.deny + ' denied' + (c.cond ? ' · ' + c.cond + ' conditional' : ''); };
+  document.getElementById('sum-api').textContent = fmt(counts.api);
+  document.getElementById('sum-bff').textContent = fmt(counts.bff);
+  document.getElementById('sum-ui').textContent  = fmt(counts.ui);
+}
+
+document.querySelectorAll('[data-role]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    state.role = b.dataset.role;
+    document.querySelectorAll('[data-role]').forEach(function (o) {
+      o.setAttribute('aria-pressed', String(o === b));
+    });
+    evaluate();
+  });
+});
+document.querySelectorAll('[data-env]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    state.env = b.dataset.env;
+    document.querySelectorAll('[data-env]').forEach(function (o) {
+      o.setAttribute('aria-pressed', String(o === b));
+    });
+    evaluate();
+  });
+});
+
+evaluate();
+</script>
+</body>
+</html>

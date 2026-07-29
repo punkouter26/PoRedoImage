@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User Workflow Trace — PoRedoImage</title>
+<meta name="description" content="End-to-end payload lifecycle from first sign-in through image regeneration to blob and table persistence.">
+<!--@STYLE-->
+<style>
+  /* The journey rail is a real sequence — each step depends on the one before it,
+     so the numbering carries information rather than decorating the list. */
+  .rail-steps { display: grid; gap: 0; counter-reset: step; }
+  .step {
+    display: grid; grid-template-columns: 2.4rem 1fr; gap: 1rem;
+    padding: 1rem 0; border-bottom: 1px solid var(--rule-soft);
+  }
+  .step:last-child { border-bottom: 0; }
+  .step__n {
+    counter-increment: step;
+    font-family: var(--mono); font-size: .7rem; font-weight: 600;
+    color: var(--accent); padding-top: .18rem; position: relative;
+  }
+  .step__n::before { content: counter(step, decimal-leading-zero); }
+  .step__n::after {
+    content: ""; position: absolute; left: .42rem; top: 1.6rem; bottom: -1.15rem;
+    width: 1px; background: var(--rule);
+  }
+  .step:last-child .step__n::after { display: none; }
+  .step h4 { margin: 0 0 .25rem; font-size: .93rem; font-weight: 650; letter-spacing: -.008em; }
+  .step p { margin: 0 0 .35rem; font-size: .86rem; color: var(--ink-2); max-width: 72ch; }
+  .step__meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
+</style>
+</head>
+<body>
+
+<header class="plate">
+  <div class="wrap plate__inner">
+    <div>
+      <p class="plate__no">Report 08 · User Workflow</p>
+      <h1>One image, end to end</h1>
+      <p class="plate__sub">From an anonymous first visit through sign-in, upload, analysis, generation and
+        persistence — following a single payload across two runtimes, six middleware hops, three AI providers and
+        two storage services.</p>
+      <div class="plate__meta">
+        <span>Scope <b>Client/Pages · Web/Features · Infrastructure/Repositories</b></span>
+        <span>Commit <b>dc027f3</b></span>
+        <span>Scanned <b>2026-07-28</b></span>
+      </div>
+    </div>
+    <div class="toolbar"><button class="btn" id="theme-toggle" type="button">Dark theme</button></div>
+  </div>
+</header>
+
+<!--@RAIL:USER_WORKFLOW.html-->
+
+<main class="wrap">
+
+  <section class="sec" id="summary">
+    <div class="sec__head"><span class="sec__n">01</span><h2>The primary path</h2><p>onboarding through first saved result</p></div>
+    <div class="tiles">
+      <div class="tile tile--accent"><span class="tile__k">Steps to first result</span><span class="tile__v">9</span><span class="tile__n">Landing → sign-in → upload → regenerate → save</span></div>
+      <div class="tile"><span class="tile__k">Network round-trips</span><span class="tile__v">3</span><span class="tile__n">Sign-in, analyze, save — the AI work is one call, not three</span></div>
+      <div class="tile"><span class="tile__k">Upload ceiling</span><span class="tile__v">20<small> MB</small></span><span class="tile__n">Client cap; Kestrel allows 25 MB for the JSON envelope</span></div>
+      <div class="tile"><span class="tile__k">Client timeout</span><span class="tile__v">4<small> min</small></span><span class="tile__n">Matched end to end — client, BFF client and provider clients agree</span></div>
+      <div class="tile tile--ok"><span class="tile__k">Replay protection</span><span class="tile__v">24<small> h</small></span><span class="tile__n">Idempotency key cached on every gallery write</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="journey">
+    <div class="sec__head"><span class="sec__n">02</span><h2>Onboarding &amp; execution</h2><p>what the user does, and what happens</p></div>
+    <div class="card"><div class="card__body">
+      <div class="rail-steps">
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>Land on the studio</h4>
+            <p>The shell and WASM runtime are served anonymously. Until the runtime hydrates the serialized
+              principal there is no authentication state at all — the boot mask — which is why every
+              <code>/_framework</code> asset must load without a cookie.</p>
+            <div class="step__meta"><span class="chip chip--mute">GET /</span><span class="chip chip--accent">AllowAnonymous shell</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>Get redirected to sign in</h4>
+            <p><code>_Imports.razor</code> applies <code>[Authorize]</code> assembly-wide, so
+              <code>AuthorizeRouteView</code> renders <code>RedirectToLogin</code> for an unauthenticated visitor.
+              Forced login is the default; pages opt out, never in.</p>
+            <div class="step__meta"><span class="chip chip--mute">/login</span><span class="chip chip--accent">AuthorizeRouteView</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>Authenticate</h4>
+            <p>Microsoft Entra ID via the OIDC code flow, or — outside Production only — a GUEST sign-in. Either
+              way the result is one HttpOnly, SameSite=Strict cookie. No token ever reaches the browser:
+              <code>SaveTokens</code> is false and the client receives serialized claims only.</p>
+            <div class="step__meta"><span class="chip chip--ok">HttpOnly cookie</span><span class="chip chip--ok">SameSite=Strict</span><span class="chip chip--mute">claims, not tokens</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>Choose a feature</h4>
+            <p>The studio home lists and describes every function — the top nav deliberately carries no feature
+              links. Choosing <em>Image Regeneration</em> routes to a page that shares the active image through
+              <code>ImageSessionService</code>, so switching features later does not lose the upload.</p>
+            <div class="step__meta"><span class="chip chip--mute">/image-regeneration</span><span class="chip chip--accent">ImageSessionService</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>Upload an image</h4>
+            <p>Held client-side and capped at 20 MB. Kestrel is bounded at 25 MB — the extra 5 MB is headroom for
+              the base64 JSON envelope, and the bound exists so an oversized payload cannot exhaust the worker
+              before it reaches a paid model.</p>
+            <div class="step__meta"><span class="chip chip--accent">20 MB client cap</span><span class="chip chip--accent">25 MB Kestrel limit</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>Pick providers, then press Regenerate</h4>
+            <p>The AI service picker offers one row per capability. Selection is session-only and resets on reload,
+              so a provider removed from the catalog can never leave a stale selection stranded. The submit calls
+              <code>PostAsJsonAsync("api/images/analyze", …)</code> with a 4-minute token.</p>
+            <div class="step__meta"><span class="chip chip--mute">AiSelectionState</span><span class="chip chip--mute">POST /api/images/analyze</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>The request crosses the middleware</h4>
+            <p><code>CorrelationHeaderHandler</code> stamps <code>X-Session-ID</code> and
+              <code>X-Correlation-ID</code>; the cookie flows because the call is same-origin. Server-side:
+              request context → rate limiter (10/min per user) → antiforgery → authentication → authorization →
+              <code>ValidationFilter</code>.</p>
+            <div class="step__meta"><span class="chip chip--accent">correlation stamped</span><span class="chip chip--accent">10 req/min</span><span class="chip chip--accent">DataAnnotations validated</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>The orchestrator runs the pipeline</h4>
+            <p><code>ImageAnalysisOrchestrator</code> resolves a vision service through the router and analyses the
+              image, then branches on <code>ProcessingMode</code>: regeneration enhances the description and calls
+              the image generator; meme generation writes captions and renders locally with ImageSharp. Per-stage
+              timings and description tokens are collected into <code>ProcessingMetricsDto</code>.</p>
+            <div class="step__meta"><span class="chip chip--mute">Vision</span><span class="chip chip--mute">Azure OpenAI</span><span class="chip chip--mute">Gemini</span><span class="chip chip--accent">metrics captured</span></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step__n"></span>
+          <div>
+            <h4>Save to the gallery</h4>
+            <p><code>UserImageSaveService</code> POSTs with an idempotency key, so a retried save never writes
+              twice. The repository puts the bytes in a private blob at
+              <code>user-images/{userId}/{imageId}</code> and upserts metadata into the <code>UserImages</code>
+              table partitioned by user. A failure surfaces as a Radzen toast that offers a retry.</p>
+            <div class="step__meta"><span class="chip chip--ok">Idempotency-Key</span><span class="chip chip--ok">Blob + Table</span><span class="chip chip--mute">retry toast</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div></div>
+  </section>
+
+  <section class="sec" id="trace">
+    <div class="sec__head"><span class="sec__n">03</span><h2>Payload lifecycle</h2><p>the same journey as a message trace</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Upload → regenerate → persist</h3><span class="src src--head">_src/diagrams/workflow-trace.mmd</span></div>
+      <div class="dgm dgm--wide"><!--@SVG:workflow-trace--></div>
+    </div>
+  </section>
+
+  <section class="sec" id="storage">
+    <div class="sec__head"><span class="sec__n">04</span><h2>Where the payload lands</h2><p>storage layout and local equivalence</p></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card__head"><h3>Storage layout</h3><span class="src src--head">Infrastructure/Repositories/</span></div>
+        <div class="scroll">
+          <table style="min-width:0">
+            <thead><tr><th scope="col">Store</th><th scope="col">Name</th><th scope="col">Key</th><th scope="col">Holds</th></tr></thead>
+            <tbody>
+              <tr><td>Blob container</td><td><code>user-images</code></td><td><code>{userId}/{imageId}</code></td><td>Image bytes, content type, tag metadata</td></tr>
+              <tr><td>Table</td><td><code>UserImages</code></td><td>PK <code>userId</code> · RK <code>imageId</code></td><td>Gallery metadata for listing</td></tr>
+              <tr><td>Table</td><td><code>BulkPrompts</code></td><td>PK <code>prompts</code> · RK per prompt</td><td>Saved bulk-generation prompt sets</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="cap">The blob container is created with <code>PublicAccessType.None</code>; bytes are streamed
+          back through <code>GET /api/user-images/{id}</code> rather than served from storage, so the ownership
+          check cannot be bypassed with a direct URL.</p>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Behaviour when storage is absent</h3><span class="chip chip--warn chip--flat">degrades, does not crash</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.87rem">Both repositories accept a null client. With no connection
+            string configured, <code>SaveBlobAsync</code> returns an empty string and the app keeps working —
+            regeneration succeeds, only persistence is silently unavailable.</p>
+          <dl class="defs">
+            <div><dt>Local development</dt><dd>Defaults to <code>UseDevelopmentStorage=true</code> — Azurite, which the integration tier also uses via Testcontainers.</dd></div>
+            <div><dt>Lifetime</dt><dd>Both repositories are singletons: <code>TableClient</code> and <code>BlobContainerClient</code> are thread-safe, and this avoids a redundant <code>CreateIfNotExists</code> per request.</dd></div>
+            <div><dt>Worth flagging</dt><dd>A silent empty return means a misconfigured deployment loses saves <strong>without an error surfacing to the user</strong>. A health check already covers table storage; the blob path has no equivalent.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="others">
+    <div class="sec__head"><span class="sec__n">05</span><h2>The other execution paths</h2><p>same spine, different pipeline</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Feature comparison</h3><span class="src src--head">Client/Pages · Web/Features</span></div>
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th scope="col">Path</th><th scope="col">Entry</th><th scope="col">Pipeline</th>
+            <th scope="col">Providers</th><th scope="col">Persists</th><th scope="col">Rate limited</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><b>Image regeneration</b></td><td>Upload → Regenerate</td>
+              <td>Vision → enhance → generate</td>
+              <td>Azure CV / Florence-2 / Ollama → Azure OpenAI → Gemini</td>
+              <td><span class="chip chip--ok">On save</span></td><td><span class="chip chip--accent">Yes</span></td>
+            </tr>
+            <tr>
+              <td><b>Meme generation</b></td><td>Upload → Generate meme</td>
+              <td>Vision → caption → local render</td>
+              <td>Azure CV → Azure OpenAI → ImageSharp <span class="dim">(no network)</span></td>
+              <td><span class="chip chip--ok">On save</span></td><td><span class="chip chip--accent">Yes</span></td>
+            </tr>
+            <tr>
+              <td><b>Bulk generate</b></td><td>Prompt set → Run</td>
+              <td>Describe → variation → re-roll</td>
+              <td>Azure OpenAI → Gemini</td>
+              <td><span class="chip chip--ok">Prompts in Table</span></td><td><span class="chip chip--accent">Yes</span></td>
+            </tr>
+            <tr>
+              <td><b>Style Director</b></td><td>Image + brief</td>
+              <td>Vision Analyst → Strategist → Refiner → Critic, sequential</td>
+              <td>HuggingFace Qwen2.5 chat + VL <span class="dim">(heuristics when unconfigured)</span></td>
+              <td><span class="chip chip--mute">No</span></td><td><span class="chip chip--mute">No</span></td>
+            </tr>
+            <tr>
+              <td><b>Rap Roast</b></td><td>Image → Roast</td>
+              <td>Scene detail → describe → lyrics → perform</td>
+              <td>Azure CV (OCR + dense captions) → HuggingFace → Google Lyria</td>
+              <td><span class="chip chip--mute">No</span></td><td><span class="chip chip--accent">Yes</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Style Director is the only AI path without a rate limit. Its default backend is a chat model
+        rather than an image model, so per-call cost is far lower — but it is still a billable outbound call, and
+        it is the one AI route a client can drive without a throttle.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="failure">
+    <div class="sec__head"><span class="sec__n">06</span><h2>What the user sees when it fails</h2><p>error surfaces along the path</p></div>
+    <div class="grid3">
+      <div class="card"><div class="card__body">
+        <span class="chip chip--warn">Session expired</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">The API returns <code>401</code>, never a redirect — both the
+          cookie and OIDC handlers suppress the 302 for <code>/api</code> paths. The client re-renders
+          <code>/login</code> rather than parsing an HTML page as JSON.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--warn">Rate limited</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem"><code>429</code> after 10 requests in a sliding minute. The
+          partition key is the user id, so one user's bulk batch cannot starve another behind the same IP. Two
+          requests may queue; the rest are rejected.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--warn">Provider failure</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">Two retries with a circuit breaker on the Gemini and
+          HuggingFace clients. Ollama gets none — it is local, so failing fast is more useful than waiting.
+          Persistent failure surfaces as a problem-details response.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--warn">Save failure</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">A Radzen toast offers a retry, holding a
+          <code>TaskCompletionSource</code> per circuit. The idempotency key is reused, so the retry cannot produce
+          a duplicate gallery entry.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--warn">Mocked services</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">The client probes <code>/api/diag/mock-status</code> anonymously
+          at startup and renders a <b>USING MOCK DATA</b> banner. The probe has a 3-second timeout and swallows
+          failures, so a slow server never blocks app start.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--crit">Unhandled error</span>
+        <p style="margin:.6rem 0 0;font-size:.86rem">Non-<code>/api</code> paths re-execute to <code>/not-found</code>;
+          outside Development the exception handler routes to <code>/Error</code> — which inherits
+          <code>[Authorize]</code>, so an unauthenticated user is sent to <code>/login</code> instead. See report 02.</p>
+      </div></div>
+    </div>
+  </section>
+
+</main>
+
+<footer><div class="wrap">
+  <p>PoRedoImage user-workflow trace · report 08 of 8 · generated from commit dc027f3 on 2026-07-28</p>
+  <p>Every step traced from source; no runtime instrumentation was used to produce this path.</p>
+</div></footer>
+
+<!--@SHELL-->
+</body>
+</html>

@@ -1,0 +1,35 @@
+sequenceDiagram
+  autonumber
+  participant U as User agent
+  participant W as WASM client
+  participant B as BFF host
+  participant E as Microsoft Entra ID
+  participant D as Downstream AI provider
+
+  U->>B: GET /image-regeneration
+  B-->>U: 200 shell + /_framework assets (AllowAnonymous)
+  W->>W: AuthenticationStateDeserialization — no principal
+  W->>U: RedirectToLogin renders /login
+
+  U->>B: GET /challenge-microsoft
+  B->>E: OIDC challenge — response_type=code<br/>scope openid profile email
+  E-->>U: interactive sign-in
+  U->>B: GET /signin-oidc?code=…
+  B->>E: code → tokens (SaveTokens = false)
+  E-->>B: id_token + claims (GetClaimsFromUserInfoEndpoint)
+  B-->>U: Set-Cookie — HttpOnly, SameSite=Strict,<br/>Secure outside Development
+
+  Note over U,W: The cookie is invisible to JS/WASM.<br/>The client only ever sees serialized claims.
+
+  W->>B: fetch /api/… + X-Session-ID + X-Correlation-ID
+  B->>B: RequestContextMiddleware — fallbacks,<br/>echo headers, HttpContext.Items
+  B->>B: LogContext: CorrelationId · UserId · SessionId
+  B->>D: OutboundCorrelationHandler re-stamps both headers<br/>(Ollama · GeminiApi · HuggingFaceApi)
+  D-->>B: provider response
+  B-->>W: 200 + echoed X-Correlation-ID / X-Session-ID
+
+  alt Session expired
+    W->>B: fetch /api/…
+    B-->>W: 401 (ApiAwareRedirectToLogin suppresses the 302)
+    W->>U: re-render /login
+  end

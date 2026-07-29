@@ -1,0 +1,40 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant P as ImageRegeneration.razor
+  participant S as ImageSessionService
+  participant H as CorrelationHeaderHandler
+  participant M as Middleware
+  participant E as /api/images/analyze
+  participant O as ImageAnalysisOrchestrator
+  participant AI as Vision → OpenAI → Imagen
+  participant SV as UserImageSaveService
+  participant R as AzureBlobUserImageRepository
+  participant ST as Azure Storage (Azurite in dev)
+
+  U->>P: choose file (≤ 20 MB client cap)
+  P->>S: hold active image for the browser session
+  U->>P: Regenerate
+  P->>H: PostAsJsonAsync("api/images/analyze", ImageAnalysisRequest)
+  H->>M: + X-Session-ID / X-Correlation-ID, auth cookie
+
+  M->>M: Kestrel body cap 25 MB
+  M->>M: rate limit 10/min · authn · authz
+  M->>E: ValidationFilter of ImageAnalysisRequest
+  E->>O: AnalyzeAsync(Mode = ImageRegeneration)
+  O->>AI: analyze → enhance → generate
+  AI-->>O: description, tags, prompt, image bytes
+  O-->>E: ImageAnalysisResponse (+ ProcessingMetrics)
+  E-->>P: 200 OK
+
+  P->>P: ImageRegenerationResultsPanel renders result
+  U->>P: Save to gallery
+  P->>SV: save result
+  SV->>M: POST /api/user-images/result + Idempotency-Key
+  M->>M: IdempotencyKeyFilter — 24 h IMemoryCache replay guard
+  M->>R: UserImageService.SaveResultAsync(userId, bytes)
+  R->>ST: Blob PUT user-images/{userId}/{imageId}
+  R->>ST: Table UPSERT UserImages<br/>PartitionKey = userId, RowKey = imageId
+  ST-->>R: ok
+  R-->>SV: UserImageDto
+  SV-->>U: Radzen toast — saved (retry offered on failure)

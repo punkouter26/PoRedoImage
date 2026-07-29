@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slice Isolation Audit — PoRedoImage</title>
+<meta name="description" content="Coupling analysis across the Client, Web and Shared boundaries: dependency edges, shared DTO surface, and layer leaks.">
+<!--@STYLE-->
+</head>
+<body>
+
+<header class="plate">
+  <div class="wrap plate__inner">
+    <div>
+      <p class="plate__no">Report 03 · Slice Isolation</p>
+      <h1>What crosses the boundaries</h1>
+      <p class="plate__sub">Six projects, eleven compile-time edges, one shared contract assembly. This report
+        traces every edge, measures the shared surface, and names the two places where a layer leaks.</p>
+      <div class="plate__meta">
+        <span>Scope <b>*.csproj ProjectReference · Shared/DTOs · Shared/Configuration</b></span>
+        <span>Commit <b>dc027f3</b></span>
+        <span>Scanned <b>2026-07-28</b></span>
+      </div>
+    </div>
+    <div class="toolbar"><button class="btn" id="theme-toggle" type="button">Dark theme</button></div>
+  </div>
+</header>
+
+<!--@RAIL:SLICE_ISOLATION_REPORT.html-->
+
+<main class="wrap">
+
+  <section class="sec" id="summary">
+    <div class="sec__head"><span class="sec__n">01</span><h2>Coupling at a glance</h2><p>edges counted from the csproj graph</p></div>
+    <div class="tiles">
+      <div class="tile tile--accent"><span class="tile__k">Compile-time edges</span><span class="tile__v">11</span><span class="tile__n">Across 6 source projects — dense, but every edge points inward</span></div>
+      <div class="tile tile--ok"><span class="tile__k">Cycles</span><span class="tile__v">0</span><span class="tile__n">The graph is a DAG; .NET would not compile it otherwise</span></div>
+      <div class="tile"><span class="tile__k">Shared DTO types</span><span class="tile__v">31</span><span class="tile__n">Across 11 files in <code>Shared/DTOs</code> — the entire client/server contract</span></div>
+      <div class="tile tile--warn"><span class="tile__k">Layer leaks</span><span class="tile__v">2</span><span class="tile__n">Both deliberate and documented — see §4</span></div>
+      <div class="tile"><span class="tile__k">Sink projects</span><span class="tile__v">1</span><span class="tile__n"><code>Domain</code> references nothing</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="graph">
+    <div class="sec__head"><span class="sec__n">02</span><h2>Dependency graph</h2><p>compiled to SVG offline</p></div>
+    <p class="lede">Arrows point from dependent to dependency. Read bottom-up: <code>Domain</code> is the sink,
+      <code>Web</code> is the composition root. No arrow ever points outward from an inner layer.</p>
+    <div class="card">
+      <div class="card__head"><h3>ProjectReference edges</h3><span class="src src--head">mermaid-cli → SVG, inlined</span></div>
+      <div class="dgm"><!--@SVG:slice-deps--></div>
+    </div>
+  </section>
+
+  <section class="sec" id="edges">
+    <div class="sec__head"><span class="sec__n">03</span><h2>Edge inventory</h2><p>every ProjectReference, with a verdict</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Directed edges</h3><span class="src src--head">src/*/*.csproj</span></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col">Why</th><th scope="col">Verdict</th></tr></thead>
+          <tbody>
+            <tr><td><b>Shared</b></td><td>Domain</td><td>DTO mapping touches domain enums and entity ids</td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Application</b></td><td>Domain</td><td>Orchestrators depend only on ports, never implementations</td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Application</b></td><td>Shared</td><td>Orchestrators return DTOs directly to the endpoint layer</td><td><span class="chip chip--warn">See §4</span></td></tr>
+            <tr><td><b>Infrastructure</b></td><td>Application</td><td>Registers Application services in the DI extension</td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Infrastructure</b></td><td>Domain</td><td>Implements the ports</td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Infrastructure</b></td><td>Shared</td><td><code>ConfigKeys</code>, <code>AiProviderIds</code>, <code>ImageBytes</code></td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Client</b></td><td>Shared</td><td>Request/response contracts and the config-key vocabulary</td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Client</b></td><td>Domain</td><td><code>IMockable</code> and <code>UserImageKind</code></td><td><span class="chip chip--warn">See §4</span></td></tr>
+            <tr><td><b>Web</b></td><td>Infrastructure</td><td>Composition root — <code>AddPoRedoImageInfrastructure</code></td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Web</b></td><td>Shared</td><td>Endpoint signatures and JSON source-gen context</td><td><span class="chip chip--ok">Inward</span></td></tr>
+            <tr><td><b>Web</b></td><td>Client</td><td>Hosts the WASM assembly — <code>AddAdditionalAssemblies</code></td><td><span class="chip chip--ok">Required by Blazor</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">Five further edges exist in the test tree. <code>Tests.Unit</code> and <code>Tests.Integration</code>
+        each reference <code>Web</code>, and therefore the whole graph transitively. Both E2E projects reference only
+        <code>Shared</code> — keeping them honest black-box clients — and <code>Tests.E2E.UI</code> additionally
+        references <code>Tests.E2E.ApiSmoke</code>, so one <code>[LiveServerFact]</code> gate governs both tiers.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="leaks">
+    <div class="sec__head"><span class="sec__n">04</span><h2>Layer leaks</h2><p>where the onion is pierced, and whether it matters</p></div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card__head"><h3>Application → Shared</h3><span class="chip chip--warn chip--flat">Deliberate</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.88rem">In a strict onion, the Application layer would define its own
+            result types and the Web layer would map them to transport DTOs. Here
+            <code>ImageAnalysisOrchestrator</code> returns <code>ImageAnalysisResponse</code> — a
+            <code>Shared</code> DTO — straight to the endpoint.</p>
+          <p style="font-size:.88rem"><strong>Cost:</strong> a change to the wire contract reaches into the
+            Application layer. <strong>Benefit:</strong> one type instead of two plus a mapper, on a contract with a
+            single consumer.</p>
+          <p style="font-size:.88rem;margin-bottom:0"><strong>Assessment:</strong> proportionate for a solution this
+            size. It would become a real cost the moment a second transport (gRPC, a queue consumer) needed a
+            different shape.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Client → Domain</h3><span class="chip chip--warn chip--flat">Narrow</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.88rem">The WASM client references <code>Domain</code> for two things
+            only: the <code>IMockable</code> interface — so <code>RemoteMockFlag</code> can register server-reported
+            mock reasons into client DI and drive the banner — and the <code>UserImageKind</code> enum.</p>
+          <p style="font-size:.88rem"><strong>Cost:</strong> the whole Domain assembly ships to the browser for two
+            types. It is small and has no dependencies, so the download cost is marginal, but the
+            <em>conceptual</em> coupling is real: a domain refactor can now break the client build.</p>
+          <p style="font-size:.88rem;margin-bottom:0"><strong>Assessment:</strong> the cheapest fix is to move both
+            types to <code>Shared</code>, which the client already references. That would delete an edge outright.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="note note--accent">
+      <span class="note__k">What is not leaking</span>
+      <strong><code>Infrastructure</code> is invisible to <code>Web</code>'s feature code.</strong> The host
+      references the assembly only to call <code>AddPoRedoImageInfrastructure(configuration)</code>; every endpoint
+      binds to a <code>Domain</code> port. Swapping Gemini for another provider touches one DI file. The mock ladder
+      is proof the seam works: <code>Mocks:UseMockAi=true</code> substitutes six services without an endpoint
+      knowing.
+    </div>
+  </section>
+
+  <section class="sec" id="surface">
+    <div class="sec__head"><span class="sec__n">05</span><h2>Shared contract surface</h2><p>everything both runtimes can see</p></div>
+    <p class="lede"><code>PoRedoImage.Shared</code> is the only assembly compiled into both the browser and the
+      server. Anything added here is, by construction, part of the public client/server contract — so its contents
+      are the honest measure of coupling between the two runtimes.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card__head"><h3>DTO files</h3><span class="src src--head">Shared/DTOs/</span></div>
+        <div class="scroll">
+          <table style="min-width:0">
+            <thead><tr><th scope="col">File</th><th scope="col" class="num">Types</th><th scope="col">Consumed by</th></tr></thead>
+            <tbody>
+              <tr><td><code>BulkGenerateDtos.cs</code></td><td class="num">6</td><td>BulkGenerate slice + page</td></tr>
+              <tr><td><code>MemeTemplateDtos.cs</code></td><td class="num">5</td><td>MemeTemplates slice + page</td></tr>
+              <tr><td><code>StyleDirectorDtos.cs</code></td><td class="num">4</td><td>StyleDirector slice + page</td></tr>
+              <tr><td><code>UserImageDtos.cs</code></td><td class="num">4</td><td>UserImages slice + gallery</td></tr>
+              <tr><td><code>BulkRerollDtos.cs</code></td><td class="num">3</td><td>BulkGenerate re-roll path</td></tr>
+              <tr><td><code>RapRoastDtos.cs</code></td><td class="num">3</td><td>RapRoast slice + page</td></tr>
+              <tr><td><code>ImageAnalysisResponse.cs</code></td><td class="num">2</td><td>Response + <code>ProcessingMetricsDto</code></td></tr>
+              <tr><td><code>ImageAnalysisRequest.cs</code></td><td class="num">1</td><td>ImageAnalysis slice</td></tr>
+              <tr><td><code>AiPricingDtos.cs</code></td><td class="num">1</td><td>Pricing slice → cost estimate UI</td></tr>
+              <tr><td><code>ProblemDetailsDto.cs</code></td><td class="num">1</td><td>Every slice's error path</td></tr>
+              <tr><td><code>ProcessingMode.cs</code></td><td class="num">1</td><td>Enum — selects the pipeline branch</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="cap">Every DTO family is named after its slice. No file serves two slices, so the contract surface
+          partitions cleanly along the same seams as the endpoints.</p>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Non-DTO shared surface</h3><span class="src src--head">Shared/Configuration · Imaging · Json · Validation</span></div>
+        <div class="card__body">
+          <dl class="defs">
+            <div><dt>ConfigKeys</dt><dd>The full configuration-key vocabulary as constants, so no slice types a key as a magic string.</dd></div>
+            <div><dt>AiProviderIds</dt><dd>Provider ids namespaced by <strong>execution location</strong> — <code>remote:</code>, <code>ollama:</code>, <code>browser:</code>. The previous scheme matched bare model-name prefixes and could not tell a browser model from an Ollama one; <code>VisionServiceRouter</code> now does an explicit namespace check.</dd></div>
+            <div><dt>ImageBytes</dt><dd>Shared image-payload handling, used on both sides of the wire.</dd></div>
+            <div><dt>SharedJsonContext</dt><dd>Source-generated serialization metadata — the reason the DTO path is reflection-free and trim-safe.</dd></div>
+            <div><dt>MaxCountAttribute<br>MaxItemLengthAttribute</dt><dd>Validation attributes applied to request DTOs, so the same rule runs client-side and in the server's <code>ValidationFilter</code>.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="note__k">One consequence worth flagging</span>
+      Because validation attributes live in <code>Shared</code>, the client and server enforce
+      <em>literally the same rule object</em> — there is no second copy to drift. That is the strongest isolation
+      property in this codebase, and it comes free from putting the attribute in the shared assembly rather than
+      duplicating the constraint.
+    </div>
+  </section>
+
+  <section class="sec" id="autonomy">
+    <div class="sec__head"><span class="sec__n">06</span><h2>Slice autonomy</h2><p>do slices reference each other?</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Cross-slice references inside <code>Web/Features</code></h3><span class="chip chip--ok chip--flat">1 shared vocabulary, 0 direct references</span></div>
+      <div class="card__body">
+        <dl class="defs">
+          <div><dt>Direct slice→slice</dt><dd><strong>None.</strong> No <code>Features/X</code> type names a <code>Features/Y</code> type.</dd></div>
+          <div><dt>Shared filters</dt><dd><code>ValidationFilter&lt;T&gt;</code> and <code>IdempotencyKeyFilter</code> live in their own folders (<code>Features/Shared</code>, <code>Features/Idempotency</code>) and are applied by the consuming slice — a dependency on infrastructure, not on a peer.</dd></div>
+          <div><dt>Policy names</dt><dd>The one genuinely cross-slice concept: Auth <em>defines</em> the <code>DiagnosticsAccess</code> policy, Diagnostics <em>requires</em> it. Resolved by putting the constant in <code>Features/Shared/AuthorizationPolicies.cs</code> — both depend on the vocabulary, neither on the other.</dd></div>
+          <div><dt>Pricing → ImageGen</dt><dd><code>PricingEndpoints</code> reads the <code>ImageGen:Provider</code> config key to pick which price block to return. Coupled through configuration, not code.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer><div class="wrap">
+  <p>PoRedoImage slice-isolation audit · report 03 of 8 · generated from commit dc027f3 on 2026-07-28</p>
+  <p>Dependency graph compiled with mermaid-cli to standalone SVG and inlined; no runtime diagram library.</p>
+</div></footer>
+
+<!--@SHELL-->
+</body>
+</html>

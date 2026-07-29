@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testing Tier Hierarchy — PoRedoImage</title>
+<meta name="description" content="Four test tiers with enforced ceilings, self-skipping gates, and a copy-paste command matrix.">
+<!--@STYLE-->
+<style>
+  /* Label, bar, count — three columns. The bar alone carries magnitude, so its width
+     can stay strictly proportional without ever squeezing the text: a two-test tier
+     renders as a two-test bar, not as a box padded out to fit its own caption. */
+  .pyr { display: grid; gap: .55rem; padding: .5rem 0; }
+  .pyr__row { display: grid; grid-template-columns: minmax(190px, 15rem) 1fr auto; gap: 1rem; align-items: center; }
+  .pyr__name { font-size: .86rem; font-weight: 650; color: var(--ink); }
+  .pyr__name small { display: block; font-weight: 400; color: var(--ink-2); font-size: .76rem; margin-top: .12rem; }
+  .pyr__track { display: block; min-width: 0; }
+  .pyr__bar {
+    display: block;   /* an inline box ignores width — the bar must be a block */
+    height: 30px; width: var(--w); min-width: 4px;
+    border: 1px solid var(--_edge); background: var(--_bg);
+    border-radius: 0 4px 4px 0;   /* rounded data-end, flat against the baseline */
+  }
+  .pyr__n {
+    font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: .8rem;
+    color: var(--ink-2); white-space: nowrap; text-align: right; min-width: 6.5rem;
+  }
+  .pyr__n b { font-size: 1.05rem; color: var(--ink); }
+  @media (max-width: 640px) {
+    .pyr__row { grid-template-columns: 1fr auto; }
+    .pyr__track { grid-column: 1 / -1; }
+  }
+  .cmd {
+    display: block; font-family: var(--mono); font-size: .74rem; line-height: 1.6;
+    background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 3px;
+    padding: .5rem .6rem; color: var(--ink-2); overflow-x: auto; white-space: pre; scrollbar-width: thin;
+  }
+  .copy {
+    appearance: none; border: 1px solid var(--rule); background: var(--surface);
+    color: var(--ink-3); font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
+    text-transform: uppercase; padding: .25rem .5rem; border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+  .copy:hover { border-color: var(--accent-edge); color: var(--accent-ink); }
+  .copy[data-done="1"] { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+</style>
+</head>
+<body>
+
+<header class="plate">
+  <div class="wrap plate__inner">
+    <div>
+      <p class="plate__no">Report 06 · Testing Tiers</p>
+      <h1>Four tiers, and a ceiling on each</h1>
+      <p class="plate__sub">164 tests arranged so that speed decreases and fidelity increases with each step down.
+        Unusually, the tier sizes are not conventions — they are asserted by meta-tests that fail the build when a
+        tier grows past its budget. One tier has almost nothing in it.</p>
+      <div class="plate__meta">
+        <span>Scope <b>tests/** · TestCounting.cs</b></span>
+        <span>Commit <b>dc027f3</b></span>
+        <span>Scanned <b>2026-07-28</b></span>
+      </div>
+    </div>
+    <div class="toolbar"><button class="btn" id="theme-toggle" type="button">Dark theme</button></div>
+  </div>
+</header>
+
+<!--@RAIL:TESTING_TIER_HIERARCHY.html-->
+
+<main class="wrap">
+
+  <section class="sec" id="summary">
+    <div class="sec__head"><span class="sec__n">01</span><h2>Suite at a glance</h2><p>counts from <code>[Fact]</code>/<code>[Theory]</code> attributes</p></div>
+    <div class="tiles">
+      <div class="tile tile--accent"><span class="tile__k">Total tests</span><span class="tile__v">164</span><span class="tile__n">Excluding the four ceiling meta-tests, which the counter also excludes</span></div>
+      <div class="tile"><span class="tile__k">Tiers</span><span class="tile__v">4</span><span class="tile__n">Unit → Azurite integration → API integration → Playwright E2E</span></div>
+      <div class="tile tile--ok"><span class="tile__k">Ceiling headroom</span><span class="tile__v">36</span><span class="tile__n">164 of a permitted 200 — every tier is under budget</span></div>
+      <div class="tile tile--warn"><span class="tile__k">Docker-gated tests</span><span class="tile__v">2</span><span class="tile__n">The entire Azurite tier — see §2, this is the suite's thinnest layer</span></div>
+      <div class="tile"><span class="tile__k">Azurite containers</span><span class="tile__v">1</span><span class="tile__n">One shared fixture for the whole collection, down from one per class</span></div>
+    </div>
+
+    <div class="note note--accent">
+      <span class="note__k">The unusual part</span>
+      <strong>Each tier asserts its own size.</strong> A <code>TestCountCeilingTests</code> class in every project
+      reflects over the assembly and fails if the tier exceeds its budget — 100 / 50 / 25 / 25. The counting logic
+      lives in one linked file, <code>tests/TestCounting.cs</code>, rather than being copy-pasted four times. The
+      effect is that adding a slow test is a deliberate act: you must either stay under budget or justify raising it.
+    </div>
+  </section>
+
+  <section class="sec" id="pyramid">
+    <div class="sec__head"><span class="sec__n">02</span><h2>The pyramid</h2><p>bar width is the tier's real size</p></div>
+    <div class="card">
+      <div class="card__head"><h3>Tiers, fastest first</h3><span class="src src--head">tests/*/TestCountCeilingTests.cs</span></div>
+      <div class="card__body">
+        <div class="pyr">
+          <div class="pyr__row" style="--w:100%;--_bg:var(--ok-wash);--_edge:color-mix(in srgb, var(--ok) 30%, transparent)">
+            <span class="pyr__name">Tier 1 — Unit<small>No I/O. Pure logic: routers, agents, parsers, catalogs, validators.</small></span>
+            <span class="pyr__track"><span class="pyr__bar"></span></span>
+            <span class="pyr__n"><b>95</b> / 100<br><span class="dim">seconds</span></span>
+          </div>
+          <div class="pyr__row" style="--w:48.4%;--_bg:var(--accent-wash);--_edge:var(--accent-edge)">
+            <span class="pyr__name">Tier 3 — API integration<small>In-process host via <code>WebApplicationFactory</code>, real middleware, mocked AI.</small></span>
+            <span class="pyr__track"><span class="pyr__bar"></span></span>
+            <span class="pyr__n"><b>46</b><br><span class="dim">tens of secs</span></span>
+          </div>
+          <div class="pyr__row" style="--w:22.1%;--_bg:var(--serious-wash);--_edge:color-mix(in srgb, var(--serious) 40%, transparent)">
+            <span class="pyr__name">Tier 4 — Playwright E2E<small>Real browser and live HTTP against a running instance.</small></span>
+            <span class="pyr__track"><span class="pyr__bar"></span></span>
+            <span class="pyr__n"><b>21</b> / 50<br><span class="dim">minutes</span></span>
+          </div>
+          <div class="pyr__row" style="--w:2.1%;--_bg:var(--warn-wash);--_edge:color-mix(in srgb, var(--warn) 40%, transparent)">
+            <span class="pyr__name">Tier 2 — Azurite integration<small>Real Blob, Queue and Table over Testcontainers.</small></span>
+            <span class="pyr__track"><span class="pyr__bar"></span></span>
+            <span class="pyr__n"><b>2</b><br><span class="dim">tens of secs</span></span>
+          </div>
+        </div>
+      </div>
+      <p class="cap">Rows are ordered fastest-first, so Tier 2 appears last: Azurite-backed tests are the slowest of
+        the in-process tiers. Tiers 2 and 3 share one assembly and one ceiling of 50 — <code>Tests.Integration</code>
+        holds 48 enforced tests, of which exactly 2 are <code>[DockerFact]</code>. Tier 4 spans two assemblies with
+        a ceiling of 25 each: 10 API smoke and 11 UI.</p>
+    </div>
+
+    <div class="note note--warn">
+      <span class="note__k">The shape is not a pyramid</span>
+      <strong>Tier 2 contains two tests.</strong> One round-trips a bulk prompt through Table storage; one checks
+      the Azurite health check. Everything else in the integration assembly runs against
+      <code>CustomWebApplicationFactory</code> without a container. That is a defensible trade — containers are
+      slow and the storage code is thin — but it means <code>AzureBlobUserImageRepository</code>, the repository
+      behind every gallery save, <strong>has no integration coverage at all</strong>: no blob round-trip, no
+      ownership-partition test, and no assertion that a missing connection string degrades rather than throws.
+      That is the single largest gap in this suite.
+    </div>
+  </section>
+
+  <section class="sec" id="tiers">
+    <div class="sec__head"><span class="sec__n">03</span><h2>Tier detail</h2><p>what each layer proves</p></div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card__head"><h3>Tier 1 — Unit</h3><span class="chip chip--ok chip--flat">95 tests · no I/O</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.87rem">Everything that can be decided without a network, disk or clock.
+            The largest cluster is provider routing and the local-AI fallback chain — logic that is easy to get
+            subtly wrong and cheap to pin down.</p>
+          <dl class="defs">
+            <div><dt>Routing</dt><dd><code>VisionServiceRouterTests</code>, <code>ImageGenerationRouterTests</code> — proves a <code>browser:</code> id is never mistaken for an <code>ollama:</code> one</dd></div>
+            <div><dt>Local AI</dt><dd><code>LocalAiChainTests</code> — dtype pruning order on devices with and without WebGPU</dd></div>
+            <div><dt>Agents</dt><dd><code>StyleDirectorWorkflowTests</code>, <code>VisionAnalystAgentTests</code> — heuristic paths, no live model</dd></div>
+            <div><dt>Contracts</dt><dd>Catalog, meme templates, tag extraction, metrics, config-key mapping</dd></div>
+            <div><dt>Cross-page state</dt><dd><code>ImageSessionServiceCrossPageStateTests</code></dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Tier 2 — Azurite integration</h3><span class="chip chip--warn chip--flat">2 tests · Testcontainers</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.87rem">One <code>AzuriteContainerFixture</code> serves the whole xUnit
+            collection. Previously each class — and in one case each method — started its own
+            <code>azurite:latest</code>, so container count scaled with the suite.</p>
+          <dl class="defs">
+            <div><dt>Docker absent</dt><dd>The fixture <strong>does not throw</strong>. <code>IsAvailable</code> stays false, the connection string stays empty, and every <code>[DockerFact]</code> self-skips.</dd></div>
+            <div><dt>Address</dt><dd><code>127.0.0.1</code>, never <code>localhost</code> — which can resolve to <code>::1</code>, where Azurite does not listen, producing connection timeouts on Windows and CI.</dd></div>
+            <div><dt>Cleanup</dt><dd>Five layered routes, all converging on one idempotent teardown: the Testcontainers reaper, xUnit <code>DisposeAsync</code>, <code>ProcessExit</code>, <code>Console.CancelKeyPress</code> (the most common accidental-leak vector in dev), and a finalizer.</dd></div>
+            <div><dt>Naming</dt><dd>Per-process container names let parallel CI shards disambiguate, and let an out-of-band prune target only this project's containers.</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Tier 3 — API integration</h3><span class="chip chip--accent chip--flat">46 tests · in-process host</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.87rem">Real middleware, real routing, real authorization — with AI
+            substituted. <code>FeatureFlags:UseRealAiInIntegrationTests</code> defaults to <code>false</code>, so
+            the suite runs against the mock ladder and spends nothing.</p>
+          <dl class="defs">
+            <div><dt>Hosts</dt><dd><code>CustomWebApplicationFactory</code> for plain API tests; <code>AzuriteWebApplicationFactory</code> when storage is needed</dd></div>
+            <div><dt>Identity</dt><dd><code>TestAuthHandler</code> — the suite authenticates without driving a login flow</dd></div>
+            <div><dt>Coverage</dt><dd>Health, diagnostics, image analysis, bulk generate, rap roast, precomputed vision, prompt round-trip, and a budget guardrail test</dd></div>
+            <div><dt>Budget guardrail</dt><dd><code>BudgetGuardrailTests</code> asserts the mock handler actually blocks outbound AI calls — the regression net under the cost controls</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>Tier 4 — Playwright E2E</h3><span class="chip chip--serious chip--flat">21 tests · real browser</span></div>
+        <div class="card__body">
+          <p style="margin-top:0;font-size:.87rem">Split across two assemblies: API smoke (HTTP against a live
+            instance) and UI (a real browser). Both gate on <code>[LiveServerFact]</code>.</p>
+          <dl class="defs">
+            <div><dt>Target</dt><dd><code>E2E_BASE_URL</code>, defaulting to <code>http://localhost:4000</code>. HTTPS redirection is disabled in Development precisely so this suite sees real status codes rather than a 307.</dd></div>
+            <div><dt>No instance</dt><dd>Self-skips with a message naming the unreachable URL — a missing server never reports as a failure.</dd></div>
+            <div><dt>Identity</dt><dd><code>Auth:EnableFakeAuth</code> plus <code>X-Fake-User</code> lets headless runs assume any identity or role without the interactive flow.</dd></div>
+            <div><dt>Coverage</dt><dd>Login journeys (6), accessibility (4), the AI service picker (1), and 10 API smoke checks. <code>PlaywrightViewports</code> parameterises the viewport matrix.</dd></div>
+            <div><dt>Isolation</dt><dd>Both E2E projects reference only <code>Shared</code> — they cannot reach into the host and are honest black-box clients.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="commands">
+    <div class="sec__head"><span class="sec__n">04</span><h2>Command matrix</h2><p>copy, paste, run</p></div>
+    <p class="lede">Run from the repository root. The solution is <code>PoRedoImage.slnx</code>; targeting a project
+      directly is faster than filtering the whole solution when you already know the tier.</p>
+
+    <div class="card">
+      <div class="card__head"><h3>By tier</h3><span class="chip chip--mute chip--flat">dotnet CLI</span></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">Goal</th><th scope="col">Command</th><th scope="col" style="width:1%"></th></tr></thead>
+          <tbody id="cmds">
+            <tr><td>Everything</td><td><code class="cmd">dotnet test PoRedoImage.slnx</code></td><td></td></tr>
+            <tr><td>Tier 1 only — fast inner loop</td><td><code class="cmd">dotnet test tests/PoRedoImage.Tests.Unit</code></td><td></td></tr>
+            <tr><td>Tier 2 + 3</td><td><code class="cmd">dotnet test tests/PoRedoImage.Tests.Integration</code></td><td></td></tr>
+            <tr><td>Tier 3 only — skip Docker-backed tests</td><td><code class="cmd">dotnet test tests/PoRedoImage.Tests.Integration --filter "FullyQualifiedName~Features"</code></td><td></td></tr>
+            <tr><td>Tier 4 — API smoke</td><td><code class="cmd">dotnet test tests/PoRedoImage.Tests.E2E.ApiSmoke</code></td><td></td></tr>
+            <tr><td>Tier 4 — UI</td><td><code class="cmd">dotnet test tests/PoRedoImage.Tests.E2E.UI</code></td><td></td></tr>
+            <tr><td>One class</td><td><code class="cmd">dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~VisionServiceRouterTests"</code></td><td></td></tr>
+            <tr><td>One method</td><td><code class="cmd">dotnet test --filter "FullyQualifiedName~VisionServiceRouterTests.Resolve_Ollama_Id_Returns_Ollama_Service"</code></td><td></td></tr>
+            <tr><td>Everything except E2E</td><td><code class="cmd">dotnet test PoRedoImage.slnx --filter "FullyQualifiedName!~E2E"</code></td><td></td></tr>
+            <tr><td>Ceiling meta-tests only</td><td><code class="cmd">dotnet test PoRedoImage.slnx --filter "FullyQualifiedName~TestCountCeilingTests"</code></td><td></td></tr>
+            <tr><td>With a TRX report</td><td><code class="cmd">dotnet test PoRedoImage.slnx --logger "trx;LogFileName=results.trx"</code></td><td></td></tr>
+            <tr><td>Point E2E at a deployed instance</td><td><code class="cmd">E2E_BASE_URL=https://your-app.azurewebsites.net dotnet test tests/PoRedoImage.Tests.E2E.ApiSmoke</code></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cap">On PowerShell, set the environment variable separately:
+        <code>$env:E2E_BASE_URL = "https://…"</code> before the <code>dotnet test</code> call — the inline
+        <code>VAR=value command</code> form is POSIX shell syntax and is a parse error in PowerShell.</p>
+    </div>
+
+    <div class="card" style="margin-top:1rem">
+      <div class="card__head"><h3>Supporting scripts</h3><span class="src src--head">SCRIPTS/</span></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">Script</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>SCRIPTS/run-e2e.ps1</code></td><td>Starts an instance and drives the E2E tiers against it</td></tr>
+            <tr><td><code>SCRIPTS/cleanup-testcontainers.ps1</code></td><td>Sixth line of defence — prunes any Azurite container the five in-process routes missed</td></tr>
+            <tr><td><code>SCRIPTS/setup.ps1</code></td><td>First-run developer setup</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="gates">
+    <div class="sec__head"><span class="sec__n">05</span><h2>Self-skipping gates</h2><p>why a missing dependency is not a failure</p></div>
+    <div class="grid2">
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">[DockerFact]</span>
+        <p style="margin:.6rem 0 0;font-size:.87rem">Probes the shared Azurite fixture. No Docker daemon →
+          <code>IsAvailable</code> is false → the test reports as <b>skipped</b> with a reason, and the body that
+          would use the connection string never runs. A developer without Docker still gets a green Tier 1 and a
+          truthful Tier 2 result.</p>
+      </div></div>
+      <div class="card"><div class="card__body">
+        <span class="chip chip--accent">[LiveServerFact]</span>
+        <p style="margin:.6rem 0 0;font-size:.87rem">Probes <code>E2E_BASE_URL</code> before the test runs. Nothing
+          listening → skipped with <em>"No live instance reachable at {url}"</em>. Because the UI project references
+          the API smoke project, a single attribute governs both E2E tiers.</p>
+      </div></div>
+    </div>
+    <div class="note">
+      <span class="note__k">The trade-off this makes</span>
+      Self-skipping keeps local runs green and fast, but it also means <strong>a CI job that silently loses Docker
+      or its test instance reports success while testing far less than it appears to</strong>. The counter-measure
+      is to assert the expected skip count in CI, or fail the pipeline when a tier reports zero executed tests.
+      Neither is present today.
+    </div>
+  </section>
+
+</main>
+
+<footer><div class="wrap">
+  <p>PoRedoImage testing-tier audit · report 06 of 8 · generated from commit dc027f3 on 2026-07-28</p>
+  <p>Counts taken from <code>[Fact]</code> and <code>[Theory]</code> attributes; a <code>[Theory]</code> counts once, matching the ceiling meta-tests' own rule.</p>
+</div></footer>
+
+<!--@SHELL-->
+<script>
+/* Copy buttons are added in script so the markup stays clean and the page still
+   reads correctly with JS disabled — the commands are selectable text either way. */
+document.querySelectorAll('#cmds tr').forEach(function (row) {
+  var code = row.querySelector('code.cmd');
+  var cell = row.lastElementChild;
+  if (!code || !cell) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy'; btn.type = 'button'; btn.textContent = 'Copy';
+  btn.addEventListener('click', function () {
+    navigator.clipboard.writeText(code.textContent).then(function () {
+      btn.textContent = 'Copied'; btn.dataset.done = '1';
+      setTimeout(function () { btn.textContent = 'Copy'; delete btn.dataset.done; }, 1600);
+    }, function () {
+      btn.textContent = 'Select it';
+      setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
+    });
+  });
+  cell.appendChild(btn);
+});
+</script>
+</body>
+</html>
