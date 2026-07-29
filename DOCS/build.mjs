@@ -14,6 +14,8 @@
  *   <!--@CHARTJS-->      Chart.js 4.5.1 UMD build, inlined
  *   <!--@SVG:name-->     DOCS/_src/diagrams/out/name.{light,dark}.svg, both inlined
  *   <!--@RAIL:file-->    cross-report navigation rail, current page marked
+ *   <!--@HISTORY-->      DOCS/diagnostic_history.json, inlined as window.VITALS_HISTORY
+ *                        (null when absent — the page then falls back to synthetic data)
  */
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -164,6 +166,18 @@ for (const [, file] of REPORTS) {
   const srcPath = join(SRC, 'pages', file);
   if (!existsSync(srcPath)) { console.log(`  ${file} — SKIP (no source)`); continue; }
   let html = readFileSync(srcPath, 'utf8');
+
+  html = html.replace('<!--@HISTORY-->', () => {
+    // Inlined rather than fetched: these pages are opened over file://, where fetch of a
+    // sibling JSON is blocked. Absent file → null, and the page keeps its synthetic series.
+    const p = join(DOCS, 'diagnostic_history.json');
+    if (!existsSync(p)) return '<script>window.VITALS_HISTORY = null;</script>';
+    const json = readFileSync(p, 'utf8');
+    const n = (JSON.parse(json).samples ?? []).length;
+    console.log(`    + diagnostic_history.json — ${n} sample(s) inlined`);
+    // </script> inside JSON string data would close the tag early.
+    return `<script>window.VITALS_HISTORY = ${json.replace(/<\//g, '<\\/')};</script>`;
+  });
 
   html = html.replace('<!--@STYLE-->', () => `<style>\n${style}\n</style>`);
   html = html.replace('<!--@CHARTJS-->', () => `<script>${chartjs}</script>`);

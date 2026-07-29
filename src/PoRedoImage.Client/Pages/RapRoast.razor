@@ -245,6 +245,21 @@
 
             if (!response.IsSuccessStatusCode)
             {
+                // 401 = BFF session cookie missing/expired. Send to /login instead of the
+                // generic "roast pipeline failed" message. See ImageRegeneration.razor for
+                // the matching fix.
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    errorMessage = "Your session has expired. Please sign in again.";
+                    NotificationService.Notify(
+                        NotificationSeverity.Warning,
+                        "Session expired",
+                        "Please sign in again to continue.",
+                        duration: 4000);
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+
                 errorMessage = response.StatusCode switch
                 {
                     System.Net.HttpStatusCode.TooManyRequests =>

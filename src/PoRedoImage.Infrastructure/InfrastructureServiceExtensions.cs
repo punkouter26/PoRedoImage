@@ -120,6 +120,11 @@ public static class InfrastructureServiceExtensions
         // Repository: Singleton — TableClient is thread-safe; avoids redundant CreateIfNotExists calls per-request
         services.AddSingleton<IBulkPromptRepository, AzureTableBulkPromptRepository>();
 
+        // Client vitals: Singleton for the same reason as the other table-backed repositories.
+        // Registered unconditionally — a mocked AI run still produces real browser timings, and
+        // suppressing them would make mock-mode sessions silently invisible in the dashboard.
+        services.AddSingleton<IClientVitalsRepository, AzureTableClientVitalsRepository>();
+
         // User image gallery: Singleton — BlobContainerClient + TableClient are both thread-safe
         services.AddSingleton<IUserImageRepository, AzureBlobUserImageRepository>();
         services.AddScoped<IUserImageService, UserImageService>();

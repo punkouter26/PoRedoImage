@@ -106,8 +106,6 @@ public sealed class IdempotencyKeyFilter : IEndpointFilter
 
         // Tell the framework we already wrote the response so it doesn't try again.
         return Results.Empty;
-
-        return result;
     }
 
     private static string? ReadBuffer(MemoryStream buffer)

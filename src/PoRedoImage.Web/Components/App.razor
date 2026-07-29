@@ -28,6 +28,10 @@
 
 <body>
     <Routes @rendermode="WasmMode" />
+    <!-- Vitals first, before the Blazor loader: the layout-shift observer inside has to be
+         installed before the WASM boot starts, or the boot's own shift goes unmeasured —
+         which is precisely the shift a WebAssembly app most needs to see. -->
+    <script src="js/vitals.js"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="js/imageProcessing.js"></script>

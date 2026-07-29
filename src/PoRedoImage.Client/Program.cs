@@ -50,6 +50,10 @@ builder.Services.AddScoped<AudioFeedbackService>();
 // so each user session has its own retry handler (TaskCompletionSource held in notifications).
 builder.Services.AddScoped<UserImageSaveService>();
 
+// Browser performance sampling (page load, CLS, WASM heap) → POST /api/diag/vitals.
+// Scoped so the once-per-load guard resets with the app, not with the process.
+builder.Services.AddScoped<PoRedoImage.Client.Diagnostics.ClientVitalsReporter>();
+
 // BFF auth (§2): the server serializes the authenticated principal (claims only, no tokens);
 // the client deserializes it into an AuthenticationStateProvider.
 builder.Services.AddAuthorizationCore();

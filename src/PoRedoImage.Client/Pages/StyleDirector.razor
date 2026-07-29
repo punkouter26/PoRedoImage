@@ -214,6 +214,20 @@
             var httpResponse = await Http.PostAsJsonAsync("/api/style-director/run", request);
             if (!httpResponse.IsSuccessStatusCode)
             {
+                // 401 = BFF session cookie missing/expired. Send to /login instead of dumping
+                // the empty body. See ImageRegeneration.razor for the matching fix.
+                if (httpResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    errorMessage = "Your session has expired. Please sign in again.";
+                    NotificationService.Notify(
+                        NotificationSeverity.Warning,
+                        "Session expired",
+                        "Please sign in again to continue.",
+                        duration: 4000);
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+
                 var body = await httpResponse.Content.ReadAsStringAsync();
                 errorMessage = $"Style director failed: {body}";
                 return;

@@ -1,5 +1,9 @@
 {
+  "name": "poredoimage-docs-toolchain",
+  "private": true,
+  "description": "Build toolchain for the DOCS/ audit reports. Not part of the application.",
   "dependencies": {
-    "@mermaid-js/mermaid-cli": "^11.16.0"
+    "@mermaid-js/mermaid-cli": "^11.16.0",
+    "puppeteer": "^25.4.0"
   }
 }

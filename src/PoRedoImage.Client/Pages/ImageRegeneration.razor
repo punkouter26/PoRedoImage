@@ -146,6 +146,25 @@
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
+                    // 401 means the BFF session cookie is missing/expired (idle tab, server
+                    // restart with rotated DataProtection keys, browser cleared the cookie, …).
+                    // The server returns an empty body in this case, so ReadFromJsonAsync would
+                    // fall into the catch and the user would see the misleading "Check that Azure
+                    // services are configured" message. Send them back to /login instead.
+                    if (httpResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    {
+                        errorMessage = "Your session has expired. Please sign in again.";
+                        NotificationService.Notify(
+                            NotificationSeverity.Warning,
+                            "Session expired",
+                            "Please sign in again to continue.",
+                            duration: 4000);
+                        // forceLoad bypasses the SPA router so the cookie + auth state are
+                        // re-established on the next page load.
+                        NavigationManager.NavigateTo("/login", forceLoad: true);
+                        return;
+                    }
+
                     try
                     {
                         var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>();

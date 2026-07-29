@@ -41,6 +41,9 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(RapRoastRequest))]
 [JsonSerializable(typeof(RapRoastResponse))]
 [JsonSerializable(typeof(SceneSnapshotDto))]
+[JsonSerializable(typeof(ClientVitalsSampleRequest))]
+[JsonSerializable(typeof(ClientVitalsHistoryDto))]
+[JsonSerializable(typeof(ClientVitalsPointDto))]
 [JsonSerializable(typeof(ImageBytes))]
 public partial class SharedJsonContext : JsonSerializerContext
 {

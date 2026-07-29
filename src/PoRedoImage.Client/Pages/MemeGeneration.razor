@@ -266,6 +266,23 @@
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
+                    // 401 = BFF session cookie missing/expired. Send to /login instead of the
+                    // misleading "Azure services" fallback (the server returns an empty body
+                    // in this case, so ReadFromJsonAsync would throw and the user would think
+                    // their Azure config is broken when actually their tab just needs to
+                    // re-authenticate). See ImageRegeneration.razor for the matching fix.
+                    if (httpResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    {
+                        errorMessage = "Your session has expired. Please sign in again.";
+                        NotificationService.Notify(
+                            NotificationSeverity.Warning,
+                            "Session expired",
+                            "Please sign in again to continue.",
+                            duration: 4000);
+                        NavigationManager.NavigateTo("/login", forceLoad: true);
+                        return;
+                    }
+
                     try
                     {
                         var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>();

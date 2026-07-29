@@ -131,6 +131,22 @@ try
                 QueueLimit = 2
             });
         });
+
+        // Telemetry writes (client vitals) are cheap compared to an AI call, so they get their own
+        // looser budget — but not an unlimited one: this is still an authenticated write path into
+        // Table Storage. One sample per page load means a real user never approaches 30/minute.
+        options.AddPolicy("telemetry", context =>
+        {
+            var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "anonymous";
+            return RateLimitPartition.GetFixedWindowLimiter(userId, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
+        });
     });
 
     // ─── Health checks ──────────────────────────────────────────────────
@@ -299,6 +315,7 @@ try
     app.MapAuthEndpoints();
     app.MapImageAnalysisEndpoints();
     app.MapDiagnosticsEndpoints();
+    app.MapVitalsEndpoints();
     app.MapBulkGenerateEndpoints();
     app.MapUserImageEndpoints();
     app.MapMemeTemplateEndpoints();
