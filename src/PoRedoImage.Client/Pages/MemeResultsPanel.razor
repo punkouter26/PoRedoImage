@@ -4,14 +4,12 @@
               DividerIcon="bi-emoji-laughing"
               OnDownloadOriginal="OnDownloadOriginal"
               OnStartOver="OnStartOver"
-              CrossLink1Href="/image-regeneration"
-              CrossLink1Icon="bi-palette2"
-              CrossLink1Label="Regenerate Instead">
+              ResultImageUrl="@MemeImageUrl"
+              ResultFileName="meme.png">
     <RightSide>
-        @if (!string.IsNullOrEmpty(AnalysisResult?.MemeImageData))
+        @if (MemeImageUrl is not null)
         {
-            var memeUrl = $"data:image/png;base64,{AnalysisResult.MemeImageData}";
-            <img src="@memeUrl" class="split-compare__img" alt="Meme"
+            <img src="@MemeImageUrl" class="split-compare__img" alt="Meme"
                  onload="this.classList.add('loaded')" />
         }
         else
@@ -58,5 +56,13 @@
     [Parameter] public EventCallback OnDownloadMeme { get; set; }
     [Parameter] public EventCallback OnManualSave { get; set; }
     [Parameter] public EventCallback OnStartOver { get; set; }
+
+    /// <summary>
+    /// The rendered meme as a data URI, or null when generation produced none. Both the
+    /// preview and the share/chaining actions read this single expression.
+    /// </summary>
+    private string? MemeImageUrl => string.IsNullOrEmpty(AnalysisResult?.MemeImageData)
+        ? null
+        : $"data:image/png;base64,{AnalysisResult.MemeImageData}";
 }
 

@@ -68,6 +68,9 @@
         analysisResult = null;
     }
 
+    /// <summary>Studio "Surprise me" hand-off — the photo is all this page needs.</summary>
+    protected override Task? AutoStartAsync() => ProcessImage();
+
     private async Task AutoSaveResultAsync(byte[] bytes, string contentType)
     {
         // Vision tags from Azure Computer Vision ride along so the gallery can filter by

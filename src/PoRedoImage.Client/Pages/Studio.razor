@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @inject ImageSessionService SessionService
 @inject NavigationManager Nav
 
@@ -45,68 +45,33 @@
 
         <div class="studio-features-col">
             <div class="studio-feature-cards">
-                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/image-regeneration">
-                    <span class="studio-feature-card__icon">🎨</span>
-                    <div>
-                        <div class="studio-feature-card__title">Regeneration</div>
-                        <p class="studio-feature-card__desc">AI recreates your photo as a brand-new artistic version using Gemini.</p>
-                    </div>
-                    <span class="studio-feature-card__cta">
-                        @(_hasImage ? "Process now →" : "Try it →")
-                    </span>
-                </a>
-
-                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/meme-generation">
-                    <span class="studio-feature-card__icon">😂</span>
-                    <div>
-                        <div class="studio-feature-card__title">Meme</div>
-                        <p class="studio-feature-card__desc">AI writes a witty caption and overlays it on your image.</p>
-                    </div>
-                    <span class="studio-feature-card__cta">
-                        @(_hasImage ? "Process now →" : "Try it →")
-                    </span>
-                </a>
-
-                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/bulk-generate">
-                    <span class="studio-feature-card__icon">🖼️</span>
-                    <div>
-                        <div class="studio-feature-card__title">Bulk Generate</div>
-                        <p class="studio-feature-card__desc">Generate up to 10 artistic variations at once via Gemini 2.0 Flash.</p>
-                    </div>
-                    <span class="studio-feature-card__cta">
-                        @(_hasImage ? "Process now →" : "Try it →")
-                    </span>
-                </a>
-
-                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/rap-roast">
-                    <span class="studio-feature-card__icon">🎤</span>
-                    <div>
-                        <div class="studio-feature-card__title">Rap Roast</div>
-                        <p class="studio-feature-card__desc">AI writes a roast verse about your photo, then performs it over a beat.</p>
-                    </div>
-                    <span class="studio-feature-card__cta">
-                        @(_hasImage ? "Process now →" : "Try it →")
-                    </span>
-                </a>
-
-                <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="/style-director">
-                    <span class="studio-feature-card__icon">✨</span>
-                    <div>
-                        <div class="studio-feature-card__title">Style Director</div>
-                        <p class="studio-feature-card__desc">Four AI agents collaborate to design the perfect art-style prompt, then Gemini paints it.</p>
-                    </div>
-                    <span class="studio-feature-card__cta">
-                        @(_hasImage ? "Process now →" : "Try it →")
-                    </span>
-                </a>
+                @foreach (var feature in FeatureCatalog.All)
+                {
+                    <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="@feature.Route">
+                        <span class="studio-feature-card__icon">@feature.Emoji</span>
+                        <div>
+                            <div class="studio-feature-card__title">@feature.Title</div>
+                            <p class="studio-feature-card__desc">@feature.Description</p>
+                        </div>
+                        <span class="studio-feature-card__cta">
+                            @(_hasImage ? "Process now →" : "Try it →")
+                        </span>
+                    </a>
+                }
             </div>
 
             @if (_hasImage)
             {
-                <p class="studio-ready-hint">
-                    <i class="bi bi-check-circle-fill text-success me-1"></i>
-                    Image ready — click any transformation above to start.
-                </p>
+                <div class="studio-ready">
+                    <p class="studio-ready-hint mb-0">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        Image ready — click any transformation above to start.
+                    </p>
+                    <button class="studio-surprise" @onclick="SurpriseMe"
+                            title="Pick a transformation at random and run it on this image">
+                        <i class="bi bi-dice-5-fill me-1"></i>Surprise me
+                    </button>
+                </div>
             }
         </div>
     </div>
@@ -153,6 +118,24 @@
         _previewUrl = $"data:{contentType};base64,{payload.Base64}";
         SessionService.SetImage(_previewUrl, contentType, payload.FileName ?? "pasted-image.png", bytes);
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// Picks a transformation at random and opens it with <c>?auto=1</c>, which
+    /// <see cref="FeaturePageBase.AutoStartAsync"/> turns into an immediate run.
+    /// </summary>
+    /// <remarks>
+    /// Bulk Generate is deliberately not in the pool: it produces ten images, and spending ten
+    /// generations on a dice roll is a cost surprise, not a delight. The pool is the four
+    /// single-output features, each of which needs nothing but the photo.
+    /// </remarks>
+    private void SurpriseMe()
+    {
+        if (!_hasImage) return;
+
+        var pool = FeatureCatalog.Except("/bulk-generate").ToArray();
+        var pick = pool[Random.Shared.Next(pool.Length)];
+        Nav.NavigateTo($"{pick.Route}?auto=1");
     }
 
     private void HandleGallerySelect(MyImagesGallery.GalleryItem item)

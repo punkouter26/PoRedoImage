@@ -66,6 +66,30 @@ public abstract class FeaturePageBase : ComponentBase
         SessionService.RecordFeatureVisit(path);
     }
 
+    /// <summary>
+    /// The page's zero-extra-input run, or null when it has none. Overriding this opts the page
+    /// into Studio's "Surprise me" hand-off: it navigates here with <c>?auto=1</c> and the active
+    /// image already in the session, and this fires once the page has rendered.
+    /// </summary>
+    protected virtual Task? AutoStartAsync() => null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _autoStarted) return;
+        _autoStarted = true;
+
+        var query = new Uri(NavigationManager.Uri).Query;
+        if (!query.Contains("auto=1", StringComparison.Ordinal)) return;
+        // Guard on an actual image: a bookmarked ?auto=1 with an empty session would otherwise
+        // fire a request that can only fail.
+        if (!SessionService.HasImage || isProcessing || isComplete) return;
+
+        var run = AutoStartAsync();
+        if (run is not null) await run;
+    }
+
+    private bool _autoStarted;
+
     protected async Task LoadFile(InputFileChangeEventArgs e)
     {
         selectedFile = e.File;

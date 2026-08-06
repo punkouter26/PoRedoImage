@@ -207,6 +207,9 @@
 
     protected override void OnGalleryImageSelected() => _result = null;
 
+    /// <summary>Studio "Surprise me" hand-off — the default beat style is enough to run.</summary>
+    protected override Task? AutoStartAsync() => RoastAsync();
+
     private async Task RoastAsync()
     {
         if (!canProcessImage) return;

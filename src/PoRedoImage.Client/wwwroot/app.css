@@ -2327,6 +2327,120 @@ code { color: #c026d3; }
 
 .prompt-drawer__reset:hover { background: var(--color-surface-elevated); color: var(--color-body); }
 
+/* Allow the per-row trace panel to wrap below the textarea + buttons. */
+.prompt-drawer__item { flex-wrap: wrap; }
+
+/* Inner flex row: keeps num / textarea / reset / improve on one line. */
+.prompt-drawer__row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    width: 100%;
+}
+
+/* "Improve with Style Director" star button — sits next to Reset. */
+.prompt-drawer__improve {
+    flex-shrink: 0;
+    margin-top: 0.3rem;
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(124,58,237,0.12));
+    color: #2563eb;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
+}
+
+.prompt-drawer__improve:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(59,130,246,0.22), rgba(124,58,237,0.22));
+    color: #1d4ed8;
+    border-color: #93c5fd;
+    transform: translateY(-1px);
+}
+
+.prompt-drawer__improve:disabled {
+    cursor: wait;
+    opacity: 0.75;
+    transform: none;
+}
+
+.prompt-drawer__improve--busy { border-color: #93c5fd; }
+
+.prompt-drawer__improve .spinner-border-sm { width: 0.85rem; height: 0.85rem; }
+
+/* Inline reasoning-trace panel that appears under a row after a successful improve. */
+.prompt-drawer__trace {
+    width: 100%;
+    margin-top: var(--spacing-xs);
+    padding: 0.55rem 0.7rem;
+    background: rgba(34, 197, 94, 0.06);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    border-radius: var(--radius-md);
+    font-size: 0.78rem;
+    color: var(--color-body);
+}
+
+.prompt-drawer__trace-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+}
+
+.prompt-drawer__trace-toggle:hover { color: var(--color-primary, #2563eb); }
+
+.prompt-drawer__trace-toggle .badge { font-size: 0.7rem; font-weight: 600; }
+
+.prompt-drawer__trace-rationale {
+    flex: 1;
+    color: var(--color-muted);
+    font-size: 0.76rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.prompt-drawer__trace-list {
+    list-style: none;
+    padding: 0.5rem 0 0 0;
+    margin: 0.5rem 0 0 0;
+    border-top: 1px dashed rgba(34, 197, 94, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.prompt-drawer__trace-row {
+    display: grid;
+    grid-template-columns: 1.1rem auto auto 1fr;
+    gap: 0.5rem;
+    align-items: baseline;
+    font-size: 0.74rem;
+    color: var(--color-muted);
+}
+
+.prompt-drawer__trace-row i { color: var(--color-primary, #2563eb); font-size: 0.85rem; }
+.prompt-drawer__trace-row strong { color: var(--color-body); font-weight: 600; }
+
+.prompt-drawer__trace-ms {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.7rem;
+    color: var(--color-muted-strong, #94a3b8);
+}
+
+.prompt-drawer__trace-summary { line-height: 1.35; }
+
 /* ── Mobile Sticky Bottom CTA ─────────────────────────────── */
 @media (max-width: 768px) {
     .mobile-sticky-cta {
@@ -2390,4 +2504,520 @@ code { color: #c026d3; }
     .mobile-sticky-cta {
         display: none !important;
     }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UX additions — paste/drop intake, wipe compare, gallery delete + lightbox,
+   prompt history, session cost chip, result chaining, Surprise me.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Paste hint + window-wide drop overlay ─────────────────────────────── */
+.drop-zone__paste {
+    font-size: .78rem;
+    color: var(--bs-secondary-color, #8a8a8a);
+    margin: .35rem 0 0;
+}
+
+.drop-zone__paste kbd {
+    font-size: .72rem;
+    padding: .1rem .3rem;
+    border-radius: 4px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.2);
+}
+
+/* Set on <body> by poUx while a file is dragged anywhere over the window. */
+body.po-drop-active::after {
+    content: "Drop your image anywhere";
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.1rem, 3vw, 1.8rem);
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: #fff;
+    background: rgba(13, 110, 253, .28);
+    border: 3px dashed rgba(255,255,255,.75);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+}
+
+/* ── Wipe compare ──────────────────────────────────────────────────────── */
+.compare-modes {
+    display: flex;
+    gap: .25rem;
+    padding: .4rem .5rem;
+    background: rgba(0,0,0,.25);
+}
+
+.compare-modes__btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.18);
+    color: rgba(255,255,255,.72);
+    border-radius: 999px;
+    padding: .18rem .7rem;
+    font-size: .78rem;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+}
+
+.compare-modes__btn:hover {
+    background: rgba(255,255,255,.1);
+    color: #fff;
+}
+
+.compare-modes__btn--active {
+    background: rgba(255,255,255,.92);
+    border-color: transparent;
+    color: #111;
+    font-weight: 600;
+}
+
+.compare {
+    position: relative;
+    height: clamp(260px, 46vh, 520px);
+    background: #0d0d10;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+
+.compare__layer {
+    position: absolute;
+    inset: 0;
+}
+
+/* The "after" layer is clipped from the left edge to the wipe position, so dragging
+   right reveals more of the generated image over the original beneath it. */
+.compare__layer--after {
+    clip-path: inset(0 0 0 var(--wipe));
+}
+
+.compare .split-compare__img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.compare__tag {
+    position: absolute;
+    top: .5rem;
+    padding: .12rem .55rem;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgba(0,0,0,.6);
+    border-radius: 999px;
+    pointer-events: none;
+}
+
+.compare__tag--left { left: .6rem; }
+.compare__tag--right { right: .6rem; }
+
+.compare__seam {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--wipe);
+    width: 2px;
+    margin-left: -1px;
+    background: rgba(255,255,255,.9);
+    box-shadow: 0 0 10px rgba(0,0,0,.6);
+    pointer-events: none;
+}
+
+.compare__seam-pill {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #fff;
+    color: #111;
+    font-size: .85rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,.45);
+}
+
+/* The range input IS the control: full-bleed, invisible track, wide thumb. */
+.compare__range {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: ew-resize;
+}
+
+.compare__range:focus-visible {
+    outline: 3px solid #4c9aff;
+    outline-offset: -3px;
+}
+
+.compare__range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 44px;
+    height: 100%;
+    background: transparent;
+    cursor: ew-resize;
+}
+
+.compare__range::-moz-range-thumb {
+    width: 44px;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    cursor: ew-resize;
+}
+
+/* ── Send result to another feature ────────────────────────────────────── */
+.send-to {
+    padding: .75rem 1rem;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+    background: rgba(255,255,255,.03);
+}
+
+.send-to__label {
+    display: block;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color, #9a9a9a);
+    margin-bottom: .5rem;
+}
+
+.send-to__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.send-to__btn {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.16);
+    color: inherit;
+    border-radius: 999px;
+    padding: .32rem .85rem;
+    font-size: .82rem;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+}
+
+.send-to__btn:hover {
+    background: rgba(13,110,253,.18);
+    border-color: rgba(13,110,253,.5);
+    transform: translateY(-1px);
+}
+
+/* ── Gallery: zoom + delete affordances ────────────────────────────────── */
+.gallery-thumb-wrap {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.gallery-thumb__zoom,
+.gallery-thumb__delete {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    font-size: .6rem;
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s, background .15s;
+}
+
+.gallery-thumb__zoom {
+    top: 2px;
+    left: 2px;
+    background: rgba(0,0,0,.7);
+}
+
+.gallery-thumb__delete {
+    top: 2px;
+    right: 2px;
+    background: rgba(190,30,45,.85);
+}
+
+.gallery-thumb__zoom:hover { background: rgba(0,0,0,.9); }
+.gallery-thumb__delete:hover { background: rgba(220,40,55,1); }
+
+.gallery-thumb-wrap:hover .gallery-thumb__zoom,
+.gallery-thumb-wrap:hover .gallery-thumb__delete,
+.gallery-thumb-wrap:focus-within .gallery-thumb__zoom,
+.gallery-thumb-wrap:focus-within .gallery-thumb__delete {
+    opacity: 1;
+}
+
+/* Touch devices have no hover — keep the controls permanently visible there. */
+@media (hover: none) {
+    .gallery-thumb__zoom,
+    .gallery-thumb__delete {
+        opacity: 1;
+    }
+}
+
+/* ── Gallery undo strip ────────────────────────────────────────────────── */
+.gallery-undo {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    margin: .5rem 0;
+    padding: .45rem .7rem;
+    border-radius: 10px;
+    background: rgba(255,193,7,.12);
+    border: 1px solid rgba(255,193,7,.35);
+    font-size: .85rem;
+}
+
+.gallery-undo__thumb {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.gallery-undo__text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gallery-undo__btn {
+    background: rgba(255,193,7,.9);
+    color: #111;
+    border: none;
+    border-radius: 999px;
+    padding: .22rem .8rem;
+    font-weight: 600;
+    font-size: .8rem;
+    cursor: pointer;
+}
+
+.gallery-undo__btn:disabled {
+    opacity: .6;
+    cursor: default;
+}
+
+.gallery-undo__dismiss {
+    background: transparent;
+    border: none;
+    color: inherit;
+    opacity: .6;
+    cursor: pointer;
+}
+
+/* ── Gallery lightbox ──────────────────────────────────────────────────── */
+.gallery-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 1600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(0,0,0,.8);
+    backdrop-filter: blur(3px);
+}
+
+.gallery-lightbox__panel {
+    position: relative;
+    max-width: min(920px, 100%);
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+    padding: 1rem;
+    border-radius: 14px;
+    background: #16161a;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    overflow: auto;
+}
+
+.gallery-lightbox__img {
+    max-width: 100%;
+    max-height: 65vh;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #0d0d10;
+}
+
+.gallery-lightbox__meta {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+}
+
+.gallery-lightbox__name { font-weight: 600; }
+.gallery-lightbox__sub { font-size: .78rem; opacity: .65; }
+
+.gallery-lightbox__actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.gallery-lightbox__close {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    cursor: pointer;
+}
+
+/* ── Prompt history strip ──────────────────────────────────────────────── */
+.prompt-history {
+    padding: .5rem .75rem;
+    border-top: 1px solid rgba(255,255,255,.08);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.prompt-history__label {
+    display: flex;
+    align-items: center;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    opacity: .6;
+    margin-bottom: .4rem;
+}
+
+.prompt-history__target {
+    margin-left: auto;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.prompt-history__list {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    max-height: 190px;
+    overflow-y: auto;
+}
+
+.prompt-history__chip {
+    display: flex;
+    align-items: center;
+    gap: .2rem;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 8px;
+    background: rgba(255,255,255,.04);
+}
+
+.prompt-history__chip--pinned {
+    border-color: rgba(255,193,7,.5);
+    background: rgba(255,193,7,.08);
+}
+
+.prompt-history__use {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: .78rem;
+    padding: .35rem .5rem;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.prompt-history__use:hover { color: #6ea8fe; }
+
+.prompt-history__pin,
+.prompt-history__drop {
+    background: transparent;
+    border: none;
+    color: inherit;
+    opacity: .55;
+    padding: .25rem .35rem;
+    font-size: .75rem;
+    cursor: pointer;
+}
+
+.prompt-history__pin:hover,
+.prompt-history__drop:hover { opacity: 1; }
+
+.prompt-history__chip--pinned .prompt-history__pin {
+    opacity: 1;
+    color: #ffc107;
+}
+
+/* ── Session cost chip (footer) ────────────────────────────────────────── */
+.session-cost {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .75rem;
+    padding: .1rem .55rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.12);
+    white-space: nowrap;
+}
+
+.session-cost__value { font-weight: 700; }
+.session-cost__meta { opacity: .6; }
+
+@media (max-width: 575px) {
+    .session-cost__meta { display: none; }
+}
+
+/* ── Studio: ready row + Surprise me ───────────────────────────────────── */
+.studio-ready {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+    margin-top: .9rem;
+}
+
+.studio-surprise {
+    margin-left: auto;
+    border: none;
+    border-radius: 999px;
+    padding: .4rem 1.1rem;
+    font-weight: 600;
+    font-size: .85rem;
+    color: #fff;
+    background: linear-gradient(135deg, #7048e8, #d6336c);
+    box-shadow: 0 4px 14px rgba(112,72,232,.35);
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+}
+
+.studio-surprise:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(112,72,232,.5);
 }

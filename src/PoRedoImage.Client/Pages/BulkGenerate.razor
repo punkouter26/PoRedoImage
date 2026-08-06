@@ -9,6 +9,7 @@
 @inject AudioFeedbackService Audio
 @inject PoRedoImage.Client.Models.AiSelectionState AiSelection
 @inject PoRedoImage.Client.Services.UserImageSaveService UserImageSave
+@inject PoRedoImage.Client.Services.SessionCostService Cost
 
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
@@ -19,14 +20,14 @@
         Description="@("Upload a photo and generate 10 artistic variations. Use <PERSON> in prompts — AI replaces it with a description of your image.")"
         ModelBadge="Gemini 2.0 Flash (img2img)" />
 
-    @if (_pricing is not null)
+    @if (Cost.Pricing is not null)
     {
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3 small text-secondary">
-            <span class="badge text-bg-light border"><i class="bi bi-cpu me-1"></i>@_pricing.ImageProviderLabel</span>
-            <span><i class="bi bi-cash-coin me-1"></i>≈ @FormatMoney(_pricing.ImageToImageUsd) / image (estimate)</span>
-            @if (_sessionEstimate > 0)
+            <span class="badge text-bg-light border"><i class="bi bi-cpu me-1"></i>@Cost.Pricing.ImageProviderLabel</span>
+            <span><i class="bi bi-cash-coin me-1"></i>≈ @Cost.Format(Cost.Pricing.ImageToImageUsd) / image (estimate)</span>
+            @if (Cost.EstimatedTotal > 0)
             {
-                <span class="ms-sm-auto fw-semibold text-body"><i class="bi bi-receipt me-1"></i>Session est: @FormatMoney(_sessionEstimate)</span>
+                <span class="ms-sm-auto fw-semibold text-body"><i class="bi bi-receipt me-1"></i>Session est: @Cost.Format(Cost.EstimatedTotal)</span>
             }
         </div>
     }
@@ -63,9 +64,16 @@
                         disabled="@(string.IsNullOrEmpty(_imagePreviewUrl) || _activePromptCount == 0)">
                     <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString()) Variation@(_activePromptCount == 1 ? "" : "s")
                 </button>
+                @if (_completedResults.Count > 0)
+                {
+                    <button class="btn-download-favs w-100 mt-2" @onclick="DownloadAllAsZip" disabled="@_zipping">
+                        <i class="bi @(_zipping ? "bi-hourglass-split" : "bi-file-earmark-zip") me-1"></i>
+                        @(_zipping ? "Packing…" : $"Download All ({_completedResults.Count}) as ZIP")
+                    </button>
+                }
                 @if (_favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
                 {
-                    <button class="btn-download-favs w-100 mt-2" @onclick="DownloadFavorites">
+                    <button class="btn-download-favs w-100 mt-2" @onclick="DownloadFavorites" disabled="@_zipping">
                         <i class="bi bi-heart-fill me-1"></i>Download Favorites (@_favorites.Count)
                     </button>
                 }
@@ -96,6 +104,8 @@
     <PromptDrawer
         Prompts="@_prompts"
         IsSaving="@_isSaving"
+        ImageBytes="@_imageBytes"
+        ContentType="@_imageContentType"
         OnPromptsChanged="@(p => { _prompts = p; StateHasChanged(); })"
         OnSaveRequested="SavePrompts"
         OnLoadRequested="LoadPrompts" />
@@ -155,13 +165,11 @@
     private MyImagesGallery? _gallery;
     private BulkGallery? _bulkGallery;
     private CancellationTokenSource? _cts;
-    private AiPricingDto? _pricing;
-    private decimal _sessionEstimate;
+    private bool _zipping;
 
-    private string FormatMoney(decimal v) =>
-        string.Equals(_pricing?.Currency, "USD", StringComparison.OrdinalIgnoreCase)
-            ? $"${v:0.####}"
-            : $"{v:0.####} {_pricing?.Currency}";
+    /// <summary>Completed slots that actually carry an image — the ZIP's contents.</summary>
+    private List<BulkGenerateImageResult> _completedResults =>
+        [.. _results.Where(r => r.Status == BulkGenerateStatus.Complete && r.ImageUrl is not null)];
 
     private sealed record BulkSavedState(BulkGenerateImageResult[] Results);
 
@@ -174,10 +182,10 @@
         // the Active Image Bar can deep-link back here.
         SessionService.RecordFeatureVisit("/bulk-generate");
 
-        // Active image-gen provider + indicative per-image pricing for the cost estimate.
-        // Non-critical: a failure just hides the pricing note.
-        try { _pricing = await Http.GetFromJsonAsync<AiPricingDto>("/api/pricing", SharedJsonOptions.Default); }
-        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load AI pricing estimate"); }
+        // Active image-gen provider + indicative per-image pricing, shared with the footer chip
+        // so the page total and the session total can't disagree. Non-critical: a failure just
+        // hides the pricing note.
+        await Cost.EnsureLoadedAsync();
 
         if (SessionService.HasImage && _imagePreviewUrl is null)
         {
@@ -346,7 +354,7 @@
                     _results[i].Prompt = rawPrompt;
                     _results[i].ImageUrl = $"data:{varResult!.ContentType};base64,{varResult.ImageData}";
                     _completedCount++;
-                    _sessionEstimate += _pricing?.ImageToImageUsd ?? 0m;
+                    Cost.RecordImages();
                     _ = Audio.TickAsync();
                     // Fire-and-forget: save variation to gallery
                     if (_userId is not null)
@@ -440,8 +448,53 @@
 
     private async Task DownloadFavorites()
     {
+        // Favorites are usually one or two picks — individual saves keep the file names
+        // meaningful. Use "Download All as ZIP" for the whole batch.
         foreach (var idx in _favorites.OrderBy(i => i))
             await DownloadImage(idx);
+    }
+
+    /// <summary>
+    /// Packs every completed variation into one archive. Ten saves used to mean ten
+    /// browser download prompts; this makes it one.
+    /// </summary>
+    private async Task DownloadAllAsZip()
+    {
+        if (_zipping) return;
+        var entries = _completedResults
+            .Select(r => new { name = $"variation-{r.Index + 1}.png", url = r.ImageUrl! })
+            .ToArray();
+        if (entries.Length == 0) return;
+
+        _zipping = true;
+        try
+        {
+            var written = await JSRuntime.InvokeAsync<int>("poUx.downloadZip", entries, "poredoimage-variations.zip");
+            if (written == 0)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "ZIP Failed",
+                    "None of the images could be read. Try saving them individually.", duration: 6000);
+            }
+            else
+            {
+                // A short count is not a silent truncation: say which images didn't make it.
+                var severity = written == entries.Length ? NotificationSeverity.Success : NotificationSeverity.Warning;
+                var detail = written == entries.Length
+                    ? $"{written} image{(written == 1 ? "" : "s")} packed."
+                    : $"{written} of {entries.Length} images packed — the rest could not be read.";
+                NotificationService.Notify(severity, "ZIP Ready", detail, duration: 4000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ZIP download failed");
+            NotificationService.Notify(NotificationSeverity.Error, "ZIP Failed", ex.Message, duration: 6000);
+        }
+        finally
+        {
+            _zipping = false;
+            StateHasChanged();
+        }
     }
 
     private async Task SavePrompts()
@@ -546,7 +599,7 @@
 
             _bulkGallery.EndReroll(index, payload.Variations);
             // Re-rolls are billed at generation time regardless of which one the user accepts.
-            _sessionEstimate += (_pricing?.ImageToImageUsd ?? 0m) * payload.Succeeded;
+            Cost.RecordImages(payload.Succeeded);
             NotificationService.Notify(NotificationSeverity.Success, "Re-roll Ready",
                 $"{payload.Succeeded} of {payload.Requested} variations ready in {payload.ElapsedMs}ms.",
                 duration: 4000);

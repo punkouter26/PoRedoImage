@@ -198,6 +198,9 @@
         await AutoSaveMemeAsync(analysisResult.MemeImageData, mime);
     }
 
+    /// <summary>Studio "Surprise me" hand-off — the photo is all the AI-caption path needs.</summary>
+    protected override Task? AutoStartAsync() => _useTemplate ? null : ProcessImage();
+
     private async Task ProcessImage()
     {
         if (imagePreviewUrl == null) return;

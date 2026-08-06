@@ -1,0 +1,26 @@
+@* Running session cost estimate. Hidden until pricing loads AND at least one image has
+   been generated — an always-visible "$0.00" is noise, not information. *@
+@implements IDisposable
+@inject PoRedoImage.Client.Services.SessionCostService Cost
+
+@if (Cost.Pricing is not null && Cost.ImageCount > 0)
+{
+    <span class="session-cost" role="status"
+          title="@($"{Cost.ImageCount} image(s) via {Cost.Pricing.ImageProviderLabel} at ≈ {Cost.Format(Cost.Pricing.ImageToImageUsd)} each. Indicative estimate from configuration — not billing data.")">
+        <i class="bi bi-receipt me-1" aria-hidden="true"></i>
+        <span class="session-cost__value">@Cost.Format(Cost.EstimatedTotal)</span>
+        <span class="session-cost__meta">· @Cost.ImageCount img · @Cost.Pricing.ImageProviderLabel</span>
+    </span>
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Cost.OnChange += OnCostChanged;
+        await Cost.EnsureLoadedAsync();
+    }
+
+    public void Dispose() => Cost.OnChange -= OnCostChanged;
+
+    private void OnCostChanged() => InvokeAsync(StateHasChanged);
+}

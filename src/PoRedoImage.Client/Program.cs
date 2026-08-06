@@ -64,6 +64,13 @@ builder.Services.AddScoped<AudioFeedbackService>();
 // so each user session has its own retry handler (TaskCompletionSource held in notifications).
 builder.Services.AddScoped<UserImageSaveService>();
 
+// Recently-used / pinned art-style prompts, persisted to localStorage by the prompt drawer.
+builder.Services.AddScoped<PromptHistoryService>();
+
+// Running per-session image-generation cost estimate, seeded from GET /api/pricing. Scoped so
+// the tally resets with the app instance — it describes this visit, not the account.
+builder.Services.AddScoped<SessionCostService>();
+
 // Browser performance sampling (page load, CLS, WASM heap) → POST /api/diag/vitals.
 // Scoped so the once-per-load guard resets with the app, not with the process.
 builder.Services.AddScoped<PoRedoImage.Client.Diagnostics.ClientVitalsReporter>();

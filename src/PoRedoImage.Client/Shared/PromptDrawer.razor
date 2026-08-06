@@ -1,5 +1,10 @@
 @using Radzen
 @using Radzen.Blazor
+@implements IDisposable
+@inject PoRedoImage.Client.Services.PromptHistoryService History
+@inject HttpClient Http
+@inject NotificationService NotificationService
+@inject ILogger<PromptDrawer> Logger
 
 <div class="prompt-drawer-wrapper">
     @* Floating toggle (FAB). Bootstrap icons — consistent with the rest of the app. *@
@@ -48,24 +53,110 @@
             Use <code>&lt;PERSON&gt;</code> — replaced with an AI description of your image
         </div>
 
+        @* ── Recents / pinned. Click fills the slot you last focused (or slot 1). ── *@
+        @if (History.Entries.Count > 0)
+        {
+            <div class="prompt-history">
+                <span class="prompt-history__label">
+                    <i class="bi bi-clock-history me-1"></i>Recent
+                    <span class="prompt-history__target">→ slot @(_targetSlot + 1)</span>
+                </span>
+                <div class="prompt-history__list">
+                    @foreach (var entry in History.Entries)
+                    {
+                        var e = entry;
+                        <div class="prompt-history__chip @(e.Pinned ? "prompt-history__chip--pinned" : "")">
+                            <button type="button" class="prompt-history__use" title="@e.Text"
+                                    @onclick="@(() => ApplyHistory(e.Text))">
+                                @Preview(e.Text)
+                            </button>
+                            <button type="button" class="prompt-history__pin"
+                                    title="@(e.Pinned ? "Unpin" : "Pin to the top")"
+                                    aria-pressed="@e.Pinned"
+                                    @onclick="@(() => History.TogglePinAsync(e.Text))">
+                                <i class="bi @(e.Pinned ? "bi-star-fill" : "bi-star")"></i>
+                            </button>
+                            <button type="button" class="prompt-history__drop" title="Forget this prompt"
+                                    @onclick="@(() => History.RemoveAsync(e.Text))">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         <div class="prompt-drawer__list">
             @for (int i = 0; i < _localPrompts.Length; i++)
             {
                 var idx = i;
                 <div class="prompt-drawer__item" @key="@($"{_resetKey}-{idx}")">
-                    <span class="prompt-drawer__num">@(idx + 1)</span>
-                    <textarea class="prompt-drawer__textarea"
-                              rows="3"
-                              value="@_localPrompts[idx]"
-                              @oninput="@(e => UpdatePrompt(idx, e.Value?.ToString() ?? string.Empty))"
-                              placeholder="@(idx < DefaultPrompts.All.Length ? DefaultPrompts.All[idx][..Math.Min(60, DefaultPrompts.All[idx].Length)] + "…" : "Enter an art style prompt…")" />
-                    @if (idx < DefaultPrompts.All.Length
-                        && !string.IsNullOrWhiteSpace(_localPrompts[idx])
-                        && _localPrompts[idx] != DefaultPrompts.All[idx])
+                    <div class="prompt-drawer__row">
+                        <span class="prompt-drawer__num">@(idx + 1)</span>
+                        <textarea class="prompt-drawer__textarea"
+                                  rows="3"
+                                  value="@_localPrompts[idx]"
+                                  @onfocus="@(() => _targetSlot = idx)"
+                                  @onblur="@(() => History.RememberAsync(_localPrompts[idx]))"
+                                  @oninput="@(e => UpdatePrompt(idx, e.Value?.ToString() ?? string.Empty))"
+                                  placeholder="@(idx < DefaultPrompts.All.Length ? DefaultPrompts.All[idx][..Math.Min(60, DefaultPrompts.All[idx].Length)] + "…" : "Enter an art style prompt…")" />
+                        @if (idx < DefaultPrompts.All.Length
+                            && !string.IsNullOrWhiteSpace(_localPrompts[idx])
+                            && _localPrompts[idx] != DefaultPrompts.All[idx])
+                        {
+                            <button type="button" class="prompt-drawer__reset" @onclick="@(() => ResetRow(idx))" title="Reset to default">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                        }
+                        @if (ImageBytes is not null && !string.IsNullOrWhiteSpace(_localPrompts[idx]))
+                        {
+                            var busy = IsRowBusy(idx);
+                            <button type="button"
+                                    class="prompt-drawer__improve @(busy ? "prompt-drawer__improve--busy" : "")"
+                                    disabled="@busy"
+                                    @onclick="@(() => ImproveRowAsync(idx))"
+                                    title="Let the 4-agent Style Director rewrite this prompt for your image">
+                                @if (busy)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-stars"></i>
+                                }
+                            </button>
+                        }
+                    </div>
+                    @if (TryGetRowState(idx, out var state) && state.Result is not null)
                     {
-                        <button type="button" class="prompt-drawer__reset" @onclick="@(() => ResetRow(idx))" title="Reset to default">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </button>
+                        <div class="prompt-drawer__trace">
+                            <button type="button"
+                                    class="prompt-drawer__trace-toggle"
+                                    @onclick="@(() => ToggleTrace(idx))"
+                                    aria-expanded="@state.ShowTrace">
+                                <i class="bi @(state.ShowTrace ? "bi-chevron-down" : "bi-chevron-right")"></i>
+                                <span class="badge bg-success">Confidence @(state.Result.Confidence ?? 0) / 100</span>
+                                <span class="prompt-drawer__trace-rationale">
+                                    @(string.IsNullOrWhiteSpace(state.Result.Critique)
+                                        ? "Style Director accepted this prompt."
+                                        : state.Result.Critique)
+                                </span>
+                            </button>
+                            @if (state.ShowTrace && state.Result.Reasoning is { Count: > 0 })
+                            {
+                                <ul class="prompt-drawer__trace-list">
+                                    @foreach (var step in state.Result.Reasoning)
+                                    {
+                                        <li class="prompt-drawer__trace-row">
+                                            <i class="bi @step.IconClass"></i>
+                                            <strong>@step.AgentDisplayName</strong>
+                                            <span class="prompt-drawer__trace-ms">@step.ElapsedMs ms</span>
+                                            <span class="prompt-drawer__trace-summary">@step.Summary</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
                     }
                 </div>
             }
@@ -80,10 +171,37 @@
     [Parameter] public EventCallback OnSaveRequested { get; set; }
     [Parameter] public EventCallback OnLoadRequested { get; set; }
 
+    /// <summary>Source image bytes (already decoded). When null, the "Improve" button is hidden.</summary>
+    [Parameter] public byte[]? ImageBytes { get; set; }
+    /// <summary>MIME type of <see cref="ImageBytes"/>. Defaults to image/jpeg.</summary>
+    [Parameter] public string ContentType { get; set; } = "image/jpeg";
+
     private bool _isExpanded;
     private string[] _localPrompts = DefaultPrompts.All.ToArray();
     private int _resetKey = 0;
+    private int _targetSlot;
     private int _activePromptCount => _localPrompts.Count(p => !string.IsNullOrWhiteSpace(p));
+
+    /// <summary>Per-row improvement cache: the in-flight result plus UI flags for the trace panel.</summary>
+    private readonly Dictionary<int, RowImproveState> _rowImprove = new();
+
+    private sealed record RowImproveState(bool Busy, StyleDirectorResultDto? Result, string? Error, bool ShowTrace);
+
+    private bool TryGetRowState(int idx, out RowImproveState state) =>
+        _rowImprove.TryGetValue(idx, out state!);
+
+    private bool IsRowBusy(int idx) =>
+        _rowImprove.TryGetValue(idx, out var s) && s.Busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        History.OnChange += OnHistoryChanged;
+        await History.LoadAsync();
+    }
+
+    public void Dispose() => History.OnChange -= OnHistoryChanged;
+
+    private void OnHistoryChanged() => InvokeAsync(StateHasChanged);
 
     protected override void OnParametersSet()
     {
@@ -95,6 +213,23 @@
     {
         _isExpanded = !_isExpanded;
     }
+
+    /// <summary>Fills the slot the user last focused (slot 1 before any focus) with a recalled prompt.</summary>
+    private async Task ApplyHistory(string text)
+    {
+        var slot = Math.Clamp(_targetSlot, 0, _localPrompts.Length - 1);
+        _localPrompts[slot] = text;
+        // The textarea is uncontrolled (value=, not @bind), so it only picks up an external
+        // write when its @key changes — same mechanism ResetRow relies on.
+        _resetKey++;
+        await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+        await History.RememberAsync(text);
+        StateHasChanged();
+    }
+
+    /// <summary>Chip label: enough of the prompt to recognise it, not enough to wrap.</summary>
+    private static string Preview(string text) =>
+        text.Length <= 44 ? text : text[..43] + "…";
 
     private async Task UpdatePrompt(int index, string value)
     {
@@ -121,4 +256,78 @@
             StateHasChanged();
         }
     }
+
+    private void ToggleTrace(int index)
+    {
+        if (!_rowImprove.TryGetValue(index, out var s)) return;
+        _rowImprove[index] = s with { ShowTrace = !s.ShowTrace };
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Runs the 4-agent Style Director on the current row's prompt and replaces
+    /// the row text with the refined, critic-approved result. The full reasoning
+    /// trace is kept under the row so the user can audit why the swap happened.
+    /// </summary>
+    private async Task ImproveRowAsync(int index)
+    {
+        if (ImageBytes is null) return;
+
+        _rowImprove[index] = new RowImproveState(Busy: true, Result: null, Error: null, ShowTrace: false);
+        StateHasChanged();
+
+        try
+        {
+            // Heuristic agents tolerate weak tags, so we ship a generic set rather
+            // than re-running vision here. If a later iteration wants to feed the
+            // upstream <PERSON> description through, this is the place to do it.
+            var request = new StyleDirectorRequestDto(
+                ImageData: Convert.ToBase64String(ImageBytes),
+                ContentType: ContentType,
+                DetectedTags: new[] { "photo", "subject" },
+                ConfidenceScore: 0.7);
+
+            using var response = await Http.PostAsJsonAsync("/api/style-director/run", request, SharedJsonOptions.Default);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                var msg = $"Style Director returned {(int)response.StatusCode}: {Truncate(body, 120)}";
+                Logger.LogWarning("Style Director row {Index} failed: {Message}", index, msg);
+                NotificationService.Notify(NotificationSeverity.Error, "Style Director", msg, duration: 5000);
+                _rowImprove[index] = new RowImproveState(false, null, msg, false);
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<StyleDirectorResultDto>(SharedJsonOptions.Default);
+            if (result is null || !result.Succeeded || string.IsNullOrWhiteSpace(result.FinalPrompt))
+            {
+                var msg = result?.ErrorMessage ?? "Style Director returned no usable prompt.";
+                NotificationService.Notify(NotificationSeverity.Warning, "Style Director", msg, duration: 5000);
+                _rowImprove[index] = new RowImproveState(false, null, msg, false);
+                return;
+            }
+
+            // Replace the row text and bump the @key so the uncontrolled textarea
+            // picks up the new value (same trick ResetDefaults / ResetRow use).
+            _localPrompts[index] = result.FinalPrompt;
+            _resetKey++;
+            _rowImprove[index] = new RowImproveState(false, result, null, ShowTrace: false);
+            await OnPromptsChanged.InvokeAsync(_localPrompts.ToArray());
+            await History.RememberAsync(result.FinalPrompt);
+            Logger.LogInformation("Style Director improved row {Index} (confidence={Confidence})", index, result.Confidence);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "Style Director row {Index} threw", index);
+            NotificationService.Notify(NotificationSeverity.Error, "Style Director", ex.Message, duration: 5000);
+            _rowImprove[index] = new RowImproveState(false, null, ex.Message, false);
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private static string Truncate(string s, int max) =>
+        string.IsNullOrEmpty(s) || s.Length <= max ? s : s[..max] + "…";
 }

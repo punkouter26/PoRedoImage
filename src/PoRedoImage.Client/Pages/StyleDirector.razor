@@ -182,6 +182,9 @@
         _directorResult = null;
     }
 
+    /// <summary>Studio "Surprise me" hand-off — the photo is all this page needs.</summary>
+    protected override Task? AutoStartAsync() => RunDirector();
+
     private async Task RunDirector()
     {
         if (imagePreviewUrl is null) return;

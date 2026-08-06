@@ -1,20 +1,64 @@
-@* ── Shared split-compare + actions base for both result panels ─────── *@
+@* ── Shared compare + actions base for both result panels ─────────────── *@
+@inject ImageSessionService SessionService
+@inject NavigationManager Nav
+@inject NotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@inject ILogger<ResultsPanel> Logger
+
 <div class="split-compare-wrapper mb-4">
-    <div class="split-compare">
-        <div class="split-compare__side">
-            <span class="split-compare__label">Original</span>
-            <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
-                 onload="this.classList.add('loaded')" />
-        </div>
-        <div class="split-compare__divider">
-            <div class="split-compare__divider-line"></div>
-            <div class="split-compare__divider-pill"><i class="bi @DividerIcon"></i></div>
-        </div>
-        <div class="split-compare__side">
-            <span class="split-compare__label">@RightLabel</span>
-            @RightSide
-        </div>
+    <div class="compare-modes">
+        <button type="button" class="compare-modes__btn @(_wipeMode ? "compare-modes__btn--active" : "")"
+                @onclick="@(() => _wipeMode = true)" aria-pressed="@_wipeMode">
+            <i class="bi bi-arrow-left-right me-1"></i>Wipe
+        </button>
+        <button type="button" class="compare-modes__btn @(!_wipeMode ? "compare-modes__btn--active" : "")"
+                @onclick="@(() => _wipeMode = false)" aria-pressed="@(!_wipeMode)">
+            <i class="bi bi-layout-split me-1"></i>Side by side
+        </button>
     </div>
+
+    @if (_wipeMode)
+    {
+        @* Both images are stacked in one box; the top layer is clipped at --wipe. The range
+           input IS the control rather than a decoration over a pointer-drag handler, so the
+           comparison is keyboard-operable and works on touch with no interop at all. *@
+        <div class="compare" style="--wipe: @(_wipe.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%">
+            <div class="compare__layer">
+                <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
+                     onload="this.classList.add('loaded')" />
+                <span class="compare__tag compare__tag--left">Original</span>
+            </div>
+            <div class="compare__layer compare__layer--after">
+                @RightSide
+                <span class="compare__tag compare__tag--right">@RightLabel</span>
+            </div>
+            <div class="compare__seam" aria-hidden="true">
+                <span class="compare__seam-pill"><i class="bi @DividerIcon"></i></span>
+            </div>
+            <input type="range" class="compare__range" min="0" max="100" step="0.5"
+                   value="@_wipe.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                   @oninput="OnWipeChanged"
+                   aria-label="@($"Reveal {RightLabel} — drag or use arrow keys")" />
+        </div>
+    }
+    else
+    {
+        <div class="split-compare">
+            <div class="split-compare__side">
+                <span class="split-compare__label">Original</span>
+                <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
+                     onload="this.classList.add('loaded')" />
+            </div>
+            <div class="split-compare__divider">
+                <div class="split-compare__divider-line"></div>
+                <div class="split-compare__divider-pill"><i class="bi @DividerIcon"></i></div>
+            </div>
+            <div class="split-compare__side">
+                <span class="split-compare__label">@RightLabel</span>
+                @RightSide
+            </div>
+        </div>
+    }
 </div>
 
 @if (CaptionContent != null)
@@ -24,16 +68,36 @@
 
 <div class="results-actions mb-4">
     @PrimaryAction
+    @if (ResultImageUrl is not null)
+    {
+        <button class="btn-result-secondary" @onclick="ShareResult" disabled="@_sharing" title="Share this result">
+            <i class="bi @(_sharing ? "bi-hourglass-split" : "bi-share") me-1"></i>Share
+        </button>
+    }
     <button class="btn-result-secondary" @onclick="OnStartOver">
         <i class="bi bi-arrow-repeat me-1"></i>Try Again
     </button>
-    <a class="btn-result-crosslink" href="@CrossLink1Href">
-        <i class="bi @CrossLink1Icon me-1"></i>@CrossLink1Label
-    </a>
-    <a class="btn-result-crosslink" href="/bulk-generate">
-        <i class="bi bi-collection me-1"></i>Bulk Variations
-    </a>
 </div>
+
+@* ── Chaining: the generated image becomes the next feature's input ───── *@
+@if (ResultImageUrl is not null)
+{
+    <div class="send-to mb-4">
+        <span class="send-to__label">
+            <i class="bi bi-arrow-right-circle me-1"></i>Use this result as input for
+        </span>
+        <div class="send-to__row">
+            @foreach (var feature in FeatureCatalog.Except(_currentRoute))
+            {
+                var target = feature;
+                <button type="button" class="send-to__btn" @onclick="@(() => SendResultTo(target))"
+                        title="@target.Description">
+                    <i class="bi @target.Icon me-1"></i>@target.Title
+                </button>
+            }
+        </div>
+    </div>
+}
 
 <div class="results-more mb-4">
     <button class="results-more__toggle" @onclick="@(() => _showMore = !_showMore)">
@@ -64,15 +128,103 @@
     [Parameter, EditorRequired] public string RightLabel { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string DividerIcon { get; set; } = string.Empty;
     [Parameter, EditorRequired] public RenderFragment RightSide { get; set; } = default!;
+
+    /// <summary>
+    /// The generated image as a <c>data:</c> URI. Drives Share and result-chaining — both are
+    /// hidden when it is null, which is also the "generation produced nothing" case.
+    /// </summary>
+    [Parameter] public string? ResultImageUrl { get; set; }
+
+    /// <summary>Suggested file name for the share sheet and the chained session image.</summary>
+    [Parameter] public string ResultFileName { get; set; } = "poredoimage-result.png";
+
     [Parameter] public RenderFragment? CaptionContent { get; set; }
     [Parameter, EditorRequired] public RenderFragment PrimaryAction { get; set; } = default!;
-    [Parameter, EditorRequired] public string CrossLink1Href { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public string CrossLink1Icon { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public string CrossLink1Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public EventCallback OnDownloadOriginal { get; set; }
     [Parameter, EditorRequired] public EventCallback OnStartOver { get; set; }
     [Parameter] public RenderFragment? AdditionalMoreOptions { get; set; }
     [Parameter] public RenderFragment? FooterContent { get; set; }
 
     private bool _showMore;
+    private bool _wipeMode = true;
+    private double _wipe = 50;
+    private bool _sharing;
+    private string _currentRoute = string.Empty;
+
+    protected override void OnInitialized() => _currentRoute = new Uri(Nav.Uri).AbsolutePath;
+
+    private void OnWipeChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var v))
+            _wipe = Math.Clamp(v, 0, 100);
+    }
+
+    /// <summary>
+    /// Makes the generated image the session's active image and navigates to
+    /// <paramref name="feature"/>, so a transformation can be chained onto its own output.
+    /// </summary>
+    private void SendResultTo(FeatureLink feature)
+    {
+        if (ResultImageUrl is null) return;
+
+        // SetImage parses the bytes back out of the data URI itself, so only one copy is held.
+        SessionService.SetImage(ResultImageUrl, ContentTypeOf(ResultImageUrl), ResultFileName);
+        NotificationService.Notify(NotificationSeverity.Info, "Result carried over",
+            $"Opening {feature.Title} with this image as the input.", duration: 3000);
+        Nav.NavigateTo(feature.Route);
+    }
+
+    private async Task ShareResult()
+    {
+        if (ResultImageUrl is null || _sharing) return;
+        _sharing = true;
+        try
+        {
+            var outcome = await JSRuntime.InvokeAsync<string>(
+                "poUx.shareImage", ResultImageUrl, ResultFileName,
+                "Made with PoRedoImage", $"My {RightLabel.ToLowerInvariant()} from PoRedoImage");
+
+            switch (outcome)
+            {
+                // "shared" and "cancelled": the native sheet already gave the user feedback —
+                // a toast on top of it would be noise.
+                case "shared":
+                case "cancelled":
+                    break;
+                case "copied":
+                    NotificationService.Notify(NotificationSeverity.Success, "Copied",
+                        "Image copied to your clipboard — paste it anywhere.", duration: 3000);
+                    break;
+                case "unsupported":
+                    NotificationService.Notify(NotificationSeverity.Info, "Sharing unavailable",
+                        "This browser can't share images directly. Use Download instead.", duration: 5000);
+                    break;
+                default:
+                    NotificationService.Notify(NotificationSeverity.Warning, "Share failed",
+                        "The image could not be prepared for sharing. Try downloading it.", duration: 5000);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Share failed");
+            NotificationService.Notify(NotificationSeverity.Warning, "Share failed",
+                "The image could not be shared. Try downloading it.", duration: 5000);
+        }
+        finally
+        {
+            _sharing = false;
+        }
+    }
+
+    /// <summary>Reads the media type out of a <c>data:&lt;type&gt;;base64,…</c> URI.</summary>
+    private static string ContentTypeOf(string dataUri)
+    {
+        const string prefix = "data:";
+        if (!dataUri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return "image/png";
+        var semi = dataUri.IndexOf(';');
+        return semi > prefix.Length ? dataUri[prefix.Length..semi] : "image/png";
+    }
 }
