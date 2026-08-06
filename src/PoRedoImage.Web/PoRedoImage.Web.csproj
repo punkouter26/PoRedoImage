@@ -2,7 +2,26 @@
 
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
-    <UserSecretsId>PoRedoImage-Web</UserSecretsId>
+    <!-- No <UserSecretsId>: §2 Cloud & Secrets forbids dotnet-secrets. Every secret comes from
+         Azure Key Vault via DefaultAzureCredential in BOTH Local and Azure (AddPoRedoImageKeyVault). -->
+    <!-- Request Delegate Generator: compiles every Map{Get,Post,...} lambda into a statically
+         analysable request delegate at build time instead of reflecting over the handler
+         signature at startup. Without it, each of the ~30 minimal-API registrations is an
+         IL2026 under the solution-wide trim analyzer (Directory.Build.props). Independent of
+         AOT — which stays disabled per project policy. -->
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+    <!-- DO NOT enable <EnableConfigurationBindingGenerator>. It looks like the natural companion to
+         the RDG above for the IL2026s on Bind/Configure<T>, and it silently breaks this app: the
+         options types (OpenAiOptions, StorageOptions, AiPricingOptions) declare `init`-only
+         properties. The reflection binder sets those; the generated binder cannot emit an
+         assignment to an init-only property, so it skips them and every value binds empty. The
+         result is not a build error — it is a host that fail-fasts at startup with
+         "OpenAI:Endpoint is not configured" while Key Vault has loaded the secret correctly.
+         Verified by bisection against a clean checkout. Those three call sites are suppressed
+         individually in Program.cs instead. -->
+    <!-- No project-wide trim suppression: shared DTOs go through the source-generated
+         SharedJsonContext (Program.cs) and the few remaining reflective JSON writes are
+         suppressed at the statement, not the project. -->
   </PropertyGroup>
 
   <ItemGroup>

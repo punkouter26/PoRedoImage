@@ -560,3 +560,6 @@ tests/PoRedoImage.Tests.E2E/playwright-report/
 
 # TestResults output
 TestResults/
+
+# Captured stdout/stderr from a local "dotnet run" (see .tmp_server.out removal)
+.tmp_server.*

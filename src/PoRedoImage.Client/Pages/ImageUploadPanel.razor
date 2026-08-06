@@ -1,5 +1,7 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using PoRedoImage.Client.Models
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 <div class="upload-panel" @onkeydown="HandleKeyDown" tabindex="0" role="region" aria-label="Image upload">
 
@@ -67,6 +69,9 @@
                 </p>
                 <p class="drop-zone__sub drop-zone__sub--desktop">or <span class="drop-zone__browse">browse to upload</span></p>
                 <p class="drop-zone__formats">JPG &amp; PNG &middot; up to 20 MB</p>
+                <p class="drop-zone__paste drop-zone__sub--desktop">
+                    <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a screenshot, or drop a file anywhere
+                </p>
             </div>
         }
 
@@ -106,7 +111,35 @@
     [Parameter] public EventCallback OnProcessClicked { get; set; }
     [Parameter] public EventCallback<int> OnDescriptionLengthChanged { get; set; }
 
+    /// <summary>
+    /// Raised when an image arrives by clipboard paste or a drop outside the drop zone.
+    /// Leave unset to opt the hosting page out of paste/drop intake entirely.
+    /// </summary>
+    [Parameter] public EventCallback<IntakeImage> OnImageIntake { get; set; }
+
     private bool _isDragging;
+    private DotNetObjectReference<ImageUploadPanel>? _selfRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !OnImageIntake.HasDelegate) return;
+        _selfRef = DotNetObjectReference.Create(this);
+        try { await JSRuntime.InvokeVoidAsync("poUx.registerIntake", _selfRef); }
+        catch (JSException) { /* helpers script unavailable — <InputFile> still works */ }
+    }
+
+    /// <summary>Callback target for <c>poUx.registerIntake</c>. Public only because JS invokes it.</summary>
+    [JSInvokable]
+    public Task AcceptIntake(IntakeImage payload) => OnImageIntake.InvokeAsync(payload);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_selfRef is null) return;
+        try { await JSRuntime.InvokeVoidAsync("poUx.unregisterIntake"); }
+        catch (JSDisconnectedException) { /* page tearing down */ }
+        catch (JSException) { }
+        _selfRef.Dispose();
+    }
 
     private Task HandleKeyDown(KeyboardEventArgs e)
     {

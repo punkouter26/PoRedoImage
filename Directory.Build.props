@@ -5,6 +5,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Trim analysis is on for EVERY project (§1 Trimming), not just the two that opted in
+         locally. This is diagnostics only: it surfaces trim-unsafe patterns as warnings (which
+         TreatWarningsAsErrors promotes to build breaks) without opting any assembly into
+         member-level trimming. <IsTrimmable> stays OFF deliberately — see the per-project
+         comments in PoRedoImage.Client/.Shared for the two runtime failures it caused. -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <!-- NU1902/1903/1904 (package vulnerability warnings) are intentionally NOT suppressed:
          with TreatWarningsAsErrors a vulnerable dependency must break the build, not pass silently. -->
     <NuGetAuditMode>all</NuGetAuditMode>

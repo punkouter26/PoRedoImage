@@ -3,6 +3,7 @@ using Azure;
 using Azure.AI.Vision.ImageAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
 
@@ -51,7 +52,7 @@ public sealed class AzureSceneDetailService : ISceneDetailProvider
     {
         _logger = logger;
         _configuration = configuration;
-        _minConfidence = configuration.GetValue<float>(ConfigKeys.ComputerVisionMinTagConfidence, 0.6f);
+        _minConfidence = ConfigValue.Float(configuration, ConfigKeys.ComputerVisionMinTagConfidence, 0.6f);
 
         var endpoint = configuration[ConfigKeys.ComputerVisionEndpoint];
         var key = CurrentKey;

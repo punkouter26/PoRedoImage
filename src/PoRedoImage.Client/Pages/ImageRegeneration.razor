@@ -26,6 +26,7 @@
                     ErrorMessage="@errorMessage"
                     CanProcess="@canProcessImage"
                     OnFileChange="LoadFile"
+                    OnImageIntake="HandleImageIntake"
                     OnProcessClicked="ProcessImage"
                     OnDescriptionLengthChanged="@(l => descriptionLength = l)" />
             </div>
@@ -142,7 +143,7 @@
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
             try
             {
-                var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, cts.Token);
+                var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, SharedJsonOptions.Default, cts.Token);
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
@@ -167,7 +168,7 @@
 
                     try
                     {
-                        var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>();
+                        var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>(SharedJsonOptions.Default);
                         errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
                     }
                     catch

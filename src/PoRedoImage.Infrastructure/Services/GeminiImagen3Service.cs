@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
 
@@ -32,7 +33,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         // named HttpClient and would also block this path, but failing here at construction
         // surfaces the misconfiguration immediately instead of at the first call. Mirrors the
         // AzureOpenAiService guard for consistency.
-        if (configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
+        if (ConfigValue.Bool(configuration, ConfigKeys.MocksUseMockAi))
         {
             throw new InvalidOperationException(
                 "GeminiImagen3Service was constructed while Mocks:UseMockAi=true. The DI container "
@@ -51,7 +52,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         GenerateImageAsync(string prompt, byte[] imageBytes, CancellationToken ct = default)
     {
         if (!IsConfigured)
-            throw new InvalidOperationException("Gemini image generation is not configured. Set Google:ApiKey in user-secrets.");
+            throw new InvalidOperationException("Gemini image generation is not configured. Set Google:ApiKey in Key Vault.");
 
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         ArgumentNullException.ThrowIfNull(imageBytes);
@@ -77,7 +78,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         GenerateImageAsync(string prompt, byte[] imageBytes, int seed, CancellationToken ct = default)
     {
         if (!IsConfigured)
-            throw new InvalidOperationException("Gemini image generation is not configured. Set Google:ApiKey in user-secrets.");
+            throw new InvalidOperationException("Gemini image generation is not configured. Set Google:ApiKey in Key Vault.");
 
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         ArgumentNullException.ThrowIfNull(imageBytes);
@@ -97,7 +98,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         GenerateAsync(string prompt, CancellationToken ct = default)
     {
         if (!IsConfigured)
-            throw new InvalidOperationException("Gemini image generation is not configured. Set Google:ApiKey in user-secrets.");
+            throw new InvalidOperationException("Gemini image generation is not configured. Set Google:ApiKey in Key Vault.");
 
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
@@ -176,7 +177,13 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         // Re-read API key from IConfiguration to pick up Key Vault rotated secrets (singleton lifetime)
         request.Headers.Add("x-goog-api-key", _configuration[ConfigKeys.GoogleApiKey] ?? string.Empty);
+        // IL2026: the outbound body is an anonymous type shaped to the third-party API's exact
+        // contract, and System.Text.Json source generation cannot describe anonymous types. This
+        // assembly is server-side only and is never trimmed, so the reflective writer is safe here.
+        // Scoped to the single statement so the analyzer (Directory.Build.props) stays live elsewhere.
+        #pragma warning disable IL2026
         request.Content = JsonContent.Create(body);
+        #pragma warning restore IL2026
         using var response = await client.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)
@@ -250,7 +257,13 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
             "Bearer", _configuration[ConfigKeys.GoogleApiKey] ?? string.Empty);
+        // IL2026: the outbound body is an anonymous type shaped to the third-party API's exact
+        // contract, and System.Text.Json source generation cannot describe anonymous types. This
+        // assembly is server-side only and is never trimmed, so the reflective writer is safe here.
+        // Scoped to the single statement so the analyzer (Directory.Build.props) stays live elsewhere.
+        #pragma warning disable IL2026
         request.Content = JsonContent.Create(body);
+        #pragma warning restore IL2026
         using var response = await client.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)

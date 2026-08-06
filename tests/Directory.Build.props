@@ -1,0 +1,12 @@
+<Project>
+  <!-- Inherit every root-level rule (net10.0, Nullable, TreatWarningsAsErrors, NuGet audit). -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!-- Trim analysis (§1) targets shippable assemblies. Test assemblies are never trimmed or
+         published, and the reflection they rely on (Assembly.GetTypes() in TestCounting.cs, the
+         xUnit discoverer) is inherently trim-unsafe. Running the analyzer here would only turn
+         test infrastructure into build errors under TreatWarningsAsErrors. -->
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+  </PropertyGroup>
+</Project>

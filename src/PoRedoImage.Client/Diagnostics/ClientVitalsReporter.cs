@@ -1,6 +1,7 @@
 using Microsoft.JSInterop;
 using PoRedoImage.Shared.DTOs;
 using System.Net.Http.Json;
+using PoRedoImage.Shared.Json;
 
 namespace PoRedoImage.Client.Diagnostics;
 
@@ -53,7 +54,7 @@ public sealed class ClientVitalsReporter(
                 WasmHeapMb = probe.WasmHeapMb is { } wasmHeap ? Clamp(wasmHeap, 16_384) : null,
             };
 
-            var response = await http.PostAsJsonAsync("api/diag/vitals", request, ct);
+            var response = await http.PostAsJsonAsync("api/diag/vitals", request, SharedJsonOptions.Default, ct);
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogDebug("Client vitals POST returned {Status}.", (int)response.StatusCode);

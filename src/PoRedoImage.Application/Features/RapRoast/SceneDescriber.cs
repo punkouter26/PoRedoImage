@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
 
@@ -105,7 +106,7 @@ public sealed class SceneDescriber(
     /// cost of the vision step for a marginal gain once OCR is supplying the facts.
     /// </summary>
     private bool SecondOpinionEnabled =>
-        configuration.GetValue<bool>(ConfigKeys.VisionSecondOpinion);
+        ConfigValue.Bool(configuration, ConfigKeys.VisionSecondOpinion);
 
     private async Task<SceneDetails> SafeDetailsAsync(byte[] image, CancellationToken ct)
     {

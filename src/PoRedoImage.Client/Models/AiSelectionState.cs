@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using PoRedoImage.Shared.Configuration;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Shared.Json;
 
 namespace PoRedoImage.Client.Models;
 
@@ -109,7 +110,7 @@ public sealed class AiSelectionState(HttpClient http)
             // "seeding failed" degrade-to-null path as every other failure mode.
             using var budget = new CancellationTokenSource(SeedBudget);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, budget.Token);
-            var pricing = await http.GetFromJsonAsync<AiPricingDto>("api/pricing", linked.Token);
+            var pricing = await http.GetFromJsonAsync<AiPricingDto>("api/pricing", SharedJsonOptions.Default, linked.Token);
             _seededImageGenProviderId = pricing?.ImageProvider switch
             {
                 // 2026-07: HuggingFace fal-ai image generation is broken on the upstream provider,

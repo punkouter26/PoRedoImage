@@ -211,7 +211,7 @@
                 DetectedTags: tags,
                 ConfidenceScore: 0.7);
 
-            var httpResponse = await Http.PostAsJsonAsync("/api/style-director/run", request);
+            var httpResponse = await Http.PostAsJsonAsync("/api/style-director/run", request, SharedJsonOptions.Default);
             if (!httpResponse.IsSuccessStatusCode)
             {
                 // 401 = BFF session cookie missing/expired. Send to /login instead of dumping
@@ -233,7 +233,7 @@
                 return;
             }
 
-            _directorResult = await httpResponse.Content.ReadFromJsonAsync<StyleDirectorResultDto>();
+            _directorResult = await httpResponse.Content.ReadFromJsonAsync<StyleDirectorResultDto>(SharedJsonOptions.Default);
             if (_directorResult is null)
             {
                 errorMessage = "Style director returned no result.";

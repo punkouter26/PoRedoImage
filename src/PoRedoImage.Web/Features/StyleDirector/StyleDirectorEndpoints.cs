@@ -2,6 +2,7 @@ using PoRedoImage.Application.Agents;
 using PoRedoImage.Application.Agents.StyleDirector;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
+using PoRedoImage.Web.Features.Shared;
 
 namespace PoRedoImage.Web.Features.StyleDirector;
 
@@ -16,7 +17,8 @@ public static class StyleDirectorEndpoints
     {
         var group = app.MapGroup("/api/style-director")
             .WithTags("StyleDirector")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireAntiforgeryValidation();
 
         group.MapPost("/run", async (
             StyleDirectorRequestDto request,

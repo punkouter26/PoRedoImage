@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Application.Agents;
 using PoRedoImage.Application.Agents.StyleDirector;
 using PoRedoImage.Application.Features.ImageAnalysis;
@@ -30,7 +31,7 @@ public static class InfrastructureServiceExtensions
     public static IServiceCollection AddPoRedoImageInfrastructure(
         this IServiceCollection services, IConfiguration? configuration = null)
     {
-        var useMockAi = configuration?.GetValue<bool>(ConfigKeys.MocksUseMockAi) ?? false;
+        var useMockAi = ConfigValue.Bool(configuration, ConfigKeys.MocksUseMockAi);
 
         // Domain service implementations (Singleton: clients own long-lived HTTP/SDK resources)
         if (useMockAi)
@@ -98,10 +99,25 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IImageGenerationRouter>(sp => new ImageGenerationRouter(
                 sp.GetRequiredService<GeminiImagen3Service>()));
 
-            // Chat completion powering the Style Director reasoning agents. HuggingFace Inference
-            // Providers (OpenAI-compatible chat + a vision model) is the real-AI backend; when its
-            // token is absent the agents fall back to their heuristics (IsConfigured guards this).
-            services.AddSingleton<IChatCompletionService, HuggingFaceChatCompletionService>();
+            // Chat completion powering the Style Director agents, the Rap Roast scene describer and
+            // its lyric writer. Switchable via Chat:Provider, mirroring ImageGen:Provider — both
+            // concretes register so swapping is config, not a redeploy. When the active backend
+            // reports IsConfigured=false the callers fall back to their heuristics.
+            //
+            // 2026-08: default is Azure OpenAI. The HuggingFace router returns HTTP 402 ("depleted
+            // your monthly included credits") on every model for this account, and because each
+            // caller catches the failure and silently substitutes canned output, an exhausted HF
+            // allowance degraded four features while the app still reported healthy. Azure OpenAI is
+            // already provisioned, already billed, and serves text and vision from the one
+            // deployment, so it is the more robust default.
+            services.AddSingleton<AzureOpenAiChatCompletionService>();
+            services.AddSingleton<HuggingFaceChatCompletionService>();
+            var chatProvider = (configuration?[ConfigKeys.ChatProvider] ?? "azureopenai").Trim().ToLowerInvariant();
+            services.AddSingleton<IChatCompletionService>(sp => chatProvider switch
+            {
+                "huggingface" => sp.GetRequiredService<HuggingFaceChatCompletionService>(),
+                _ => sp.GetRequiredService<AzureOpenAiChatCompletionService>(),
+            });
 
             // Music generation for the Rap Roast slice. Lyria performs supplied lyrics, which no
             // HuggingFace-hosted model with a live inference provider can do (stable-audio-3 is

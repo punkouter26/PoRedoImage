@@ -49,7 +49,7 @@ public static class ConfigKeys
 
     /// <summary>
     /// Legacy alias for <see cref="ComputerVisionApiKey"/>. Read sites use
-    /// <c>ApiKey ?? Key</c> so older local user-secrets keep working; the Key Vault mapping and
+    /// <c>ApiKey ?? Key</c> so pre-existing configuration under either spelling keeps working; the Key Vault mapping and
     /// <c>infra/main.bicep</c> only ever provision the <c>ApiKey</c> form.
     /// </summary>
     public const string ComputerVisionKeyLegacy = "ComputerVision:Key";
@@ -100,6 +100,13 @@ public static class ConfigKeys
 
     // ── Feature flags ───────────────────────────────────────────────────
     public const string ImageGenProvider = "ImageGen:Provider";
+
+    /// <summary>
+    /// Which backend serves <c>IChatCompletionService</c> — <c>"azureopenai"</c> (default) or
+    /// <c>"huggingface"</c>. Mirrors <see cref="ImageGenProvider"/>: both concretes register, so
+    /// swapping providers is a config change rather than a redeploy.
+    /// </summary>
+    public const string ChatProvider = "Chat:Provider";
     public const string MocksUseMockAi = "Mocks:UseMockAi";
     public const string AuthEnableFakeAuth = "Auth:EnableFakeAuth";
 }

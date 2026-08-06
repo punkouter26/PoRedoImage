@@ -20,6 +20,7 @@ using PoRedoImage.Web.Features.ImageAnalysis;
 using PoRedoImage.Web.Features.MemeTemplates;
 using PoRedoImage.Web.Features.Pricing;
 using PoRedoImage.Web.Features.RapRoast;
+using PoRedoImage.Web.Features.Shared;
 using PoRedoImage.Web.Features.StyleDirector;
 using PoRedoImage.Web.Features.UserImages;
 using Radzen;
@@ -55,15 +56,40 @@ try
     // Global Interactive WebAssembly (§1 BFF model): the whole UI runs in the browser; this
     // project is the API/BFF host only. AddAuthenticationStateSerialization flows the cookie-
     // authenticated principal (claims only, never tokens) to the WASM AuthenticationStateProvider.
+    // IL2026: AddRazorComponents reflects over the component graph to build the render tree.
+    // There is no source-generated alternative — this is the Blazor host registration itself,
+    // and the host assembly is never trimmed (only the WASM client is published trimmed).
+#pragma warning disable IL2026
     builder.Services.AddRazorComponents()
         .AddInteractiveWebAssemblyComponents()
         .AddAuthenticationStateSerialization();
+#pragma warning restore IL2026
 
     // Register Radzen services on the server so SSR pre-rendering can resolve
     // Radzen-injected properties on Client WASM components (e.g. NotificationService).
     builder.Services.AddRadzenComponents();
 
     builder.Services.AddOpenApi();
+
+    // ─── Antiforgery (§2 Security) ──────────────────────────────────────────────
+    // The WASM client cannot read the HttpOnly antiforgery cookie, so it echoes the request
+    // token back in a header instead of a form field. AntiforgeryEndpoints issues that token;
+    // AntiforgeryExtensions.RequireAntiforgeryValidation() is what actually arms the middleware
+    // on a JSON API (UseAntiforgery alone validates only form-binding endpoints).
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = AntiforgeryExtensions.TokenHeaderName;
+        // The cookie carries the secret half of the double-submit pair.
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        // IsDevOrTest, not IsDevelopment: unlike the auth cookie (which merely goes unset over
+        // plain HTTP), the antiforgery system THROWS from GetAndStoreTokens when SecurePolicy is
+        // Always on a non-SSL request. The integration/E2E tiers run over http on the Test
+        // environment, so Always there would fail every write with a 500.
+        options.Cookie.SecurePolicy = builder.Environment.IsDevOrTest()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+    });
 
     // ─── JSON source-gen (PoNetCaching §7) ──────────────────────────────────────
     // Wire the shared DTO JsonSerializerContext into the minimal-API serializer so
@@ -72,15 +98,21 @@ try
     // responses) and framework types fall back to reflection.
     builder.Services.ConfigureHttpJsonOptions(options =>
     {
-        options.SerializerOptions.TypeInfoResolver = JsonTypeInfoResolver.Combine(
-            new DefaultJsonTypeInfoResolver(),
-            new SharedJsonContext());
+        // Built in Shared so the WASM client's HttpClient call sites serialize through the exact
+        // same resolver chain — see SharedJsonOptions for why the ordering matters.
+        options.SerializerOptions.TypeInfoResolver = SharedJsonOptions.CreateResolver();
         options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
 
     // ─── Strongly-typed options (Po2Logic R3) ──────────────────────────────────
     // Options-pattern binding with IValidateOptions<T> gives us hot-reloadable config
     // (Key Vault rotates every 30 min) AND startup-time validation for required fields.
+    //
+    // IL2026: the reflective binder is REQUIRED here — these options types use `init`-only
+    // properties, which the configuration binding source generator cannot assign, so enabling it
+    // silently binds every value to empty and the host fail-fasts at startup. See the long note in
+    // PoRedoImage.Web.csproj. Suppressed at the three call sites rather than project-wide.
+#pragma warning disable IL2026
     builder.Services.AddOptions<OpenAiOptions>()
         .Bind(builder.Configuration.GetSection(OpenAiOptions.SectionName))
         .ValidateOnStart();
@@ -94,6 +126,7 @@ try
     // Indicative AI per-image pricing surfaced to the client cost estimate (§ImageGen feature flag).
     builder.Services.Configure<AiPricingOptions>(
         builder.Configuration.GetSection(AiPricingOptions.SectionName));
+#pragma warning restore IL2026
 
     // Fail-fast secret validator (Po2Logic F7)
     builder.Services.AddHostedService<StartupSecretValidator>();
@@ -245,7 +278,6 @@ try
     });
 
     app.UseRateLimiter();
-    app.UseAntiforgery();
     app.UseAuthentication();
 
     // The Blazor WebAssembly boot assets under /_framework must load for anonymous users: the whole
@@ -276,6 +308,12 @@ try
 
     app.UseAuthorization();
 
+    // Must run after routing (so endpoint metadata is resolved) and after authentication, so a
+    // rejected token surfaces as a 400 on an identified request rather than an anonymous one.
+    // Only endpoints tagged via RequireAntiforgeryValidation() are validated, and only on
+    // POST/PUT/PATCH/DELETE.
+    app.UseAntiforgery();
+
     // OpenAPI + Scalar API documentation (public — the FallbackPolicy would otherwise gate them)
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference().AllowAnonymous();
@@ -294,6 +332,10 @@ try
                 Converters = { new JsonStringEnumConverter() },
                 WriteIndented = false
             };
+            // IL2026: the health payload is an anonymous projection over HealthReport.Entries.
+            // The deploy smoke test greps this exact shape, so it stays anonymous rather than
+            // becoming a Shared DTO the browser would never deserialize.
+#pragma warning disable IL2026
             await context.Response.WriteAsJsonAsync(new
             {
                 Status = report.Status.ToString(),
@@ -307,11 +349,13 @@ try
                     Error = e.Value.Exception?.Message
                 })
             }, options);
+#pragma warning restore IL2026
         }
     }).AllowAnonymous();
     app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 
     // Minimal API endpoints (Vertical Slice)
+    app.MapAntiforgeryEndpoints();
     app.MapAuthEndpoints();
     app.MapImageAnalysisEndpoints();
     app.MapDiagnosticsEndpoints();

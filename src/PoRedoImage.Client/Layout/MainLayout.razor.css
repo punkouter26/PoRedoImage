@@ -114,7 +114,9 @@
 
 .app-main {
     min-height: calc(100vh - 64px);
-    background: #f8fafc;
+    /* Token, not a literal: this is the page canvas and must follow the dark scheme
+       override in app.css (the header/footer chrome above stays fixed dark by design). */
+    background: var(--color-bg);
 }
 
 /* Footer */

@@ -5,6 +5,7 @@ using PoRedoImage.Client.Services;
 using PoRedoImage.Client.Shared;
 using Radzen;
 using System.Net.Http.Json;
+using PoRedoImage.Shared.Json;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -18,14 +19,27 @@ builder.Services.AddSingleton<ClientRequestContext>();
 // HTTP client targeting the BFF host that served this app (same origin → cookies flow,
 // the WASM client never handles tokens). The correlation handler wraps the browser fetch
 // handler so every BFF call carries session + correlation headers for end-to-end tracing.
-builder.Services.AddScoped(sp => new HttpClient(
-    new CorrelationHeaderHandler(sp.GetRequiredService<ClientRequestContext>())
-    {
-        InnerHandler = new HttpClientHandler()
-    })
+// The antiforgery handler sits between correlation and the browser fetch handler so a replayed
+// request (stale-token retry) keeps its correlation headers and gets a fresh CSRF token (§2).
+builder.Services.AddScoped(sp =>
 {
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
-    Timeout = TimeSpan.FromMinutes(4),
+    var baseAddress = new Uri(builder.HostEnvironment.BaseAddress);
+
+    return new HttpClient(
+        new CorrelationHeaderHandler(sp.GetRequiredService<ClientRequestContext>())
+        {
+            InnerHandler = new AntiforgeryTokenHandler(
+                // A bare client for the token GET: reusing this pipeline would re-enter the
+                // handler that is mid-fetch.
+                () => new HttpClient { BaseAddress = baseAddress, Timeout = TimeSpan.FromSeconds(30) })
+            {
+                InnerHandler = new HttpClientHandler()
+            }
+        })
+    {
+        BaseAddress = baseAddress,
+        Timeout = TimeSpan.FromMinutes(4),
+    };
 });
 
 // Radzen UI services (Dialog, Notification, Tooltip, ContextMenu).
@@ -70,7 +84,7 @@ try
         BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
         Timeout = TimeSpan.FromSeconds(3),
     };
-    var reasons = await probe.GetFromJsonAsync<string[]>("api/diag/mock-status");
+    var reasons = await probe.GetFromJsonAsync<string[]>("api/diag/mock-status", SharedJsonOptions.Default);
     foreach (var reason in reasons ?? [])
     {
         builder.Services.AddSingleton<PoRedoImage.Domain.Interfaces.IMockable>(

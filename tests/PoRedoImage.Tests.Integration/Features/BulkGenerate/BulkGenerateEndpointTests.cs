@@ -49,7 +49,7 @@ public class BulkGenerateEndpointTests : IDisposable
             Prompts: Enumerable.Range(1, 10).Select(i => $"Prompt {i}").ToArray()
         );
 
-        var response = await _client.PostAsJsonAsync("/api/bulk-generate/prompts", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/bulk-generate/prompts", request);
 
         // Service is a no-op when Storage is disabled — should still return 204
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -62,7 +62,7 @@ public class BulkGenerateEndpointTests : IDisposable
             Prompts: ["only-one-prompt"]
         );
 
-        var response = await _client.PostAsJsonAsync("/api/bulk-generate/prompts", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/bulk-generate/prompts", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -74,7 +74,7 @@ public class BulkGenerateEndpointTests : IDisposable
             Prompts: Enumerable.Range(0, 10).Select(i => i == 0 ? badPrompt : $"Prompt {i}").ToArray()
         );
 
-        var response = await _client.PostAsJsonAsync("/api/bulk-generate/prompts", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/bulk-generate/prompts", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -85,7 +85,7 @@ public class BulkGenerateEndpointTests : IDisposable
             Prompts: Enumerable.Range(0, 10).Select(i => i == 0 ? "" : $"Prompt {i}").ToArray()
         );
 
-        var response = await _client.PostAsJsonAsync("/api/bulk-generate/prompts", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/bulk-generate/prompts", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

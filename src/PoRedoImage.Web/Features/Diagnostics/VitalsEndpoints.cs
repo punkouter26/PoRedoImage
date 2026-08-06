@@ -38,7 +38,8 @@ public static class VitalsEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .RequireAuthorization()
             .RequireRateLimiting("telemetry")
-            .AddEndpointFilter<ValidationFilter<ClientVitalsSampleRequest>>();
+            .AddEndpointFilter<ValidationFilter<ClientVitalsSampleRequest>>()
+            .RequireAntiforgeryValidation();
 
         // ── Read ─────────────────────────────────────────────────────────────────
         app.MapGet("/api/diag/vitals", GetVitalsAsync)

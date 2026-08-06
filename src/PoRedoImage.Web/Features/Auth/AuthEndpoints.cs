@@ -53,6 +53,11 @@ public static class AuthEndpoints
 
         // Server auth state + returnUrl validation. Returns 401 for unauthenticated callers
         // (no redirect, no body leak) so API clients get a clean signal.
+        // IL2026: both responses are anonymous types, which System.Text.Json source generation
+        // cannot describe. Naming them would put the auth-probe shape in Shared and ship it to the
+        // browser as a DTO it never deserializes — the reflective writer is the lesser cost on a
+        // host assembly that is never trimmed. Scoped to this handler only.
+#pragma warning disable IL2026
         app.MapGet("/auth/me", (HttpContext context, string? returnUrl) =>
         {
             var user = context.User;
@@ -75,6 +80,7 @@ public static class AuthEndpoints
         // Must be reachable anonymously: it is the client's auth-probe and returns its own 401
         // body ({authenticated:false}) rather than triggering the FallbackPolicy login redirect.
         .AllowAnonymous();
+#pragma warning restore IL2026
     }
 
     // ─── Shared handlers (legacy + canonical routes) ──────────────────────────

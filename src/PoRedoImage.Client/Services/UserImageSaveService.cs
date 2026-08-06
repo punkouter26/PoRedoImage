@@ -27,14 +27,11 @@ public sealed class UserImageSaveService
     private readonly ILogger<UserImageSaveService> _logger;
 
     /// <summary>
-    /// Static JSON options wired to the source-generated context. We don't use the default
-    /// <see cref="HttpClientJsonExtensions.PostAsJsonAsync"/> overload because that path picks
-    /// up the reflection-based serializer, which the WASM trim/AOT analyzer flags.
+    /// The solution-wide source-generated options (see <see cref="SharedJsonOptions"/>). Previously
+    /// a private copy here; every WASM call site now shares one instance so the client and the BFF
+    /// cannot drift apart on naming policy or null handling.
     /// </summary>
-    private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web)
-    {
-        TypeInfoResolver = new SharedJsonContext()
-    };
+    private static JsonSerializerOptions JsonOpts => SharedJsonOptions.Default;
 
     public UserImageSaveService(HttpClient http, NotificationService notify, ILogger<UserImageSaveService> logger)
     {

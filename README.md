@@ -118,15 +118,22 @@ dotnet restore PoRedoImage.slnx
 ```
 
 ### 2. Configure secrets (local)
+
+There is no local secret store to populate — `dotnet user-secrets` is deliberately **not** used
+(the project has no `UserSecretsId`). Local runs read the same Azure Key Vault the deployed app
+does, through `DefaultAzureCredential`. Sign in once and the host picks the secrets up on start:
+
 ```bash
-dotnet user-secrets set "ComputerVision:ApiKey" "your-key" --project src/PoRedoImage.Web
-dotnet user-secrets set "ComputerVision:Endpoint" "https://eastus.api.cognitive.microsoft.com/" --project src/PoRedoImage.Web
-dotnet user-secrets set "OpenAI:Key" "your-key" --project src/PoRedoImage.Web
-dotnet user-secrets set "OpenAI:Endpoint" "https://your-resource.openai.azure.com/" --project src/PoRedoImage.Web
-dotnet user-secrets set "OpenAI:ChatCompletionsDeployment" "gpt-4.1-nano" --project src/PoRedoImage.Web
-dotnet user-secrets set "Google:ApiKey" "your-gemini-key" --project src/PoRedoImage.Web
-dotnet user-secrets set "Google:Imagen3Model" "gemini-2.5-flash-image" --project src/PoRedoImage.Web
-dotnet user-secrets set "Storage:ConnectionString" "your-connection-string" --project src/PoRedoImage.Web
+az login          # the signed-in identity needs "Key Vault Secrets User" on kv-poshared
+dotnet run --project src/PoRedoImage.Web
+```
+
+`AddPoRedoImageKeyVault` loads `KeyVault:Uri` (`https://kv-poshared.vault.azure.net/`) and
+`StartupSecretValidator` fails the host fast, naming any secret it could not resolve. To work
+without Key Vault access — no AI calls, no storage — run against the mocks instead:
+
+```bash
+Mocks__UseMockAi=true Storage__ConnectionString="" dotnet run --project src/PoRedoImage.Web
 ```
 
 ### 3. Run

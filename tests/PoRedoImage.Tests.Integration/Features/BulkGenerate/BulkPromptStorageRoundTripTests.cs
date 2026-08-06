@@ -35,7 +35,7 @@ public sealed class BulkPromptStorageRoundTripTests : IDisposable
     {
         var prompts = Enumerable.Range(1, 10).Select(i => $"Prompt {i}").ToArray();
 
-        var save = await _client.PostAsJsonAsync("/api/bulk-generate/prompts",
+        var save = await _client.PostAsJsonWithTokenAsync("/api/bulk-generate/prompts",
             new SavePromptsRequest(prompts));
         Assert.Equal(HttpStatusCode.NoContent, save.StatusCode);
 

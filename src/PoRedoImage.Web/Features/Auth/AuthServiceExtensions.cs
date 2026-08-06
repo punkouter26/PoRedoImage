@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Features.Auth;
@@ -63,7 +64,7 @@ public static class AuthServiceExtensions
         // When Auth:EnableFakeAuth=true (and NOT Production), the entire auth pipeline is the
         // header-driven FakeAuthHandler — callers assume an identity via X-Fake-User / X-Fake-Roles.
         // This is the BFF local bypass used by headless Playwright golden-path suites.
-        var enableFakeAuth = configuration.GetValue<bool>(ConfigKeys.AuthEnableFakeAuth);
+        var enableFakeAuth = ConfigValue.Bool(configuration, ConfigKeys.AuthEnableFakeAuth);
         if (enableFakeAuth && !environment.IsProduction())
         {
             services.AddAuthentication(FakeAuthHandler.SchemeName)

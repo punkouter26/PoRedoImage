@@ -4,7 +4,9 @@ using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
+using PoRedoImage.Shared.Json;
 using Microsoft.Extensions.Logging;
+using PoRedoImage.Web.Features.Shared;
 
 namespace PoRedoImage.Web.Features.BulkGenerate;
 
@@ -15,7 +17,8 @@ public static class BulkGenerateEndpoints
         // Prompt persistence endpoints require authentication (use the caller's user identity).
         var authGroup = app.MapGroup("/api/bulk-generate")
             .WithTags("BulkGenerate")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireAntiforgeryValidation();
 
         // Add Idempotency-Key filter to the auth group so duplicate POST /prompts are de-duped
         // (Po2Logic F6 — no Idempotency-Key on Write endpoints).
@@ -29,7 +32,7 @@ public static class BulkGenerateEndpoints
             var stored = await storage.GetByRowKeyAsync(userId);
             if (stored is null) return Results.NotFound();
 
-            var prompts = JsonSerializer.Deserialize<string[]>(stored.PromptText);
+            var prompts = JsonSerializer.Deserialize(stored.PromptText, SharedJsonContext.Default.StringArray);
             return prompts is not null ? Results.Ok(prompts) : Results.NotFound();
         })
         .WithName("GetBulkPrompts")
@@ -46,7 +49,7 @@ public static class BulkGenerateEndpoints
             if (request.Prompts.Any(p => string.IsNullOrWhiteSpace(p) || p.Length > 2000))
                 return Results.BadRequest("Each prompt must be non-empty and at most 2000 characters.");
 
-            var prompt = BulkPrompt.Create(userId, userId, JsonSerializer.Serialize(request.Prompts));
+            var prompt = BulkPrompt.Create(userId, userId, JsonSerializer.Serialize(request.Prompts, SharedJsonContext.Default.StringArray));
             await storage.SaveAsync(prompt);
             return Results.NoContent();
         })
@@ -57,7 +60,8 @@ public static class BulkGenerateEndpoints
         // Rate limiting still applies to protect costly AI calls.
         var aiGroup = app.MapGroup("/api/bulk-generate")
             .WithTags("BulkGenerate")
-            .RequireRateLimiting("ai-endpoints");
+            .RequireRateLimiting("ai-endpoints")
+            .RequireAntiforgeryValidation();
 
         // Describe the primary person in the uploaded image using GPT-4o vision.
         // Called once per generation batch; result is reused across all variation prompts.

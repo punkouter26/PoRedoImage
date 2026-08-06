@@ -31,7 +31,7 @@ public sealed class StorageOptionsValidator : IValidateOptions<StorageOptions>
 
         _logger.LogWarning(
             "Storage:ConnectionString is not configured. The User Images gallery, Bulk Prompt persistence, " +
-            "and Table Storage features will be disabled. Set it via user-secrets, Key Vault " +
+            "and Table Storage features will be disabled. Set it via Key Vault " +
             "(PoRedoImage-StorageConnectionString), or run Azurite locally and set UseDevelopmentStorage=true.");
 
         return ValidateOptionsResult.Success; // never block startup

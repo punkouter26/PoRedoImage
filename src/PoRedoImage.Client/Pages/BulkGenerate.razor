@@ -43,7 +43,8 @@
                     ImagePreviewUrl="@_imagePreviewUrl"
                     ErrorMessage="@_uploadError"
                     CanProcess="false"
-                    OnFileChange="LoadFile" />
+                    OnFileChange="LoadFile"
+                    OnImageIntake="HandleImageIntake" />
             }
             else
             {
@@ -175,7 +176,7 @@
 
         // Active image-gen provider + indicative per-image pricing for the cost estimate.
         // Non-critical: a failure just hides the pricing note.
-        try { _pricing = await Http.GetFromJsonAsync<AiPricingDto>("/api/pricing"); }
+        try { _pricing = await Http.GetFromJsonAsync<AiPricingDto>("/api/pricing", SharedJsonOptions.Default); }
         catch (Exception ex) { Logger.LogWarning(ex, "Failed to load AI pricing estimate"); }
 
         if (SessionService.HasImage && _imagePreviewUrl is null)
@@ -244,6 +245,33 @@
         StateHasChanged();
     }
 
+    /// <summary>Clipboard paste / drop-anywhere intake — mirrors <see cref="LoadFile"/>.</summary>
+    private void HandleImageIntake(IntakeImage payload)
+    {
+        if (payload.Error is not null) { _uploadError = payload.Error; StateHasChanged(); return; }
+        var bytes = payload.Decode();
+        if (bytes is null) { _uploadError = "The pasted image could not be read."; StateHasChanged(); return; }
+
+        _selectedFile = null;
+        _uploadError = null;
+        _results = [];
+        _completedCount = 0;
+        _favorites = [];
+        _imageBytes = bytes;
+        _imageContentType = payload.ContentType ?? "image/png";
+        _imagePreviewUrl = $"data:{_imageContentType};base64,{payload.Base64}";
+
+        var fileName = payload.FileName ?? "pasted-image.png";
+        SessionService.SetImage(_imagePreviewUrl, _imageContentType, fileName, bytes);
+        if (_userId is not null)
+            _ = AutoSaveOriginalAsync(bytes, _imageContentType, fileName);
+
+        NotificationService.Notify(NotificationSeverity.Success,
+            payload.Source == "drop" ? "Image dropped" : "Image pasted",
+            $"{fileName} is ready to generate from.", duration: 2500);
+        StateHasChanged();
+    }
+
     private async Task StartGeneration()
     {
         if (_imageBytes is null || _imagePreviewUrl is null) return;
@@ -272,9 +300,9 @@
         {
             // Use GPT-4o vision via API to get a detailed physical description of the person
             var descResp = await Http.PostAsJsonAsync("/api/bulk-generate/describe",
-                new BulkDescribeRequest(Convert.ToBase64String(_imageBytes), _imageContentType));
+                new BulkDescribeRequest(Convert.ToBase64String(_imageBytes), _imageContentType), SharedJsonOptions.Default);
             descResp.EnsureSuccessStatusCode();
-            var descResult = await descResp.Content.ReadFromJsonAsync<BulkDescribeResponse>();
+            var descResult = await descResp.Content.ReadFromJsonAsync<BulkDescribeResponse>(SharedJsonOptions.Default);
             var description = descResult?.Description ?? string.Empty;
 
             if (string.IsNullOrEmpty(description))
@@ -309,10 +337,10 @@
 
                     // True image-to-image via API: Gemini 2.0 Flash uses the uploaded photo as subject reference
                     var varResp = await Http.PostAsJsonAsync("/api/bulk-generate/variation",
-                        new BulkVariationRequest(Convert.ToBase64String(_imageBytes), _imageContentType, finalPrompt, AiSelection.Get(AiCapability.GenerateImage)));
+                        new BulkVariationRequest(Convert.ToBase64String(_imageBytes), _imageContentType, finalPrompt, AiSelection.Get(AiCapability.GenerateImage)), SharedJsonOptions.Default);
                     if (!varResp.IsSuccessStatusCode)
                         throw new InvalidOperationException($"Variation API returned {varResp.StatusCode}");
-                    var varResult = await varResp.Content.ReadFromJsonAsync<BulkVariationResponse>();
+                    var varResult = await varResp.Content.ReadFromJsonAsync<BulkVariationResponse>(SharedJsonOptions.Default);
 
                     _results[i].Status = BulkGenerateStatus.Complete;
                     _results[i].Prompt = rawPrompt;
@@ -427,7 +455,7 @@
         try
         {
             // Persist via the BFF — the WASM client never touches table storage directly.
-            var resp = await Http.PostAsJsonAsync("/api/bulk-generate/prompts", new SavePromptsRequest(_prompts));
+            var resp = await Http.PostAsJsonAsync("/api/bulk-generate/prompts", new SavePromptsRequest(_prompts), SharedJsonOptions.Default);
             resp.EnsureSuccessStatusCode();
             NotificationService.Notify(NotificationSeverity.Success, "Saved", "Prompts saved successfully!", duration: 3000);
         }
@@ -454,7 +482,7 @@
             var resp = await Http.GetAsync("/api/bulk-generate/prompts");
             if (resp.IsSuccessStatusCode)
             {
-                var saved = await resp.Content.ReadFromJsonAsync<string[]>();
+                var saved = await resp.Content.ReadFromJsonAsync<string[]>(SharedJsonOptions.Default);
                 if (saved is not null)
                 {
                     _prompts = saved;
@@ -498,7 +526,7 @@
                     ContentType: _imageContentType,
                     SeedPrompt: source.Prompt ?? string.Empty,
                     Count: 3,
-                    ImageGenModelId: AiSelection.Get(AiCapability.GenerateImage)));
+                    ImageGenModelId: AiSelection.Get(AiCapability.GenerateImage)), SharedJsonOptions.Default);
 
             if (!resp.IsSuccessStatusCode)
             {
@@ -508,7 +536,7 @@
                 return;
             }
 
-            var payload = await resp.Content.ReadFromJsonAsync<BulkRerollResponse>();
+            var payload = await resp.Content.ReadFromJsonAsync<BulkRerollResponse>(SharedJsonOptions.Default);
             if (payload is null || payload.Variations.Count == 0)
             {
                 NotificationService.Notify(NotificationSeverity.Warning, "Re-roll",

@@ -57,6 +57,38 @@
     --spacing-2xl: 3rem;
 }
 
+/* ── Dark scheme ─────────────────────────────────────────────────────────
+   §3 requires system-native Light/Dark support. Every component already paints with the
+   var(--color-*) tokens above, so flipping the surface/text/border tokens here is what actually
+   turns the theme over — no component rules are duplicated.
+
+   The header and footer are deliberately NOT re-themed: they are fixed dark chrome in both
+   schemes, and their contrast ratios were computed against #0f172a (see the inline notes in
+   MainLayout.razor.css). Re-tinting them would invalidate that work for no visual gain.
+
+   Contrast against --color-bg (#0b1220): --color-body ≈ 14:1, --color-muted ≈ 7.4:1 — both
+   clear WCAG AA. Note --color-muted-light is unchanged; it was already a dark-surface token. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-border:           #243049;
+        --color-border-hover:     #3b4a6b;
+        --color-surface:          #111a2e;
+        --color-surface-elevated: #1b2540;
+        --color-bg:               #0b1220;
+        --color-body:             #e2e8f0;
+        --color-muted:            #94a3b8;
+        --color-focus-ring:       rgba(147,197,253,0.25);
+
+        /* Glass panels default to the dark variant rather than the white wash. */
+        --glass-bg:     rgba(15, 23, 42, 0.72);
+        --glass-border: rgba(255, 255, 255, 0.10);
+        --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+        --shadow-lg: 0 8px 24px rgba(0,0,0,0.45);
+    }
+}
+
 /* ── Global Nav Styles (must be here — child components bypass CSS isolation) ── */
 .app-nav__link {
     color: #94a3b8 !important;
@@ -235,7 +267,7 @@ a, .btn-link { color: var(--color-primary); }
 
 .drop-zone:hover {
     border-color: var(--color-border-hover);
-    background: #f1f5f9;
+    background: var(--color-surface-elevated);
 }
 
 .drop-zone__input {

@@ -52,6 +52,7 @@ tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI
 6. **BFF invariant**: Blazor WASM must never store or handle access tokens. The server authenticates via `HttpOnly`+`SameSite=Strict` cookies (set in `AuthServiceExtensions.HardenCookie`; `Secure` is `Always` outside Development) and serializes the principal (claims only) to the client via `AddAuthenticationStateSerialization` ↔ `AddAuthenticationStateDeserialization`. The `Microsoft.AspNetCore.Components.WebAssembly.Authentication` package IS referenced on `.Client` (it supplies `AddAuthenticationStateDeserialization`), but only the **safe, claims-only** extension is used — `AddOidcAuthentication()` and any token-handling API in that package are forbidden.
 7. **Server-side authz is fail-closed (§4.5)**: `AuthorizationOptions.FallbackPolicy = RequireAuthenticatedUser`. Every endpoint requires auth unless it explicitly `.AllowAnonymous()` — the public set is the WASM host shell, `MapStaticAssets`, `/health`, `/alive`, favicon, OpenAPI/Scalar, all `/auth/*`, and `/api/diag/mock-status`. Client `[Authorize]` is UI-only. **Adding a new anonymous endpoint requires an explicit `.AllowAnonymous()`.**
 8. **Request correlation (§6.9)**: the WASM `CorrelationHeaderHandler` stamps `X-Session-ID` (stable per tab) + `X-Correlation-ID` (per request) on every BFF call; server `RequestContextMiddleware` reads, echoes, and pushes them into the Serilog LogContext.
+9. **Antiforgery is enforced by a filter, not the middleware**: every state-changing endpoint group calls `.RequireAntiforgeryValidation()`, which adds `AntiforgeryValidationFilter`. `app.UseAntiforgery()` alone does **nothing** for this API — it only validates requests it recognises as form posts, so a JSON `POST` passes untouched no matter what `IAntiforgeryMetadata` says. Do **not** also mark endpoints `RequiresValidation = true`: the middleware then flags the request as unvalidated and the filter's own `ValidateRequestAsync` trips that guard, rejecting even correct tokens. The WASM client fetches its token from `GET /api/antiforgery/token` and returns it in the `X-CSRF-TOKEN` header (`AntiforgeryTokenHandler`). **Tokens are bound to the caller's identity**, so one issued while anonymous stops validating after sign-in — the handler's single retry-on-400 exists for exactly that, and is a normal part of the first authenticated write.
 
 ## Auth Modes (BFF)
 - Cookie is the default auth + challenge scheme: an unauthenticated page hit redirects to `/login`
@@ -101,6 +102,7 @@ tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI
 | `GET /challenge-microsoft` | Legacy alias for /auth/login/microsoft |
 | `GET /dev-login?email=…` | Legacy alias for /auth/login/fake (Development only) |
 | `GET /logout` | Legacy alias for /auth/logout |
+| `GET /api/antiforgery/token` | Issue the antiforgery request token (anonymous; identity-bound) |
 | `GET /scalar/v1` | Interactive API docs |
 
 ## Health & Diagnostics
@@ -322,6 +324,9 @@ HuggingFace Inference Providers). Which one actually runs a given request is dec
 | Hard-coded secrets in appsettings         | Use Key Vault references + user-secrets locally   |
 | Raw `Configuration["literal"]`            | Use `ConfigKeys` constants; prefer `IOptions<T>` for validated sections |
 | New package not in `Directory.Packages.props` | Violates central package management              |
+| A state-changing endpoint group without `.RequireAntiforgeryValidation()` | Unprotected write on a cookie-authenticated API |
+| `ConfigurationBinder.GetValue<T>` for config | IL2026 under the solution-wide trim analyzer; use `ConfigValue` |
+| `<UserSecretsId>` / `dotnet user-secrets` | Secrets come from Key Vault via `DefaultAzureCredential`, local and Azure alike |
 | `Task.Result` / `.Wait()`                 | Async-all-the-way; use `await`                    |
 | AOT-only APIs without `[DynamicallyAccessedMembers]` | Will break interpreted WASM at runtime   |
 

@@ -19,7 +19,8 @@ public static class ImageAnalysisEndpoints
     public static void MapImageAnalysisEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/images")
-            .WithTags("Image Analysis");
+            .WithTags("Image Analysis")
+            .RequireAntiforgeryValidation();
 
         group.MapPost("/analyze", AnalyzeImageAsync)
             .WithName("AnalyzeImage")

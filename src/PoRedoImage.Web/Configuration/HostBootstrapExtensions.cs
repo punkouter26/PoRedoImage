@@ -8,6 +8,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Configuration;
@@ -47,7 +48,7 @@ public static class HostBootstrapExtensions
                 "Skipping KV load; secrets must come from another provider or Mocks:UseMockAi must be true.");
             return builder;
         }
-        if (builder.Configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
+        if (ConfigValue.Bool(builder.Configuration, ConfigKeys.MocksUseMockAi))
         {
             Log.Information(
                 "Mocks:UseMockAi=true — skipping Key Vault load (real AI services are not wired).");
@@ -201,7 +202,7 @@ public static class HostBootstrapExtensions
         //     60-min/day CPU budget (see ADR-015). Up/down visibility comes from the heartbeat metric.
         var samplingRatio = builder.Environment.IsDevelopment()
             ? 1.0
-            : builder.Configuration.GetValue<double?>(ConfigKeys.ApplicationInsightsSamplingRatio) ?? 0.1;
+            : ConfigValue.Double(builder.Configuration, ConfigKeys.ApplicationInsightsSamplingRatio) ?? 0.1;
 
         otelBuilder.UseAzureMonitor(options =>
         {

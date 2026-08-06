@@ -34,7 +34,7 @@ public class ClientVitalsEndpointTests : IClassFixture<CustomWebApplicationFacto
             WasmHeapMb = 28.7,
         };
 
-        var response = await _client.PostAsJsonAsync("/api/diag/vitals", sample);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/diag/vitals", sample);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
@@ -52,7 +52,7 @@ public class ClientVitalsEndpointTests : IClassFixture<CustomWebApplicationFacto
             Cls = 5000,
         };
 
-        var response = await _client.PostAsJsonAsync("/api/diag/vitals", sample);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/diag/vitals", sample);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

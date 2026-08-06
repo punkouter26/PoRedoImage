@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Tests.Integration;
 
 namespace PoRedoImage.Tests.Integration.Features;
 
@@ -26,7 +27,7 @@ public class RapRoastEndpointTests : IClassFixture<CustomWebApplicationFactory>
             Style = RapStyle.BoomBap,
         };
 
-        var response = await _client.PostAsJsonAsync("/api/rap-roast", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/rap-roast", request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -44,7 +45,7 @@ public class RapRoastEndpointTests : IClassFixture<CustomWebApplicationFactory>
     {
         var request = new RapRoastRequest { ImageData = "", ContentType = "image/png" };
 
-        var response = await _client.PostAsJsonAsync("/api/rap-roast", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/rap-roast", request);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -60,7 +61,7 @@ public class RapRoastEndpointTests : IClassFixture<CustomWebApplicationFactory>
             ContentType = "image/png",
         };
 
-        var response = await _client.PostAsJsonAsync("/api/rap-roast", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/rap-roast", request);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

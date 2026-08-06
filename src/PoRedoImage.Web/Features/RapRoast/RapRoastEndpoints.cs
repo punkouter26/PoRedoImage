@@ -21,7 +21,8 @@ public static class RapRoastEndpoints
         var group = app.MapGroup("/api/rap-roast")
             .WithTags("RapRoast")
             .RequireAuthorization()
-            .RequireRateLimiting("ai-endpoints");
+            .RequireRateLimiting("ai-endpoints")
+            .RequireAntiforgeryValidation();
 
         group.MapPost("/", async (
             RapRoastRequest request,

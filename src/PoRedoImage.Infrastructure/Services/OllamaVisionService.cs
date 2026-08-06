@@ -56,7 +56,13 @@ public sealed class OllamaVisionService(
         };
 
         var client = httpClientFactory.CreateClient("Ollama");
+        // IL2026: the outbound body is an anonymous type shaped to the third-party API's exact
+        // contract, and System.Text.Json source generation cannot describe anonymous types. This
+        // assembly is server-side only and is never trimmed, so the reflective writer is safe here.
+        // Scoped to the single statement so the analyzer (Directory.Build.props) stays live elsewhere.
+        #pragma warning disable IL2026
         using var resp = await client.PostAsJsonAsync("/api/chat", payload, ct);
+        #pragma warning restore IL2026
         resp.EnsureSuccessStatusCode();
 
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));

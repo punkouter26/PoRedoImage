@@ -39,7 +39,8 @@
                 ImagePreviewUrl="@_previewUrl"
                 ErrorMessage="@_error"
                 CanProcess="false"
-                OnFileChange="LoadFile" />
+                OnFileChange="LoadFile"
+                OnImageIntake="HandleImageIntake" />
         </div>
 
         <div class="studio-features-col">
@@ -137,6 +138,20 @@
         if (error is not null) { _error = error; return; }
         _previewUrl = result!.PreviewUrl;
         SessionService.SetImage(result.PreviewUrl, result.ContentType, e.File.Name, result.Bytes);
+        StateHasChanged();
+    }
+
+    /// <summary>Clipboard paste / drop-anywhere intake — same destination as an upload.</summary>
+    private void HandleImageIntake(IntakeImage payload)
+    {
+        if (payload.Error is not null) { _error = payload.Error; StateHasChanged(); return; }
+        var bytes = payload.Decode();
+        if (bytes is null) { _error = "The pasted image could not be read."; StateHasChanged(); return; }
+
+        _error = null;
+        var contentType = payload.ContentType ?? "image/png";
+        _previewUrl = $"data:{contentType};base64,{payload.Base64}";
+        SessionService.SetImage(_previewUrl, contentType, payload.FileName ?? "pasted-image.png", bytes);
         StateHasChanged();
     }
 

@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Options;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Configuration;
@@ -56,7 +57,7 @@ public sealed class OpenAiOptionsValidator : IValidateOptions<OpenAiOptions>
         // If real services aren't wired (mock mode forced), the bound options are never consumed.
         // Skipping the check here keeps the offline / CI path bootable while still producing loud,
         // actionable failures when someone WANTS real AI but forgot the keys.
-        if (_configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
+        if (ConfigValue.Bool(_configuration, ConfigKeys.MocksUseMockAi))
         {
             _logger.LogInformation(
                 "Mocks:UseMockAi=true — OpenAI key validation skipped. Real Azure OpenAI is not wired.");
@@ -66,9 +67,9 @@ public sealed class OpenAiOptionsValidator : IValidateOptions<OpenAiOptions>
         var failures = new List<string>();
 
         if (string.IsNullOrWhiteSpace(options.Endpoint))
-            failures.Add("OpenAI:Endpoint is not configured. Set it via Key Vault (PoRedoImage-OpenAI-Endpoint) or `dotnet user-secrets set \"OpenAI:Endpoint\" --project src/PoRedoImage.Web`.");
+            failures.Add("OpenAI:Endpoint is not configured. Set it in Key Vault as PoRedoImage-OpenAI-Endpoint (kv-poshared).");
         if (string.IsNullOrWhiteSpace(options.Key))
-            failures.Add("OpenAI:Key is not configured. Set it via Key Vault (PoRedoImage-OpenAI-ApiKey) or `dotnet user-secrets set \"OpenAI:Key\" --project src/PoRedoImage.Web`.");
+            failures.Add("OpenAI:Key is not configured. Set it in Key Vault as PoRedoImage-OpenAI-ApiKey (kv-poshared).");
         if (string.IsNullOrWhiteSpace(options.ChatCompletionsDeployment))
             failures.Add("OpenAI:ChatCompletionsDeployment is not configured (defaulted to gpt-5.4-nano in appsettings.json — verify it matches your Azure OpenAI deployment).");
 

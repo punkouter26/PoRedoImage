@@ -17,10 +17,15 @@
          components as it does by default. -->
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <!-- IL2111: framework Router.NotFoundPage setter (reflection-annotated), not user code.
-         IL2026/IL3050: reflection-based System.Text.Json across the app. Fully trim/AOT-safe
-         JSON would require a JsonSerializerContext for every DTO (out of scope; AOT is disabled
-         per project policy). Scoped suppression keeps the analyzer on for everything else while
-         honouring TreatWarningsAsErrors. -->
+         IL2026/IL3050: every HttpClient JSON call site now passes SharedJsonOptions.Default, so
+         at RUNTIME the shared DTOs resolve through the source-generated SharedJsonContext. The
+         analyzer still flags them because it reasons about overload signatures, not option
+         contents: only the JsonTypeInfo<T>-taking overloads are statically provable, and the
+         JsonSerializerOptions-taking ones carry the [RequiresUnreferencedCode] annotation
+         regardless of which resolver the options actually hold. Converting all ~25 call sites to
+         the JsonTypeInfo overloads would also force the page-local view models (Diag's payload,
+         the gallery item) into a serializer context, which is churn for no runtime gain while
+         IsTrimmable and AOT are both off. -->
     <NoWarn>$(NoWarn);IL2111;IL2026;IL3050</NoWarn>
   </PropertyGroup>
 

@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
 
@@ -43,7 +44,7 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
         _configuration = configuration;
 
         // Mirror the Gemini guard: never let a real provider construct under mock mode.
-        if (configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
+        if (ConfigValue.Bool(configuration, ConfigKeys.MocksUseMockAi))
             throw new InvalidOperationException(
                 "HuggingFaceImageGenerationService was constructed while Mocks:UseMockAi=true — DI should "
                 + "have resolved MockImagen3Service. Blocking to guarantee zero live token spend.");
@@ -105,7 +106,13 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer", _configuration[ConfigKeys.HuggingFaceApiKey] ?? string.Empty);
+        // IL2026: the outbound body is an anonymous type shaped to the third-party API's exact
+        // contract, and System.Text.Json source generation cannot describe anonymous types. This
+        // assembly is server-side only and is never trimmed, so the reflective writer is safe here.
+        // Scoped to the single statement so the analyzer (Directory.Build.props) stays live elsewhere.
+        #pragma warning disable IL2026
         request.Content = JsonContent.Create(body);
+        #pragma warning restore IL2026
 
         using var response = await client.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)
@@ -188,6 +195,6 @@ public sealed class HuggingFaceImageGenerationService : IImageGenerationService
         if (!IsConfigured)
             throw new InvalidOperationException(
                 "HuggingFace image generation is not configured. Set HuggingFace:ApiKey (a token with the "
-                + "'Inference Providers' permission) in user-secrets / Key Vault.");
+                + "'Inference Providers' permission) in Key Vault.");
     }
 }

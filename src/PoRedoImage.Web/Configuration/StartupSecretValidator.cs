@@ -1,5 +1,6 @@
 ﻿using PoRedoImage.Web.Features.Diagnostics;
 using Microsoft.Extensions.Options;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Web.Configuration;
@@ -32,7 +33,7 @@ public sealed class StartupSecretValidator : IHostedService
         // Mock-mode opt-out: real services aren't wired, so AI key validation is unnecessary.
         // Keeps the offline / CI path bootable while still producing loud, actionable failures
         // when someone WANTS real AI but forgot the keys.
-        if (_configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
+        if (ConfigValue.Bool(_configuration, ConfigKeys.MocksUseMockAi))
         {
             _logger.LogInformation(
                 "Mocks:UseMockAi=true — AI secret validation skipped. Mock services wired; no live keys required.");
@@ -101,7 +102,7 @@ public sealed class StartupSecretValidator : IHostedService
     private void ValidateOpenIdConnectConfig()
     {
         // FakeAuth replaces the whole pipeline; nothing to validate.
-        if (_configuration.GetValue<bool>(ConfigKeys.AuthEnableFakeAuth))
+        if (ConfigValue.Bool(_configuration, ConfigKeys.AuthEnableFakeAuth))
             return;
 
         var clientId = _configuration[ConfigKeys.AzureAdClientId];
@@ -118,7 +119,7 @@ public sealed class StartupSecretValidator : IHostedService
         {
             failures.Add(
                 "AzureAd:ClientId is missing or not a parseable GUID. " +
-                "Set it via Key Vault (PoRedoImage-AzureAd-ClientId) or `dotnet user-secrets set \"AzureAd:ClientId\" --project src/PoRedoImage.Web`.");
+                "Set it in Key Vault as PoRedoImage-AzureAd-ClientId (kv-poshared).");
         }
 
         var tenantId = _configuration[ConfigKeys.AzureAdTenantId];

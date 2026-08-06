@@ -30,6 +30,7 @@
                     ErrorMessage="@errorMessage"
                     CanProcess="@canProcessImage"
                     OnFileChange="LoadFile"
+                    OnImageIntake="HandleImageIntake"
                     OnProcessClicked="ProcessImage" />
 
                 @* ── Idea #17 — Meme Template Library toggle ────────────── *@
@@ -143,7 +144,7 @@
     {
         try
         {
-            _templates = await Http.GetFromJsonAsync<IReadOnlyList<MemeTemplateDto>>("/api/meme-templates");
+            _templates = await Http.GetFromJsonAsync<IReadOnlyList<MemeTemplateDto>>("/api/meme-templates", SharedJsonOptions.Default);
         }
         catch (Exception ex)
         {
@@ -262,7 +263,7 @@
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
             try
             {
-                var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, cts.Token);
+                var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, SharedJsonOptions.Default, cts.Token);
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
@@ -285,7 +286,7 @@
 
                     try
                     {
-                        var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>();
+                        var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>(SharedJsonOptions.Default);
                         errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
                     }
                     catch
@@ -386,7 +387,7 @@
                 TemplateId: _selectedTemplate.Id,
                 ZoneTexts: _zoneTexts);
 
-            var response = await Http.PostAsJsonAsync("/api/meme-templates/render", request);
+            var response = await Http.PostAsJsonAsync("/api/meme-templates/render", request, SharedJsonOptions.Default);
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync();
@@ -394,7 +395,7 @@
                 return;
             }
 
-            var rendered = await response.Content.ReadFromJsonAsync<MemeTemplateRenderResponse>();
+            var rendered = await response.Content.ReadFromJsonAsync<MemeTemplateRenderResponse>(SharedJsonOptions.Default);
             if (rendered is null || string.IsNullOrEmpty(rendered.ImageData))
             {
                 errorMessage = "Template render returned no image.";

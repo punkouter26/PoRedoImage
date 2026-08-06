@@ -102,7 +102,7 @@
             isLoading = true;
             errorMessage = null;
             StateHasChanged();
-            diag = await Http.GetFromJsonAsync<DiagPayload>("/api/diag");
+            diag = await Http.GetFromJsonAsync<DiagPayload>("/api/diag", SharedJsonOptions.Default);
             ProjectRows();
         }
         catch (Exception ex)

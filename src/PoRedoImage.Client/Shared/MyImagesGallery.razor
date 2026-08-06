@@ -84,7 +84,7 @@ else
                 _images = [];
                 return;
             }
-            var result = await httpResponse.Content.ReadFromJsonAsync<List<GalleryItem>>(cts.Token);
+            var result = await httpResponse.Content.ReadFromJsonAsync<List<GalleryItem>>(SharedJsonOptions.Default,cts.Token);
             _images = result ?? [];
         }
         catch (Exception ex)

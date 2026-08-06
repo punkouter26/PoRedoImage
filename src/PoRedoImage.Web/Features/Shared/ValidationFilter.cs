@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PoRedoImage.Web.Features.Shared;
 
@@ -7,8 +8,20 @@ namespace PoRedoImage.Web.Features.Shared;
 /// Minimal APIs do not validate [Range]/[Required] attributes automatically — this filter bridges the gap.
 /// Reusable across all feature endpoint groups.
 /// </summary>
-internal sealed class ValidationFilter<T> : IEndpointFilter where T : class
+/// <remarks>
+/// <typeparamref name="T"/> is annotated for the trim analyzer (§1): DataAnnotations discovers
+/// <c>[Required]</c>/<c>[Range]</c> by reflecting over the type's properties, so every member the
+/// validator may read has to survive trimming. Call sites close the generic over a statically
+/// known DTO, which satisfies the annotation at compile time.
+/// </remarks>
+internal sealed class ValidationFilter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)] T>
+    : IEndpointFilter where T : class
 {
+    [UnconditionalSuppressMessage("Trimming", "IL2026",
+        Justification = "DataAnnotations' ValidationContext/Validator are unconditionally " +
+                        "[RequiresUnreferencedCode]; the DynamicallyAccessedMembers annotation on T " +
+                        "above is what actually keeps the validated DTO's members alive, and this " +
+                        "host assembly is never trimmed.")]
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var arg = context.Arguments.OfType<T>().FirstOrDefault();

@@ -241,7 +241,7 @@
                 Style = _style,
             };
 
-            var response = await Http.PostAsJsonAsync("/api/rap-roast", request);
+            var response = await Http.PostAsJsonAsync("/api/rap-roast", request, SharedJsonOptions.Default);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -276,7 +276,7 @@
             progressMessage = "Cutting the track…";
             StateHasChanged();
 
-            _result = await response.Content.ReadFromJsonAsync<RapRoastResponse>();
+            _result = await response.Content.ReadFromJsonAsync<RapRoastResponse>(SharedJsonOptions.Default);
             isComplete = _result is not null;
         }
         catch (Exception ex)

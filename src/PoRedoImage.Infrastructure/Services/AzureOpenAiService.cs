@@ -4,6 +4,7 @@ using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
 
@@ -32,7 +33,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         // service uses the Azure.AI.OpenAI SDK, which is NOT routed through HttpClient — so a
         // future regression that wires a real client while mock mode is on would bypass the
         // handler and silently spend a live token. Fail loud here instead.
-        if (configuration.GetValue<bool>(ConfigKeys.MocksUseMockAi))
+        if (ConfigValue.Bool(configuration, ConfigKeys.MocksUseMockAi))
         {
             throw new InvalidOperationException(
                 "AzureOpenAiService was constructed while Mocks:UseMockAi=true. The DI container "

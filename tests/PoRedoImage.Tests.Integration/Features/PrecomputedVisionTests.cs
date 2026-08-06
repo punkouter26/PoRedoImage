@@ -27,7 +27,7 @@ public class PrecomputedVisionTests(MockedServicesWebApplicationFactory factory)
             PrecomputedTags = ["lighthouse", "dusk"],
         };
 
-        var response = await client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ImageAnalysisResponse>();

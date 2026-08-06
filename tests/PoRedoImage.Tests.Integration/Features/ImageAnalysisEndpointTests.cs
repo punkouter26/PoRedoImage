@@ -38,7 +38,7 @@ public class ImageAnalysisEndpointTests : IClassFixture<MockedServicesWebApplica
     public async Task AnalyzeImage_BadImageData_Returns400(string imageData)
     {
         var request = new ImageAnalysisRequest { ImageData = imageData, ContentType = "image/png" };
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -56,7 +56,7 @@ public class ImageAnalysisEndpointTests : IClassFixture<MockedServicesWebApplica
             DescriptionLength = 200
         };
 
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var content = await response.Content.ReadAsStringAsync();
@@ -88,7 +88,7 @@ public class ImageAnalysisEndpointTests : IClassFixture<MockedServicesWebApplica
             Mode = ProcessingMode.MemeGeneration
         };
 
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var content = await response.Content.ReadAsStringAsync();
@@ -129,7 +129,7 @@ public class ImageAnalysisEndpointTests : IClassFixture<MockedServicesWebApplica
             DescriptionLength = 200
         };
 
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         var content = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(content);
 
@@ -291,7 +291,7 @@ public class ImageAnalysisEndpointFailureTests : IClassFixture<ThrowingComputerV
             DescriptionLength = 200
         };
 
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
@@ -306,7 +306,7 @@ public class ImageAnalysisEndpointFailureTests : IClassFixture<ThrowingComputerV
             Mode = ProcessingMode.MemeGeneration
         };
 
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         var content = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -416,7 +416,7 @@ public class RealImageGenerationRouterTests : IClassFixture<RealImageGenRouterWe
             ImageGenModelId = null,
         };
 
-        var response = await _client.PostAsJsonAsync("/api/images/analyze", request);
+        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var content = await response.Content.ReadAsStringAsync();

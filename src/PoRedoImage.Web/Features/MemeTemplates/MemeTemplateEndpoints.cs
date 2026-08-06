@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
+using PoRedoImage.Web.Features.Shared;
 
 namespace PoRedoImage.Web.Features.MemeTemplates;
 
@@ -19,7 +20,8 @@ public static class MemeTemplateEndpoints
     {
         var group = app.MapGroup("/api/meme-templates")
             .WithTags("MemeTemplates")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireAntiforgeryValidation();
 
         group.MapGet("/", async (IMemeTemplateService templates, HybridCache cache, CancellationToken ct) =>
         {

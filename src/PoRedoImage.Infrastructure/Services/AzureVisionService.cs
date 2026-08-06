@@ -3,6 +3,7 @@ using Azure;
 using Azure.AI.Vision.ImageAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoRedoImage.Application.Configuration;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
 
@@ -30,7 +31,7 @@ public sealed class AzureVisionService : IVisionService
 
         var endpoint = configuration[ConfigKeys.ComputerVisionEndpoint];
         var key = CurrentKey;
-        _minTagConfidence = configuration.GetValue<float>(ConfigKeys.ComputerVisionMinTagConfidence, 0.6f);
+        _minTagConfidence = ConfigValue.Float(configuration, ConfigKeys.ComputerVisionMinTagConfidence, 0.6f);
 
         if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(key))
         {

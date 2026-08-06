@@ -75,16 +75,53 @@ public abstract class FeaturePageBase : ComponentBase
         var (result, error) = await ImageLoadHelper.LoadAsync(selectedFile);
         if (error is not null) { errorMessage = error; selectedFile = null; return; }
 
-        imagePreviewUrl = result!.PreviewUrl;
-        SessionService.SetImage(result!.PreviewUrl, result.ContentType, selectedFile.Name, result.Bytes);
+        AdoptImage(result!.PreviewUrl, result.Bytes, result.ContentType, selectedFile.Name);
+        StateHasChanged();
+        Logger.LogInformation("Image loaded: {Name}, {KB:F1} KB", selectedFile.Name, selectedFile.Size / 1024.0);
+    }
+
+    /// <summary>
+    /// Accepts an image that arrived via clipboard paste or a window-level drop
+    /// (see <see cref="IntakeImage"/>), applying the same session + auto-save path as an upload.
+    /// </summary>
+    protected void HandleImageIntake(IntakeImage payload)
+    {
+        if (payload.Error is not null) { errorMessage = payload.Error; StateHasChanged(); return; }
+
+        var bytes = payload.Decode();
+        if (bytes is null) { errorMessage = "The pasted image could not be read."; StateHasChanged(); return; }
+
+        var contentType = payload.ContentType ?? "image/png";
+        var fileName = payload.FileName ?? "pasted-image.png";
+
+        // A pasted image has no IBrowserFile; clearing selectedFile keeps the two intake paths
+        // from disagreeing about which file the page is currently working on.
+        selectedFile = null;
+        errorMessage = null;
+        isComplete = false;
+        AdoptImage($"data:{contentType};base64,{payload.Base64}", bytes, contentType, fileName);
+        OnGalleryImageSelected(); // clears derived result state on the concrete page
+
+        NotificationService.Notify(NotificationSeverity.Success,
+            payload.Source == "drop" ? "Image dropped" : "Image pasted",
+            $"{fileName} is ready to process.", duration: 2500);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Makes <paramref name="bytes"/> the page's and the session's active image and kicks off the
+    /// gallery auto-save. Shared by the upload, paste, and drop paths so they cannot drift.
+    /// </summary>
+    private void AdoptImage(string previewUrl, byte[]? bytes, string contentType, string fileName)
+    {
+        imagePreviewUrl = previewUrl;
+        SessionService.SetImage(previewUrl, contentType, fileName, bytes);
         // Fire-and-forget has bitten us before: a transient 5xx silently produced a gallery
         // with no entry. Delegate to UserImageSaveService which sends an Idempotency-Key and
         // surfaces a Retry-button Radzen toast on failure. The _ = drop is intentional here
         // because we don't want to block the upload UI waiting for storage.
-        if (_userId is not null && result.Bytes is not null)
-            _ = AutoSaveOriginalAsync(result.Bytes, result.ContentType, selectedFile.Name);
-        StateHasChanged();
-        Logger.LogInformation("Image loaded: {Name}, {KB:F1} KB", selectedFile.Name, selectedFile.Size / 1024.0);
+        if (_userId is not null && bytes is not null)
+            _ = AutoSaveOriginalAsync(bytes, contentType, fileName);
     }
 
     protected void HandleGalleryImage(MyImagesGallery.GalleryItem item)

@@ -3,6 +3,7 @@ using PoRedoImage.Application.Features.UserImages;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
+using PoRedoImage.Web.Features.Shared;
 
 namespace PoRedoImage.Web.Features.UserImages;
 
@@ -21,7 +22,8 @@ public static class UserImageEndpoints
         var group = app.MapGroup("/api/user-images")
             .WithTags("UserImages")
             .RequireAuthorization()
-            .AddEndpointFilter<PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter>();
+            .AddEndpointFilter<PoRedoImage.Web.Features.Idempotency.IdempotencyKeyFilter>()
+            .RequireAntiforgeryValidation();
 
         group.MapGet("/", ListImagesAsync)
             .WithName("ListUserImages")

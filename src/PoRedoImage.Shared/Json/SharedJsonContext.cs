@@ -14,6 +14,15 @@ namespace PoRedoImage.Shared.Json;
 /// both <c>PoRedoImage.Web.Program.cs</c> (server MVC JSON) and <c>PoRedoImage.Client.Program.cs</c>
 /// (WASM <c>HttpClient</c> JSON). Add new DTOs here whenever a new endpoint is introduced.
 /// </summary>
+// The naming policy and null handling MUST mirror what the hosts configure at runtime
+// (ASP.NET Core's JsonOptions defaults to JsonSerializerDefaults.Web → camelCase; Program.cs adds
+// WhenWritingNull). Source-generated JsonTypeInfo bakes property names in at compile time rather
+// than reading the ambient JsonSerializerOptions, so a mismatch here silently changes the wire
+// format for every DTO the moment this context takes precedence over the reflective resolver.
+// SharedJsonContractTests pins this.
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(ImageAnalysisRequest))]
 [JsonSerializable(typeof(ImageAnalysisResponse))]
 [JsonSerializable(typeof(ProcessingMetricsDto))]
@@ -45,6 +54,10 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(ClientVitalsHistoryDto))]
 [JsonSerializable(typeof(ClientVitalsPointDto))]
 [JsonSerializable(typeof(ImageBytes))]
+// Not a DTO, but the persisted shape of the bulk-prompt column: BulkGenerateEndpoints
+// round-trips the 10 saved prompts through it, and the reflective JsonSerializer overload
+// is an IL2026 under the solution-wide trim analyzer.
+[JsonSerializable(typeof(string[]))]
 public partial class SharedJsonContext : JsonSerializerContext
 {
 }
