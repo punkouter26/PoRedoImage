@@ -113,7 +113,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // IsConfigured=false and degrade rather than call out, but registering the mock keeps
             // the guarantee explicit rather than incidental.
             // Chat completion backs the roast lyric writer (and the Style Director agents). The real
-            // HuggingFace implementation throws on construction when Mocks:UseMockAi is set, so it
+            // Azure OpenAI implementation throws on construction when Mocks:UseMockAi is set, so it
             // must be swapped here rather than relying on the builder-phase flag.
             services.RemoveAll<IChatCompletionService>();
             services.AddSingleton<MockChatCompletionService>();

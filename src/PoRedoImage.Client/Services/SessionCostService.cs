@@ -9,10 +9,10 @@ namespace PoRedoImage.Client.Services;
 /// per-image prices from <c>GET /api/pricing</c>.
 /// </summary>
 /// <remarks>
-/// Worth surfacing persistently rather than only on Bulk Generate: the two configured image
-/// providers differ by roughly 13× per image (Gemini ≈ $0.039 vs HuggingFace/FLUX ≈ $0.003), so
-/// which one is active is a real cost signal, not decoration. These are estimates from config —
-/// they are not billing data and never claim to be.
+/// Worth surfacing persistently rather than only on Bulk Generate: generation is billed per image
+/// (Gemini ≈ $0.039), so a ten-slot bulk run is a real spend the user should see accumulating rather
+/// than discover later. These are indicative prices from config — they are not billing data and
+/// never claim to be.
 /// </remarks>
 public sealed class SessionCostService(HttpClient http, ILogger<SessionCostService> logger)
 {

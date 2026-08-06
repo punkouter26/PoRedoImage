@@ -41,19 +41,6 @@ internal static partial class AiServiceLog
     [LoggerMessage(Level = LogLevel.Debug, Message = "Gemini raw response: {Body}")]
     public static partial void GeminiRawResponse(this ILogger logger, string body);
 
-    // ── HuggingFace ─────────────────────────────────────────────────────
-    [LoggerMessage(Level = LogLevel.Information, Message = "Calling HuggingFace (img2img). Provider={Provider}/{Model}, Seed={Seed}")]
-    public static partial void HuggingFaceImg2ImgStarting(this ILogger logger, string provider, string model, int seed);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Calling HuggingFace (text2img). Provider={Provider}/{Model}")]
-    public static partial void HuggingFaceText2ImgStarting(this ILogger logger, string provider, string model);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "HuggingFace API error {Status}: {Body}")]
-    public static partial void HuggingFaceError(this ILogger logger, int status, string body);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "HuggingFace API complete in {Elapsed}ms. Size={Size} bytes")]
-    public static partial void HuggingFaceComplete(this ILogger logger, long elapsed, int size);
-
     // ── Azure Computer Vision ───────────────────────────────────────────
     [LoggerMessage(Level = LogLevel.Information, Message = "Analyzing image via Azure Computer Vision. Size={Size} bytes")]
     public static partial void VisionAnalysisStarting(this ILogger logger, int size);

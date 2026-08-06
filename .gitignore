@@ -563,3 +563,10 @@ TestResults/
 
 # Captured stdout/stderr from a local "dotnet run" (see .tmp_server.out removal)
 .tmp_server.*
+
+# Impeccable design skill + local Claude Code settings.
+# The skill is a dev tool (148 files, ~3.3 MB) reinstallable with `npx impeccable install`,
+# and settings.local.json is machine-local by convention. DESIGN.md and PRODUCT.md — the
+# outputs that matter to the project — ARE committed. Drop this rule if you want the design
+# detector hook to travel with the repo for every contributor.
+.claude/

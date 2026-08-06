@@ -152,7 +152,6 @@ jobs:
             "ComputerVision__Endpoint=PoRedoImage-ComputerVision-Endpoint" \
             "Google__ApiKey=PoRedoImage-Google-ApiKey" \
             "Google__Imagen3Model=PoRedoImage-Google-Imagen3Model" \
-            "HuggingFace__ApiKey=PoRedoImage-HuggingFace-ApiKey" \
             "OpenAI__Endpoint=PoRedoImage-OpenAI-Endpoint" \
             "OpenAI__Key=PoRedoImage-OpenAI-ApiKey" \
             "Storage__ConnectionString=PoRedoImage-StorageConnectionString"; do

@@ -171,11 +171,14 @@
                     }
                     @if (!_result.DescriptionIsDetailed)
                     {
+                        @* The reason comes from the server, which knows whether the vision call was
+                           throttled, filtered, misconfigured, or simply absent. This used to assert
+                           one cause for all four and pointed at a setting that was already correct. *@
                         <p class="roast-seen__thin mb-0">
                             <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
-                            That's a keyword list, not a description — no vision model was available, so
-                            the bars are working from labels alone. Configure <code>HuggingFace:ApiKey</code>
-                            for a detailed read of the scene.
+                            That's a keyword list, not a description.
+                            @(_result.DescriptionFallbackReason
+                                ?? "The bars are working from image labels alone.")
                         </p>
                     }
                 </details>

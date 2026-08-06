@@ -41,11 +41,7 @@ public static class AiServiceCatalog
 
         [AiCapability.GenerateImage] =
         [
-            // The provider that actually runs is decided server-side by the ImageGen:Provider
-            // config flag and seeded into the client via AiSelectionState.EnsureInitializedAsync.
-            // 2026-07: HuggingFace fal-ai has stopped routing FLUX/Qwen model ids (HTTP 400), so
-            // image generation through the HF router is no longer offered. The previous FLUX
-            // option has been removed; re-add it only after a live model id is verified.
+            // Google is the only image-generation provider; HuggingFace was removed in 2026-08.
             new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image (only)"),
         ],
 
@@ -56,9 +52,11 @@ public static class AiServiceCatalog
             new(AiProviderIds.AzureOpenAi, "Azure OpenAI", CategoryRemote, "Only provider configured"),
         ],
 
+        // The Style Director agents reason through IChatCompletionService, which is Azure OpenAI —
+        // the same deployment that reads images for the scene describer.
         [AiCapability.StyleDirector] =
         [
-            new(AiProviderIds.HuggingFaceChat, "HuggingFace chat", CategoryRemote, "Only provider configured"),
+            new(AiProviderIds.AzureOpenAi, "Azure OpenAI", CategoryRemote, "Only provider configured"),
         ],
 
         [AiCapability.SceneDetail] =

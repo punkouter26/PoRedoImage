@@ -92,10 +92,9 @@ public static class BulkGenerateEndpoints
         .WithName("DescribePerson")
         .WithSummary("Describe the primary person in an image for use in art-style prompts");
 
-        // Generate a single art-style variation. Routed through IImageGenerationRouter so the
-        // client-side AI picker can choose Gemini Imagen 3 vs HuggingFace FLUX/Qwen per request.
-        // Resolves the configured default when no modelId is supplied (matches the legacy behaviour
-        // for callers that haven't adopted the picker yet).
+        // Generate a single art-style variation. Still routed through IImageGenerationRouter even
+        // though Google is the only provider: the router is where a second one would slot back in,
+        // and it already resolves the default when no modelId is supplied.
         aiGroup.MapPost("/variation", async (BulkVariationRequest request, IImageGenerationRouter router) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))

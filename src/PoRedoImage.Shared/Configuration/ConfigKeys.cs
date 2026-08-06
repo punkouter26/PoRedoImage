@@ -70,15 +70,6 @@ public static class ConfigKeys
     /// </summary>
     public const string GoogleLyriaModel = "Google:LyriaModel";
 
-    // ── HuggingFace Inference Providers ─────────────────────────────────
-    public const string HuggingFaceApiKey = "HuggingFace:ApiKey";
-    public const string HuggingFaceBaseUrl = "HuggingFace:BaseUrl";
-    public const string HuggingFaceChatModel = "HuggingFace:ChatModel";
-    public const string HuggingFaceImageToImageProviderId = "HuggingFace:ImageToImageProviderId";
-    public const string HuggingFaceProvider = "HuggingFace:Provider";
-    public const string HuggingFaceTextToImageProviderId = "HuggingFace:TextToImageProviderId";
-    public const string HuggingFaceVisionModel = "HuggingFace:VisionModel";
-
     // ── Ollama (local, dev only) ────────────────────────────────────────
     public const string OllamaEndpoint = "Ollama:Endpoint";
     public const string OllamaVisionModel = "Ollama:VisionModel";
@@ -99,14 +90,13 @@ public static class ConfigKeys
     public const string VisionSecondOpinion = "Vision:SecondOpinion";
 
     // ── Feature flags ───────────────────────────────────────────────────
+    /// <summary>
+    /// Historic image-generation provider switch. Google Gemini/Imagen is now the only provider, so
+    /// nothing reads this: the key is kept only so an existing App Service setting or Key Vault
+    /// reference does not fail configuration binding after the HuggingFace removal (2026-08).
+    /// </summary>
     public const string ImageGenProvider = "ImageGen:Provider";
 
-    /// <summary>
-    /// Which backend serves <c>IChatCompletionService</c> — <c>"azureopenai"</c> (default) or
-    /// <c>"huggingface"</c>. Mirrors <see cref="ImageGenProvider"/>: both concretes register, so
-    /// swapping providers is a config change rather than a redeploy.
-    /// </summary>
-    public const string ChatProvider = "Chat:Provider";
     public const string MocksUseMockAi = "Mocks:UseMockAi";
     public const string AuthEnableFakeAuth = "Auth:EnableFakeAuth";
 }

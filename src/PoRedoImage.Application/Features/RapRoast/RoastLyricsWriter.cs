@@ -9,7 +9,7 @@ namespace PoRedoImage.Application.Features.RapRoast;
 /// Writes the roast bars from an image description.
 /// </summary>
 /// <remarks>
-/// Backed by <see cref="IChatCompletionService"/> (HuggingFace) with a deterministic heuristic
+/// Backed by <see cref="IChatCompletionService"/> (Azure OpenAI) with a deterministic heuristic
 /// fallback, mirroring the Style Director agents — so the feature still works when no chat provider
 /// is configured, which is the normal local-development state.
 /// </remarks>

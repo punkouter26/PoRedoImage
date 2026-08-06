@@ -8,7 +8,12 @@
     <span class="session-cost" role="status"
           title="@($"{Cost.ImageCount} image(s) via {Cost.Pricing.ImageProviderLabel} at ≈ {Cost.Format(Cost.Pricing.ImageToImageUsd)} each. Indicative estimate from configuration — not billing data.")">
         <i class="bi bi-receipt me-1" aria-hidden="true"></i>
-        <span class="session-cost__value">@Cost.Format(Cost.EstimatedTotal)</span>
+        @* The fare counter reads in flap cells, and because each digit is keyed by position the
+           cells that actually change are the only ones that flip — the total ticks up like a
+           board rather than redrawing itself. *@
+        <span class="session-cost__value">
+            <FlapText Text="@Cost.Format(Cost.EstimatedTotal)" Class="flapstrip--sm" />
+        </span>
         <span class="session-cost__meta">· @Cost.ImageCount img · @Cost.Pricing.ImageProviderLabel</span>
     </span>
 }

@@ -6,7 +6,7 @@
   ...
 ## Product Vision
 
-PoRedoImage is a cloud-native AI image studio that transforms ordinary photos into artistic masterpieces, memes, and stylistic variations in seconds. By chaining Azure Computer Vision, Azure OpenAI GPT-4.1-nano, and Google Gemini Imagen3 behind a clean Blazor Web App, PoRedoImage makes professional-grade AI image manipulation accessible to anyone — no prompt engineering required.
+PoRedoImage is a cloud-native AI image studio that transforms ordinary photos into artistic masterpieces, memes, and stylistic variations in seconds. By chaining Azure Computer Vision, Azure OpenAI `gpt-5.4-nano` (text *and* vision), and Google `gemini-2.5-flash-image` behind a clean Blazor Web App, PoRedoImage makes professional-grade AI image manipulation accessible to anyone — no prompt engineering required.
 
 The core user promise: *upload a photo, choose a style, get a gallery-worthy result in under 10 seconds.*
 
@@ -71,7 +71,7 @@ flowchart LR
 
 | Feature | Description |
 |---------|-------------|
-| Image Analysis | Computer Vision → GPT-4.1-nano enhancement → tags + confidence |
+| Image Analysis | Computer Vision → `gpt-5.4-nano` enhancement → tags + confidence |
 | Image Regeneration | Gemini `gemini-2.5-flash-image` with reference bytes |
 | Meme Generation | SkiaSharp text overlay on analysed image |
 | Bulk Generate | 10 art-style variations via parallel Gemini calls, streamed live |
@@ -86,8 +86,9 @@ flowchart LR
 |-------|-----------|
 | Framework | .NET 10 Blazor Web App (global Interactive WebAssembly, no prerender) behind an ASP.NET Core BFF |
 | AI — Vision | Azure Computer Vision `cv-poshared-eastus` |
-| AI — Language | Azure OpenAI GPT-4.1-nano `openai-poshared-eastus` |
+| AI — Language + Vision | Azure OpenAI `gpt-5.4-nano` — one deployment serves reasoning and image-to-text |
 | AI — Image Gen | Google Gemini `gemini-2.5-flash-image` |
+| AI — Music | Google Lyria `lyria-3-clip-preview` (Rap Roast) |
 | Storage | Azure Table Storage `stporedoimage26` |
 | Secrets | Azure Key Vault `kv-poshared` (Access Policy + 30 min rotation) |
 | Observability | OpenTelemetry + Serilog → Application Insights |
@@ -201,11 +202,17 @@ All secrets load from `kv-poshared` via `AZURE_KEY_VAULT_ENDPOINT` app setting.
 | `PoRedoImage-ComputerVision-Endpoint` | `ComputerVision:Endpoint` |
 | `PoRedoImage-OpenAI-ApiKey` | `OpenAI:Key` |
 | `PoRedoImage-OpenAI-Endpoint` | `OpenAI:Endpoint` |
-| `PoRedoImage-OpenAI-DeploymentName` | `OpenAI:ChatCompletionsDeployment` |
 | `PoRedoImage-StorageConnectionString` | `Storage:ConnectionString` |
 | `PoRedoImage-Google-ApiKey` | `Google:ApiKey` |
 | `PoRedoImage-Google-Imagen3Model` | `Google:Imagen3Model` |
 | `PoRedoImage-ApplicationInsights-ConnectionString` | `ApplicationInsights:ConnectionString` |
+
+> **`OpenAI:ChatCompletionsDeployment` is deliberately NOT a Key Vault secret.** The deployment name
+> is not sensitive, and a stale Key Vault copy (`gpt-4.1-nano`) once shadowed the live value and
+> caused `404 DeploymentNotFound`. The single source of truth is config: `appsettings.json` for
+> local/dev/test, overridden in production by the literal `OpenAI__ChatCompletionsDeployment` app
+> setting in [`infra/main.bicep`](infra/main.bicep). Do not re-add a `PoRedoImage-OpenAI-DeploymentName`
+> secret — see the note in `KeyVaultSecretNameMapping.cs`.
 
 ---
 

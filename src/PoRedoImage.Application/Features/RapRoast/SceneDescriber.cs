@@ -66,6 +66,9 @@ public sealed class SceneDescriber(
         if (!chat.IsConfigured)
         {
             sw.Stop();
+            const string reason =
+                "No vision model is configured, so the bars are working from image labels alone. "
+                + "Set OpenAI:Endpoint and OpenAI:Key for a detailed read of the scene.";
 
             // Even with no vision model, OCR and objects beat a bare tag list.
             if (details.HasAny)
@@ -73,15 +76,15 @@ public sealed class SceneDescriber(
                 logger.LogInformation("No vision model configured; describing from extracted detail alone.");
                 return new SceneDescription(
                     $"{fallbackDescription}. {details.ToPromptBlock()}",
-                    Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds);
+                    Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds, reason);
             }
 
             logger.LogInformation("No vision model or scene detail available; using the tag-derived description.");
             return new SceneDescription(
-                fallbackDescription, Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds);
+                fallbackDescription, Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds, reason);
         }
 
-        var snapshot = await ExtractAsync(image, tags, details, ct);
+        var (snapshot, failure) = await ExtractAsync(image, tags, details, ct);
 
         if (SecondOpinionEnabled)
         {
@@ -94,11 +97,50 @@ public sealed class SceneDescriber(
         {
             logger.LogWarning("Vision model returned nothing usable; falling back to extracted detail.");
             var text = details.HasAny ? $"{fallbackDescription}. {details.ToPromptBlock()}" : fallbackDescription;
-            return new SceneDescription(text, Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds);
+            return new SceneDescription(
+                text, Detailed: false, SceneSnapshot.Empty, details, sw.ElapsedMilliseconds,
+                failure ?? "The vision model returned nothing usable, so the bars are working from "
+                    + "image labels alone. Roasting the photo again usually fixes it.");
         }
 
         return new SceneDescription(
-            snapshot.ToProse(), Detailed: true, snapshot, details, sw.ElapsedMilliseconds);
+            snapshot.ToProse(), Detailed: true, snapshot, details, sw.ElapsedMilliseconds, FallbackReason: null);
+    }
+
+    /// <summary>
+    /// Turns a failed vision call into something the user can act on. The distinction matters:
+    /// a throttled call succeeds on retry, whereas a filtered or misconfigured one never will.
+    /// </summary>
+    private static string DescribeFailure(Exception ex)
+    {
+        var message = ex.Message;
+
+        if (message.Contains("429", StringComparison.Ordinal)
+            || message.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("rate_limit", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The vision model was rate-limited, so the bars are working from image labels "
+                + "alone. Wait a moment and roast the photo again.";
+        }
+
+        if (message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("content filter", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The vision model declined to describe this image, so the bars are working from "
+                + "image labels alone.";
+        }
+
+        if (message.Contains("401", StringComparison.Ordinal)
+            || message.Contains("403", StringComparison.Ordinal)
+            || message.Contains("DeploymentNotFound", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The vision model rejected the request (credentials or deployment name), so the "
+                + "bars are working from image labels alone. Check OpenAI:Key and "
+                + "OpenAI:ChatCompletionsDeployment.";
+        }
+
+        return "The vision model call failed, so the bars are working from image labels alone. "
+            + "Roasting the photo again usually fixes it.";
     }
 
     /// <summary>
@@ -121,7 +163,11 @@ public sealed class SceneDescriber(
         }
     }
 
-    private async Task<SceneSnapshot> ExtractAsync(
+    /// <summary>
+    /// Runs the vision read. Returns the snapshot plus, when the call failed, a user-facing reason —
+    /// the caller cannot tell "model said nothing" from "model was throttled" without it.
+    /// </summary>
+    private async Task<(SceneSnapshot Snapshot, string? Failure)> ExtractAsync(
         byte[] image, IReadOnlyList<string> tags, SceneDetails details, CancellationToken ct)
     {
         try
@@ -149,12 +195,12 @@ public sealed class SceneDescriber(
                 result.ElapsedMs, snapshot.Outfit.Count, snapshot.Props.Count,
                 snapshot.TextInImage.Count, result.TokensUsed);
 
-            return snapshot;
+            return (snapshot, null);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Vision extraction failed.");
-            return SceneSnapshot.Empty;
+            return (SceneSnapshot.Empty, DescribeFailure(ex));
         }
     }
 
@@ -213,9 +259,13 @@ public sealed class SceneDescriber(
 /// <param name="Snapshot">Structured slots; <see cref="SceneSnapshot.Empty"/> when unavailable.</param>
 /// <param name="Details">Machine-extracted ground truth.</param>
 /// <param name="ElapsedMs">Wall-clock time taken.</param>
+/// <param name="FallbackReason">
+/// User-facing explanation of why <paramref name="Detailed"/> is false, or null when it is true.
+/// </param>
 public sealed record SceneDescription(
     string Text,
     bool Detailed,
     SceneSnapshot Snapshot,
     SceneDetails Details,
-    long ElapsedMs);
+    long ElapsedMs,
+    string? FallbackReason);

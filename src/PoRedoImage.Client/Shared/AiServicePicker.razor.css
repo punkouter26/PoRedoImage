@@ -1,63 +1,96 @@
+/* Scoped CSS for AiServicePicker.razor — the routing panel.
+
+   This is where the product tells you which machine handles each step, so it is
+   built as the board's patch list: one ruled row per capability, label left,
+   selected service right. PRODUCT.md's third principle (cost and execution
+   location stay visible) is why this panel is legible rather than tucked away. */
+
 .ai-picker {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
-    background: var(--color-surface);
+    gap: 0;
+    background: var(--flap-black);
+    box-shadow: var(--shadow-md);
 }
 
 .ai-picker__legend {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--color-body);
-    padding: 0 var(--spacing-xs);
+    font-family: var(--font-flap);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #14161a;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
+    background: var(--steel-face);
+    border-bottom: 1px solid rgba(0,0,0,0.6);
+    padding: 0.5rem 0.85rem;
+    width: 100%;
+    float: none;
 }
 
+/* Label above selector, always. These option strings are long ("Azure Computer Vision —
+   Fastest, uses your API key"), and a side-by-side grid truncated every one of them to
+   "Azure Computer Visi⌄" inside the Studio's 360px column. A stacked row costs one line
+   and shows the whole value, which is the point of disclosing the provider at all. */
 .ai-picker__row {
     display: grid;
-    grid-template-columns: minmax(9rem, 12rem) 1fr;
-    align-items: center;
-    gap: var(--spacing-sm);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.2rem;
+    padding: 0.45rem 0.85rem;
+    border-bottom: 1px solid var(--rule);
 }
 
-@media (max-width: 34rem) {
-    .ai-picker__row {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-2xs);
-    }
-}
+.ai-picker__row:last-of-type { border-bottom: none; }
 
 .ai-picker__label {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
+    font-family: var(--font-flap);
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
 }
 
 .ai-picker__select {
     width: 100%;
+    min-width: 0;
+    text-overflow: ellipsis;
     padding: 0.4rem 0.6rem;
-    font-size: 0.8125rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-body);
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    color: var(--flap-white);
+    transition: border-color var(--motion-fast);
 }
 
+.ai-picker__select:hover { border-color: var(--steel-dark); }
+
 .ai-picker__select:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--amber);
     outline-offset: 1px;
+    border-color: var(--amber);
 }
 
 .ai-picker__select:disabled {
-    background: var(--color-surface-elevated);
-    color: var(--color-muted);
+    background: var(--flap-black);
+    color: var(--steel-dark);
     cursor: not-allowed;
 }
 
+/* Where the model actually runs. Amber, because execution location is the
+   thing this panel exists to disclose. */
 .ai-picker__device {
     margin: 0;
-    font-size: 0.75rem;
-    color: var(--color-muted);
+    padding: 0.35rem 0.85rem 0.6rem;
+    font-family: var(--font-flap);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--amber);
 }

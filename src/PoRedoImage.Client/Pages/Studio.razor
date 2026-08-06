@@ -6,27 +6,9 @@
 
 <div class="studio-page">
 
-    @* ── Hero ──────────────────────────────────────────────────────── *@
-    <div class="studio-hero">
-        <div class="studio-hero__icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-            </svg>
-        </div>
-        <div>
-            <h1 class="studio-hero__title">AI Image Studio</h1>
-            <p class="studio-hero__sub">Upload a photo, then choose how to transform it.</p>
-        </div>
-    </div>
-
-    @* ── My Images gallery (auth users only) ───────────────────────── *@
-    <AuthorizeView>
-        <Authorized>
-            <div class="studio-gallery-row">
-                <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGallerySelect" />
-            </div>
-        </Authorized>
-    </AuthorizeView>
+    @* The board head and the saved-images strip were removed at the user's request. The page
+       now opens straight on the intake bay and the service list. There is no <h1> left here,
+       so <PageTitle> above is what names the page for assistive tech and the browser tab. *@
 
     @* ── Upload zone + feature cards ──────────────────────────────── *@
     <div class="studio-body">
@@ -44,17 +26,28 @@
         </div>
 
         <div class="studio-features-col">
+            @* Ruled board rows, not a grid of cards. The status column reads QUEUED until a
+               photo is loaded and BOARDING once one is, so the board itself tells you whether
+               the service can depart. *@
             <div class="studio-feature-cards">
+                <div class="row-head" aria-hidden="true">
+                    <span></span>
+                    <span>Service</span>
+                    <span>Status</span>
+                </div>
+
                 @foreach (var feature in FeatureCatalog.All)
                 {
                     <a class="studio-feature-card @(_hasImage ? "studio-feature-card--ready" : "")" href="@feature.Route">
-                        <span class="studio-feature-card__icon">@feature.Emoji</span>
+                        <span class="studio-feature-card__icon" aria-hidden="true">
+                            <i class="bi @feature.Icon"></i>
+                        </span>
                         <div>
                             <div class="studio-feature-card__title">@feature.Title</div>
                             <p class="studio-feature-card__desc">@feature.Description</p>
                         </div>
                         <span class="studio-feature-card__cta">
-                            @(_hasImage ? "Process now →" : "Try it →")
+                            @(_hasImage ? "Boarding" : "Awaiting photo")
                         </span>
                     </a>
                 }
@@ -64,12 +57,11 @@
             {
                 <div class="studio-ready">
                     <p class="studio-ready-hint mb-0">
-                        <i class="bi bi-check-circle-fill text-success me-1"></i>
-                        Image ready — click any transformation above to start.
+                        <span class="lamp lamp--lit me-2" aria-hidden="true"></span>Photo loaded — pick a service
                     </p>
                     <button class="studio-surprise" @onclick="SurpriseMe"
                             title="Pick a transformation at random and run it on this image">
-                        <i class="bi bi-dice-5-fill me-1"></i>Surprise me
+                        Any service
                     </button>
                 </div>
             }
@@ -82,7 +74,6 @@
     private string? _previewUrl;
     private string? _error;
     private bool _hasImage => SessionService.HasImage;
-    private MyImagesGallery? _gallery;
 
     protected override void OnInitialized()
     {
@@ -136,12 +127,6 @@
         var pool = FeatureCatalog.Except("/bulk-generate").ToArray();
         var pick = pool[Random.Shared.Next(pool.Length)];
         Nav.NavigateTo($"{pick.Route}?auto=1");
-    }
-
-    private void HandleGallerySelect(MyImagesGallery.GalleryItem item)
-    {
-        _previewUrl = SessionService.PreviewUrl;
-        StateHasChanged();
     }
 
     public void Dispose() => SessionService.OnChange -= OnSessionChanged;

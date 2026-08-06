@@ -15,8 +15,12 @@ public static class PricingEndpoints
     {
         app.MapGet("/api/pricing", (IConfiguration config, IOptions<AiPricingOptions> pricing) =>
         {
-            var provider = (config[ConfigKeys.ImageGenProvider] ?? "google").Trim().ToLowerInvariant();
-            var key = provider is "hf" ? "huggingface" : provider;
+            // Google is the only provider, but the configured value is still read rather than
+            // hardcoded: an App Service setting left over from the HuggingFace era would otherwise
+            // report a provider label that no longer has a price entry. Anything unrecognised
+            // resolves to "google", which is what actually runs.
+            var configured = (config[ConfigKeys.ImageGenProvider] ?? "google").Trim().ToLowerInvariant();
+            var key = pricing.Value.Providers.ContainsKey(configured) ? configured : "google";
             var p = pricing.Value.Providers.GetValueOrDefault(key);
 
             return Results.Ok(new AiPricingDto(

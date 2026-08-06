@@ -1,45 +1,49 @@
-/* Scoped CSS for BulkPromptEditor.razor — Blazor appends a per-component
-   attribute selector to every rule, so selectors here only match elements
-   inside this component's render tree. */
+/* Scoped CSS for BulkPromptEditor.razor.
+
+   Ten prompts, ten numbered rows — the same manifest shape as the board they feed.
+   `--color-text` was never defined anywhere in this project, so every rule below
+   that used it was rendering with the inherited colour by accident; they now name
+   real tokens. The light-mode code chip (#eff6ff on #bfdbfe) is replaced by a dark
+   flap cell, which is the only place a token placeholder appears in this world. */
 
 .prompt-editor {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
     overflow: hidden;
 }
 
+/* The editor's steel rail, matching every other titled panel. */
 .prompt-editor__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: var(--spacing-xs);
-    padding: 0.6rem 0.85rem;
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg);
+    gap: 0.35rem;
+    padding: 0.5rem 0.85rem;
+    border-bottom: 1px solid rgba(0,0,0,0.6);
+    background: var(--steel-face);
 }
 
 .prompt-editor__title {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--color-text);
+    font-family: var(--font-flap);
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #14161a;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
     margin: 0;
     white-space: nowrap;
 }
 
-.prompt-editor__actions {
-    display: flex;
-    gap: 0.35rem;
-    flex-shrink: 0;
-}
-
+.prompt-editor__actions { display: flex; gap: 1px; flex-shrink: 0; }
 .prompt-editor__actions .btn .d-action-label { display: inline; }
 
 .prompt-editor__token-hint {
     width: 100%;
     font-size: 0.72rem;
-    color: var(--color-muted);
+    color: #2b2f36;
     padding: 0.25rem 0;
     display: flex;
     align-items: center;
@@ -47,11 +51,11 @@
 }
 
 .prompt-editor__token-hint code {
-    background: #eff6ff;
-    color: var(--color-primary, #2563eb);
-    border: 1px solid #bfdbfe;
-    border-radius: 4px;
-    padding: 0.05rem 0.4rem;
+    background: var(--flap-black);
+    color: var(--amber);
+    border: 1px solid rgba(0,0,0,0.5);
+    border-radius: 0;
+    padding: 0.1rem 0.4rem;
     font-size: 0.72rem;
     font-weight: 600;
 }
@@ -59,52 +63,67 @@
 .prompt-editor__list {
     padding: 0.75rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: var(--spacing-xs);
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.4rem;
 }
 
-.prompt-editor__item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.6rem;
+/* Single column below the two-up threshold — a 320px minimum would otherwise
+   force a horizontal scroll on the narrowest phones. */
+@media (max-width: 576px) {
+    .prompt-editor__list { grid-template-columns: 1fr; }
 }
 
+.prompt-editor__item { display: flex; align-items: flex-start; gap: 0.5rem; }
+
+/* Row numbers are the board's position column: tabular, in their own cell. */
 .prompt-editor__num {
-    width: 1.5rem;
-    text-align: center;
-    color: var(--color-muted-strong, #94a3b8);
-    font-size: 0.75rem;
-    padding-top: 0.5rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    margin-top: 0.4rem;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    color: var(--steel-dark);
+    font-family: var(--font-flap);
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    padding: 0;
 }
 
 .prompt-editor__textarea {
     flex: 1;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    color: var(--color-text);
-    font-size: 0.82rem;
-    padding: 0.45rem 0.7rem;
+    background: var(--flap-shadow);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    box-shadow: var(--inset-cell);
+    color: var(--flap-white);
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    padding: 0.5rem 0.7rem;
     resize: vertical;
     min-height: 56px;
-    transition: border-color 0.15s, background 0.15s;
-    line-height: 1.45;
+    transition: border-color var(--motion-fast);
+    line-height: 1.5;
 }
 
 .prompt-editor__textarea:focus {
     outline: none;
-    border-color: var(--color-primary, #3b82f6);
-    background: var(--color-surface);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    border-color: var(--amber);
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell), 0 0 0 1px var(--amber);
 }
 
 .btn-reset-row {
-    background: none;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    color: var(--color-muted-strong, #94a3b8);
-    font-size: 0.75rem;
+    background: transparent;
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    color: var(--steel-dark);
+    font-size: 0.72rem;
     width: 26px;
     height: 26px;
     display: flex;
@@ -113,16 +132,8 @@
     cursor: pointer;
     flex-shrink: 0;
     margin-top: 0.45rem;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    transition: color var(--motion-fast), border-color var(--motion-fast);
 }
 
-.btn-reset-row:hover {
-    background: var(--color-bg);
-    border-color: var(--color-muted-strong, #94a3b8);
-    color: var(--color-text);
-}
-
-.btn-reset-row:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
+.btn-reset-row:hover { background: transparent; border-color: var(--amber); color: var(--amber); }
+.btn-reset-row:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

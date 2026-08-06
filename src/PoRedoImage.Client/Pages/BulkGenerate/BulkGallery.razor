@@ -32,23 +32,28 @@
             <Virtualize Items="Results.AsReadOnly()" Context="result" ItemSize="280" OverscanCount="3">
                 <div class="bulk-slot bulk-slot--@result.Status.ToString().ToLower()">
                     <div class="bulk-slot__header">
-                        <span class="bulk-slot__num">#@(result.Index + 1)</span>
+                        @* The bay number belongs in real flap cells: this is the board's position
+                           column, the one value on the page that is literally a board number. *@
+                        <span class="bulk-slot__num">
+                            <FlapText Text="@($"{result.Index + 1:00}")" Class="flapstrip--sm" />
+                        </span>
+                        @* Four states, four words, one colour law. The lamp only lights while a
+                           bay is actually working, so a glance down the board finds live rows. *@
                         @switch (result.Status)
                         {
                             case BulkGenerateStatus.Pending:
-                                <span class="text-muted bulk-slot__status--queued">Queued</span>
+                                <span class="status status--queued bulk-slot__status--queued">Queued</span>
                                 break;
                             case BulkGenerateStatus.Processing:
-                                <span class="text-info">
-                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                                    <span>Processing…</span>
+                                <span class="status status--working">
+                                    <span class="lamp lamp--lit" aria-hidden="true"></span>Working
                                 </span>
                                 break;
                             case BulkGenerateStatus.Complete:
-                                <span class="text-success"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Done</span>
+                                <span class="status status--done">Done</span>
                                 break;
                             case BulkGenerateStatus.Failed:
-                                <span class="text-danger"><i class="bi bi-x-circle-fill me-1" aria-hidden="true"></i>Failed</span>
+                                <span class="status status--failed">Failed</span>
                                 break;
                         }
                     </div>

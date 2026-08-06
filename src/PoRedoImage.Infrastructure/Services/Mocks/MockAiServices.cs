@@ -39,7 +39,7 @@ public sealed class MockGenerativeAiService : IGenerativeAiService, IMockable
 }
 
 /// <summary>
-/// Canned chat completion — never calls HuggingFace. Reports <see cref="IsConfigured"/> == false so
+/// Canned chat completion — never calls a live provider. Reports <see cref="IsConfigured"/> == false so
 /// the Style Director agents deterministically fall back to their heuristic path (zero network, stable
 /// output for the automated-test tier).
 /// </summary>

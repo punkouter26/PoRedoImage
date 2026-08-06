@@ -1,205 +1,216 @@
-﻿/* Scoped styles for RapRoast.razor. All colours resolve from the shared tokens so they inherit
-   the light/dark treatment and stay above the 4.5:1 contrast floor the axe gate enforces. */
+/* Scoped styles for RapRoast.razor.
+
+   Every colour resolves from the board tokens. The previous sheet hard-coded slate
+   greys (#475569, #334155) that were computed for a light page; on flap-black they
+   fall to ~2:1. Contrast floors used here, all against --flap-shadow #1B1B1E:
+     --flap-white 17:1 · --steel 9.4:1 · --steel-dark 4.8:1 · --amber 10:1
+
+   The `border-left: 4px` accent on .roast-refused is gone. A thick coloured edge on
+   a callout is the AI side-tab tell; the refusal now reads as a full amber-framed
+   cell, which is also how every other state in this world announces itself. */
 
 .roast-style {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg, 12px);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    background: var(--flap-black);
     padding: 0.9rem 1rem 1rem;
 }
 
 .roast-style__legend {
-    font-size: 0.85rem;
+    font-family: var(--font-flap);
+    font-size: 0.68rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--steel-dark);
     padding: 0 0.35rem;
     width: auto;
-    margin-bottom: 0;
+    margin-bottom: 0.5rem;
 }
 
 .roast-style__options {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.5rem;
+    gap: 1px;
 }
 
+/* One selectable flap cell, same object as a mode card or a preset button. */
 .roast-style__option {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
     padding: 0.6rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md, 8px);
+    border: 1px solid transparent;
+    border-radius: 0;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color var(--motion-fast), color var(--motion-fast);
 }
 
-.roast-style__option:hover {
-    border-color: var(--color-border-hover, var(--color-primary));
-}
+.roast-style__option:hover { border-color: var(--steel-dark); }
 
-/* Keyboard focus must be visible on the label, since the radio itself is visually small. */
+/* The radio itself is small, so the whole cell shows the focus ring. */
 .roast-style__option:focus-within {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--amber);
     outline-offset: 2px;
 }
 
-.roast-style__option--selected {
-    border-color: var(--color-primary);
-    background: rgba(5, 39, 103, 0.06);
-}
+.roast-style__option--selected { border-color: var(--amber); background: rgba(255,180,0,0.08); }
 
 .roast-style__name {
-    font-weight: 600;
-    font-size: 0.9rem;
+    font-family: var(--font-flap);
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--flap-white);
 }
 
-.roast-style__hint {
-    font-size: 0.75rem;
-    /* --color-muted clears 4.5:1 on the page background but only reaches 4.05:1 on the selected
-       option's tinted fill. Slate-600 stays above the floor in both states. */
-    color: #475569;
-}
+.roast-style__option--selected .roast-style__name { color: var(--amber); }
 
-.roast-disclaimer {
-    margin-top: 0.75rem;
-    font-size: 0.78rem;
-    color: var(--color-muted);
-}
+.roast-style__hint { font-size: 0.76rem; color: var(--steel); line-height: 1.45; }
+
+.roast-disclaimer { margin-top: 0.75rem; font-size: 0.78rem; color: var(--steel-dark); }
 
 .roast-player {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg, 12px);
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
     padding: 1rem;
 }
 
-.roast-player__audio {
-    width: 100%;
-}
+.roast-player__audio { width: 100%; }
 
+/* A refusal is a cancelled row, so it takes the cancelled colour — no side tab. */
 .roast-refused {
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
-    background: var(--color-surface-elevated);
-    border: 1px solid var(--color-border);
-    border-left: 4px solid var(--color-primary);
-    border-radius: var(--radius-md, 8px);
+    gap: 0.6rem;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    border: 1px solid var(--cancel-red);
+    border-radius: 0;
     padding: 0.85rem 1rem;
+    color: var(--cancel-red-tx);
 }
 
-.roast-softened {
-    margin-top: 0.65rem;
-    color: var(--color-muted);
-}
+.roast-softened { margin-top: 0.65rem; color: var(--steel); }
 
 .roast-lyrics {
     margin-top: 1.25rem;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg, 12px);
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
     padding: 1rem 1.25rem;
 }
 
 .roast-lyrics__heading {
-    font-size: 1rem;
+    font-family: var(--font-flap);
+    font-size: 0.8rem;
     font-weight: 700;
-    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
+    margin-bottom: 0.6rem;
 }
 
-/* The lyrics are pre-formatted: section tags and line breaks are meaningful, so whitespace is
-   preserved, but long lines still wrap rather than forcing the page to scroll sideways. */
+/* Lyrics are pre-formatted: section tags and line breaks carry meaning, so whitespace
+   is preserved, but long bars still wrap rather than scrolling the page sideways. */
 .roast-lyrics__text {
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: inherit;
+    font-family: var(--font-ui);
     font-size: 0.95rem;
-    line-height: 1.65;
+    line-height: 1.7;
+    color: var(--flap-white);
+    max-width: 60ch;
     margin: 0;
 }
 
-.roast-seen {
-    margin-top: 1rem;
-    font-size: 0.85rem;
-}
+.roast-seen { margin-top: 1rem; font-size: 0.85rem; }
 
 .roast-seen summary {
     cursor: pointer;
-    color: var(--color-muted);
+    font-family: var(--font-flap);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
 }
+
+.roast-seen summary:hover { color: var(--amber); }
 
 .roast-subject {
     margin: 0 0 1rem;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg, 12px);
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
     padding: 0.75rem;
     text-align: center;
 }
 
-/* Capped by viewport height as well as width: a tall portrait photo would otherwise push the
-   audio player and the bars entirely below the fold. */
+/* Capped by viewport height as well as width: a tall portrait photo would otherwise
+   push the audio player and the bars entirely below the fold. */
 .roast-subject__img {
     max-width: 100%;
     max-height: 340px;
     width: auto;
-    border-radius: var(--radius-md, 8px);
+    border-radius: 0;
     display: block;
     margin: 0 auto;
+    background: var(--flap-shadow);
 }
 
 .roast-subject__caption {
     margin-top: 0.5rem;
-    font-size: 0.75rem;
-    color: #475569;
+    font-family: var(--font-flap);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
 }
 
-.roast-seen__thin {
-    margin-top: 0.5rem;
-    font-size: 0.78rem;
-    color: #475569;
-}
+.roast-seen__thin { margin-top: 0.5rem; font-size: 0.78rem; color: var(--steel); }
 
-/* Structured scene slots. A definition list is the correct semantic here — each label genuinely
-   describes its value — and it gives screen readers the pairing for free. */
+/* Structured scene slots. A definition list is the correct semantic — each label
+   genuinely describes its value — and it gives screen readers the pairing for free.
+   Visually it is the board's two-column manifest. */
 .scene-slots {
     display: grid;
     grid-template-columns: minmax(90px, auto) 1fr;
-    gap: 0.35rem 0.85rem;
+    gap: 0.4rem 0.85rem;
     margin: 0.5rem 0 0;
     font-size: 0.82rem;
 }
 
 .scene-slots dt {
+    font-family: var(--font-flap);
+    font-size: 0.66rem;
     font-weight: 600;
-    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
 }
 
-.scene-slots dd {
-    margin: 0;
-    color: #475569;
-}
+.scene-slots dd { margin: 0; color: var(--steel); }
 
-/* OCR lines are quoted verbatim from the image, so they get chip treatment to distinguish them
-   from the model's own words. */
+/* OCR lines are quoted verbatim off the image, so they sit in monospaced cells —
+   measurement, not costume: this is literal text read out of the photograph. */
 .scene-slots__chip {
     display: inline-block;
-    background: var(--color-surface-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.05rem 0.35rem;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    border: none;
+    border-radius: 0;
+    padding: 0.1rem 0.4rem;
     margin: 0 0.25rem 0.25rem 0;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.75rem;
-    color: #334155;
+    color: var(--flap-white);
 }
 
 @media (max-width: 479px) {
-    .scene-slots {
-        grid-template-columns: 1fr;
-        gap: 0.1rem 0;
-    }
-
-    .scene-slots dd {
-        margin-bottom: 0.4rem;
-    }
+    .scene-slots { grid-template-columns: 1fr; gap: 0.1rem 0; }
+    .scene-slots dd { margin-bottom: 0.5rem; }
 }

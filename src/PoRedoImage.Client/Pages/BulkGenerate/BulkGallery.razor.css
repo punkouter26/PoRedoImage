@@ -1,8 +1,21 @@
-/* Scoped CSS for BulkGallery.razor — Blazor appends a per-component attribute
-   selector to every rule, so selectors here only match elements inside this
-   component's render tree. */
+/* Scoped CSS for BulkGallery.razor.
 
-/* ── Empty state ──────────────────────────────────────────────────────── */
+   This is the surface the chosen world was picked for: ten slots that each move
+   independently from QUEUED through WORKING to DONE or FAILED. So it is built as
+   the departures board proper — a fixed grid of numbered bays, each one a flap
+   cell that turns in place. Columns never move; only the cells' contents change.
+
+   The old sheet leaned on light-mode fallbacks (#f8fafc, #f1f5f9, #334155) that
+   are invisible on flap-black, and on a blue→violet gradient fill. Both are gone.
+
+   Status colour law, shared with the rest of the app and never extended:
+     steel-dark = QUEUED · amber = WORKING · flap-white = DONE · red = FAILED
+   Every state also carries its own word, so the board reads in monochrome. */
+
+/* ── Empty state: an unlit board waiting for a service ─────────────────────
+   Solid rule, not dashed. In this world a dashed edge means "you can drop a file
+   here", and it is used by the intake zone directly above this panel. This bay is
+   an output area — giving it the same dashed edge invited a drop that does nothing. */
 .bulk-empty-state {
     display: flex;
     flex-direction: column;
@@ -10,114 +23,132 @@
     justify-content: center;
     padding: var(--spacing-xl) var(--spacing-lg);
     text-align: center;
-    color: var(--color-muted);
-    background: var(--color-surface-muted, #f8fafc);
-    border: 2px dashed var(--color-border);
-    border-radius: var(--radius-lg);
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
     min-height: 260px;
 }
 
-.bulk-empty-state__icon {
-    font-size: 3rem;
-    color: var(--color-border-strong, #cbd5e1);
-    margin-bottom: var(--spacing-md);
-}
+.bulk-empty-state__icon { font-size: 2rem; color: var(--steel-dark); margin-bottom: var(--spacing-md); }
 
 .bulk-empty-state__title {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--color-text, #334155);
-    margin-bottom: var(--spacing-xs);
-}
-
-.bulk-empty-state__hint {
+    font-family: var(--font-flap);
     font-size: 0.9rem;
-    color: var(--color-muted);
-    max-width: 38ch;
-    margin: 0 auto;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--flap-white);
+    margin-bottom: 0.5rem;
 }
 
-/* ── Progress header (aria-live = polite) ─────────────────────────────── */
+.bulk-empty-state__hint { font-size: 0.86rem; color: var(--steel); max-width: 42ch; margin: 0 auto; line-height: 1.55; }
+
+/* ── Board progress header ───────────────────────────────────────────────── */
 .bulk-progress-header {
     display: flex;
     justify-content: space-between;
-    font-size: 0.85rem;
-    color: var(--color-muted);
-    margin-bottom: var(--spacing-xs);
+    align-items: baseline;
+    font-family: var(--font-flap);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
+    margin-bottom: 0.4rem;
+    font-variant-numeric: tabular-nums;
 }
 
+/* A strip of unlit flaps that light amber as slots complete. */
 .bulk-progress-bar {
-    height: 6px;
-    background: var(--color-surface-muted, #e2e8f0);
-    border-radius: 99px;
+    height: 10px;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    border-radius: 0;
     overflow: hidden;
+    background-image: repeating-linear-gradient(90deg, transparent 0 7px, var(--cell-split) 7px 8px);
 }
 
 .bulk-progress-bar__fill {
     height: 100%;
     width: 100%;
-    background: linear-gradient(90deg, var(--color-primary, #2563eb), var(--color-accent, #7c3aed));
-    border-radius: 99px;
+    background: var(--amber);
+    border-radius: 0;
     transform: scaleX(var(--progress, 0));
     transform-origin: left center;
-    transition: transform 0.4s var(--motion-ease-in-out, ease);
+    transition: transform var(--motion-slow) var(--motion-ease-in-out);
     will-change: transform;
 }
 
-/* ── Gallery grid (virtualized — see BulkGallery.razor <Virtualize>) ── */
+/* ── The board grid (virtualized — see <Virtualize> in the component) ────── */
 .bulk-gallery {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: var(--spacing-md);
+    gap: 1px;
+    background: var(--rule);
     margin-top: 0;
-    /* Reserve room for the scrollbar so virtualization layout stays stable. */
     scrollbar-gutter: stable;
 }
 
+/* Portrait: two bays across keeps the images large enough to judge. A single
+   column would push slot 10 far below the fold on a phone. */
 @media (max-width: 576px) {
+    .bulk-gallery { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 340px) {
     .bulk-gallery { grid-template-columns: 1fr; }
 }
 
-/* ── Slot card ────────────────────────────────────────────────────────── */
+/* ── A bay ───────────────────────────────────────────────────────────────── */
 .bulk-slot {
-    border-radius: var(--radius-lg);
+    border-radius: 0;
     overflow: hidden;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    transition: border-color var(--motion-base, 0.2s ease);
-    box-shadow: var(--shadow-sm);
+    background: var(--flap-black);
+    border: 1px solid transparent;
+    transition: border-color var(--motion-fast);
 }
 
-.bulk-slot:hover { border-color: var(--color-primary-soft, #93c5fd); }
-.bulk-slot:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.bulk-slot:focus-within { outline: 2px solid var(--amber); outline-offset: -2px; }
 
-.bulk-slot--pending  { opacity: 0.92; }
-.bulk-slot--complete { border-color: var(--color-primary-soft, #93c5fd); }
-.bulk-slot--failed   { border-color: var(--color-danger-soft, #fca5a5); }
+.bulk-slot--pending  { }
+.bulk-slot--processing { border-color: var(--amber); }
+.bulk-slot--complete { }
+.bulk-slot--failed   { border-color: var(--cancel-red); }
 
+/* Bay header: the position number in its own cell, status on the right. */
 .bulk-slot__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: 0.78rem;
-    color: var(--color-muted);
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg);
+    gap: 0.4rem;
+    padding: 0.35rem 0.5rem;
+    font-family: var(--font-flap);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    border-bottom: 1px solid var(--rule);
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
 }
 
 .bulk-slot__num {
     font-weight: 700;
-    color: var(--color-text, #334155);
+    color: var(--flap-white);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
 }
 
-/* ── Slot image area (1:1 aspect-ratio) ──────────────────────────────── */
+.bulk-slot__status--queued { font-size: 0.68rem; }
+
+/* ── Image bay (1:1, so the grid's rows stay aligned across the board) ───── */
 .bulk-slot__img-area {
     aspect-ratio: 1 / 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-surface-muted, #f1f5f9);
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
     overflow: hidden;
 }
 
@@ -126,165 +157,155 @@
     height: 100%;
     object-fit: cover;
     cursor: zoom-in;
-    transition: transform var(--motion-base, 0.2s ease);
+    /* The finished image is revealed, not scaled on hover: a photo that jumps
+       under the cursor makes a ten-up comparison harder to read. */
+    opacity: 0;
+    animation: slotReveal var(--motion-slow) var(--motion-ease-in-out) forwards;
 }
 
-.bulk-slot__img-area img:hover { transform: scale(1.02); }
+@keyframes slotReveal { to { opacity: 1; } }
+
+.bulk-slot__img-area img:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
 
 .bulk-slot__img-area--pending {
-    color: var(--color-muted-strong, #94a3b8);
-    font-size: 0.8rem;
+    color: var(--steel-dark);
+    font-family: var(--font-flap);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
 }
 
 .bulk-slot__img-area--processing {
     flex-direction: column;
-    gap: var(--spacing-xs);
-    color: var(--color-muted);
-    font-size: 0.78rem;
+    gap: 0.5rem;
+    color: var(--amber);
+    font-family: var(--font-flap);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
 }
 
 .bulk-slot__img-area--failed {
-    color: var(--color-danger, #ef4444);
-    font-size: 0.8rem;
+    color: var(--cancel-red-tx);
+    font-size: 0.76rem;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: 0.4rem;
+    padding: 0.75rem;
+    text-align: center;
+    line-height: 1.4;
 }
 
+/* The working indicator is the board's row lamp, not a spinning ring. */
 .bulk-slot__spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--color-border, #e2e8f0);
-    border-top-color: var(--color-primary, #3b82f6);
-    border-radius: 50%;
-    animation: bulk-spin 0.8s linear infinite;
+    width: 26px;
+    height: 10px;
+    border: none;
+    border-radius: 0;
+    background: radial-gradient(circle at 50% 50%, var(--amber) 0 22%, transparent 24%) 0 0 / 5px 5px;
+    animation: lampRun 1.1s steps(5, end) infinite;
 }
 
-@keyframes bulk-spin { to { transform: rotate(360deg); } }
+@keyframes lampRun {
+    0%   { background-position: 0 0; opacity: 1; }
+    50%  { opacity: 0.45; }
+    100% { background-position: 25px 0; opacity: 1; }
+}
 
+/* A queued bay: the unlit sweep crossing dark flaps. */
 .bulk-slot__shimmer {
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg,
-        var(--color-surface-muted, #f1f5f9) 0%,
-        var(--color-border, #e2e8f0) 50%,
-        var(--color-surface-muted, #f1f5f9) 100%);
-    background-size: 200% 100%;
-    animation: bulk-shimmer 1.5s ease-in-out infinite;
+    background-color: var(--flap-shadow);
+    background-image: linear-gradient(90deg,
+        transparent 0%, rgba(255,180,0,0.14) 45%, rgba(255,180,0,0.14) 55%, transparent 100%);
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    animation: bulk-shimmer 1.5s linear infinite;
 }
 
 @keyframes bulk-shimmer {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0%   { background-position: 220% 0; }
+    100% { background-position: -120% 0; }
 }
 
-/* ── Slot footer ──────────────────────────────────────────────────────── */
+/* ── Bay footer ──────────────────────────────────────────────────────────── */
 .bulk-slot__footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--spacing-sm);
-    padding: 0.4rem 0.75rem;
+    gap: 0.4rem;
+    padding: 0.35rem 0.5rem;
     min-height: 2.2rem;
+    border-top: 1px solid var(--rule);
 }
 
 .bulk-slot__prompt-preview {
     font-size: 0.72rem;
-    color: var(--color-muted-strong, #94a3b8);
+    color: var(--steel-dark);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 75%;
+    max-width: 60%;
 }
 
-.bulk-slot__actions {
-    display: flex;
-    gap: 0.25rem;
-    flex-shrink: 0;
-}
+.bulk-slot__actions { display: flex; gap: 1px; flex-shrink: 0; }
 
-/* ── Inline action buttons ───────────────────────────────────────────── */
-.btn-dl-slot {
-    background: none;
-    border: 1px solid rgba(91, 154, 255, 0.4);
-    border-radius: 6px;
-    color: #5b9aff;
-    font-size: 0.72rem;
-    padding: 0.2rem 0.55rem;
-    cursor: pointer;
-    transition: background 0.15s;
-    flex-shrink: 0;
-}
-
-.btn-dl-slot:hover { background: rgba(91, 154, 255, 0.12); }
-.btn-dl-slot:focus-visible { outline: 2px solid #5b9aff; outline-offset: 2px; }
-
-.btn-heart-slot {
-    background: none;
-    border: 1px solid rgba(220, 38, 38, 0.25);
-    border-radius: 6px;
-    color: var(--color-muted);
-    font-size: 0.72rem;
-    padding: 0.2rem 0.45rem;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.btn-heart-slot:hover { background: rgba(220, 38, 38, 0.08); }
-.btn-heart-slot--active {
-    color: var(--color-danger, #dc2626);
-    border-color: rgba(220, 38, 38, 0.55);
-    background: rgba(220, 38, 38, 0.08);
-}
-
+/* ── Inline bay actions: three outlined cells, one grammar ───────────────── */
+.btn-dl-slot,
+.btn-heart-slot,
 .btn-reroll-slot {
-    background: none;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    color: var(--color-text, #334155);
-    font-size: 0.72rem;
-    padding: 0.2rem 0.55rem;
+    background: transparent;
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    color: var(--steel-dark);
+    font-family: var(--font-flap);
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.22rem 0.45rem;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: border-color var(--motion-fast), color var(--motion-fast);
+    flex-shrink: 0;
 }
 
-.btn-reroll-slot:hover:not(:disabled) {
-    background: var(--color-surface-muted, #f1f5f9);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
+.btn-dl-slot:hover,
+.btn-heart-slot:hover,
+.btn-reroll-slot:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); background: transparent; }
+
+.btn-dl-slot:focus-visible,
+.btn-heart-slot:focus-visible,
+.btn-reroll-slot:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* A kept variation is a confirmed departure: the flap turns amber and stays. */
+.btn-heart-slot--active {
+    color: var(--flap-black);
+    border-color: var(--amber);
+    background: var(--amber);
 }
 
-.btn-reroll-slot:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-reroll-slot:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.btn-heart-slot--active:hover { color: var(--flap-black); background: var(--flap-white); border-color: var(--flap-white); }
 
-/* ── Re-roll panel ────────────────────────────────────────────────────── */
+.btn-reroll-slot:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Re-roll panel: a supplementary service, shown under the main board ──── */
 .bulk-reroll-panel {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
     padding: var(--spacing-md);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
 }
 
-.bulk-reroll-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: var(--spacing-sm);
-}
+.bulk-reroll-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1px; }
 
 .bulk-reroll-cell {
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md, 8px);
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    border: 1px solid transparent;
+    border-radius: 0;
     overflow: hidden;
+    transition: border-color var(--motion-fast);
 }
 
-.bulk-reroll-cell img {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    display: block;
-}
-/* Status pill for a not-yet-started slot. Sized here rather than inline (NET_RULES §4). */
-.bulk-slot__status--queued {
-    font-size: 0.72rem;
-}
+.bulk-reroll-cell:hover { border-color: var(--steel-dark); }
+.bulk-reroll-cell img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; }

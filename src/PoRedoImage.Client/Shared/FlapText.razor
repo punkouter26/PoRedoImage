@@ -1,0 +1,42 @@
+@*
+    Renders a string as split-flap character cells — the board's native way of showing a value.
+
+    Each character is its own cell and is @key'd by position + glyph, so when Text changes Blazor
+    replaces only the cells whose character actually differs. Replaced cells re-run the flapSettle
+    animation while unchanged ones sit still, which is what produces the real board's cascade: the
+    ripple runs across only the part of the row that changed. Animating the whole strip on every
+    update would look like a fade, not a flap.
+
+    The visible cells are aria-hidden and the readable string is carried once on the wrapper, so a
+    screen reader hears "MEME GENERATION", not eighteen separate letters.
+*@
+<span class="flapstrip @Class" aria-label="@Text" role="text">
+    @{
+        var display = (Text ?? string.Empty).ToUpperInvariant();
+    }
+    @for (var i = 0; i < display.Length; i++)
+    {
+        var glyph = display[i];
+
+        if (char.IsWhiteSpace(glyph))
+        {
+            <span class="flap flap--gap" aria-hidden="true"></span>
+        }
+        else
+        {
+            // Position + glyph: same character in the same slot keeps its cell (and stays still),
+            // a changed character gets a new cell and replays the flap.
+            var cellKey = $"{i}:{glyph}";
+
+            <span @key="cellKey" class="flap" style="--i:@i" aria-hidden="true">@glyph</span>
+        }
+    }
+</span>
+
+@code {
+    /// <summary>The value to paint across the flaps. Rendered upper-case; the board has no lower case.</summary>
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+
+    /// <summary>Extra classes, e.g. <c>flapstrip--display</c> or <c>flapstrip--sm</c>.</summary>
+    [Parameter] public string? Class { get; set; }
+}

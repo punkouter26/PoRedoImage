@@ -180,7 +180,6 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'OpenAI__ChatCompletionsDeployment', value: openAiChatDeployment }
         { name: 'Google__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-Google-ApiKey') }
         { name: 'Google__Imagen3Model', value: kvRef(keyVaultName, 'PoRedoImage-Google-Imagen3Model') }
-        { name: 'HuggingFace__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-HuggingFace-ApiKey') }
         { name: 'ComputerVision__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-ApiKey') }
         { name: 'ComputerVision__Endpoint', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-Endpoint') }
         { name: 'ApplicationInsights__ConnectionString', value: kvRef(keyVaultName, 'PoRedoImage-ApplicationInsights-ConnectionString') }

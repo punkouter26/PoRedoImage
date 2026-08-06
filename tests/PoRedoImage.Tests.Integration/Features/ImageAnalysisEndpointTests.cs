@@ -402,7 +402,7 @@ public class RealImageGenerationRouterTests : IClassFixture<RealImageGenRouterWe
     }
 
     [Fact]
-    public async Task AnalyzeImage_NullImageGenModelId_RealRouterUsesConfiguredProvider_NotGemini()
+    public async Task AnalyzeImage_NullImageGenModelId_RealRouterResolvesToGoogle()
     {
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
         var request = new ImageAnalysisRequest
@@ -424,28 +424,30 @@ public class RealImageGenerationRouterTests : IClassFixture<RealImageGenRouterWe
         var regeneratedBytes = Convert.FromBase64String(
             doc.RootElement.GetProperty("regeneratedImageData").GetString()!);
 
-        // ImageGen:Provider=huggingface is configured on this factory (matching both real
-        // appsettings files); a null id must resolve through the REAL router to HuggingFace, never
-        // fall through to Gemini.
-        Assert.Equal(RealImageGenRouterWebApplicationFactory.HuggingFaceMarkerBytes, regeneratedBytes);
-        Assert.NotEqual(RealImageGenRouterWebApplicationFactory.GeminiMarkerBytes, regeneratedBytes);
+        // Google is the only image-generation provider, so a null model id must resolve through the
+        // REAL router to Gemini. The other arm is a provider id the router does not know; it must
+        // never be reachable, which is what keeps this from being a tautology.
+        Assert.Equal(RealImageGenRouterWebApplicationFactory.GeminiMarkerBytes, regeneratedBytes);
+        Assert.NotEqual(RealImageGenRouterWebApplicationFactory.UnroutableMarkerBytes, regeneratedBytes);
     }
 }
 
 /// <summary>
 /// WebApplicationFactory that mirrors <see cref="MockedServicesWebApplicationFactory"/> for
 /// everything except image generation, where it wires the REAL <see cref="ImageGenerationRouter"/>
-/// (configured with <c>ImageGen:Provider=huggingface</c>) over two distinguishable mock
-/// <see cref="IImageGenerationService"/> instances, instead of the usual
+/// over distinguishable mock <see cref="IImageGenerationService"/> instances instead of the usual
 /// <see cref="SingleImageGenerationRouter"/> stub.
 /// </summary>
 public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Program>
 {
-    /// <summary>Bytes the Gemini-arm mock returns — must never come back for a null model id.</summary>
+    /// <summary>Bytes the Gemini arm returns — the only provider, so the expected output.</summary>
     internal static readonly byte[] GeminiMarkerBytes = [0xEE, 0xEE, 0xEE, 0xEE];
 
-    /// <summary>Bytes the HuggingFace-arm mock returns — the configured provider's expected output.</summary>
-    internal static readonly byte[] HuggingFaceMarkerBytes = [0xAA, 0xAA, 0xAA, 0xAA];
+    /// <summary>
+    /// Bytes from a service the router is never given. Asserting these do NOT come back is what
+    /// proves the response came through the real router rather than from an incidental default.
+    /// </summary>
+    internal static readonly byte[] UnroutableMarkerBytes = [0xAA, 0xAA, 0xAA, 0xAA];
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -465,8 +467,8 @@ public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Pro
                 ["Storage:ConnectionString"] = "",
                 ["Google:ApiKey"] = "test-key",
                 ["Mocks:UseMockAi"] = "true",
-                // The value under test: both real appsettings files set this to huggingface today.
-                ["ImageGen:Provider"] = "huggingface",
+                // Matches both real appsettings files since the HuggingFace removal (2026-08).
+                ["ImageGen:Provider"] = "google",
             });
         });
 
@@ -494,16 +496,14 @@ public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Pro
             geminiSpy.Setup(s => s.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((GeminiMarkerBytes, "image/png", 500L));
 
-            var huggingFaceSpy = new Mock<IImageGenerationService>();
-            huggingFaceSpy.SetupGet(s => s.IsConfigured).Returns(true);
-            huggingFaceSpy.Setup(s => s.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((HuggingFaceMarkerBytes, "image/png", 500L));
+            // Deliberately NOT handed to the router: if the endpoint ever returns these bytes, the
+            // request bypassed the router and hit some other registration.
+            var unroutableSpy = new Mock<IImageGenerationService>();
+            unroutableSpy.SetupGet(s => s.IsConfigured).Returns(true);
+            unroutableSpy.Setup(s => s.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((UnroutableMarkerBytes, "image/png", 500L));
 
             // The REAL router, not SingleImageGenerationRouter — this is the whole point of the test.
-            // Reads configuredProvider from IConfiguration (the actual ImageGen:Provider key set
-            // above) rather than a hardcoded literal, so this test is provably driven by that config
-            // value and not merely decorative — flipping the in-memory value to "google" must flip
-            // which marker bytes come back, not just be inert dead config.
             services.RemoveAll<IImageGenerationRouter>();
             services.AddSingleton<IImageGenerationRouter>(_ => new ImageGenerationRouter(
                 geminiSpy.Object));

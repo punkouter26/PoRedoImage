@@ -188,37 +188,54 @@ path; a `browser:` id for text (`AiProviderIds.BrowserQwen25`) exists but is del
 offered in the catalog. The original design spec proposed extending browser execution to
 description enhancement too, but that was deliberately dropped from scope.
 
-## Image Generation Provider (feature flag + per-request router)
-`IImageGenerationService` has two real implementations, both registered so a config flip needs no
-redeploy: `GeminiImagen3Service` (Gemini/Imagen) and `HuggingFaceImageGenerationService` (FLUX/Qwen via
-HuggingFace Inference Providers). Which one actually runs a given request is decided in two layers:
-- **`ImageGen:Provider`** (`"google"` or `"huggingface"`) is the server-side default — read once at
-  startup in `InfrastructureServiceExtensions` and baked into `IImageGenerationRouter` as its
-  fallback. **`appsettings.Development.json` and `appsettings.Production.json` both currently set
-  `huggingface`** — neither environment defaults to Google today.
+## Image Generation Provider (Google only, via a per-request router)
+`IImageGenerationService` has exactly one real implementation: `GeminiImagen3Service`
+(Google Gemini/Imagen, `gemini-2.5-flash-image`, ~$0.039/img).
+
+**HuggingFace was removed in 2026-08 and must not be reintroduced without an explicit decision.** It
+never worked end-to-end — every `fal-ai/{flux/schnell,qwen-image-edit}` POST returned HTTP 400
+"Model not supported by provider", and the account's inference credits were depleted so the router
+answered 402. Because every caller of a chat/vision/image service catches failures and silently
+substitutes canned output, an unusable provider degraded four features while the app still reported
+healthy. That failure mode is the important lesson here, not the vendor.
+
 - **`IImageGenerationRouter.Resolve(ImageAnalysisRequest.ImageGenModelId)`** (in
-  `PoRedoImage.Infrastructure.Services.ImageGenerationRouter`) is what the orchestrator actually calls.
-  A recognised id (`AiProviderIds.GeminiImagen3` / `HuggingFaceFlux`) picks that provider directly;
-  `null` or an unrecognised id falls through to the `ImageGen:Provider` default above. The picker on
-  the client (`AiServicePicker` / `AiCapability.GenerateImage`) lets a user pick explicitly, and
-  `AiSelectionState.EnsureInitializedAsync` seeds the *un*-picked case from `GET /api/pricing` so the
-  client's default and the server's configured default agree — degrading to sending no id at all
-  (`GetExplicit` returns `null`) if that seed fetch fails, rather than guessing.
-- HuggingFace is routed **fal-native** as `{BaseUrl}/{Provider}/{providerId}` with
-  `{prompt, image_url?}` → `{images:[{url}]}`. Text-to-image = **FLUX.1-schnell**
-  (`fal-ai/flux/schnell`, ~$0.003/img); image-to-image = **Qwen-Image-Edit**
-  (`fal-ai/qwen-image-edit`, ~$0.02/img) — both NON-GATED (verified live 2026-07-11). FLUX.1-Kontext-dev is
-  higher quality but **gated** (needs license accept + a gated-repo-scoped token). NOTE: only `hf-inference`
-  uses the `/{provider}/models/{hf-id}` path with raw-byte responses; external providers (fal/replicate)
-  need their own `providerId` (from `…/api/models/{repo}?expand[]=inferenceProviderMapping`) + native body.
-  Set `HuggingFace:ApiKey` (token with the *Inference Providers* permission). Google/Gemini costs
-  roughly 13× more per image (~$0.039 vs ~$0.003), so an id or config value that resolves to Gemini
-  when HuggingFace was intended is a real cost (or hard-failure, if `Google:ApiKey` is unset) bug, not
-  just a labeling one.
+  `PoRedoImage.Infrastructure.Services.ImageGenerationRouter`) is what the orchestrator calls. Every
+  id — recognised, unrecognised, or `null` — resolves to Gemini. The type is kept rather than
+  collapsed into a direct dependency because it is where a second provider would slot back in.
+- **`ImageGen:Provider`** is now vestigial. Both `appsettings.Development.json` and
+  `appsettings.Production.json` set `google`, and nothing branches on the value; the key survives only
+  so a leftover App Service setting or Key Vault reference cannot fail configuration binding.
+- The client picker (`AiServicePicker` / `AiCapability.GenerateImage`) offers Gemini alone, and
+  `AiSelectionState.EnsureInitializedAsync` still seeds from `GET /api/pricing`, degrading to sending
+  no id at all (`GetExplicit` returns `null`) if the seed fetch fails rather than guessing.
 - **Pricing UI**: `GET /api/pricing` returns the active provider + indicative per-image prices from the
   `AiPricing` config section; the Bulk Generate page shows "≈ $X/image" plus a running session estimate.
-  This is also the seed source for the client's per-request default (above).
-- Mock mode (`Mocks:UseMockAi=true`) still wins and swaps in `MockImagen3Service` for either provider.
+  An unrecognised `ImageGen:Provider` value resolves to `google` rather than reporting a label with no
+  price entry.
+- Mock mode (`Mocks:UseMockAi=true`) still wins and swaps in `MockImagen3Service`.
+
+## Chat + Vision Provider (Azure OpenAI only)
+`IChatCompletionService` has one real implementation, `AzureOpenAiChatCompletionService`. One
+deployment (`OpenAI:ChatCompletionsDeployment`, currently `gpt-5.4-nano`) serves both free-form
+reasoning and **image-to-text**, because GPT-4o/5-class deployments accept image content parts — so
+there is no separate vision model id to configure or keep in sync.
+
+This is the path that turns a photo into words for Rap Roast and the Style Director:
+`SceneDescriber` sends the image bytes plus OCR/object ground truth from `AzureSceneDetailService`,
+and the model returns a structured `SceneSnapshot`.
+
+Two failure modes to know about, because both degrade silently by design:
+- **Azure Computer Vision's `Caption` and `DenseCaptions` are region-limited** and unavailable on the
+  current resource. `AzureVisionService` logs `Caption not supported in this region — retrying with
+  Tags only` on **every** call and synthesises a description by joining its top tags. That keyword
+  list is the fallback the scene describer exists to replace.
+- **When the vision call itself fails** (429 rate limit is the common one on a nano deployment with
+  large images), `SceneDescriber` catches it and falls back to that same tag list. The reason is
+  classified into a user-facing string and carried to the UI as
+  `RapRoastResponse.DescriptionFallbackReason`, so a throttled run says "rate-limited, try again"
+  instead of blaming configuration. **Any new fallback path must set that reason**; a silent
+  degradation here reads to the user as "the AI ignored my photo".
 
 ---
 

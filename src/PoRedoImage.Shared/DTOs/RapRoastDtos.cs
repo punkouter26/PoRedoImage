@@ -77,6 +77,18 @@ public class RapRoastResponse
     /// </summary>
     public bool DescriptionIsDetailed { get; set; }
 
+    /// <summary>
+    /// Why the detailed read did not happen, when <see cref="DescriptionIsDetailed"/> is false.
+    /// Null when the description is detailed.
+    /// </summary>
+    /// <remarks>
+    /// Exists because the UI previously hardcoded a single explanation ("no vision model was
+    /// available — configure HuggingFace:ApiKey") for every fallback path. A rate-limited call, a
+    /// content-filter refusal, and an unconfigured backend are different problems with different
+    /// recoveries, and naming the wrong one sent people to change settings that were already fine.
+    /// </remarks>
+    public string? DescriptionFallbackReason { get; set; }
+
     /// <summary>Structured scene slots, when a vision model produced them. Null otherwise.</summary>
     public SceneSnapshotDto? Scene { get; set; }
 

@@ -33,7 +33,7 @@ else if (_images.Count > 0)
                             title="@item.FileName (@item.Kind.ToString()) — click to use"
                             @onclick="@(() => SelectImage(item))">
                         <img src="@item.ImageUrl" alt="@item.FileName" loading="lazy" />
-                        <span class="gallery-thumb__badge" aria-label="@item.Kind">@KindIcon(item.Kind)</span>
+                        <span class="gallery-thumb__badge" aria-label="@item.Kind"><i class="bi @KindIcon(item.Kind)" aria-hidden="true"></i></span>
                     </button>
                     <button class="gallery-thumb__zoom" title="View full size"
                             aria-label="@($"View {item.FileName} full size")"
@@ -96,7 +96,7 @@ else
         <div class="gallery-lightbox__panel" @onclick:stopPropagation="true">
             <img class="gallery-lightbox__img" src="@_lightbox.ImageUrl" alt="@_lightbox.FileName" />
             <div class="gallery-lightbox__meta">
-                <span class="gallery-lightbox__name">@KindIcon(_lightbox.Kind) @_lightbox.FileName</span>
+                <span class="gallery-lightbox__name"><i class="bi @KindIcon(_lightbox.Kind) me-2" aria-hidden="true"></i>@_lightbox.FileName</span>
                 <span class="gallery-lightbox__sub">
                     @_lightbox.Kind · @FormatSize(_lightbox.SizeBytes) · @_lightbox.CreatedAt.ToLocalTime().ToString("g")
                 </span>
@@ -273,12 +273,17 @@ else
         _ => "gallery-thumb--original"
     };
 
+    /// <summary>
+    /// Bootstrap-icon class for the kind badge. These were emoji, which render in whatever
+    /// colour and weight the platform font supplies — unusable in a board built on one
+    /// consistent stroke, and unreadable at the 16px badge size on several platforms.
+    /// </summary>
     private static string KindIcon(UserImageKind kind) => kind switch
     {
-        UserImageKind.Regeneration => "🎨",
-        UserImageKind.Meme => "😂",
-        UserImageKind.BulkVariation => "🖼️",
-        _ => "📷"
+        UserImageKind.Regeneration => "bi-palette2",
+        UserImageKind.Meme => "bi-chat-square-text",
+        UserImageKind.BulkVariation => "bi-grid-3x3",
+        _ => "bi-camera"
     };
 
     public sealed record GalleryItem(

@@ -1,17 +1,10 @@
 <div class="shimmer-wrapper">
     <div class="shimmer-header">
-        <div class="shimmer-spinner">
-            <svg class="spinner-svg" viewBox="0 0 48 48" width="36" height="36">
-                <circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" stroke-width="4" />
-                <circle cx="24" cy="24" r="20" fill="none" stroke="url(#spinGrad)" stroke-width="4"
-                        stroke-linecap="round" stroke-dasharray="60 200" />
-                <defs>
-                    <linearGradient id="spinGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#052767" />
-                        <stop offset="100%" stop-color="#3a0647" />
-                    </linearGradient>
-                </defs>
-            </svg>
+        @* A running row lamp, not a spinning ring: this world signals work with amber
+           dots stepping across a dark strip. Colours come from the tokens so the strip
+           cannot drift away from the board. *@
+        <div class="shimmer-spinner" role="status" aria-label="Working">
+            <span class="lamp-run" aria-hidden="true"></span>
         </div>
         <div class="flex-grow-1">
             <div class="shimmer-status-label">@Message</div>

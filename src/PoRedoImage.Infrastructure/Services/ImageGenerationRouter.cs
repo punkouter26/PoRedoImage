@@ -4,12 +4,13 @@ using PoRedoImage.Shared.Configuration;
 namespace PoRedoImage.Infrastructure.Services;
 
 /// <summary>
-/// Routes image generation to Gemini/Imagen or HuggingFace per request.
+/// Resolves the image-generation service for a request. Google Gemini/Imagen is the only provider,
+/// so every request routes to it whatever <paramref name="modelId"/> asks for.
 /// </summary>
 /// <remarks>
-/// The <c>ImageGen:Provider</c> flag remains the fallback rather than being replaced, so a request
-/// that carries no id behaves exactly as it did before per-request routing existed. That keeps the
-/// no-redeploy config flip working and makes this change additive.
+/// The type is kept rather than collapsed into a direct dependency because callers pass a
+/// per-request model id and the indirection is where a second provider would slot back in. It had
+/// a HuggingFace branch until 2026-08; see <c>InfrastructureServiceExtensions</c> for why that went.
 /// </remarks>
 public sealed class ImageGenerationRouter(
     IImageGenerationService gemini) : IImageGenerationRouter

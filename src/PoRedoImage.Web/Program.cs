@@ -225,7 +225,7 @@ try
     // by name — AddHttpClient with an existing name appends to that client's configuration.
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddTransient<OutboundCorrelationHandler>();
-    foreach (var aiClient in new[] { "Ollama", "GeminiApi", "HuggingFaceApi" })
+    foreach (var aiClient in new[] { "Ollama", "GeminiApi" })
     {
         builder.Services.AddHttpClient(aiClient)
             .AddHttpMessageHandler<OutboundCorrelationHandler>();

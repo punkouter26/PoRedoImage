@@ -5,8 +5,7 @@ namespace PoRedoImage.Domain.Interfaces;
 /// Unlike <see cref="IGenerativeAiService"/> (task-specific: enhance description, meme caption,
 /// describe person), this is a free-form reasoning primitive: give it a system + user prompt and,
 /// optionally, an image, and it returns the model's text. Kept separate so the reasoning agents can
-/// be backed by any provider (HuggingFace Inference Providers today) without touching the
-/// task-specific service surface.
+/// be backed by any provider (Azure OpenAI today) without touching the task-specific service surface.
 /// </summary>
 public interface IChatCompletionService
 {

@@ -1,7 +1,31 @@
-/* Oversized, de-emphasised glyph above the 404 message. Lives here rather than inline
-   per NET_RULES §4 (inline styles forbidden). */
-.not-found__icon {
-    font-size: 4rem;
-    opacity: 0.4;
-    line-height: 1;
+/* Scoped styles for NotFound.razor. Inline styles are forbidden (NET_RULES §4), so the
+   404's composition lives here.
+
+   The oversized de-emphasised glyph is gone: this world announces a dead route the same
+   way the board announces a dropped service — with the word CANCELLED in red, then the
+   destination that isn't running. That is more legible than a faded 4rem icon and it
+   reuses a status vocabulary the user has already seen on every other page. */
+
+.not-found {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+    max-width: 46ch;
+    margin: 0 auto;
+    padding: 1.5rem;
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+    box-shadow: var(--shadow-md);
 }
+
+.not-found__title { margin: 0; }
+
+.not-found__hint {
+    margin: 0;
+    color: var(--steel);
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+.not-found__back { align-self: flex-start; text-decoration: none; }

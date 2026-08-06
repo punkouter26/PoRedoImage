@@ -6,11 +6,11 @@ using PoRedoImage.Shared.Configuration;
 namespace PoRedoImage.Tests.Unit.Features;
 
 /// <summary>
-/// 2026-07: HuggingFace fal-ai image generation is broken on the upstream provider (every POST to
-/// <c>fal-ai/{flux/schnell,qwen-image-edit}</c> returns HTTP 400). The router is therefore pinned
-/// to Gemini: every <c>Resolve</c> call returns the Gemini service regardless of the caller-supplied
-/// id or any configured default. These tests guard the pinning so a future swap (e.g. when fal-ai
-/// restores routing) is an intentional code change rather than an accidental widening.
+/// Google Gemini/Imagen is the only image-generation provider, so every <c>Resolve</c> call returns
+/// the Gemini service regardless of the caller-supplied id or any configured default. These tests
+/// guard that, so adding a second provider back is an intentional code change rather than an
+/// accidental widening. (A HuggingFace arm existed until 2026-08; see
+/// <c>InfrastructureServiceExtensions</c> for why it was removed.)
 /// </summary>
 public class ImageGenerationRouterTests
 {

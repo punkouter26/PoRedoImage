@@ -99,23 +99,18 @@
     </div>
 }
 
+@* The "More options" disclosure was removed: it hid two ordinary buttons behind a click for
+   no protective reason, and the secondary actions are cheap enough to just show. *@
 <div class="results-more mb-4">
-    <button class="results-more__toggle" @onclick="@(() => _showMore = !_showMore)">
-        <i class="bi bi-three-dots me-1"></i>More options
-        <i class="bi @(_showMore ? "bi-chevron-up" : "bi-chevron-down") ms-1"></i>
-    </button>
-    @if (_showMore)
-    {
-        <div class="results-more__panel d-flex gap-2 flex-wrap mt-2">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="OnDownloadOriginal">
-                <i class="bi bi-download me-1"></i>Download Original
-            </button>
-            @if (AdditionalMoreOptions != null)
-            {
-                @AdditionalMoreOptions
-            }
-        </div>
-    }
+    <div class="results-more__panel d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="OnDownloadOriginal">
+            <i class="bi bi-download me-1"></i>Download Original
+        </button>
+        @if (AdditionalMoreOptions != null)
+        {
+            @AdditionalMoreOptions
+        }
+    </div>
 </div>
 
 @if (FooterContent != null)
@@ -145,7 +140,6 @@
     [Parameter] public RenderFragment? AdditionalMoreOptions { get; set; }
     [Parameter] public RenderFragment? FooterContent { get; set; }
 
-    private bool _showMore;
     private bool _wipeMode = true;
     private double _wipe = 50;
     private bool _sharing;

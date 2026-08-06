@@ -50,6 +50,7 @@ public sealed class RapRoastOrchestrator(
         {
             ImageDescription = description,
             DescriptionIsDetailed = scene.Detailed,
+            DescriptionFallbackReason = scene.FallbackReason,
             Scene = scene.Detailed ? Map(scene.Snapshot) : null,
         };
 

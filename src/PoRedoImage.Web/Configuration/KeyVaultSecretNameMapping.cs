@@ -29,8 +29,10 @@ public class KeyVaultSecretNameMapping : KeyVaultSecretManager
         ["PoRedoImage-AzureAd-ClientId"] = ConfigKeys.AzureAdClientId,
         ["PoRedoImage-AzureAd-ClientSecret"] = ConfigKeys.AzureAdClientSecret,
         ["PoRedoImage-Google-ApiKey"] = ConfigKeys.GoogleApiKey,
-        ["PoRedoImage-Google-Imagen3Model"] = ConfigKeys.GoogleImagen3Model,
-        ["PoRedoImage-HuggingFace-ApiKey"] = ConfigKeys.HuggingFaceApiKey
+        // PoRedoImage-HuggingFace-ApiKey was removed in 2026-08 with the provider. It is no longer
+        // required at startup, so StartupSecretValidator will not fail if it is absent from the
+        // vault — deleting the secret itself is a separate, optional cleanup.
+        ["PoRedoImage-Google-Imagen3Model"] = ConfigKeys.GoogleImagen3Model
     };
 
     public static IReadOnlyCollection<string> RequiredSecretNames => SecretMappings.Keys;

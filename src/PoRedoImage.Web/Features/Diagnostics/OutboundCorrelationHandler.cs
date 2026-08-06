@@ -3,7 +3,7 @@ namespace PoRedoImage.Web.Features.Diagnostics;
 /// <summary>
 /// Completes the correlation chain required by §3 ("pass X-Session-ID and X-Correlation-ID through
 /// all HTTP calls"). <see cref="RequestContextMiddleware"/> covers the browser → BFF leg; this handler
-/// covers BFF → downstream (Gemini, HuggingFace, Ollama), so a single correlation id spans the whole
+/// covers BFF → downstream (Gemini/Lyria, Ollama), so a single correlation id spans the whole
 /// request path instead of stopping at the server boundary.
 /// </summary>
 /// <remarks>

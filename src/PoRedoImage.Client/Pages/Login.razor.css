@@ -1,73 +1,91 @@
-/* Scoped styles for Login.razor — auto-prefixed by Blazor at compile time. */
+/* Scoped styles for Login.razor — the ticket window before the concourse.
+
+   The card is a steel-framed board with a single dark bay in it. The old 3px
+   gradient stripe across the top is gone: a coloured hairline above a panel is
+   the AI side-tab tell, and this world already marks a panel by framing it. */
 
 .login-page {
-    background: radial-gradient(ellipse 90% 80% at 50% -10%, rgba(5,39,103,0.18), transparent);
-    /* Vertically centres the card in the viewport without inline styles (NET_RULES §4). */
     min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .login-card {
-    background: #0f172a;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    padding: 2rem 2.25rem;
+    background: var(--flap-black);
+    border: 1px solid var(--steel-dark);
+    border-radius: 0;
+    padding: 0;
     width: 100%;
     max-width: 400px;
-    box-shadow: 0 16px 48px rgba(0,0,0,.55);
+    box-shadow: var(--shadow-xl);
     position: relative;
     overflow: hidden;
 }
 
-.login-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #052767, #3a0647, #052767);
+/* The card's own steel rail carries the title, matching every other board. */
+.login-card__rail {
+    background: var(--steel-face);
+    border-bottom: 1px solid rgba(0,0,0,0.6);
+    padding: 0.7rem 1.1rem;
 }
 
+.login-card__body { padding: 1.5rem 1.5rem 1.75rem; }
+
 .login-title {
-    font-size: 1.4rem;
+    font-family: var(--font-flap);
+    font-size: 0.86rem;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
     margin: 0;
-    color: #f1f5f9;
+    color: #14161a;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
 }
 
 .login-subtitle {
-    font-size: .85rem;
-    color: #94a3b8;
-    margin-top: .3rem;
+    font-size: 0.86rem;
+    color: var(--steel);
+    margin: 0 0 1.25rem;
+    line-height: 1.55;
 }
 
+/* Microsoft sign-in keeps its own brand plate — a white flap, deliberately the
+   one light cell on the page, because it represents someone else's identity. */
 .btn-ms-signin {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #fff;
-    color: #1a1a1a;
-    border: 1px solid #d0d7de;
-    border-radius: 6px;
-    padding: .6rem 1rem;
-    font-size: .95rem;
-    font-weight: 500;
+    gap: 0.5rem;
+    background: var(--flap-white);
+    color: #14161a;
+    border: 1px solid var(--flap-white);
+    border-radius: 0;
+    padding: 0.7rem 1rem;
+    font-family: var(--font-flap);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
     text-decoration: none;
-    transition: background .15s, box-shadow .15s;
+    transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .btn-ms-signin:hover {
-    background: #f3f4f6;
-    box-shadow: 0 2px 8px rgba(0,0,0,.12);
-    color: #1a1a1a;
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--flap-black);
 }
 
 .login-divider {
     display: flex;
     align-items: center;
-    gap: .75rem;
-    color: #484f58;
-    font-size: .8rem;
+    gap: 0.75rem;
+    color: var(--steel-dark);
+    font-family: var(--font-flap);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
     margin: 1.25rem 0;
 }
 
@@ -76,40 +94,45 @@
     content: '';
     flex: 1;
     height: 1px;
-    background: #30363d;
+    background: var(--rule-strong);
 }
 
 .btn-anon-signin {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.4rem;
     background: transparent;
-    color: #94a3b8;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: .6rem 1rem;
-    font-size: .95rem;
-    font-weight: 500;
+    color: var(--steel);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    padding: 0.7rem 1rem;
+    font-family: var(--font-flap);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
     text-decoration: none;
-    transition: background .15s, border-color .15s, color .15s;
-    gap: .25rem;
+    transition: border-color var(--motion-fast), color var(--motion-fast);
 }
 
 .btn-anon-signin:hover {
-    background: rgba(148,163,184,.08);
-    border-color: #94a3b8;
-    color: #e2e8f0;
+    background: transparent;
+    border-color: var(--amber);
+    color: var(--amber);
 }
 
+/* A guest pass is provisional work, so it takes amber — the working colour. */
 .anon-badge {
-    font-size: .65rem;
-    font-weight: 600;
+    font-family: var(--font-flap);
+    font-size: 0.62rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .04em;
-    color: #f0883e;
-    background: rgba(240,136,62,.12);
-    border: 1px solid rgba(240,136,62,.25);
-    border-radius: 4px;
-    padding: .1rem .35rem;
-    margin-left: .4rem;
+    letter-spacing: 0.14em;
+    color: var(--flap-black);
+    background: var(--amber);
+    border: none;
+    border-radius: 0;
+    padding: 0.1rem 0.35rem;
+    margin-left: 0.4rem;
 }

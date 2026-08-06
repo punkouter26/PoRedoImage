@@ -78,50 +78,33 @@ public static class InfrastructureServiceExtensions
 
             services.AddSingleton<IGenerativeAiService, AzureOpenAiService>();
 
-            // Image generation provider is switchable via the ImageGen:Provider feature flag:
-            //   "google"      → Gemini/Imagen (default)
-            //   "huggingface" → FLUX via HuggingFace Inference Providers (cheaper — see backlog).
-            // Both concretes register so a config flip needs no redeploy; the flag picks the active one.
+            // Image generation: Google Gemini/Imagen, the only provider.
+            //
+            // HuggingFace was removed here in 2026-08. It had never worked end-to-end — every
+            // fal-ai/{flux,qwen-image-edit} POST returned HTTP 400 "Model not supported by provider"
+            // — and the account's inference credits were depleted, so the router returned 402. Both
+            // failures were swallowed by callers that substitute canned output, which meant an
+            // unusable provider degraded four features while the app still reported healthy.
             services.AddSingleton<GeminiImagen3Service>();
-            services.AddSingleton<HuggingFaceImageGenerationService>();
-            var imageProvider = (configuration?[ConfigKeys.ImageGenProvider] ?? "google").Trim().ToLowerInvariant();
-
-            // Kept so callers that resolve the interface directly (health checks, other slices)
-            // still get the configured default.
-            // 2026-07: HuggingFace fal-ai image generation is currently broken (every fal-ai/{flux,
-            // qwen-image-edit} POST returns HTTP 400). ImageGen:Provider is retained as a config key
-            // for back-compat but the IImageGenerationService and router are pinned to Gemini until
-            // a live HF image model id is verified end-to-end. The HF service is still registered so
-            // a future swap is a single-line config change.
             services.AddSingleton<IImageGenerationService>(sp =>
                 sp.GetRequiredService<GeminiImagen3Service>());
 
             services.AddSingleton<IImageGenerationRouter>(sp => new ImageGenerationRouter(
                 sp.GetRequiredService<GeminiImagen3Service>()));
 
-            // Chat completion powering the Style Director agents, the Rap Roast scene describer and
-            // its lyric writer. Switchable via Chat:Provider, mirroring ImageGen:Provider — both
-            // concretes register so swapping is config, not a redeploy. When the active backend
-            // reports IsConfigured=false the callers fall back to their heuristics.
+            // Chat + vision powering the Style Director agents, the Rap Roast scene describer, and
+            // its lyric writer. Azure OpenAI is the only backend: one deployment serves both text
+            // and image content parts, so image-to-text needs no second provider or model id.
             //
-            // 2026-08: default is Azure OpenAI. The HuggingFace router returns HTTP 402 ("depleted
-            // your monthly included credits") on every model for this account, and because each
-            // caller catches the failure and silently substitutes canned output, an exhausted HF
-            // allowance degraded four features while the app still reported healthy. Azure OpenAI is
-            // already provisioned, already billed, and serves text and vision from the one
-            // deployment, so it is the more robust default.
-            services.AddSingleton<AzureOpenAiChatCompletionService>();
-            services.AddSingleton<HuggingFaceChatCompletionService>();
-            var chatProvider = (configuration?[ConfigKeys.ChatProvider] ?? "azureopenai").Trim().ToLowerInvariant();
-            services.AddSingleton<IChatCompletionService>(sp => chatProvider switch
-            {
-                "huggingface" => sp.GetRequiredService<HuggingFaceChatCompletionService>(),
-                _ => sp.GetRequiredService<AzureOpenAiChatCompletionService>(),
-            });
+            // Note for anyone re-adding a provider switch here: every caller of
+            // IChatCompletionService catches failures and silently falls back to heuristics or a
+            // tag-derived description. That makes a broken backend invisible in the UI and expensive
+            // to diagnose — which is exactly how the HuggingFace outage above went unnoticed. A new
+            // backend needs its failures surfaced, not swallowed.
+            services.AddSingleton<IChatCompletionService, AzureOpenAiChatCompletionService>();
 
-            // Music generation for the Rap Roast slice. Lyria performs supplied lyrics, which no
-            // HuggingFace-hosted model with a live inference provider can do (stable-audio-3 is
-            // instrumental and gated), so this stays on Google regardless of ImageGen:Provider.
+            // Music generation for the Rap Roast slice: Google Lyria, which performs supplied
+            // lyrics rather than producing an instrumental bed.
             services.AddSingleton<IMusicGenerationService, LyriaMusicService>();
 
             // OCR (Read), region captions (DenseCaptions), objects and people — the grounded facts
@@ -178,24 +161,41 @@ public static class InfrastructureServiceExtensions
         })
         .AddHttpMessageHandler<MockAiDelegatingHandler>();
 
-        // Named HttpClient for Gemini with standard resilience: retry, timeout, circuit-breaker
+        // Named HttpClient for Gemini/Lyria with standard resilience: retry, timeout, circuit-breaker
         services.AddHttpClient("GeminiApi")
             .AddHttpMessageHandler<MockAiDelegatingHandler>()
-            .AddStandardResilienceHandler(options =>
-            {
-                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);
-                options.Retry.MaxRetryAttempts = 2;
-            });
-
-        // Named HttpClient for HuggingFace Inference Providers — same resilience + mock guardrail.
-        services.AddHttpClient("HuggingFaceApi")
-            .AddHttpMessageHandler<MockAiDelegatingHandler>()
-            .AddStandardResilienceHandler(options =>
-            {
-                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);
-                options.Retry.MaxRetryAttempts = 2;
-            });
+            .AddStandardResilienceHandler(ConfigureGenerativeAiResilience);
 
         return services;
+    }
+
+    /// <summary>
+    /// Resilience for the generative-AI HTTP client (Gemini image generation and Lyria music).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>AttemptTimeout must be set explicitly.</b> <c>AddStandardResilienceHandler</c> defaults it
+    /// to <b>10 seconds</b>, and that default is per-attempt, so raising only
+    /// <see cref="HttpStandardResilienceOptions.TotalRequestTimeout"/> to five minutes did nothing:
+    /// every call still had ten seconds to finish. Image generation and Lyria music generation
+    /// routinely take 30–90s, so each attempt died at 10s, burned both retries, and surfaced as
+    /// <c>TimeoutRejectedException</c> — which the Rap Roast endpoint reported to the user as
+    /// "Something went wrong making your track." It broke image regeneration, bulk generate, and
+    /// style director the same way; only small/fast calls ever completed.
+    /// </para>
+    /// <para>
+    /// The three values are interdependent and the handler validates them at startup:
+    /// <c>TotalRequestTimeout >= AttemptTimeout</c>, and
+    /// <c>CircuitBreaker.SamplingDuration >= 2 × AttemptTimeout</c>. Changing one means checking
+    /// the others, or the app throws on boot. Total is the real ceiling: three attempts at two
+    /// minutes would be six, so the five-minute total is what actually cuts a run off.
+    /// </para>
+    /// </remarks>
+    private static void ConfigureGenerativeAiResilience(HttpStandardResilienceOptions options)
+    {
+        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(2);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(4);
+        options.Retry.MaxRetryAttempts = 2;
     }
 }

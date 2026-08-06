@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!--
+    NOT the served host document. This Blazor Web App boots from
+    src/PoRedoImage.Web/Components/App.razor (global InteractiveWebAssembly, no prerender);
+    this file only exists so the Client project remains runnable standalone. It is kept in
+    step with App.razor so the two cannot disagree about fonts or stylesheets — the direction
+    contract itself lives in App.razor, which is the document that actually ships.
+-->
 <html lang="en">
 
 <head>
@@ -7,9 +14,12 @@
     <title>PoRedoImage</title>
     <base href="/" />
     <link rel="preload" id="webassembly" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.min.css" />
-    <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" />
+    <link rel="stylesheet" href="_content/Radzen.Blazor/css/default.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="PoRedoImage.Client.styles.css" rel="stylesheet" />
@@ -28,7 +38,7 @@
     <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+        <span class="dismiss" aria-hidden="true">&#215;</span>
     </div>
     <script src="js/audio.js"></script>
     <script src="js/ux.js"></script>

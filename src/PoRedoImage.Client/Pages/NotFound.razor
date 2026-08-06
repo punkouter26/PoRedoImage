@@ -4,15 +4,14 @@
 
 <PageTitle>Page Not Found — PoRedoImage</PageTitle>
 
+@* A cancelled service: the board's own way of saying this destination isn't running. *@
 <div class="container py-5">
-    <div class="text-center">
-        <div class="mb-3 not-found__icon">
-            <i class="bi bi-file-earmark-x"></i>
-        </div>
-        <h1 class="h3 mb-2">Page Not Found</h1>
-        <p class="text-muted mb-4">The page you’re looking for doesn’t exist or has been moved.</p>
-        <a href="/" class="btn btn-primary">
-            <i class="bi bi-house me-2"></i>Back to Home
-        </a>
+    <div class="not-found">
+        <span class="status status--failed">Cancelled</span>
+        <h1 class="not-found__title"><FlapText Text="No such page" /></h1>
+        <p class="not-found__hint">
+            That route isn’t on the board — it may have been moved or never existed.
+        </p>
+        <a href="/" class="btn-process not-found__back">Back to departures</a>
     </div>
 </div>

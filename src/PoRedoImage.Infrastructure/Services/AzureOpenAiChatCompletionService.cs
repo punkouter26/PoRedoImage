@@ -22,9 +22,9 @@ namespace PoRedoImage.Infrastructure.Services;
 /// reasoning primitive.
 ///
 /// One deployment serves both paths. <c>OpenAI:ChatCompletionsDeployment</c> (gpt-5.4-nano and
-/// every other GPT-4o/5-class deployment) accepts image content parts, so unlike the HuggingFace
-/// backend — which needed a separate <c>VisionModel</c> — there is no second model id to configure
-/// or keep in sync.
+/// every other GPT-4o/5-class deployment) accepts image content parts, so this one class covers both
+/// free-form reasoning and image-to-text — there is no second model id to configure or keep in sync.
+/// Since 2026-08 it is the only <see cref="IChatCompletionService"/> implementation outside mock mode.
 /// </remarks>
 public sealed class AzureOpenAiChatCompletionService : IChatCompletionService
 {
