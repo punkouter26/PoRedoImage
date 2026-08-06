@@ -6,9 +6,13 @@
 
 <div class="studio-page">
 
-    @* The board head and the saved-images strip were removed at the user's request. The page
-       now opens straight on the intake bay and the service list. There is no <h1> left here,
-       so <PageTitle> above is what names the page for assistive tech and the browser tab. *@
+    @* The visible board head and the saved-images strip were removed at the user's request, so the
+       page opens straight on the intake bay. The <h1> stays in the document but not on screen: a
+       page with no level-one heading is a real accessibility defect (screen-reader users navigate
+       by heading, and the document outline starts at h2), and removing a visual treatment is not a
+       reason to remove document structure. E2E LoginUiTests assert on it across three viewports. *@
+    <h1 class="visually-hidden">Studio</h1>
+
 
     @* ── Upload zone + feature cards ──────────────────────────────── *@
     <div class="studio-body">

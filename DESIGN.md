@@ -42,10 +42,19 @@ one. `color-scheme: dark` is declared and there is no `prefers-color-scheme` blo
 | `--steel-dark` | `#7D838C` | frame body, labels (4.9:1 on flap-black) |
 | `--board-ground` | `#070708` | concourse wall behind the boards |
 
-Measured contrast on `--flap-black`: flap-white ≈ 18:1, amber ≈ 10:1, steel ≈ 9.6:1,
-steel-dark ≈ 4.9:1. `--cancel-red` is ~3.9:1 and is therefore **never used for small text** —
+**Check contrast against `--flap-shadow`, not `--flap-black`.** The recessed cell is the lighter of
+the two grounds and therefore the worse case, and most small text sits in a cell. Getting this
+backwards is how `--steel-dark` shipped at `#7D838C` — 5.08:1 on flap-black, which looked fine, but
+**4.498:1** on flap-shadow, which axe failed for missing the 4.5:1 AA floor by 0.002. It is now
+`#868C95`: 5.07:1 on flap-shadow, 5.73:1 on flap-black.
+
+Measured on `--flap-shadow` `#1B1B1E`: flap-white ≈ 16:1, amber ≈ 9:1, steel ≈ 8.5:1,
+steel-dark ≈ 5.1:1. `--cancel-red` is ~3.5:1 there and is therefore **never used for small text** —
 that is what `--cancel-red-tx` exists for. Steel rails are a *light* surface: text on them is
 near-black (`#14161a`, `#22252b`), never the board's dim greys.
+
+The `Studio_page_has_no_WCAG_AA_violations` E2E test is the enforcement point — run the E2E tier
+(`pwsh SCRIPTS/run-e2e.ps1`) after touching any colour token.
 
 ### Status is a four-value law
 

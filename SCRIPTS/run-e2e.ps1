@@ -48,8 +48,25 @@ try {
 
     Write-Host "==> Running E2E tier" -ForegroundColor Cyan
     $env:E2E_BASE_URL = $BaseUrl
-    dotnet test "$Root/tests/PoRedoImage.Tests.E2E/PoRedoImage.Tests.E2E.csproj" -c Release --no-build --nologo
-    exit $LASTEXITCODE
+
+    # Two projects since the E2EAPI/E2EUI split (spec §2.2): ApiSmoke is pure HTTP, UI drives
+    # Playwright. This script pointed at the pre-split PoRedoImage.Tests.E2E.csproj and had been
+    # failing with MSB1009 "Project file does not exist" ever since — so the documented E2E entry
+    # point ran nothing. Both projects run even if the first fails, because a red API smoke and a
+    # red UI suite are independently useful signals; the script exits non-zero if either failed.
+    $projects = @(
+        "$Root/tests/PoRedoImage.Tests.E2E.ApiSmoke/PoRedoImage.Tests.E2E.ApiSmoke.csproj",
+        "$Root/tests/PoRedoImage.Tests.E2E.UI/PoRedoImage.Tests.E2E.UI.csproj"
+    )
+
+    $failed = 0
+    foreach ($proj in $projects) {
+        Write-Host "--> $(Split-Path $proj -LeafBase)" -ForegroundColor Cyan
+        dotnet test $proj -c Release --no-build --nologo
+        if ($LASTEXITCODE -ne 0) { $failed = 1 }
+    }
+
+    exit $failed
 }
 finally {
     Write-Host "==> Stopping Web app" -ForegroundColor Cyan

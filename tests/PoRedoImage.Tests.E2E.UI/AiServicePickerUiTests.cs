@@ -4,11 +4,22 @@ using PoRedoImage.Shared.Configuration;
 namespace PoRedoImage.Tests.E2E.UI;
 
 /// <summary>
-/// The four single-provider capabilities render as disabled selects. Asserting on that is what stops
-/// a future refactor from silently making them look choosable when nothing would change.
+/// Single-provider capabilities render as disabled selects. Asserting on that is what stops a future
+/// refactor from silently making them look choosable when nothing would change.
 /// </summary>
 public sealed class AiServicePickerUiTests : IAsyncLifetime
 {
+    /// <summary>
+    /// The <c>AiCapability</c> names the picker renders, in order. Kept as strings because this test
+    /// project deliberately does not reference the Client assembly — it drives the app over HTTP like
+    /// any other browser, and the element ids are the contract.
+    /// </summary>
+    private static readonly string[] AiCapabilityNames =
+    [
+        "AnalyzeImage", "GenerateImage", "EnhanceDescription",
+        "StyleDirector", "SceneDetail", "CreateAudio",
+    ];
+
     private IPlaywright _playwright = default!;
     private IBrowser _browser = default!;
 
@@ -64,12 +75,27 @@ public sealed class AiServicePickerUiTests : IAsyncLifetime
 
         await Assertions.Expect(page.Locator(".ai-picker__select")).ToHaveCountAsync(6);
 
-        await Assertions.Expect(page.Locator("#ai-picker-AnalyzeImage")).ToBeEnabledAsync();
-        await Assertions.Expect(page.Locator("#ai-picker-GenerateImage")).ToBeEnabledAsync();
-        await Assertions.Expect(page.Locator("#ai-picker-EnhanceDescription")).ToBeDisabledAsync();
-        await Assertions.Expect(page.Locator("#ai-picker-StyleDirector")).ToBeDisabledAsync();
-        await Assertions.Expect(page.Locator("#ai-picker-SceneDetail")).ToBeDisabledAsync();
-        await Assertions.Expect(page.Locator("#ai-picker-CreateAudio")).ToBeDisabledAsync();
+        // Assert the RULE, not a snapshot of today's provider counts: a capability with one option
+        // is disabled, one with several is choosable.
+        //
+        // This previously hardcoded which selects were enabled, and listed GenerateImage among
+        // them. When the second image-gen provider was dropped (2026-07) GenerateImage became
+        // single-provider and therefore disabled, but the list was not updated — so the assertion
+        // had been failing for a month, unnoticed because the deploy pipeline runs no tests.
+        // Deriving the expectation from the rendered option count cannot rot that way: adding or
+        // removing a provider flips the expectation automatically.
+        foreach (var capability in AiCapabilityNames)
+        {
+            var select = page.Locator($"#ai-picker-{capability}");
+            var optionCount = await select.Locator("option").CountAsync();
+
+            Assert.True(optionCount >= 1, $"{capability} rendered no provider options at all.");
+
+            if (optionCount == 1)
+                await Assertions.Expect(select).ToBeDisabledAsync();
+            else
+                await Assertions.Expect(select).ToBeEnabledAsync();
+        }
 
         // Pins that the default provider is genuinely marked selected on first render rather than
         // silently falling back to whichever <option> happens to be first in markup order.

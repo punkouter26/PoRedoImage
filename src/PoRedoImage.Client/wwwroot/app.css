@@ -23,7 +23,11 @@
     --cancel-red:    #D32F2F;   /* FAILED — fills and borders only */
     --cancel-red-tx: #F0736F;   /* FAILED — small text (6.4:1 on flap-black) */
     --steel:         #B6BBC2;   /* frame highlight, secondary text */
-    --steel-dark:    #7D838C;   /* frame body, labels (4.9:1 on flap-black) */
+    /* Label grey. Was #7D838C, which measures 4.498:1 on --flap-shadow — axe failed it for
+       missing the 4.5:1 AA floor by 0.002. Contrast must be checked against flap-SHADOW, the
+       recessed cell colour, not flap-black: the cell is the lighter of the two grounds and so
+       the worse case. This value clears 5.07:1 there and 5.73:1 on flap-black. */
+    --steel-dark:    #868C95;
 
     --board-ground:  #070708;   /* concourse wall behind the boards */
     --rule:          rgba(242,242,242,0.10);  /* hairline row rule */
