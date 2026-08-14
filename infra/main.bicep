@@ -17,14 +17,14 @@ param storageAccountName string = 'stporedoimage26'
 @description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
 param storageLocation string = 'eastus'
 
-@description('Name of the App Service Plan to bind the web app to. Dedicated F1 (Free) plan for this app, living in the PoShared RG. It is in PoShared rather than PoRedoImage because this site’s webSpace is PoShared-WestUS2webspace-Linux — stamped at creation, unchanged by resource-group moves — and a site can only bind a plan in its own webspace (see ADR-031). Relocating the plan into PoRedoImage requires destroying and recreating the site.')
+@description('Name of the App Service Plan to bind the web app to. Dedicated F1 (Free) plan for this app, now co-located with the site in the PoRedoImage RG. The site was destroyed and recreated to achieve this: a site can only bind a plan in its own webSpace, and webSpace is derived from the resource group at creation and is NOT rewritten by a resource-group move (see ADR-031).')
 param appServicePlanName string = 'asp-PoRedoImage-f1'
 
-@description('Resource group that owns the shared App Service Plan. Defaults to PoShared (the consolidation target).')
-param appServicePlanResourceGroup string = 'PoShared'
+@description('Resource group that owns the App Service Plan. Same RG as the web app — the plan is dedicated to this app, not shared.')
+param appServicePlanResourceGroup string = 'PoRedoImage'
 
-@description('Region the web app is deployed into. Must match the home stamp of the shared App Service Plan. New plan is westus2; if the shared plan moves regions, update this.')
-param webAppLocation string = 'westus2'
+@description('Region the web app is deployed into. Must match the plan. westus3, not westus2: westus2 had no F1 Linux capacity when the plan was recreated ("No available instances to satisfy this request"). Note the storage account remains in its own region, so this pairing is cross-region.')
+param webAppLocation string = 'westus3'
 
 @description('Key Vault endpoint in the PoShared resource group')
 param keyVaultEndpoint string = 'https://kv-poshared.vault.azure.net/'
