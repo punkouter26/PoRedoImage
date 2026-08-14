@@ -145,7 +145,10 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
-      alwaysOn: true // Shared plan is B1 Basic (Always On supported); off only for F1 (n/a now)
+      // Must stay false: the plan is F1 (Free), which has no Always On, and ARM rejects the
+      // whole deployment with Conflict/01020 rather than ignoring the flag. The cost is a cold
+      // start after ~20 min idle.
+      alwaysOn: false
       appCommandLine: 'dotnet /home/site/wwwroot/PoRedoImage.Web.dll'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
