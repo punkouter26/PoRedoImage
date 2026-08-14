@@ -15,15 +15,16 @@ env:
   AZURE_RESOURCE_GROUP: PoRedoImage
   SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
-  # Expected App Service Plan (B1 Basic, westus2 Linux) — owned by the PoShared RG as a
-  # consolidated shared plan (see ADR-031). infra/main.bicep only references it; it does
-  # NOT create or delete it. The legacy in-RG plans (asp-poredoimage-b1, asp-poredoimage-f1)
-  # still exist and still host the existing live site — automated migration is blocked by
-  # Azure's home-stamp affinity (extended error 59602 on cross-stamp serverFarmId patch).
-  # New deploys of a fresh web app to this template land on the shared plan; the live
-  # poredoimage-web instance stays on its current plan until a manual migration (clone or
-  # destroy+recreate) is performed.
-  EXPECTED_PLAN: asp-PoShared-b1
+  # Expected App Service Plan (F1 Free, westus2 Linux), dedicated to this app and owned by
+  # the PoShared RG. infra/main.bicep only references it; it does NOT create or delete it.
+  # It sits in PoShared rather than PoRedoImage because this site's webSpace is
+  # PoShared-WestUS2webspace-Linux — stamped at creation and NOT rewritten by a
+  # resource-group move — and a site can only bind a plan in its own webspace. Patching
+  # serverFarmId across webspaces fails with extended error 59602, so relocating the plan
+  # into PoRedoImage needs a destroy+recreate of the site (see ADR-031).
+  # Documentation only: nothing in this workflow reads EXPECTED_PLAN. The binding is
+  # asserted by infra/main.bicep, whose appServicePlanName param must be kept in step.
+  EXPECTED_PLAN: asp-PoRedoImage-f1
 concurrency:
   group: deploy-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
@@ -78,12 +79,13 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Deploy infrastructure (bicep)
-        # Applies infra/main.bicep so the web app is bound to the SHARED B1 plan
-        # (asp-PoShared-b1, owned by PoShared RG). infra/main.bicep only REFERENCES
+        # Applies infra/main.bicep so the web app is bound to its dedicated F1 plan
+        # (asp-PoRedoImage-f1, owned by PoShared RG). infra/main.bicep only REFERENCES
         # the existing plan; it does NOT create it. Plan provisioning/cleanup of
-        # asp-PoShared-b1 lives in the PoShared RG infra templates.
-        # app is bound to it. Idempotent — converges storage, app config, role assignments every run.
-        # This is what asserts the binding (serverFarmId) is correct; live instances may legitimately stay on legacy plans until a manual stamp-affinity migration (see ADR-031).
+        # asp-PoRedoImage-f1 lives in the PoShared RG infra templates.
+        # Idempotent — converges storage, app config, role assignments every run.
+        # This is what asserts the binding (serverFarmId) is correct. Because the plan is
+        # referenced as `existing`, deleting or renaming it fails this step outright.
         run: |
           az deployment group create \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \

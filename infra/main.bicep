@@ -17,8 +17,8 @@ param storageAccountName string = 'stporedoimage26'
 @description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
 param storageLocation string = 'eastus'
 
-@description('Name of the shared App Service Plan to bind the web app to. Lives in the PoShared RG (consolidation target — see ADR-031). New deploys bind here; the legacy in-RG plans (asp-poredoimage-b1 / asp-poredoimage-f1) remain bound to the existing live site until a manual cross-stamp migration is performed.')
-param appServicePlanName string = 'asp-PoShared-b1'
+@description('Name of the App Service Plan to bind the web app to. Dedicated F1 (Free) plan for this app, living in the PoShared RG. It is in PoShared rather than PoRedoImage because this site’s webSpace is PoShared-WestUS2webspace-Linux — stamped at creation, unchanged by resource-group moves — and a site can only bind a plan in its own webspace (see ADR-031). Relocating the plan into PoRedoImage requires destroying and recreating the site.')
+param appServicePlanName string = 'asp-PoRedoImage-f1'
 
 @description('Resource group that owns the shared App Service Plan. Defaults to PoShared (the consolidation target).')
 param appServicePlanResourceGroup string = 'PoShared'
