@@ -1,21 +1,16 @@
-using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Json;
 
 namespace PoRedoImage.Mobile.Services;
 
 /// <summary>
-/// Handles authenticated HTTP communication with the PoRedoImage BFF host.
+/// Handles direct HTTP communication with the PoRedoImage backend (no authentication required for mobile).
 /// </summary>
 public class MobileApiClient : IMobileApiClient
 {
     private readonly IMobileSettingsService _settings;
-    private readonly CookieContainer _cookieContainer = new();
-    private readonly SemaphoreSlim _authLock = new(1, 1);
     private HttpClient? _client;
-    private string? _csrfToken;
     private Uri? _lastBaseUri;
 
     public MobileApiClient(IMobileSettingsService settings)
@@ -29,20 +24,12 @@ public class MobileApiClient : IMobileApiClient
         if (_client == null || _lastBaseUri != baseUri)
         {
             _client?.Dispose();
-            var handler = new HttpClientHandler
-            {
-                CookieContainer = _cookieContainer,
-                UseCookies = true,
-                AllowAutoRedirect = true
-            };
-
-            _client = new HttpClient(handler)
+            _client = new HttpClient
             {
                 BaseAddress = baseUri,
                 Timeout = TimeSpan.FromSeconds(90)
             };
             _lastBaseUri = baseUri;
-            _csrfToken = null; // Clear token on endpoint change
         }
         return _client;
     }
@@ -63,38 +50,8 @@ public class MobileApiClient : IMobileApiClient
 
     public async Task<bool> EnsureAuthenticatedAsync(CancellationToken ct = default)
     {
-        await _authLock.WaitAsync(ct);
-        try
-        {
-            var client = GetOrCreateClient();
-
-            // 1. Establish guest session via /auth/login/fake (populates .AspNetCore.Cookies)
-            var guestLoginUrl = $"auth/login/fake?guestId={Uri.EscapeDataString(_settings.GuestId)}";
-            using var authResponse = await client.GetAsync(guestLoginUrl, ct);
-
-            // 2. Fetch the CSRF token bound to this session
-            using var tokenResponse = await client.GetAsync("api/antiforgery/token", ct);
-            if (tokenResponse.IsSuccessStatusCode)
-            {
-                var content = await tokenResponse.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(content);
-                if (doc.RootElement.TryGetProperty("token", out var tokenProp))
-                {
-                    _csrfToken = tokenProp.GetString();
-                    return !string.IsNullOrEmpty(_csrfToken);
-                }
-            }
-
-            return false;
-        }
-        catch
-        {
-            return false;
-        }
-        finally
-        {
-            _authLock.Release();
-        }
+        // Authentication is not required for the mobile client; verify connectivity
+        return await PingAsync(ct);
     }
 
     public async Task<ImageAnalysisResponse> ProcessMemeAsync(ImageCaptureResult image, CancellationToken ct = default)
@@ -161,42 +118,7 @@ public class MobileApiClient : IMobileApiClient
     {
         var client = GetOrCreateClient();
 
-        if (string.IsNullOrEmpty(_csrfToken))
-        {
-            var authOk = await EnsureAuthenticatedAsync(ct);
-            if (!authOk)
-                throw new InvalidOperationException("Failed to connect or authenticate with the backend server. Check server address in Settings.");
-        }
-
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, endpoint)
-        {
-            Content = JsonContent.Create(request, options: SharedJsonOptions.Default)
-        };
-
-        if (!string.IsNullOrEmpty(_csrfToken))
-        {
-            requestMessage.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", _csrfToken);
-        }
-
-        var response = await client.SendAsync(requestMessage, ct);
-
-        // On 400 (expired/stale token) or 401, refresh token and retry once
-        if (response.StatusCode == HttpStatusCode.BadRequest || response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            _csrfToken = null;
-            await EnsureAuthenticatedAsync(ct);
-
-            using var retryMessage = new HttpRequestMessage(HttpMethod.Post, endpoint)
-            {
-                Content = JsonContent.Create(request, options: SharedJsonOptions.Default)
-            };
-
-            if (!string.IsNullOrEmpty(_csrfToken))
-                retryMessage.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", _csrfToken);
-
-            response.Dispose();
-            response = await client.SendAsync(retryMessage, ct);
-        }
+        using var response = await client.PostAsJsonAsync(endpoint, request, SharedJsonOptions.Default, ct);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -211,4 +133,3 @@ public class MobileApiClient : IMobileApiClient
         return result;
     }
 }
-

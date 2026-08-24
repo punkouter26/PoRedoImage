@@ -15,6 +15,23 @@ public partial class SettingsPage : ContentPage
         BindingContext = viewModel;
     }
 
+    private async void OnTestConnectionClicked(object? sender, EventArgs e)
+    {
+        if (BindingContext is SettingsViewModel vm)
+        {
+            await vm.TestConnectionAsync();
+        }
+    }
+
+    private void OnSaveSettingsClicked(object? sender, EventArgs e)
+    {
+        if (BindingContext is SettingsViewModel vm)
+        {
+            vm.SaveSettings();
+            DisplayAlertAsync("Settings Saved", "Preferences updated successfully.", "OK");
+        }
+    }
+
     private static SettingsViewModel CreateFallbackViewModel()
     {
         var sp = IPlatformApplication.Current?.Services;

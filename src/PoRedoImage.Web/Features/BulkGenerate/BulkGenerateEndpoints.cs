@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text.Json;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
@@ -70,8 +70,8 @@ public static class BulkGenerateEndpoints
         // Rate limiting still applies to protect costly AI calls.
         var aiGroup = app.MapGroup("/api/bulk-generate")
             .WithTags("BulkGenerate")
-            .RequireRateLimiting("ai-endpoints")
-            .RequireAntiforgeryValidation();
+            .AllowAnonymous()
+            .RequireRateLimiting("ai-endpoints");
 
         // Describe the primary person in the uploaded image using GPT-4o vision.
         // Called once per generation batch; result is reused across all variation prompts.

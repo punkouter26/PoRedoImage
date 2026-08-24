@@ -19,8 +19,7 @@ public static class ImageAnalysisEndpoints
     public static void MapImageAnalysisEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/images")
-            .WithTags("Image Analysis")
-            .RequireAntiforgeryValidation();
+            .WithTags("Image Analysis");
 
         group.MapPost("/analyze", AnalyzeImageAsync)
             .WithName("AnalyzeImage")
@@ -28,7 +27,7 @@ public static class ImageAnalysisEndpoints
             .Produces<ImageAnalysisResponse>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
             .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError)
-            .RequireAuthorization()
+            .AllowAnonymous()
             .RequireRateLimiting("ai-endpoints")
             .AddEndpointFilter<ValidationFilter<ImageAnalysisRequest>>();
     }

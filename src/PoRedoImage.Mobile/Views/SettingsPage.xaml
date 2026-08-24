@@ -43,7 +43,7 @@
                            FontSize="15"
                            FontAttributes="Bold" />
 
-                    <Label Text="PoRedoImage BFF API URL. For Android Emulator use 10.0.2.2:4000."
+                    <Label Text="PoRedoImage API URL (e.g. http://192.168.1.X:4000 for Phone, http://10.0.2.2:4000 for Emulator)."
                            FontSize="12"
                            TextColor="{StaticResource TextSecondary}" />
 
@@ -53,6 +53,7 @@
                            HeightRequest="42" />
 
                     <Button Text="⚡ Test Connection"
+                            Clicked="OnTestConnectionClicked"
                             Command="{Binding TestConnectionCommand}"
                             BackgroundColor="{StaticResource Primary}"
                             TextColor="White"
@@ -61,37 +62,6 @@
                     <Label Text="{Binding ConnectionStatus}"
                            FontSize="12"
                            TextColor="{StaticResource TextSecondary}" />
-                </VerticalStackLayout>
-            </Border>
-
-            <!-- ── Guest Identity ────────────────────────────────── -->
-            <Border BackgroundColor="{StaticResource BgCard}"
-                    Stroke="{StaticResource BorderLight}"
-                    StrokeShape="RoundRectangle 14"
-                    Padding="16">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="Guest Identity"
-                           FontSize="15"
-                           FontAttributes="Bold" />
-
-                    <Label Text="Dev &amp; Guest sessions are isolated by Guest ID."
-                           FontSize="12"
-                           TextColor="{StaticResource TextSecondary}" />
-
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <Entry Grid.Column="0"
-                               Text="{Binding GuestId}"
-                               BackgroundColor="{StaticResource BgDark}"
-                               TextColor="{StaticResource TextPrimary}"
-                               HeightRequest="42" />
-
-                        <Button Grid.Column="1"
-                                Text="🎲 New"
-                                Command="{Binding GenerateNewGuestIdCommand}"
-                                BackgroundColor="{StaticResource BgCardHover}"
-                                TextColor="{StaticResource TextPrimary}"
-                                HeightRequest="42" />
-                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
@@ -137,6 +107,7 @@
 
             <!-- ── Save Button ───────────────────────────────────── -->
             <Button Text="💾 Save Settings"
+                    Clicked="OnSaveSettingsClicked"
                     Command="{Binding SaveSettingsCommand}"
                     BackgroundColor="{StaticResource AccentEmerald}"
                     TextColor="White"
@@ -146,4 +117,3 @@
     </ScrollView>
 
 </ContentPage>
-

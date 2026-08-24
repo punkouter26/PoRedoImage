@@ -1,11 +1,15 @@
-using Microsoft.Maui.Graphics;
-using Microsoft.Maui.Graphics.Platform;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Processing;
 using PoRedoImage.Shared.DTOs;
+using ImageSharpImage = SixLabors.ImageSharp.Image;
+using ImageSharpResizeMode = SixLabors.ImageSharp.Processing.ResizeMode;
+using ImageSharpSize = SixLabors.ImageSharp.Size;
 
 namespace PoRedoImage.Mobile.Services;
 
 /// <summary>
-/// Downscales large camera photos to mobile-optimized AI dimensions to ensure sub-second uploads.
+/// Downscales large camera photos to mobile-optimized AI dimensions and fixes EXIF orientation.
 /// </summary>
 public class ImageOptimizationService : IImageOptimizationService
 {
@@ -36,56 +40,27 @@ public class ImageOptimizationService : IImageOptimizationService
         {
             try
             {
-                using var inStream = new MemoryStream(rawBytes);
-                var platformImage = PlatformImage.FromStream(inStream);
+                using var image = ImageSharpImage.Load(rawBytes);
 
-                if (platformImage == null)
+                // Automatically fix orientation based on camera EXIF tags (e.g. portrait photos)
+                image.Mutate(x => x.AutoOrient());
+
+                // Resize down if larger than maxDimension while preserving aspect ratio
+                if (image.Width > maxDimension || image.Height > maxDimension)
                 {
-                    // Fallback to raw bytes if decoding fails
-                    var rawBase64 = Convert.ToBase64String(rawBytes);
-                    return new ImageCaptureResult(
-                        fileName,
-                        contentType,
-                        rawBytes,
-                        rawBase64,
-                        rawBytes.Length);
+                    image.Mutate(x => x.Resize(new ResizeOptions
+                    {
+                        Size = new ImageSharpSize(maxDimension, maxDimension),
+                        Mode = ImageSharpResizeMode.Max
+                    }));
                 }
 
-                var originalWidth = (int)platformImage.Width;
-                var originalHeight = (int)platformImage.Height;
-
-                // Check if resizing is necessary
-                if (originalWidth <= maxDimension && originalHeight <= maxDimension)
-                {
-                    var base64 = Convert.ToBase64String(rawBytes);
-                    return new ImageCaptureResult(
-                        fileName,
-                        contentType,
-                        rawBytes,
-                        base64,
-                        rawBytes.Length,
-                        originalWidth,
-                        originalHeight);
-                }
-
-                // Calculate aspect ratio preserving dimensions
-                double ratio = (double)originalWidth / originalHeight;
-                int targetWidth, targetHeight;
-
-                if (originalWidth > originalHeight)
-                {
-                    targetWidth = maxDimension;
-                    targetHeight = (int)Math.Round(maxDimension / ratio);
-                }
-                else
-                {
-                    targetHeight = maxDimension;
-                    targetWidth = (int)Math.Round(maxDimension * ratio);
-                }
-
-                using var downscaled = platformImage.Downsize(targetWidth, targetHeight, true);
                 using var outStream = new MemoryStream();
-                downscaled.Save(outStream, ImageFormat.Jpeg, (float)(quality / 100.0));
+                var encoder = new JpegEncoder
+                {
+                    Quality = quality
+                };
+                image.Save(outStream, encoder);
                 var optimizedBytes = outStream.ToArray();
                 var optimizedBase64 = Convert.ToBase64String(optimizedBytes);
 
@@ -95,12 +70,12 @@ public class ImageOptimizationService : IImageOptimizationService
                     optimizedBytes,
                     optimizedBase64,
                     optimizedBytes.Length,
-                    targetWidth,
-                    targetHeight);
+                    image.Width,
+                    image.Height);
             }
             catch
             {
-                // Resilient fallback to original bytes
+                // Resilient fallback to raw bytes if decoding fails
                 var base64 = Convert.ToBase64String(rawBytes);
                 return new ImageCaptureResult(
                     fileName,
@@ -112,4 +87,3 @@ public class ImageOptimizationService : IImageOptimizationService
         }, ct);
     }
 }
-

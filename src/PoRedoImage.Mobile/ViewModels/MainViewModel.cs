@@ -91,10 +91,25 @@ public partial class MainViewModel : ObservableObject
     {
         ClearError();
         ProcessingStage = "Opening camera…";
-        var result = await _cameraService.CapturePhotoAsync();
-        if (result != null)
+        try
         {
-            SetCapturedPhoto(result);
+            var result = await _cameraService.CapturePhotoAsync();
+            if (result != null)
+            {
+                SetCapturedPhoto(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Camera error: {ex.Message}";
+            HasError = true;
+        }
+        finally
+        {
+            if (!HasPhoto)
+            {
+                ProcessingStage = "Ready";
+            }
         }
     }
 
@@ -103,10 +118,25 @@ public partial class MainViewModel : ObservableObject
     {
         ClearError();
         ProcessingStage = "Selecting photo…";
-        var result = await _cameraService.PickPhotoAsync();
-        if (result != null)
+        try
         {
-            SetCapturedPhoto(result);
+            var result = await _cameraService.PickPhotoAsync();
+            if (result != null)
+            {
+                SetCapturedPhoto(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Gallery error: {ex.Message}";
+            HasError = true;
+        }
+        finally
+        {
+            if (!HasPhoto)
+            {
+                ProcessingStage = "Ready";
+            }
         }
     }
 

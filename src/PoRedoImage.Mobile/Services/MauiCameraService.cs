@@ -18,26 +18,29 @@ public class MauiCameraService : ICameraService
 
     public async Task<ImageCaptureResult?> CapturePhotoAsync(CancellationToken ct = default)
     {
-        if (!MediaPicker.Default.IsCaptureSupported)
-            return null;
-
-        var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
-        if (status != PermissionStatus.Granted)
-        {
-            status = await Permissions.RequestAsync<Permissions.Camera>();
-            if (status != PermissionStatus.Granted)
-                return null;
-        }
-
         try
         {
+            var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
+            if (status != PermissionStatus.Granted)
+            {
+                status = await Permissions.RequestAsync<Permissions.Camera>();
+                if (status != PermissionStatus.Granted)
+                {
+                    Console.WriteLine($"[MauiCameraService] Camera permission denied: {status}");
+                    return null;
+                }
+            }
+
             var photo = await MediaPicker.Default.CapturePhotoAsync(new MediaPickerOptions
             {
                 Title = "Capture Image for PoRedo"
             });
 
             if (photo == null)
+            {
+                Console.WriteLine("[MauiCameraService] User cancelled camera capture.");
                 return null;
+            }
 
             await using var stream = await photo.OpenReadAsync();
             var fileName = photo.FileName ?? $"camera_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
@@ -45,9 +48,9 @@ public class MauiCameraService : ICameraService
 
             return await _optimizer.OptimizeAsync(stream, fileName, contentType, maxDimension: 1280, quality: 85, ct: ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // User cancelled or camera interaction failed
+            Console.WriteLine($"[MauiCameraService] Error during CapturePhotoAsync: {ex}");
             return null;
         }
     }
@@ -63,7 +66,10 @@ public class MauiCameraService : ICameraService
 
             var photo = photos?.FirstOrDefault();
             if (photo == null)
+            {
+                Console.WriteLine("[MauiCameraService] User cancelled photo picking.");
                 return null;
+            }
 
             await using var stream = await photo.OpenReadAsync();
             var fileName = photo.FileName ?? $"gallery_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
@@ -71,8 +77,9 @@ public class MauiCameraService : ICameraService
 
             return await _optimizer.OptimizeAsync(stream, fileName, contentType, maxDimension: 1280, quality: 85, ct: ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"[MauiCameraService] Error during PickPhotoAsync: {ex}");
             return null;
         }
     }

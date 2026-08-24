@@ -13,9 +13,6 @@ public partial class SettingsViewModel : ObservableObject
     private string _serverUrl;
 
     [ObservableProperty]
-    private string _guestId;
-
-    [ObservableProperty]
     private string _selectedStyle;
 
     [ObservableProperty]
@@ -43,7 +40,6 @@ public partial class SettingsViewModel : ObservableObject
         _settings = settings;
         _apiClient = apiClient;
         _serverUrl = _settings.ServerUrl;
-        _guestId = _settings.GuestId;
         _selectedStyle = _settings.SelectedStyle;
         _autoSaveToGallery = _settings.AutoSaveToGallery;
     }
@@ -58,20 +54,13 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var isAlive = await _apiClient.PingAsync();
-            if (!isAlive)
+            if (isAlive)
             {
-                ConnectionStatus = "❌ Server unreachable. Check IP & port.";
-                return;
-            }
-
-            var isAuthOk = await _apiClient.EnsureAuthenticatedAsync();
-            if (isAuthOk)
-            {
-                ConnectionStatus = "✅ Connected & Authenticated (Guest ready)";
+                ConnectionStatus = "✅ Connected to backend successfully!";
             }
             else
             {
-                ConnectionStatus = "⚠️ Server alive, but Auth/CSRF handshake failed.";
+                ConnectionStatus = "❌ Server unreachable. Verify your IP/port and ensure backend is running.";
             }
         }
         catch (Exception ex)
@@ -88,16 +77,7 @@ public partial class SettingsViewModel : ObservableObject
     public void SaveSettings()
     {
         _settings.ServerUrl = ServerUrl;
-        _settings.GuestId = GuestId;
         _settings.SelectedStyle = SelectedStyle;
         _settings.AutoSaveToGallery = AutoSaveToGallery;
     }
-
-    [RelayCommand]
-    public void GenerateNewGuestId()
-    {
-        GuestId = $"GUEST{Random.Shared.Next(10000000, 99999999)}";
-        _settings.GuestId = GuestId;
-    }
 }
-

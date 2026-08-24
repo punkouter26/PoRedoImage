@@ -45,6 +45,7 @@
 
                 <Button Grid.Column="1"
                         Text="Reset"
+                        Clicked="OnResetClicked"
                         Command="{Binding ResetCommand}"
                         IsVisible="{Binding HasPhoto}"
                         BackgroundColor="{StaticResource BgCard}"
@@ -89,6 +90,9 @@
                                BorderColor="{StaticResource Primary}"
                                Padding="0"
                                HorizontalOptions="Center">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnTakePhotoClicked" />
+                            </Frame.GestureRecognizers>
                             <Label Text="📸"
                                    FontSize="32"
                                    HorizontalOptions="Center"
@@ -109,6 +113,7 @@
 
                         <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,6,0,0">
                             <Button Text="📷 Snap Photo"
+                                    Clicked="OnTakePhotoClicked"
                                     Command="{Binding TakePhotoCommand}"
                                     BackgroundColor="{StaticResource Primary}"
                                     TextColor="White"
@@ -117,6 +122,7 @@
                                     Padding="16,8" />
 
                             <Button Text="📁 Gallery"
+                                    Clicked="OnPickPhotoClicked"
                                     Command="{Binding PickPhotoCommand}"
                                     BackgroundColor="{StaticResource BgCardHover}"
                                     TextColor="{StaticResource TextPrimary}"
@@ -150,6 +156,7 @@
 
                             <HorizontalStackLayout Grid.Column="1" Spacing="8">
                                 <Button Text="Retake"
+                                        Clicked="OnTakePhotoClicked"
                                         Command="{Binding TakePhotoCommand}"
                                         BackgroundColor="{StaticResource BgCardHover}"
                                         TextColor="{StaticResource TextPrimary}"
@@ -157,6 +164,7 @@
                                         Padding="10,4"
                                         HeightRequest="30" />
                                 <Button Text="Choose"
+                                        Clicked="OnPickPhotoClicked"
                                         Command="{Binding PickPhotoCommand}"
                                         BackgroundColor="{StaticResource BgCardHover}"
                                         TextColor="{StaticResource TextPrimary}"
@@ -188,6 +196,7 @@
                             Padding="12">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding ProcessMemeCommand}" />
+                            <TapGestureRecognizer Tapped="OnMemeClicked" Command="{Binding ProcessMemeCommand}" />
                         </Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6">
                             <Label Text="🎭" FontSize="24" />
@@ -204,6 +213,7 @@
                             Padding="12">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding ProcessRegenerateCommand}" />
+                            <TapGestureRecognizer Tapped="OnReimagineClicked" Command="{Binding ProcessRegenerateCommand}" />
                         </Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6">
                             <Label Text="✨" FontSize="24" />
@@ -220,6 +230,7 @@
                             Padding="12">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding ProcessRapRoastCommand}" />
+                            <TapGestureRecognizer Tapped="OnRoastClicked" Command="{Binding ProcessRapRoastCommand}" />
                         </Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6">
                             <Label Text="🎤" FontSize="24" />
@@ -236,6 +247,7 @@
                             Padding="12">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding ProcessDescribeCommand}" />
+                            <TapGestureRecognizer Tapped="OnDescribeClicked" Command="{Binding ProcessDescribeCommand}" />
                         </Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6">
                             <Label Text="🔍" FontSize="24" />
@@ -313,6 +325,7 @@
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                         <Button Grid.Column="0"
                                 Text="📤 Share"
+                                Clicked="OnShareClicked"
                                 Command="{Binding ShareResultCommand}"
                                 BackgroundColor="{StaticResource Primary}"
                                 TextColor="White"
@@ -321,6 +334,7 @@
 
                         <Button Grid.Column="1"
                                 Text="💾 Save"
+                                Clicked="OnSaveClicked"
                                 Command="{Binding SaveResultCommand}"
                                 BackgroundColor="{StaticResource BgCardHover}"
                                 TextColor="{StaticResource TextPrimary}"
@@ -331,6 +345,7 @@
 
                         <Button Grid.Column="2"
                                 Text="🔄 Snap New"
+                                Clicked="OnTakePhotoClicked"
                                 Command="{Binding TakePhotoCommand}"
                                 BackgroundColor="{StaticResource AccentEmerald}"
                                 TextColor="White"
