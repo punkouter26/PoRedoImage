@@ -27,7 +27,7 @@ public class RapRoastTests
         chat.SetupGet(c => c.IsConfigured).Returns(false);
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
 
-        var result = await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, softened: false);
+        var result = await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: false);
 
         // The fallback must be structurally identical to the AI output — the music model relies on
         // the section tags, so a bare paragraph would change how the track is performed.
@@ -56,8 +56,8 @@ public class RapRoastTests
             .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
-        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, softened: false);
-        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, softened: true);
+        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: false);
+        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: true);
 
         // The guardrail is what keeps the roast on choices rather than characteristics — and what
         // keeps the music provider's safety filter from refusing the track outright.
@@ -82,11 +82,46 @@ public class RapRoastTests
             .ReturnsAsync(new ChatCompletionResult("```\n[Verse]\nbars here\n[Chorus]\nhook\n```", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
-        var result = await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, softened: false);
+        var result = await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: false);
 
         // A stray fence would otherwise be handed to the music model and performed as a lyric.
         Assert.DoesNotContain("```", result.Text, StringComparison.Ordinal);
         Assert.StartsWith("[Verse]", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Intensity_steers_the_tone_direction_and_the_retry_steps_it_down_one_stop()
+    {
+        var userPrompts = new List<string>();
+
+        var chat = new Mock<IChatCompletionService>();
+        chat.SetupGet(c => c.IsConfigured).Returns(true);
+        chat.Setup(c => c.CompleteAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, byte[]?, CancellationToken>((_, user, _, _) => userPrompts.Add(user))
+            .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
+
+        var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
+        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Gentle, softened: false);
+        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Scorched, softened: false);
+        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Scorched, softened: true);
+
+        // The dial has to reach the model, or it is a control that does nothing.
+        Assert.Contains("affectionate", userPrompts[0], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("merciless", userPrompts[1], StringComparison.OrdinalIgnoreCase);
+
+        // Turning it up must never widen what may be targeted — Scorched is a harsher delivery at
+        // the same targets, and the prompt says so out loud because that is when a model reaches
+        // for the cheap shot.
+        Assert.Contains("CHOICE", userPrompts[1], StringComparison.Ordinal);
+
+        // A refusal steps the dial down one stop rather than collapsing to the mildest setting:
+        // Scorched retries as Roast, so the user still gets close to the track they asked for.
+        Assert.Contains("SECOND attempt", userPrompts[2], StringComparison.Ordinal);
+        Assert.Contains("good-natured", userPrompts[2], StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("merciless", userPrompts[2], StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(RoastIntensity.Roast, RoastLyricsWriter.StepDown(RoastIntensity.Scorched));
+        Assert.Equal(RoastIntensity.Gentle, RoastLyricsWriter.StepDown(RoastIntensity.Gentle));
     }
 
     // ── RapRoastOrchestrator ─────────────────────────────────────────

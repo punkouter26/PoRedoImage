@@ -1,7 +1,10 @@
 ﻿@page "/rap-roast"
 @attribute [Authorize]
 @inherits FeaturePageBase
+@implements IDisposable
 @using System.Net.Http.Json
+@using PoRedoImage.Client.Services
+@inject IJSRuntime JS
 
 <PageTitle>Rap Roast — PoRedoImage</PageTitle>
 
@@ -48,10 +51,32 @@
                     </div>
                 </fieldset>
 
+                @* ── Intensity dial ───────────────────────────────────────────────
+                   A three-stop dial rather than a slider: the levels are named tones the
+                   ghostwriter is actually instructed in, not a continuum, and a slider would
+                   promise a granularity the prompt cannot deliver. *@
+                <fieldset class="roast-dial mt-3">
+                    <legend class="roast-style__legend">How hard should it hit</legend>
+                    <div class="roast-dial__track" role="radiogroup" aria-label="Roast intensity">
+                        @foreach (var option in IntensityOptions)
+                        {
+                            <label class="roast-dial__stop @(_intensity == option.Value ? "roast-dial__stop--selected" : "")">
+                                <input type="radio" name="roast-intensity" value="@option.Value"
+                                       checked="@(_intensity == option.Value)"
+                                       @onchange="@(() => _intensity = option.Value)" />
+                                <span class="roast-dial__lamp" aria-hidden="true"></span>
+                                <span class="roast-style__name">@option.Label</span>
+                                <span class="roast-style__hint">@option.Hint</span>
+                            </label>
+                        }
+                    </div>
+                </fieldset>
+
                 <p class="roast-disclaimer">
                     <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-                    Roasts stay on styling, pose and vibe — never on appearance traits like race,
-                    body size, age or disability. Best used on photos of yourself and friends.
+                    Every setting stays on styling, pose and vibe — never on appearance traits like
+                    race, body size, age or disability. <strong>Scorched</strong> changes how hard the
+                    jab lands, not what it lands on. Best used on photos of yourself and friends.
                 </p>
             </div>
         </div>
@@ -95,10 +120,32 @@
                 else
                 {
                     <div class="roast-player">
-                        <audio controls preload="metadata" class="roast-player__audio"
+                        <audio @ref="_audioRef" controls preload="metadata" class="roast-player__audio"
                                src="@($"data:{_result.AudioContentType};base64,{_result.AudioData}")">
                             Your browser does not support audio playback.
                         </audio>
+
+                        @* The nudge only appears once the karaoke view is actually running — offering
+                           a sync control over a lyric block that never moves would be a lie. *@
+                        @if (_karaokeLive)
+                        {
+                            <div class="roast-sync">
+                                <label class="roast-sync__label" for="roast-sync">
+                                    Sync
+                                    <span class="roast-sync__value">@FormatOffset(_syncOffset)</span>
+                                </label>
+                                <input id="roast-sync" class="roast-sync__range" type="range"
+                                       min="-3" max="3" step="0.1"
+                                       value="@_syncOffset.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                       @oninput="OnSyncChanged"
+                                       aria-describedby="roast-sync-hint" />
+                                <p id="roast-sync-hint" class="roast-sync__hint mb-0">
+                                    Line timings are estimated from the length of each bar — the music
+                                    model returns audio, not timings. Drag if the highlight runs ahead
+                                    or behind.
+                                </p>
+                            </div>
+                        }
                     </div>
                 }
 
@@ -112,8 +159,70 @@
 
                 <section class="roast-lyrics" aria-label="Roast lyrics">
                     <h2 class="roast-lyrics__heading">The bars</h2>
-                    <pre class="roast-lyrics__text">@_result.Lyrics</pre>
+
+                    @if (_lines.Count > 0)
+                    {
+                        @* Every sung bar is a button, so the list is operable by keyboard and by
+                           screen reader without an aria-live region narrating each highlight — which
+                           on a 12-bar verse would be constant interruption, not information. The lit
+                           state is decoration on top of a list that reads correctly with none of it. *@
+                        <ol class="roast-script" @ref="_lyricsRef">
+                            @foreach (var line in _lines)
+                            {
+                                var index = line.Index;
+                                if (line.IsSection)
+                                {
+                                    <li class="roast-script__section" data-roast-line="@index">@line.Text</li>
+                                }
+                                else
+                                {
+                                    <li class="roast-script__row">
+                                        <button type="button" class="roast-script__line" data-roast-line="@index"
+                                                disabled="@(!_karaokeLive)"
+                                                title="@(_karaokeLive ? "Jump the track to this bar" : null)"
+                                                @onclick="@(() => SeekToLineAsync(index))">@line.Text</button>
+                                    </li>
+                                }
+                            }
+                        </ol>
+                    }
+                    else
+                    {
+                        @* Nothing parseable to time — show the lyrics exactly as the model wrote them. *@
+                        <pre class="roast-lyrics__text">@_result.Lyrics</pre>
+                    }
                 </section>
+
+                @* ── Export ──────────────────────────────────────────────────────
+                   The card needs nothing but a 2D canvas, so it is offered even when the track was
+                   refused: a refusal still produced bars worth keeping. The video needs
+                   MediaRecorder + captureStream and is hidden outright where they are missing,
+                   rather than shown as a button that fails on click. *@
+                <div class="roast-export">
+                    <span class="roast-export__label">
+                        <i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Take it with you
+                    </span>
+                    <div class="roast-export__actions">
+                        <button class="btn-result-secondary" @onclick="SaveCardAsync" disabled="@_exporting">
+                            <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-image") me-1" aria-hidden="true"></i>Save card
+                        </button>
+                        @if (_canRecord && !_result.AudioRefused)
+                        {
+                            <button class="btn-result-secondary" @onclick="ExportVideoAsync" disabled="@_exporting">
+                                <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-camera-video") me-1" aria-hidden="true"></i>Export video
+                            </button>
+                        }
+                    </div>
+                    @if (_exportProgress >= 0)
+                    {
+                        <div class="roast-export__progress" role="status">
+                            <div class="roast-export__bar" style="--export: @_exportProgress%"></div>
+                            <span class="roast-export__pct">
+                                Recording @_exportProgress% — the track plays through in real time.
+                            </span>
+                        </div>
+                    }
+                </div>
 
                 <details class="roast-seen" open="@(!_result.DescriptionIsDetailed)">
                     <summary>What the AI saw</summary>
@@ -196,16 +305,42 @@
 @code {
     private RapRoastResponse? _result;
     private RapStyle _style = RapStyle.BoomBap;
+    private RoastIntensity _intensity = RoastIntensity.Roast;
 
     // Snapshotted when the roast is submitted, not read live: the session image can change while a
     // result is on screen, which would leave the bars describing a photo that is no longer shown.
     private string? _roastedImageUrl;
+
+    // ── Karaoke + export state ───────────────────────────────────────────────
+    private ElementReference _audioRef;
+    private ElementReference _lyricsRef;
+    private IReadOnlyList<RoastLine> _lines = [];
+
+    /// <summary>True once the JS driver confirmed the track carries a usable duration.</summary>
+    private bool _karaokeLive;
+    private bool _canRecord;
+    private bool _exporting;
+
+    /// <summary>-1 when idle; 0–100 while a video is recording.</summary>
+    private int _exportProgress = -1;
+    private double _syncOffset;
+
+    /// <summary>Guards against re-attaching on every render — one attach per result.</summary>
+    private RapRoastResponse? _attachedTo;
+    private DotNetObjectReference<RapRoast>? _selfRef;
 
     private static readonly (RapStyle Value, string Label, string Hint)[] StyleOptions =
     [
         (RapStyle.BoomBap, "Boom-bap", "90s, dusty drums"),
         (RapStyle.Trap, "Trap", "808s, hi-hat rolls"),
         (RapStyle.OldSchool, "Old-school", "Funk break, horns"),
+    ];
+
+    private static readonly (RoastIntensity Value, string Label, string Hint)[] IntensityOptions =
+    [
+        (RoastIntensity.Gentle, "Gentle", "Warm teasing, no real burns"),
+        (RoastIntensity.Roast, "Roast", "Real punchlines, good-natured"),
+        (RoastIntensity.Scorched, "Scorched", "Merciless — still only about choices"),
     ];
 
     protected override void OnGalleryImageSelected() => _result = null;
@@ -245,6 +380,7 @@
                 ImageData = ExtractBase64(previewUrl),
                 ContentType = SessionService.ContentType ?? "image/png",
                 Style = _style,
+                Intensity = _intensity,
             };
 
             var response = await Http.PostAsJsonAsync("/api/rap-roast", request, SharedJsonOptions.Default);
@@ -284,6 +420,7 @@
 
             _result = await response.Content.ReadFromJsonAsync<RapRoastResponse>(SharedJsonOptions.Default);
             isComplete = _result is not null;
+            _lines = RoastScript.Parse(_result?.Lyrics);
         }
         catch (Exception ex)
         {
@@ -300,10 +437,191 @@
 
     private void Reset()
     {
+        _ = DetachKaraokeAsync();
         _result = null;
         _roastedImageUrl = null;
+        _lines = [];
         isComplete = false;
         errorMessage = null;
         StateHasChanged();
+    }
+
+    // ── Karaoke ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Binds the JS driver once per result, after the audio element and lyric list are in the DOM.
+    /// </summary>
+    /// <remarks>
+    /// The base class owns the "Surprise me" auto-start in its own <c>OnAfterRenderAsync</c>, so this
+    /// must call through to it rather than replace it.
+    /// </remarks>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            _canRecord = await SafeInvokeAsync<bool>("poRoast.canRecord");
+            if (_canRecord) StateHasChanged();
+        }
+
+        // Nothing to sync against when the music provider refused: there is no track to follow.
+        if (_result is null || ReferenceEquals(_attachedTo, _result)) return;
+        if (_result.AudioRefused || _lines.Count == 0) return;
+
+        _attachedTo = _result;
+        _selfRef ??= DotNetObjectReference.Create(this);
+
+        // False is an ordinary answer, not a failure: the mock music service returns a fraction of a
+        // second of silence, and there is no honest way to spread twelve bars across it.
+        var live = await SafeInvokeAsync<bool>("poRoast.attach", _audioRef, _lyricsRef, _lines, _syncOffset);
+        if (live != _karaokeLive)
+        {
+            _karaokeLive = live;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSyncChanged(ChangeEventArgs e)
+    {
+        if (!double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var seconds))
+            return;
+
+        _syncOffset = seconds;
+        await SafeInvokeVoidAsync("poRoast.setOffset", seconds);
+    }
+
+    private Task SeekToLineAsync(int index) =>
+        _karaokeLive ? SafeInvokeVoidAsync("poRoast.seekToLine", _audioRef, index) : Task.CompletedTask;
+
+    private async Task DetachKaraokeAsync()
+    {
+        _attachedTo = null;
+        _karaokeLive = false;
+        await SafeInvokeVoidAsync("poRoast.detach");
+    }
+
+    private static string FormatOffset(double seconds) =>
+        seconds == 0 ? "on the beat" : $"{(seconds > 0 ? "+" : "")}{seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}s";
+
+    // ── Export ───────────────────────────────────────────────────────────────
+
+    /// <summary>Beat style and intensity, stamped on the exported card so a share carries its recipe.</summary>
+    private string ExportMeta =>
+        $"{StyleOptions.First(o => o.Value == _style).Label} · {IntensityOptions.First(o => o.Value == _intensity).Label}";
+
+    private async Task SaveCardAsync()
+    {
+        if (_result is null || _exporting) return;
+        _exporting = true;
+        StateHasChanged();
+        try
+        {
+            // -1 asks the JS side for whichever bar is lit right now.
+            var outcome = await SafeInvokeAsync<string>(
+                "poRoast.exportCard", _roastedImageUrl, _lines, -1, ExportMeta, "rap-roast-card.png");
+
+            if (outcome == "saved")
+                NotificationService.Notify(NotificationSeverity.Success, "Card saved",
+                    "Check your downloads.", duration: 3000);
+            else
+                NotificationService.Notify(NotificationSeverity.Warning, "Card not saved",
+                    "The browser blocked the image export. Try again, or screenshot the player.", duration: 5000);
+        }
+        finally
+        {
+            _exporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportVideoAsync()
+    {
+        if (_result is null || _exporting) return;
+        _exporting = true;
+        _exportProgress = 0;
+        StateHasChanged();
+        try
+        {
+            _selfRef ??= DotNetObjectReference.Create(this);
+            var outcome = await SafeInvokeAsync<string>(
+                "poRoast.exportVideo", _audioRef, _selfRef, _roastedImageUrl, _lines, ExportMeta, "rap-roast.webm");
+
+            var (severity, title, detail) = outcome switch
+            {
+                "saved" => (NotificationSeverity.Success, "Video saved", "Check your downloads."),
+                "unsupported" => (NotificationSeverity.Info, "Video export unavailable",
+                    "This browser can't record canvas video. The card export works everywhere."),
+                _ => (NotificationSeverity.Warning, "Recording failed",
+                    "The track needs to play through uninterrupted to record. Try again without switching tabs."),
+            };
+            NotificationService.Notify(severity, title, detail, duration: 5000);
+        }
+        finally
+        {
+            _exporting = false;
+            _exportProgress = -1;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Called from the recorder's draw loop — the recording is real-time, so this ticks.</summary>
+    [JSInvokable]
+    public void OnExportProgress(int percent)
+    {
+        var clamped = Math.Clamp(percent, 0, 100);
+        if (clamped == _exportProgress) return;
+        _exportProgress = clamped;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // ── Interop plumbing ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Interop that tolerates a torn-down circuit. Every call here is an enhancement — karaoke,
+    /// sync, export — so a failure must leave the page working with plain lyrics rather than
+    /// throwing into the render loop.
+    /// </summary>
+    /// <remarks>
+    /// The annotation is forwarded rather than suppressed: <c>IJSRuntime.InvokeAsync&lt;T&gt;</c>
+    /// deserializes into <typeparamref name="T"/> by reflection, so the trim analyzer needs the same
+    /// guarantee from every caller. Both call sites here close it over <c>bool</c> and <c>string</c>.
+    /// </remarks>
+    private async Task<T?> SafeInvokeAsync<
+        [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(
+            System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicFields
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties)] T>(
+        string identifier, params object?[] args)
+    {
+        try
+        {
+            return await JS.InvokeAsync<T>(identifier, args);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or TaskCanceledException)
+        {
+            Logger.LogDebug(ex, "Roast stage interop {Identifier} unavailable", identifier);
+            return default;
+        }
+    }
+
+    private async Task SafeInvokeVoidAsync(string identifier, params object?[] args)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync(identifier, args);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or TaskCanceledException)
+        {
+            Logger.LogDebug(ex, "Roast stage interop {Identifier} unavailable", identifier);
+        }
+    }
+
+    public void Dispose()
+    {
+        _ = SafeInvokeVoidAsync("poRoast.detach");
+        _selfRef?.Dispose();
+        _selfRef = null;
     }
 }

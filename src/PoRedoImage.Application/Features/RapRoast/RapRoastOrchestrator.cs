@@ -62,7 +62,8 @@ public sealed class RapRoastOrchestrator(
         for (var attempt = 1; attempt <= MaxMusicAttempts; attempt++)
         {
             var softened = attempt > 1;
-            lyrics = await lyricsWriter.WriteAsync(description, tags, request.Style, softened, ct);
+            lyrics = await lyricsWriter.WriteAsync(
+                description, tags, request.Style, request.Intensity, softened, ct);
 
             if (!musicService.IsConfigured)
             {

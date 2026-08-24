@@ -117,8 +117,14 @@ public sealed class AccessibilityUiTests : IAsyncLifetime
             new() { WaitUntil = WaitUntilState.NetworkIdle });
 
         Assert.DoesNotContain("/login", page.Url, StringComparison.OrdinalIgnoreCase);
-        // The radio-group fieldset and the audio player are the parts most likely to regress here.
-        await Assertions.Expect(page.Locator("legend")).ToContainTextAsync("Beat style");
+        // Both radio-group fieldsets and the audio player are the parts most likely to regress
+        // here. A bare "legend" locator used to be enough; the intensity dial added a second
+        // fieldset, and matching by text is what keeps this pinned to the controls it means.
+        await Assertions.Expect(page.Locator("legend", new() { HasTextString = "Beat style" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("legend", new() { HasTextString = "How hard should it hit" })).ToBeVisibleAsync();
+        // The dial's radios are visually replaced by lamps, so they are the exact shape that turns
+        // into an unlabelled control if the visually-hidden treatment is ever changed to display:none.
+        await Assertions.Expect(page.Locator("input[name='roast-intensity']")).ToHaveCountAsync(3);
 
         await AssertNoViolationsAsync(page);
     }

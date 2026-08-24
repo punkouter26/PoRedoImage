@@ -25,6 +25,34 @@ public class RapRoastRequest
     /// different style without re-running vision.
     /// </summary>
     public RapStyle Style { get; set; } = RapStyle.BoomBap;
+
+    /// <summary>
+    /// How hard the bars hit. Absent from the payload it stays <see cref="RoastIntensity.Roast"/>,
+    /// which is the tone the feature shipped with — System.Text.Json leaves a property at its
+    /// initializer when the JSON omits it, so an older client keeps its old behaviour exactly.
+    /// </summary>
+    public RoastIntensity Intensity { get; set; } = RoastIntensity.Roast;
+}
+
+/// <summary>
+/// How sharp the roast is allowed to get. Orthogonal to <see cref="RapStyle"/>: intensity steers the
+/// words, style steers the beat.
+/// </summary>
+/// <remarks>
+/// Every level sits inside the same content guardrail — the dial changes how hard the jab lands, never
+/// what it is allowed to land on. <see cref="Scorched"/> is not permission to cross into
+/// characteristics; it is permission to be merciless about choices.
+/// </remarks>
+public enum RoastIntensity
+{
+    /// <summary>Affectionate teasing. Warm enough to show your mum.</summary>
+    Gentle = 0,
+
+    /// <summary>Real punchlines, good-natured. The default, and the tone the feature shipped with.</summary>
+    Roast = 1,
+
+    /// <summary>Merciless — surgical burns, still aimed only at choices.</summary>
+    Scorched = 2,
 }
 
 /// <summary>Backing-track style. An enum, not a free string (§1 "zero magic strings").</summary>

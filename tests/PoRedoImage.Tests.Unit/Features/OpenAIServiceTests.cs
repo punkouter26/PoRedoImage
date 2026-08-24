@@ -90,20 +90,16 @@ public class AzureOpenAiServiceTests
             service.EnhanceDescriptionAsync("desc", null!, 200));
     }
 
-    [Fact]
-    public async Task EnhanceDescriptionAsync_ZeroTargetLength_ThrowsArgumentOutOfRange()
+    // Zero and negative are the same guard clause reached by two literals, so this is one theory
+    // rather than two facts — consolidated to keep the Unit tier inside its 100-method ceiling.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task EnhanceDescriptionAsync_NonPositiveTargetLength_ThrowsArgumentOutOfRange(int targetLength)
     {
         var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, 0));
-    }
-
-    [Fact]
-    public async Task EnhanceDescriptionAsync_NegativeTargetLength_ThrowsArgumentOutOfRange()
-    {
-        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, -1));
+            service.EnhanceDescriptionAsync("desc", new List<string> { "tag" }, targetLength));
     }
 
     // ─── GenerateMemeCaptionAsync guard-clause tests ────────────────

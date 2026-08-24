@@ -51,45 +51,32 @@ public class MemeGeneratorServiceTests
     // ─── Output correctness ─────────────────────────────────────────
 
     [Fact]
-    public async Task GenerateMemeAsync_ValidPng_ReturnsNonEmptyBytes()
+    public async Task GenerateMemeAsync_ValidPng_ReturnsNonEmptyPng()
     {
         var svc = CreateService();
         var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), "TOP TEXT", "BOTTOM TEXT");
 
         Assert.NotNull(result);
         Assert.NotEmpty(result);
-    }
-
-    [Fact]
-    public async Task GenerateMemeAsync_NullCaptions_ReturnsImageWithoutThrow()
-    {
-        var svc = CreateService();
-        // Null top and bottom text — service should skip drawing and return the image unchanged
-        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), null!, null!);
-
-        Assert.NotEmpty(result);
-    }
-
-    [Fact]
-    public async Task GenerateMemeAsync_EmptyCaptions_ReturnsImageWithoutThrow()
-    {
-        var svc = CreateService();
-        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), "", "");
-
-        Assert.NotEmpty(result);
-    }
-
-    [Fact]
-    public async Task GenerateMemeAsync_ValidPng_OutputIsPng()
-    {
-        var svc = CreateService();
-        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), "HELLO", "WORLD");
-
-        // PNG magic bytes: 89 50 4E 47
+        // PNG magic bytes: 89 50 4E 47. Was a separate test; "produced bytes" and "produced a PNG"
+        // are one behaviour with one arrangement, and splitting them bought no diagnostic power.
         Assert.Equal(0x89, result[0]);
         Assert.Equal(0x50, result[1]);
         Assert.Equal(0x4E, result[2]);
         Assert.Equal(0x47, result[3]);
+    }
+
+    // Null and empty captions are the same branch — the service skips drawing either way — so this
+    // is one theory rather than two facts that differed only in the literal passed in.
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", "")]
+    public async Task GenerateMemeAsync_BlankCaptions_ReturnsImageWithoutThrow(string? top, string? bottom)
+    {
+        var svc = CreateService();
+        var (result, _) = await svc.GenerateMemeAsync(CreateMinimalPng(), top!, bottom!);
+
+        Assert.NotEmpty(result);
     }
 
     // ─── Regression: long captions must fit inside the photo ────────

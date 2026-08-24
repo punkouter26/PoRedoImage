@@ -38,20 +38,35 @@ public sealed class RoastLyricsWriter(IChatCompletionService chat, ILogger<Roast
         + "Write 8 lines under [Verse] and 4 under [Chorus]. Make the lines rhyme and scan to a beat. "
         + Guardrail;
 
+    /// <summary>
+    /// Steps an intensity down one notch. This is what <c>softened</c> means now: the retry after a
+    /// refusal re-runs the dial one position cooler rather than jumping straight to the mildest
+    /// setting, so a Scorched request that upset the filter comes back as a Roast — still the track
+    /// the user asked for, just survivable.
+    /// </summary>
+    internal static RoastIntensity StepDown(RoastIntensity intensity) => intensity switch
+    {
+        RoastIntensity.Scorched => RoastIntensity.Roast,
+        RoastIntensity.Roast => RoastIntensity.Gentle,
+        _ => RoastIntensity.Gentle,
+    };
+
     public async Task<RoastLyrics> WriteAsync(
         string imageDescription,
         IReadOnlyList<string> tags,
         RapStyle style,
+        RoastIntensity intensity,
         bool softened,
         CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
+        var effective = softened ? StepDown(intensity) : intensity;
 
         if (chat.IsConfigured)
         {
             try
             {
-                var lyrics = await WriteWithAiAsync(imageDescription, tags, style, softened, ct);
+                var lyrics = await WriteWithAiAsync(imageDescription, tags, style, effective, softened, ct);
                 if (!string.IsNullOrWhiteSpace(lyrics))
                 {
                     sw.Stop();
@@ -67,19 +82,29 @@ public sealed class RoastLyricsWriter(IChatCompletionService chat, ILogger<Roast
         }
 
         sw.Stop();
-        return new RoastLyrics(Heuristic(imageDescription, tags, softened), softened, sw.ElapsedMilliseconds);
+        return new RoastLyrics(Heuristic(imageDescription, tags, effective), softened, sw.ElapsedMilliseconds);
     }
 
     private async Task<string> WriteWithAiAsync(
-        string imageDescription, IReadOnlyList<string> tags, RapStyle style, bool softened, CancellationToken ct)
+        string imageDescription,
+        IReadOnlyList<string> tags,
+        RapStyle style,
+        RoastIntensity effective,
+        bool softened,
+        CancellationToken ct)
     {
-        // The softened pass is the retry after the music provider declined the first attempt. It is
-        // deliberately a *stronger* instruction rather than a different prompt shape, so the output
-        // stays structurally identical and the client renders it the same way.
-        var toneDirection = softened
-            ? "This is a SECOND attempt — the first was rejected as too harsh. Dial the burns "
-              + "right down: affectionate teasing only, closer to a friendly nudge than a roast."
-            : "Land real punchlines, but keep them good-natured.";
+        // Two independent things are said here, and they must stay independent. The intensity line
+        // is what the user asked for; the retry line is the fact that the music provider already
+        // rejected one draft. Folding the second into the first is what the old code did, which made
+        // every retry read as "be gentle" no matter which dial position it started from.
+        var toneDirection = ToneDirection(effective);
+
+        if (softened)
+        {
+            toneDirection =
+                "This is a SECOND attempt — the first draft was rejected by the music provider as too "
+                + $"harsh, so the dial has been stepped down to {effective}. {toneDirection}";
+        }
 
         var user =
             $"Photo description: {imageDescription}\n"
@@ -91,21 +116,52 @@ public sealed class RoastLyricsWriter(IChatCompletionService chat, ILogger<Roast
         var result = await chat.CompleteAsync(SystemPrompt, user, image: null, ct);
 
         logger.LogInformation(
-            "Roast lyrics written by model in {Elapsed}ms. Tokens={Tokens}, Softened={Softened}",
-            result.ElapsedMs, result.TokensUsed, softened);
+            "Roast lyrics written by model in {Elapsed}ms. Tokens={Tokens}, Intensity={Intensity}, Softened={Softened}",
+            result.ElapsedMs, result.TokensUsed, effective, softened);
 
         return Sanitize(result.Content);
     }
 
     /// <summary>
+    /// The one instruction that moves with the dial.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="RoastIntensity.Scorched"/> restates the guardrail rather than relaxing it. Turning
+    /// a model up is exactly when it starts reaching for the cheap shot — appearance, age, weight —
+    /// so the harshest setting is the one that most needs to be told where the line is. It also
+    /// happens to be the setting most likely to be refused by the music model, which is what the
+    /// step-down retry is for.
+    /// </remarks>
+    private static string ToneDirection(RoastIntensity intensity) => intensity switch
+    {
+        RoastIntensity.Gentle =>
+            "Keep it affectionate. Warm teasing only — the kind of nudge you would give a friend "
+            + "across a table, closer to fond than funny-mean. No real burns.",
+        RoastIntensity.Scorched =>
+            "Go hard. Merciless, surgical punchlines with genuine bite — the kind that gets an "
+            + "\"ohhh\" out of a room. Every burn must still land on a CHOICE (the outfit, the pose, "
+            + "the props, the vibe) and never on the person's characteristics. Harsher delivery, "
+            + "same targets.",
+        _ => "Land real punchlines, but keep them good-natured.",
+    };
+
+    /// <summary>
     /// Deterministic fallback. Structurally identical to the AI output (same section tags) so every
     /// downstream consumer — the music model and the UI — behaves the same either way.
     /// </summary>
-    private static string Heuristic(string imageDescription, IReadOnlyList<string> tags, bool softened)
+    private static string Heuristic(string imageDescription, IReadOnlyList<string> tags, RoastIntensity intensity)
     {
         var subject = tags.FirstOrDefault() ?? "you";
         var second = tags.Skip(1).FirstOrDefault() ?? "that look";
-        var edge = softened ? "gentle" : "sharp";
+
+        // The dial has to move something even with no chat provider, or the control reads as broken
+        // in the exact environment (local dev, no Key Vault) where it is most often first tried.
+        var edge = intensity switch
+        {
+            RoastIntensity.Gentle => "gentle",
+            RoastIntensity.Scorched => "merciless",
+            _ => "sharp",
+        };
 
         return $"""
             [Verse]

@@ -37,6 +37,7 @@
 /* One selectable flap cell, same object as a mode card or a preset button. */
 .roast-style__option {
     display: flex;
+    position: relative;
     flex-direction: column;
     gap: 0.1rem;
     padding: 0.6rem 0.75rem;
@@ -213,4 +214,205 @@
 @media (max-width: 479px) {
     .scene-slots { grid-template-columns: 1fr; gap: 0.1rem 0; }
     .scene-slots dd { margin-bottom: 0.5rem; }
+}
+
+/* ── Intensity dial ──────────────────────────────────────────────────────────
+   Three stops on one track, not three cards. The lamp beside each label is the
+   board's existing status glyph doing the job a slider handle would: it says which
+   position the dial is in from across the room, and it darkens as the tone cools. */
+
+.roast-dial {
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    background: var(--flap-black);
+    padding: 0.9rem 1rem 1rem;
+}
+
+.roast-dial__track {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+}
+
+.roast-dial__stop {
+    display: grid;
+    position: relative;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "lamp name" "lamp hint";
+    align-items: center;
+    column-gap: 0.55rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid transparent;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    cursor: pointer;
+    transition: border-color var(--motion-fast);
+}
+
+.roast-dial__stop:hover { border-color: var(--steel-dark); }
+.roast-dial__stop:focus-within { outline: 2px solid var(--amber); outline-offset: 2px; }
+.roast-dial__stop--selected { border-color: var(--amber); background: rgba(255,180,0,0.08); }
+.roast-dial__stop .roast-style__name { grid-area: name; }
+.roast-dial__stop .roast-style__hint { grid-area: hint; }
+.roast-dial__stop--selected .roast-style__name { color: var(--amber); }
+
+.roast-dial__lamp {
+    grid-area: lamp;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--amber-dim);
+}
+
+.roast-dial__stop--selected .roast-dial__lamp {
+    background: var(--amber);
+    box-shadow: 0 0 8px rgba(255,180,0,0.55);
+}
+
+/* The radio is the control; the cell is its face. Hidden visually, never from AT. */
+.roast-dial__stop input,
+.roast-style__option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+
+/* ── Sync nudge ──────────────────────────────────────────────────────────────
+   Sits with the player, not the lyrics, because it corrects the track's alignment
+   rather than the words. Only rendered once the karaoke driver reports it is live. */
+
+.roast-sync {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.5rem 0.85rem;
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--rule);
+}
+
+.roast-sync__label {
+    font-family: var(--font-flap);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
+    white-space: nowrap;
+}
+
+.roast-sync__value { display: block; color: var(--amber); letter-spacing: 0.08em; }
+.roast-sync__range { width: 100%; accent-color: var(--amber); }
+.roast-sync__range:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+.roast-sync__hint {
+    grid-column: 1 / -1;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--steel-dark);
+}
+
+/* ── The script ──────────────────────────────────────────────────────────────
+   One bar per row, each a button that seeks the track. The lit row is amber; rows
+   already performed drop to steel-dark (4.8:1 on the cell — still AA for body text)
+   so the eye lands on what is being said now without the past going unreadable. */
+
+.roast-script {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0 0;
+    max-height: 22rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.roast-script__row { margin: 0; }
+
+.roast-script__line {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-left: 2px solid transparent;
+    padding: 0.22rem 0.6rem;
+    font-family: var(--font-ui);
+    font-size: 0.98rem;
+    line-height: 1.65;
+    color: var(--steel);
+    cursor: pointer;
+    transition: color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.roast-script__line:disabled { cursor: default; color: var(--flap-white); }
+.roast-script__line:not(:disabled):hover { color: var(--flap-white); border-left-color: var(--steel-dark); }
+.roast-script__line:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.roast-script__line.is-past { color: var(--steel-dark); }
+
+.roast-script__line.is-active {
+    color: var(--amber);
+    border-left-color: var(--amber);
+    font-weight: 600;
+}
+
+.roast-script__section {
+    margin: 0.9rem 0 0.25rem;
+    padding: 0 0.6rem;
+    font-family: var(--font-flap);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--steel-dark);
+}
+
+.roast-script__section:first-child { margin-top: 0; }
+
+/* ── Export ──────────────────────────────────────────────────────────────────
+   The recording is a real-time capture, so the progress bar is measuring playback,
+   not encoding. The copy says so — a bar that looks like a normal export would read
+   as hung when it is simply listening to a 30-second track. */
+
+.roast-export {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+}
+
+.roast-export__label {
+    display: block;
+    font-family: var(--font-flap);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--steel-dark);
+    margin-bottom: 0.6rem;
+}
+
+.roast-export__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.roast-export__progress { margin-top: 0.75rem; }
+
+.roast-export__bar {
+    height: 4px;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+}
+
+.roast-export__bar::before {
+    content: "";
+    display: block;
+    height: 100%;
+    width: var(--export, 0%);
+    background: var(--amber);
+    transition: width var(--motion-base) linear;
+}
+
+.roast-export__pct {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.76rem;
+    color: var(--steel);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .roast-export__bar::before { transition: none; }
 }
