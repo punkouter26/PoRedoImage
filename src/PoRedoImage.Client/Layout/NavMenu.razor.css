@@ -1,2 +1,26 @@
-/* Nav links are styled globally in app.css via .app-nav__link */
+/* Individual link styling is global (app.css .app-nav__link) because these anchors are
+   rendered by NavLink inside this component and MainLayout's scoped sheet cannot reach
+   them. Only the rail's own layout belongs here. */
 
+.app-nav__links {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: center;
+}
+
+/* Below md the five labels cannot share the rail with the wordmark. They become a
+   scrollable strip rather than wrapping the header to two rows or disappearing —
+   a hidden nav is the bug this component was written to fix. */
+@media (max-width: 991.98px) {
+    .app-nav__links {
+        justify-content: flex-start;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .app-nav__links::-webkit-scrollbar { display: none; }
+}

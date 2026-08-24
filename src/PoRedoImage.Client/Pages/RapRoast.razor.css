@@ -9,70 +9,7 @@
    a callout is the AI side-tab tell; the refusal now reads as a full amber-framed
    cell, which is also how every other state in this world announces itself. */
 
-.roast-style {
-    border: 1px solid var(--rule-strong);
-    border-radius: 0;
-    background: var(--flap-black);
-    padding: 0.9rem 1rem 1rem;
-}
-
-.roast-style__legend {
-    font-family: var(--font-flap);
-    font-size: 0.68rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    color: var(--steel-dark);
-    padding: 0 0.35rem;
-    width: auto;
-    margin-bottom: 0.5rem;
-}
-
-.roast-style__options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1px;
-}
-
-/* One selectable flap cell, same object as a mode card or a preset button. */
-.roast-style__option {
-    display: flex;
-    position: relative;
-    flex-direction: column;
-    gap: 0.1rem;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid transparent;
-    border-radius: 0;
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    cursor: pointer;
-    transition: border-color var(--motion-fast), color var(--motion-fast);
-}
-
-.roast-style__option:hover { border-color: var(--steel-dark); }
-
-/* The radio itself is small, so the whole cell shows the focus ring. */
-.roast-style__option:focus-within {
-    outline: 2px solid var(--amber);
-    outline-offset: 2px;
-}
-
-.roast-style__option--selected { border-color: var(--amber); background: rgba(255,180,0,0.08); }
-
-.roast-style__name {
-    font-family: var(--font-flap);
-    font-weight: 700;
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--flap-white);
-}
-
-.roast-style__option--selected .roast-style__name { color: var(--amber); }
-
-.roast-style__hint { font-size: 0.76rem; color: var(--steel); line-height: 1.45; }
-
-.roast-disclaimer { margin-top: 0.75rem; font-size: 0.78rem; color: var(--steel-dark); }
+.roast-disclaimer { margin-top: 0.75rem; font-size: var(--text-xs); color: var(--steel-dark); }
 
 .roast-player {
     background: var(--flap-black);
@@ -108,7 +45,7 @@
 
 .roast-lyrics__heading {
     font-family: var(--font-flap);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -122,19 +59,19 @@
     white-space: pre-wrap;
     word-break: break-word;
     font-family: var(--font-ui);
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
     line-height: 1.7;
     color: var(--flap-white);
     max-width: 60ch;
     margin: 0;
 }
 
-.roast-seen { margin-top: 1rem; font-size: 0.85rem; }
+.roast-seen { margin-top: 1rem; font-size: var(--text-md); }
 
 .roast-seen summary {
     cursor: pointer;
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.16em;
     color: var(--steel-dark);
@@ -166,13 +103,13 @@
 .roast-subject__caption {
     margin-top: 0.5rem;
     font-family: var(--font-flap);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.16em;
     color: var(--steel-dark);
 }
 
-.roast-seen__thin { margin-top: 0.5rem; font-size: 0.78rem; color: var(--steel); }
+.roast-seen__thin { margin-top: 0.5rem; font-size: var(--text-xs); color: var(--steel); }
 
 /* Structured scene slots. A definition list is the correct semantic — each label
    genuinely describes its value — and it gives screen readers the pairing for free.
@@ -182,12 +119,12 @@
     grid-template-columns: minmax(90px, auto) 1fr;
     gap: 0.4rem 0.85rem;
     margin: 0.5rem 0 0;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
 }
 
 .scene-slots dt {
     font-family: var(--font-flap);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -207,71 +144,14 @@
     padding: 0.1rem 0.4rem;
     margin: 0 0.25rem 0.25rem 0;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--flap-white);
 }
 
-@media (max-width: 479px) {
+@media (max-width: 479.98px) {
     .scene-slots { grid-template-columns: 1fr; gap: 0.1rem 0; }
     .scene-slots dd { margin-bottom: 0.5rem; }
 }
-
-/* ── Intensity dial ──────────────────────────────────────────────────────────
-   Three stops on one track, not three cards. The lamp beside each label is the
-   board's existing status glyph doing the job a slider handle would: it says which
-   position the dial is in from across the room, and it darkens as the tone cools. */
-
-.roast-dial {
-    border: 1px solid var(--rule-strong);
-    border-radius: 0;
-    background: var(--flap-black);
-    padding: 0.9rem 1rem 1rem;
-}
-
-.roast-dial__track {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1px;
-}
-
-.roast-dial__stop {
-    display: grid;
-    position: relative;
-    grid-template-columns: auto 1fr;
-    grid-template-areas: "lamp name" "lamp hint";
-    align-items: center;
-    column-gap: 0.55rem;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid transparent;
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    cursor: pointer;
-    transition: border-color var(--motion-fast);
-}
-
-.roast-dial__stop:hover { border-color: var(--steel-dark); }
-.roast-dial__stop:focus-within { outline: 2px solid var(--amber); outline-offset: 2px; }
-.roast-dial__stop--selected { border-color: var(--amber); background: rgba(255,180,0,0.08); }
-.roast-dial__stop .roast-style__name { grid-area: name; }
-.roast-dial__stop .roast-style__hint { grid-area: hint; }
-.roast-dial__stop--selected .roast-style__name { color: var(--amber); }
-
-.roast-dial__lamp {
-    grid-area: lamp;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--amber-dim);
-}
-
-.roast-dial__stop--selected .roast-dial__lamp {
-    background: var(--amber);
-    box-shadow: 0 0 8px rgba(255,180,0,0.55);
-}
-
-/* The radio is the control; the cell is its face. Hidden visually, never from AT. */
-.roast-dial__stop input,
-.roast-style__option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 
 /* ── Sync nudge ──────────────────────────────────────────────────────────────
    Sits with the player, not the lyrics, because it corrects the track's alignment
@@ -289,7 +169,7 @@
 
 .roast-sync__label {
     font-family: var(--font-flap);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -303,7 +183,7 @@
 
 .roast-sync__hint {
     grid-column: 1 / -1;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     line-height: 1.5;
     color: var(--steel-dark);
 }
@@ -333,7 +213,7 @@
     border-left: 2px solid transparent;
     padding: 0.22rem 0.6rem;
     font-family: var(--font-ui);
-    font-size: 0.98rem;
+    font-size: var(--text-lg);
     line-height: 1.65;
     color: var(--steel);
     cursor: pointer;
@@ -355,7 +235,7 @@
     margin: 0.9rem 0 0.25rem;
     padding: 0 0.6rem;
     font-family: var(--font-flap);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.18em;
@@ -379,7 +259,7 @@
 .roast-export__label {
     display: block;
     font-family: var(--font-flap);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -409,7 +289,7 @@
 .roast-export__pct {
     display: block;
     margin-top: 0.4rem;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--steel);
 }
 

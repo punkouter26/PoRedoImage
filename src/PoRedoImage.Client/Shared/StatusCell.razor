@@ -1,0 +1,48 @@
+﻿@*
+    The board's status column, as one component.
+
+    The direction contract for this app says "the queue is the interface" and fixes the
+    vocabulary at four values — QUEUED, WORKING, DONE, FAILED — but the vocabulary was
+    only ever a CSS convention. Bulk Generate spelled it out in a four-case switch;
+    Studio wrote its own bare strings with no lamp; the progress
+    bar had no status word at all. Three surfaces, three renderings, and nothing stopping
+    a fourth from inventing a fifth value — which is the exact drift the contract forbids.
+
+    So it is a type now. `BoardStatus` is the only set of states a row may be in, and
+    this component is the only thing that draws them. A caller supplies its own wording
+    (`Ready`, `Working`, `Cutting the track…`) but cannot supply its own state.
+*@
+<span class="status status--@Status.ToString().ToLowerInvariant() @Class" role="@(Status == BoardStatus.Failed ? "alert" : null)">
+    @if (Status == BoardStatus.Working)
+    {
+        @* Only a working row is lit. A lamp on a queued row would make "waiting" and
+           "running" look the same from across the concourse, which is the one thing a
+           departure board must never do. *@
+        <span class="lamp lamp--lit" aria-hidden="true"></span>
+    }
+    else if (ShowLamp)
+    {
+        <span class="lamp" aria-hidden="true"></span>
+    }
+    @(Label ?? DefaultLabel)
+</span>
+
+@code {
+    [Parameter, EditorRequired] public BoardStatus Status { get; set; }
+
+    /// <summary>Wording for this row. Falls back to the status' own name.</summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>Draw an unlit lamp on non-working rows, so the column aligns down the board.</summary>
+    [Parameter] public bool ShowLamp { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    private string DefaultLabel => Status switch
+    {
+        BoardStatus.Working => "Working",
+        BoardStatus.Done => "Done",
+        BoardStatus.Failed => "Failed",
+        _ => "Queued",
+    };
+}

@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using PoRedoImage.Infrastructure.Services;
@@ -26,30 +26,22 @@ public class AzureVisionServiceTests
 
     // ─── Constructor tests ──────────────────────────────────────────
 
-    [Fact]
-    public void Constructor_MissingEndpoint_DoesNotThrow_SetsConfigError()
+    // One behaviour — construction never throws, whatever is missing — reached by three
+    // configurations. Was three facts differing only in which key was omitted; consolidated to keep
+    // the Unit tier inside its 100-method ceiling.
+    [Theory]
+    [InlineData(false, true)]   // no endpoint
+    [InlineData(true, false)]   // no api key
+    [InlineData(true, true)]    // fully configured
+    public void Constructor_DegradesGracefully_RatherThanThrowing(bool hasEndpoint, bool hasApiKey)
     {
-        // Service now degrades gracefully; errors are reported at call time, not construction
-        var config = BuildConfig(endpoint: null);
-        var service = new AzureVisionService(config, _loggerMock.Object);
-        Assert.NotNull(service);
-    }
+        // Errors are reported at call time, not construction, so a half-configured environment
+        // still starts and tells the user which secret is missing when they try to use it.
+        var config = BuildConfig(
+            endpoint: hasEndpoint ? "https://test.cognitiveservices.azure.com/" : null,
+            apiKey: hasApiKey ? "test-key" : null);
 
-    [Fact]
-    public void Constructor_MissingApiKey_DoesNotThrow_SetsConfigError()
-    {
-        // Service now degrades gracefully; errors are reported at call time, not construction
-        var config = BuildConfig(apiKey: null);
-        var service = new AzureVisionService(config, _loggerMock.Object);
-        Assert.NotNull(service);
-    }
-
-    [Fact]
-    public void Constructor_ValidConfig_DoesNotThrow()
-    {
-        var config = BuildConfig();
-        var service = new AzureVisionService(config, _loggerMock.Object);
-        Assert.NotNull(service);
+        Assert.NotNull(new AzureVisionService(config, _loggerMock.Object));
     }
 
     // ─── AnalyzeImageAsync guard-clause tests ───────────────────────

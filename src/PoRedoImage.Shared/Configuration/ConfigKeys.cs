@@ -74,6 +74,13 @@ public static class ConfigKeys
     public const string OllamaEndpoint = "Ollama:Endpoint";
     public const string OllamaVisionModel = "Ollama:VisionModel";
 
+    /// <summary>
+    /// Names a local model for free-form reasoning. Setting it switches <c>IChatCompletionService</c>
+    /// from Azure OpenAI to Ollama for the whole process — see <c>OllamaChatCompletionService</c>
+    /// for why that is a deployment choice rather than a per-request one.
+    /// </summary>
+    public const string OllamaChatModel = "Ollama:ChatModel";
+
     // ── Azure OpenAI ────────────────────────────────────────────────────
     public const string OpenAiChatCompletionsDeployment = "OpenAI:ChatCompletionsDeployment";
     public const string OpenAiEndpoint = "OpenAI:Endpoint";

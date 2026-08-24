@@ -39,23 +39,7 @@
                         </span>
                         @* Four states, four words, one colour law. The lamp only lights while a
                            bay is actually working, so a glance down the board finds live rows. *@
-                        @switch (result.Status)
-                        {
-                            case BulkGenerateStatus.Pending:
-                                <span class="status status--queued bulk-slot__status--queued">Queued</span>
-                                break;
-                            case BulkGenerateStatus.Processing:
-                                <span class="status status--working">
-                                    <span class="lamp lamp--lit" aria-hidden="true"></span>Working
-                                </span>
-                                break;
-                            case BulkGenerateStatus.Complete:
-                                <span class="status status--done">Done</span>
-                                break;
-                            case BulkGenerateStatus.Failed:
-                                <span class="status status--failed">Failed</span>
-                                break;
-                        }
+                        <StatusCell Status="@ToBoardStatus(result.Status)" ShowLamp="true" />
                     </div>
 
                     <div class="bulk-slot__img-area bulk-slot__img-area--@result.Status.ToString().ToLower()">
@@ -142,14 +126,14 @@
         <div class="bulk-reroll-panel mt-3">
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <strong><i class="bi bi-arrow-repeat me-1"></i>Re-roll results for slot #@(_rerollSourceIndex + 1)</strong>
-                <button class="btn btn-sm btn-link" @onclick="@(() => _rerollVariations = [])">Close</button>
+                <button class="flap-btn flap-btn--quiet flap-btn--sm" @onclick="@(() => _rerollVariations = [])">Close</button>
             </div>
             <div class="bulk-reroll-grid">
                 @foreach (var r in _rerollVariations)
                 {
                     <div class="bulk-reroll-cell">
                         <img src="@($"data:{r.ContentType};base64,{r.ImageData}")" alt="Re-roll #@(r.Index + 1)" />
-                        <button class="btn btn-sm btn-primary mt-1 w-100"
+                        <button class="flap-btn flap-btn--primary flap-btn--sm flap-btn--block mt-1"
                                 @onclick="@(() => AcceptReroll(r))">
                             <i class="bi bi-check2 me-1"></i>Use this
                         </button>
@@ -161,6 +145,19 @@
 </div>
 
 @code {
+    /// <summary>
+    /// Maps this slice's own progress enum onto the board vocabulary. The mapping is
+    /// deliberately explicit: a new BulkGenerateStatus must be given a board meaning here
+    /// rather than silently defaulting to a lit or an unlit row.
+    /// </summary>
+    private static BoardStatus ToBoardStatus(BulkGenerateStatus status) => status switch
+    {
+        BulkGenerateStatus.Processing => BoardStatus.Working,
+        BulkGenerateStatus.Complete => BoardStatus.Done,
+        BulkGenerateStatus.Failed => BoardStatus.Failed,
+        _ => BoardStatus.Queued,
+    };
+
     [Parameter] public List<BulkGenerateImageResult> Results { get; set; } = [];
     [Parameter] public int CompletedCount { get; set; }
     [Parameter] public HashSet<int> Favorites { get; set; } = [];

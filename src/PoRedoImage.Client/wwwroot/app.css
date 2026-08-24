@@ -1,8 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   PoRedoImage — SPLIT-FLAP CONCOURSE
+   PoRedoImage — COMPONENTS
    Seed key 11888fdd. The world is a railway departure board: matte flap faces in
    ruled cells, brushed-steel frames, paint-white condensed caps, amber for work in
-   progress, red for failure. Rows are the live entities; columns never move.
+   progress, red for failure.
+
+   Tokens, reset, grid and utilities live in css/foundation.css and load first.
+   This sheet is the board's own furniture and nothing else.
 
    Rules this sheet holds to, so later edits do not drift out of the world:
      · Corners are square. --radius-* exist only because older markup names them.
@@ -11,192 +14,26 @@
      · Status is carried by four values only: STEEL=queued, AMBER=working,
        WHITE=done, RED=failed. Never invent a fifth.
      · One authored motion: the flap cascade. Everything else is a 120ms state change.
+     · Every font-size is a --text-* step. Every breakpoint is one of the four.
+     · No !important. The cascade layers below are what make that possible: a
+       component rule beats a utility because of its LAYER, not its specificity.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-:root {
-    /* ── Board palette (fixed; this world does not re-theme) ─────────────── */
-    --flap-black:    #0D0D0F;   /* flap face — the ground of every panel */
-    --flap-shadow:   #1B1B1E;   /* recessed cell / elevated face */
-    --flap-white:    #F2F2F2;   /* painted letters, and the DONE state */
-    --amber:         #FFB400;   /* WORKING. Also the single accent. */
-    --amber-dim:     #8a6200;   /* amber at rest, for unlit lamps */
-    --cancel-red:    #D32F2F;   /* FAILED — fills and borders only */
-    --cancel-red-tx: #F0736F;   /* FAILED — small text (6.4:1 on flap-black) */
-    --steel:         #B6BBC2;   /* frame highlight, secondary text */
-    /* Label grey. Was #7D838C, which measures 4.498:1 on --flap-shadow — axe failed it for
-       missing the 4.5:1 AA floor by 0.002. Contrast must be checked against flap-SHADOW, the
-       recessed cell colour, not flap-black: the cell is the lighter of the two grounds and so
-       the worse case. This value clears 5.07:1 there and 5.73:1 on flap-black. */
-    --steel-dark:    #868C95;
-
-    --board-ground:  #070708;   /* concourse wall behind the boards */
-    --rule:          rgba(242,242,242,0.10);  /* hairline row rule */
-    --rule-strong:   rgba(242,242,242,0.20);
-    --cell-split:    rgba(0,0,0,0.62);        /* the split across a flap face */
-
-    /* Brushed steel — fine vertical streaks, used for frames and chrome. */
-    --steel-face:
-        repeating-linear-gradient(90deg,
-            rgba(255,255,255,0.055) 0 1px,
-            rgba(0,0,0,0.05) 1px 2px,
-            rgba(255,255,255,0.02) 2px 4px),
-        linear-gradient(180deg, #9DA3AB 0%, #6E747D 42%, #555A62 58%, #7C828A 100%);
-
-    /* Row lamp — amber dot matrix, lit only while a row is WORKING. */
-    --lamp-lit:
-        radial-gradient(circle at 50% 50%, var(--amber) 0 22%, transparent 24%) 0 0 / 5px 5px;
-    --lamp-dark:
-        radial-gradient(circle at 50% 50%, var(--amber-dim) 0 22%, transparent 24%) 0 0 / 5px 5px;
-
-    /* ── Legacy token names, remapped so any rule this sheet misses still
-          lands inside the world instead of reverting to navy/plum. ───────── */
-    --color-primary:          var(--amber);
-    --color-primary-end:      var(--amber);
-    --color-primary-grad:     var(--amber);
-    --color-border:           var(--rule-strong);
-    --color-border-hover:     var(--steel-dark);
-    --color-surface:          var(--flap-black);
-    --color-surface-elevated: var(--flap-shadow);
-    --color-bg:               var(--board-ground);
-    --color-body:             var(--flap-white);
-    --color-muted:            var(--steel);
-    --color-muted-light:      var(--steel-dark);
-    --color-muted-strong:     var(--steel);
-    --color-focus-ring:       rgba(255,180,0,0.45);
-    --color-success:          var(--flap-white);
-    --color-warning:          var(--amber);
-    --color-danger:           var(--cancel-red);
-
-    /* Glass tokens are neutralised: this world has no glass. */
-    --glass-bg:      var(--flap-black);
-    --glass-bg-dark: var(--flap-black);
-    --glass-border:  var(--rule-strong);
-    --glass-shadow:  0 10px 30px rgba(0,0,0,0.55);
-    --glass-blur:    none;
-
-    /* ── Type ───────────────────────────────────────────────────────────── */
-    --font-flap: 'Archivo Narrow', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
-    --font-ui:   'Archivo', 'Helvetica Neue', Arial, sans-serif;
-
-    /* ── Geometry. Flaps are rectangles; nothing here rounds. ───────────── */
-    --radius-sm: 0;
-    --radius-md: 0;
-    --radius-lg: 0;
-    --radius-xl: 0;
-    --radius-full: 0;
-    --frame: 6px;              /* steel frame thickness */
-
-    /* ── Depth: neutral, offset, soft. No colored halos. ────────────────── */
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.55);
-    --shadow-md: 0 3px 10px rgba(0,0,0,0.55);
-    --shadow-lg: 0 10px 30px rgba(0,0,0,0.55);
-    --shadow-xl: 0 24px 64px rgba(0,0,0,0.7);
-    --inset-cell: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.5);
-
-    /* ── Motion. Exponential ease-out; the flap is the only cascade. ────── */
-    --motion-ease-in-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --motion-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);   /* was bounce; flaps do not bounce */
-    --motion-fast: 120ms;
-    --motion-base: 200ms;
-    --motion-slow: 320ms;
-
-    /* ── Spacing ────────────────────────────────────────────────────────── */
-    --spacing-2xs: 0.125rem;
-    --spacing-xs: 0.25rem;
-    --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
-    --spacing-2xl: 3rem;
-
-    color-scheme: dark;
-}
-
-/* The board is the board under any system preference: a departure board does not
-   have a light mode. Tokens above are already final, so there is no scheme block. */
-
-/* ═══ Base ═══════════════════════════════════════════════════════════════ */
-*, *::before, *::after { box-sizing: border-box; }
-
-html { scroll-behavior: smooth; }
-
-@media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-}
-
-body {
-    font-family: var(--font-ui);
-    font-size: 16px;
-    line-height: 1.6;
-    color: var(--flap-white);
-    background-color: var(--board-ground);
-    /* The concourse wall: a faint vertical ruling, like the board's own mullions.
-       Neutral, no hue — this is texture, not a glow. */
-    background-image: repeating-linear-gradient(90deg,
-        rgba(255,255,255,0.014) 0 1px, transparent 1px 96px);
-    margin: 0;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    font-variant-numeric: tabular-nums;
-}
-
-h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-flap);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 700;
-    color: var(--flap-white);
-    line-height: 1.1;
-    text-wrap: balance;
-    margin: 0 0 0.5rem;
-}
-
-h1 { font-size: clamp(1.5rem, 6vw, 2.4rem); }
-h2 { font-size: clamp(1.2rem, 4vw, 1.6rem); }
-h3 { font-size: 1.05rem; }
-
-p { max-width: 68ch; }
-
-h1:focus { outline: none; }
-
-a { color: var(--amber); text-decoration-thickness: 1px; text-underline-offset: 2px; }
-a:hover { color: var(--flap-white); }
-
-/* One focus treatment, everywhere. Amber, square, always visible. */
-:focus-visible {
-    outline: 2px solid var(--amber);
-    outline-offset: 2px;
-}
-
-.content { padding-top: 1rem; }
-
-::selection { background: var(--amber); color: var(--flap-black); }
-
+@layer components {
 /* ═══ Materials ══════════════════════════════════════════════════════════
    Three reusable surfaces. Everything else is composed from these.        */
-
 /* A steel-framed board panel. */
 .board,
 .upload-panel,
-.bento-card,
 .card,
-.prompt-accordion,
-.diag-group,
 .diag-stat,
 .shimmer-wrapper,
 .style-director-trace,
 .meme-template-card,
-.caption-battle-card,
 .style-director-intro,
 .style-director-summary,
 .style-director-final,
 .send-to,
-.recents-bar,
 .gallery-bar {
     position: relative;
     background: var(--flap-black);
@@ -206,37 +43,25 @@ a:hover { color: var(--flap-white); }
 }
 
 /* The steel top rail that names a board. */
-.board__rail,
-.card-header,
-.diag-group__header,
-.prompt-accordion__toggle,
-.bento-card__header {
+.card-header {
     background: var(--steel-face);
     color: #14161a;
     font-family: var(--font-flap);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     padding: 0.55rem 0.9rem;
     border: none;
     border-bottom: 1px solid rgba(0,0,0,0.6);
-    border-radius: 0 !important;
+    border-radius: 0;
     text-shadow: 0 1px 0 rgba(255,255,255,0.35);
-}
-
-/* A recessed flap face — used wherever a value sits in a cell. */
-.flap-face {
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    border: 1px solid rgba(0,0,0,0.55);
 }
 
 /* ═══ Flap character cells ═══════════════════════════════════════════════
    FlapText renders one .flap per character. The cascade below is this
    build's single authored motion moment: characters settle in sequence,
    from an already-visible default, with an exponential ease-out.          */
-
 /* Cells wrap. They must: flap cells are fixed-width, so a long destination like
    "IMAGE REGENERATION" is ~330px of cells and ran off the right edge of a 390px
    phone viewport. A real board wraps or splits a long name too — what it never
@@ -289,25 +114,26 @@ a:hover { color: var(--flap-white); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    /* The cascade collapses to a single update, per the world's own rule. */
-    .flap { animation: none; }
+/* The cascade collapses to a single update, per the world's own rule. */
+.flap { animation: none; }
+
 }
 
 /* Display-scale flaps, for the brand and page titles. */
 .flapstrip--display .flap { font-size: clamp(1.1rem, 5.2vw, 2rem); min-width: 0.76em; }
-.flapstrip--sm .flap { font-size: 0.72rem; padding: 0.2em 0.14em; }
+
+.flapstrip--sm .flap { font-size: var(--text-xs); padding: 0.2em 0.14em; }
 
 /* ═══ Status vocabulary ══════════════════════════════════════════════════
    Four values, one visual law. Status never relies on colour alone: each
    carries its own word, so the row reads correctly in monochrome too.     */
-
 .status {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
     font-family: var(--font-flap);
     font-weight: 700;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     padding: 0.2rem 0.5rem;
@@ -315,10 +141,13 @@ a:hover { color: var(--flap-white); }
     white-space: nowrap;
 }
 
-.status--queued  { color: var(--steel-dark); }
+.status--queued { color: var(--steel-dark); }
+
 .status--working { color: var(--amber); }
-.status--done    { color: var(--flap-white); }
-.status--failed  { color: var(--cancel-red-tx); border-color: var(--cancel-red); }
+
+.status--done { color: var(--flap-white); }
+
+.status--failed { color: var(--cancel-red-tx); border-color: var(--cancel-red); }
 
 /* The lamp beside a working row. Inline-block so it also works inside a
    paragraph, not only inside a flex row. */
@@ -338,55 +167,6 @@ a:hover { color: var(--flap-white); }
 
 @keyframes lampPulse { 0%, 60% { opacity: 1; } 61%, 100% { opacity: 0.42; } }
 
-/* ═══ Board rows ═════════════════════════════════════════════════════════
-   The composition of this entire product. A row is a grid whose columns
-   are fixed; only the flaps inside them change.                          */
-
-/* NAMING: these are `board-row`, never `row`. Bootstrap owns `.row` as its grid
-   container and nine pages in this app use it (`<div class="row g-4">`); defining
-   `.row` here turned every one of those into a 3-column grid and collapsed their
-   columns to ~10px on narrow viewports. Do not reintroduce a bare `.row` rule. */
-.board-rows { display: flex; flex-direction: column; }
-
-.board-row {
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 0.85rem;
-    padding: 0.7rem 0.9rem;
-    border-bottom: 1px solid var(--rule);
-    text-decoration: none;
-    color: var(--flap-white);
-    background: transparent;
-    transition: background var(--motion-fast);
-}
-
-.board-row:last-child { border-bottom: none; }
-.board-row:hover { background: rgba(255,255,255,0.035); color: var(--flap-white); }
-
-.board-row--working { background: rgba(255,180,0,0.05); }
-.board-row--failed .board-row__name { color: var(--cancel-red-tx); }
-
-.board-row__name {
-    font-family: var(--font-flap);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.98rem;
-}
-
-.board-row__meta {
-    display: block;
-    font-family: var(--font-ui);
-    text-transform: none;
-    letter-spacing: 0;
-    font-size: 0.82rem;
-    line-height: 1.45;
-    color: var(--steel);
-    margin-top: 0.15rem;
-    max-width: 58ch;
-}
-
 /* Column labels above a set of rows — the board's header strip. The template matches
    .studio-feature-card exactly (34px glyph bay, name, status) so SERVICE sits over the
    name and STATUS over the status, rather than approximately near them. */
@@ -397,7 +177,7 @@ a:hover { color: var(--flap-white); }
     padding: 0.4rem 0.9rem;
     border-bottom: 1px solid var(--rule-strong);
     font-family: var(--font-flap);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     letter-spacing: 0.18em;
     text-transform: uppercase;
@@ -412,7 +192,6 @@ a:hover { color: var(--flap-white); }
    It is amber because running on mocks is a provisional state — the same meaning
    amber carries everywhere else in this world. The detail list is clamped to one
    line so six mock service names cannot eat a third of a phone viewport. */
-
 .mock-data-banner {
     display: flex;
     align-items: baseline;
@@ -421,7 +200,7 @@ a:hover { color: var(--flap-white); }
     background: var(--amber);
     color: var(--flap-black);
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -442,16 +221,22 @@ a:hover { color: var(--flap-white); }
 
 /* On a phone the banner states the condition; the service list is detail the
    header has no room for. */
-@media (max-width: 639px) {
-    .mock-data-banner__details { display: none; }
+@media (max-width: 639.98px) {
+.mock-data-banner__details { display: none; }
+
 }
 
-
+/* The rail is BRUSHED STEEL — a light surface. --steel (#B6BBC2) is a board grey meant
+   for the dark flap faces; on the rail's own gradient it measures 1.3:1 at the light end
+   and 2.4:1 at the middle, so "SIGN OUT" and the feature links were washed out at every
+   width. The rail's ink is --steel-ink, which is what MainLayout.razor.css already used
+   for the same elements — but that sheet is scoped to MainLayout and cannot reach anchors
+   NavMenu and LoginDisplay render, so this global rule won and undid it. */
 .app-nav__link {
-    color: var(--steel) !important;
-    text-decoration: none !important;
+    color: var(--steel-ink);
+    text-decoration: none;
     font-family: var(--font-flap);
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -459,63 +244,99 @@ a:hover { color: var(--flap-white); }
     border-radius: 0;
     border-bottom: 2px solid transparent;
     transition: color var(--motion-fast), border-color var(--motion-fast);
-    background: transparent !important;
+    background: transparent;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
     line-height: 1;
     white-space: nowrap;
-    box-shadow: none !important;
+    box-shadow: none;
 }
 
 .app-nav__link:hover {
-    background: transparent !important;
-    color: var(--flap-white) !important;
-    border-bottom-color: var(--steel-dark);
+    background: transparent;
+    color: var(--flap-black);
+    border-bottom-color: rgba(0,0,0,0.45);
 }
 
+/* Active gets the amber it always had, but on the dark cell rather than bare steel:
+   amber on light steel is 1.9:1 and the current page is the one label that must be
+   unmistakable. The cell is the board's own way of lighting a value. */
 .app-nav__link.active {
-    background: transparent !important;
-    color: var(--amber) !important;
+    background: var(--flap-black);
+    color: var(--amber);
     border-bottom-color: var(--amber);
-    box-shadow: none !important;
+    box-shadow: none;
 }
+
+/* Rail controls sit on a 54-60px bar, so they cannot be 44px tall without filling it.
+   The tap target is extended past the painted box instead — the pointer/touch area is
+   what the guideline is about, not the ink. */
+.app-nav__link::after {
+    content: "";
+    position: absolute;
+    inset: 50% 0 auto 0;
+    height: 44px;
+    transform: translateY(-50%);
+}
+
+.app-nav__link { position: relative; }
+
+/* ── Skip link ───────────────────────────────────────────────────────────────
+   Hidden until focused, then a real flap cell at the head of the rail. Every page
+   put six or more rail stops in front of its own first control without it. */
+.skip-link {
+    position: absolute;
+    left: 0.5rem;
+    top: -100%;
+    z-index: 2000;
+    background: var(--flap-black);
+    color: var(--amber);
+    font-family: var(--font-flap);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--amber);
+    transition: top var(--motion-fast);
+}
+
+.skip-link:focus-visible {
+    top: 0.5rem;
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+}
+
+/* The skip target must not paint a focus ring when it receives focus programmatically —
+   it is a landmark, not a control. */
+#main-content:focus { outline: none; }
 
 .app-nav__brand {
-    color: var(--flap-white) !important;
-    text-decoration: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
+    color: var(--flap-white);
+    text-decoration: none;
+    background: transparent;
+    box-shadow: none;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.app-nav__brand:hover { color: var(--flap-white) !important; }
+.app-nav__brand:hover { color: var(--flap-white); }
+
 .app-nav__brand:hover .flap { color: var(--amber); }
 
-.app-nav__brand-text {
-    font-family: var(--font-flap);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    font-size: 0.95rem;
-}
-
 .app-nav__user {
-    color: var(--steel) !important;
-    font-size: 0.78rem;
+    /* Same steel-surface rule as .app-nav__link above: board greys are illegal on the rail. */
+    color: var(--steel-ink);
+    font-size: var(--text-xs);
     font-family: var(--font-flap);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     max-width: 200px;
 }
 
-/* ═══ Page head ══════════════════════════════════════════════════════════ */
-
-.hero-section { padding: 1.75rem 0 0.75rem; }
-
-.hero-icon,
 .feature-page-icon,
 .drop-zone__icon {
     display: inline-flex;
@@ -528,10 +349,9 @@ a:hover { color: var(--flap-white); }
     background: var(--flap-shadow);
     box-shadow: var(--inset-cell);
     color: var(--amber);
-    font-size: 1.1rem;
+    font-size: var(--text-xl);
 }
 
-.hero-title,
 .feature-page-title,
 .diag-title {
     min-width: 0;
@@ -548,9 +368,8 @@ a:hover { color: var(--flap-white); }
     line-height: 1.1;
 }
 
-.hero-subtitle,
 .feature-page-desc {
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
     color: var(--steel);
     max-width: 62ch;
     margin: 0.35rem 0 0;
@@ -566,6 +385,7 @@ a:hover { color: var(--flap-white); }
 /* The title block is a flex item next to the glyph bay; without min-width:0 it
    refuses to shrink and pushes the flap cells past the right edge on a phone. */
 .feature-page-header > .d-flex { min-width: 0; }
+
 .feature-page-header > .d-flex > div { min-width: 0; }
 
 /* "How it works" — a route strip, read like stops on a line. */
@@ -583,7 +403,7 @@ a:hover { color: var(--flap-white); }
     border: none;
     border-radius: 0;
     padding: 0.24rem 0.6rem;
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -591,33 +411,11 @@ a:hover { color: var(--flap-white); }
     white-space: nowrap;
 }
 
-.feature-how-it-works__arrow { color: var(--steel-dark); font-size: 0.7rem; }
-
-.btn-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    background: none;
-    border: 1px solid var(--rule-strong);
-    border-radius: 0;
-    color: var(--steel);
-    font-family: var(--font-flap);
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    padding: 0.4rem 0.75rem;
-    cursor: pointer;
-    transition: border-color var(--motion-fast), color var(--motion-fast);
-    align-self: flex-start;
-}
-
-.btn-back:hover { border-color: var(--amber); color: var(--amber); }
+.feature-how-it-works__arrow { color: var(--steel-dark); font-size: var(--text-2xs); }
 
 /* ═══ Intake ═════════════════════════════════════════════════════════════
    The upload zone is the board's source row: a recessed flap bay waiting
    for a photo to be loaded into it.                                       */
-
 .upload-panel { padding: 0; }
 
 .drop-zone {
@@ -635,8 +433,7 @@ a:hover { color: var(--flap-white); }
     justify-content: center;
 }
 
-.drop-zone--active,
-.upload-drop-zone.drag-over {
+.drop-zone--active {
     border-color: var(--amber);
     border-style: solid;
     background: rgba(255,180,0,0.06);
@@ -660,7 +457,7 @@ a:hover { color: var(--flap-white); }
 
 .drop-zone__title {
     font-family: var(--font-flap);
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -668,7 +465,7 @@ a:hover { color: var(--flap-white); }
     margin: 0 0 0.35rem;
 }
 
-.drop-zone__sub { font-size: 0.85rem; color: var(--steel); margin: 0 0 0.4rem; }
+.drop-zone__sub { font-size: var(--text-md); color: var(--steel); margin: 0 0 0.4rem; }
 
 .drop-zone__browse {
     color: var(--amber);
@@ -680,7 +477,7 @@ a:hover { color: var(--flap-white); }
 .drop-zone__formats,
 .drop-zone__paste {
     font-family: var(--font-flap);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     color: var(--steel-dark);
@@ -689,7 +486,7 @@ a:hover { color: var(--flap-white); }
 
 .drop-zone__paste kbd {
     font-family: var(--font-flap);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     padding: 0.1rem 0.35rem;
     border-radius: 0;
     background: var(--flap-black);
@@ -732,7 +529,7 @@ a:hover { color: var(--flap-white); }
 .drop-zone__preview-hint {
     font-family: var(--font-flap);
     color: var(--flap-white);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -744,15 +541,22 @@ a:hover { color: var(--flap-white); }
 }
 
 .drop-zone__title--desktop { display: block; }
-.drop-zone__title--mobile  { display: none; }
-.drop-zone__sub--desktop   { display: block; }
+
+.drop-zone__title--mobile { display: none; }
+
+.drop-zone__sub--desktop { display: block; }
 
 @media (pointer: coarse) {
-    .drop-zone__title--desktop { display: none; }
-    .drop-zone__title--mobile  { display: block; }
-    .drop-zone__sub--desktop   { display: none; }
-    .drop-zone { min-height: 168px; }
-    .drop-zone__empty { padding: 1.75rem 1rem; }
+.drop-zone__title--desktop { display: none; }
+
+.drop-zone__title--mobile { display: block; }
+
+.drop-zone__sub--desktop { display: none; }
+
+.drop-zone { min-height: 168px; }
+
+.drop-zone__empty { padding: 1.75rem 1rem; }
+
 }
 
 /* Window-wide drop target. */
@@ -775,16 +579,25 @@ body.po-drop-active::after {
     pointer-events: none;
 }
 
-/* ═══ Selectable options: modes, presets, templates ══════════════════════
-   All of them are the same object — a flap cell you can pick. One rule set,
-   so a mode card and a preset button cannot drift apart.                   */
+/* ═══ Choice cells ═══════════════════════════════════════════════════════
+   ONE selectable cell. `.flap-choice` is a flap you pick; picking it turns it amber.
 
-.mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); }
+   A detail level, a beat style, a roast intensity, a meme template and a style
+   direction are the same object wearing five names, and before this they were five
+   independent rule sets that had already drifted: the AI-detail presets centred
+   their label, the beat styles left-aligned theirs, and the intensity dial invented
+   its own lamp column. They now differ only by layout modifier.
 
-.mode-card,
-.preset-btn,
-.meme-template-tile,
-.bulk-mode-btn,
+   Modifiers:
+     --stack  label over meta, centred. Presets, beat styles.
+     --lamp   status lamp in a left bay, label and meta stacked beside it.
+     --tile   label over category, left-aligned. Template pickers.
+     --active picked. Always paired with aria-checked / :checked on the real input.
+
+   Parts: __name (the tracked cap), __meta (the sub-label), __badge (corner flag),
+          __lamp (the dot).                                                        */
+
+.flap-choice,
 .direction-cell {
     position: relative;
     display: flex;
@@ -802,187 +615,178 @@ body.po-drop-active::after {
     user-select: none;
 }
 
-.mode-card { align-items: flex-start; }
-.preset-btn { flex-direction: column; align-items: center; gap: 0.2rem; }
-.meme-template-tile, .bulk-mode-btn { flex-direction: column; gap: 0.15rem; }
-.bulk-mode-btn { flex: 1; align-items: center; text-align: center; }
+.flap-choice--stack { flex-direction: column; align-items: center; gap: 0.2rem; text-align: center; }
+.flap-choice--tile  { flex-direction: column; gap: 0.15rem; }
 
-.mode-card:hover,
-.preset-btn:hover,
-.meme-template-tile:hover,
-.bulk-mode-btn:hover,
+.flap-choice--lamp {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "lamp name" "lamp meta";
+    align-items: center;
+    column-gap: 0.55rem;
+}
+
+.flap-choice:hover,
 .direction-cell:hover {
     color: var(--flap-white);
     border-color: var(--steel-dark);
     background: #22232a;
 }
 
+/* The real radio/checkbox is visually replaced by the cell, so the cell has to
+   carry the focus ring — remove this and the control becomes keyboard-invisible. */
+.flap-choice:focus-within { outline: 2px solid var(--amber); outline-offset: 2px; }
+
 /* Selected = the flap has turned. Amber border, amber label, lit ground. */
-.mode-card--active,
-.preset-btn--active,
-.meme-template-tile--selected,
-.bulk-mode-btn--active,
-.studio-feature-card.card-active {
+.flap-choice--active,
+.studio-feature-card.flap-choice--active {
     border-color: var(--amber);
     background: rgba(255,180,0,0.08);
     color: var(--flap-white);
     box-shadow: var(--inset-cell);
 }
 
-.mode-card__icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; color: var(--amber); }
-
-.mode-card__title,
-.preset-btn__name,
-.meme-template-tile__name {
+.flap-choice__name {
+    grid-area: name;
     font-family: var(--font-flap);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: var(--track-caps);
     color: var(--flap-white);
 }
 
-.mode-card--active .mode-card__title,
-.preset-btn--active .preset-btn__name,
-.meme-template-tile--selected .meme-template-tile__name { color: var(--amber); }
+.flap-choice--active .flap-choice__name { color: var(--amber); }
 
-.mode-card__desc { font-size: 0.78rem; color: var(--steel); line-height: 1.45; }
-
-.preset-btn__words,
-.meme-template-tile__cat {
+.flap-choice__meta {
+    grid-area: meta;
     font-family: var(--font-flap);
-    font-size: 0.64rem;
+    font-size: var(--text-3xs);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     color: var(--steel-dark);
 }
 
-.preset-btn__badge {
+/* The beat/intensity hints are sentences, not caps — they read as prose in the cell. */
+.flap-choice--lamp .flap-choice__meta,
+.flap-choice--stack .flap-choice__meta {
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+    text-transform: none;
+    letter-spacing: 0;
+    line-height: var(--lh-snug);
+    color: var(--steel);
+}
+
+.flap-choice__lamp {
+    grid-area: lamp;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--amber-dim);
+}
+
+.flap-choice--active .flap-choice__lamp { background: var(--amber); box-shadow: 0 0 8px rgba(255,180,0,0.55); }
+
+.flap-choice__badge {
     position: absolute;
     top: -1px;
     right: -1px;
     background: var(--amber);
     color: var(--flap-black);
     font-family: var(--font-flap);
-    font-size: 0.6rem;
+    font-size: var(--text-3xs);
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: var(--track-caps);
     padding: 1px 5px;
     border-radius: 0;
     white-space: nowrap;
     text-transform: uppercase;
 }
 
-.preset-group__label,
+/* The input is the control; the cell is its face. Hidden visually, never from AT. */
+.flap-choice input[type="radio"],
+.flap-choice input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+}
+
+/* ── Fieldsets that hold a row of choices ── */
+.flap-fieldset {
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    background: var(--flap-black);
+    padding: 0.9rem 1rem 1rem;
+    margin: 0;
+}
+
+.flap-fieldset__legend {
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--track-wide);
+    color: var(--steel-dark);
+    padding: 0 0.35rem;
+    width: auto;
+    margin-bottom: 0.5rem;
+}
+
+/* One track for every set of choices. auto-fit means a two-stop dial and a
+   five-stop one both fill the row without either being told a column count. */
+.flap-choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+}
+
+.flap-choices--tight { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+
 .preset-section__label,
 .send-to__label,
 .prompt-history__label,
 .gallery-bar__label,
-.recents-bar__label,
 .diag-stat__label,
 .split-compare__label,
 .compare__tag {
     display: block;
     font-family: var(--font-flap);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     color: var(--steel-dark);
     text-transform: uppercase;
-    letter-spacing: 0.18em;
+    letter-spacing: var(--track-wide);
     margin-bottom: 0.5rem;
 }
 
 .preset-section { border-top: 1px solid var(--rule); padding-top: 1rem; }
-.preset-group__buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
-
-.bulk-mode-toggle { display: flex; gap: 1px; }
-
-.bulk-mode-badge {
-    font-family: var(--font-flap);
-    font-size: 0.6rem;
-    background: var(--amber);
-    color: var(--flap-black);
-    border-radius: 0;
-    padding: 0.05rem 0.35rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}
-
-.bulk-mode-hint { font-size: 0.78rem; color: var(--steel); margin: 0.4rem 0 0; line-height: 1.45; }
 
 /* ═══ Buttons ════════════════════════════════════════════════════════════
-   Two shapes only. Primary is a lit amber flap; secondary is an outlined
-   cell. Every label is a tracked cap that names its action.               */
+   ONE button. `.flap-btn` is a lit flap you can press; the modifiers change how
+   loudly it says so, never what it is.
 
-.btn-process,
-.btn-generate-all,
-.btn-result-primary,
-.btn-dl-modal,
-.btn-download-favs,
-.studio-surprise,
-.mobile-sticky-cta__btn--primary,
-.prompt-drawer__btn--primary,
-.gallery-undo__btn,
-.btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
-    border: 1px solid var(--amber);
-    border-radius: 0;
-    background: var(--amber);
-    color: var(--flap-black);
-    font-family: var(--font-flap);
-    font-size: 0.85rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    cursor: pointer;
-    box-shadow: var(--shadow-sm);
-    transition: background var(--motion-fast), color var(--motion-fast);
-}
+   This replaces ~20 differently-named classes (btn-process, btn-generate-all,
+   btn-result-primary, btn-result-secondary, btn-download-favs, btn-dl-modal,
+   btn-heart-modal, studio-surprise, send-to__btn, compare-modes__btn,
+   prompt-drawer__btn, gallery-undo__btn, …) that were held in sync only by two
+   very long selector lists. A selector list is not consolidation: every new
+   button still had to be added to it by hand in three places (base, :hover,
+   :disabled), and any that was missed silently fell back to the browser default.
 
-.btn-process:hover:not(:disabled),
-.btn-generate-all:hover:not(:disabled),
-.btn-result-primary:hover:not(:disabled),
-.btn-dl-modal:hover:not(:disabled),
-.btn-download-favs:hover:not(:disabled),
-.studio-surprise:hover:not(:disabled),
-.prompt-drawer__btn--primary:hover:not(:disabled),
-.gallery-undo__btn:hover:not(:disabled),
-.btn-primary:hover:not(:disabled) {
-    background: var(--flap-white);
-    border-color: var(--flap-white);
-    color: var(--flap-black);
-}
+   Modifiers:
+     --primary  amber fill; the one action a screen is for. At most one per view.
+     (default)  outlined cell; everything else.
+     --danger   destructive, red outline.
+     --quiet    borderless; inline text actions inside a cell.
+     --sm       compact — toolbars, result rows, chips.
+     --icon     square, glyph only. Always needs an aria-label.
+     --block    full width — the bottom of a form or a mobile rail.
+     --active   pressed/selected state for toggle buttons; reads as --primary.  */
 
-.btn-process:disabled,
-.btn-generate-all:disabled,
-.btn-download-favs:disabled,
-.studio-surprise:disabled,
-.gallery-undo__btn:disabled,
-.btn-primary:disabled {
-    background: transparent;
-    border-color: var(--rule-strong);
-    color: var(--steel-dark);
-    cursor: not-allowed;
-    box-shadow: none;
-    opacity: 1;
-}
-
-.btn-process { width: 100%; }
-
-.btn-outline-primary,
-.btn-result-secondary,
-.btn-result-crosslink,
-.send-to__btn,
-.compare-modes__btn,
-.prompt-drawer__btn,
-.mobile-sticky-cta__btn--secondary,
-.btn-heart-modal,
-.active-image-bar__btn {
+.flap-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -993,44 +797,100 @@ body.po-drop-active::after {
     background: transparent;
     color: var(--steel);
     font-family: var(--font-flap);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     font-weight: 600;
+    line-height: var(--lh-tight);
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    cursor: pointer;
     text-decoration: none;
-    transition: border-color var(--motion-fast), color var(--motion-fast);
+    cursor: pointer;
+    transition: border-color var(--motion-fast), color var(--motion-fast),
+                background var(--motion-fast);
 }
 
-.btn-outline-primary:hover,
-.btn-result-secondary:hover,
-.btn-result-crosslink:hover,
-.send-to__btn:hover,
-.compare-modes__btn:hover,
-.prompt-drawer__btn:hover:not(:disabled),
-.btn-heart-modal:hover,
-.active-image-bar__btn:hover {
+.flap-btn:hover:not(:disabled) {
     border-color: var(--amber);
     color: var(--amber);
     background: transparent;
 }
 
-.compare-modes__btn--active,
-.btn-heart-modal--active {
+.flap-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; box-shadow: none; }
+
+/* Disabled is a cancelled row: it keeps its cell and loses its lamp. Never a
+   fade — opacity on an already-dim label drops it under the contrast floor. */
+.flap-btn:disabled,
+.flap-btn[aria-disabled="true"] {
+    background: transparent;
+    border-color: var(--rule-strong);
+    color: var(--steel-dark);
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 1;
+}
+
+.flap-btn--primary {
+    padding: 0.75rem 1.25rem;
+    border-color: var(--amber);
+    background: var(--amber);
+    color: var(--flap-black);
+    font-size: var(--text-md);
+    font-weight: 700;
+    box-shadow: var(--shadow-sm);
+}
+
+.flap-btn--primary:hover:not(:disabled) {
+    background: var(--flap-white);
+    border-color: var(--flap-white);
+    color: var(--flap-black);
+}
+
+.flap-btn--danger { border-color: var(--cancel-red); color: var(--cancel-red-tx); }
+.flap-btn--danger:hover:not(:disabled) { border-color: var(--cancel-red); background: var(--cancel-red); color: var(--flap-white); }
+
+.flap-btn--quiet { border-color: transparent; padding-inline: 0.4rem; }
+.flap-btn--quiet:hover:not(:disabled) { border-color: transparent; }
+
+.flap-btn--sm { padding: 0.35rem 0.7rem; font-size: var(--text-3xs); letter-spacing: 0.12em; }
+.flap-btn--primary.flap-btn--sm { padding: 0.45rem 0.85rem; font-size: var(--text-2xs); }
+
+.flap-btn--icon { padding: 0.4rem; aspect-ratio: 1; gap: 0; }
+.flap-btn--icon.flap-btn--sm { padding: 0.28rem; }
+
+.flap-btn--block { width: 100%; }
+
+/* A pressed toggle reads exactly like the primary action, because that is what it
+   has become: the flap has turned and this is the state now in force. */
+.flap-btn--active {
     border-color: var(--amber);
     background: var(--amber);
     color: var(--flap-black);
     font-weight: 700;
 }
 
-.prompt-drawer__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.flap-btn--active:hover:not(:disabled) { background: var(--flap-white); border-color: var(--flap-white); color: var(--flap-black); }
 
-.btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; box-shadow: none; }
+/* Touch targets. WCAG 2.5.8 asks for 24px; a coarse pointer wants 44. The board's
+   compact buttons are 26–30px tall by design, so they grow only where the pointer
+   is actually coarse rather than being padded out for everyone. */
+@media (pointer: coarse) {
+    .flap-btn { min-height: 44px; }
+    .flap-btn--sm { min-height: 38px; }
+    .flap-btn--icon { min-width: 44px; }
+}
 
 /* ═══ Progress: the row working its way across the board ═════════════════ */
-
 .shimmer-wrapper { padding: 1.1rem; }
+
+/* Status word beside the stage text, on one line at every width the header survives. */
+.shimmer-head-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
 .shimmer-header { display: flex; align-items: center; gap: 0.9rem; }
+
 .shimmer-spinner { flex-shrink: 0; color: var(--amber); display: inline-flex; align-items: center; }
 
 /* A run of amber lamps stepping left to right — the board saying "this one is live". */
@@ -1048,12 +908,11 @@ body.po-drop-active::after {
     100% { background-position: 30px 0; opacity: 1; }
 }
 
-.spinner-svg { animation: spinRotate 1.2s linear infinite; }
 @keyframes spinRotate { to { transform: rotate(360deg); } }
 
 .shimmer-status-label {
     font-family: var(--font-flap);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -1072,8 +931,7 @@ body.po-drop-active::after {
         transparent 0 7px, var(--cell-split) 7px 8px);
 }
 
-.shimmer-progress__bar,
-.shimmer-progress__fill {
+.shimmer-progress__bar {
     height: 100%;
     width: 100%;
     background: var(--amber);
@@ -1085,9 +943,33 @@ body.po-drop-active::after {
     will-change: transform;
 }
 
+/* Indeterminate: a lit run of flaps sweeping the track, because the length of the job
+   is genuinely unknown. The alternative — parking a determinate bar at an invented 85%
+   until the model answers — reads as a stall, which is precisely the bug this replaced. */
+.shimmer-progress--indeterminate .shimmer-progress__bar {
+    transform: none;
+    width: 34%;
+    animation: shimmer-sweep 1.4s var(--motion-ease-in-out) infinite;
+    transition: none;
+}
+
+@keyframes shimmer-sweep {
+    0%   { margin-left: -34%; }
+    100% { margin-left: 100%; }
+}
+
+/* Honour reduced motion: hold a static lit segment rather than sweeping. */
+@media (prefers-reduced-motion: reduce) {
+    .shimmer-progress--indeterminate .shimmer-progress__bar {
+        animation: none;
+        width: 100%;
+        opacity: 0.45;
+    }
+}
+
 .shimmer-pct {
     font-family: var(--font-flap);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
     font-weight: 700;
     color: var(--amber);
     flex-shrink: 0;
@@ -1096,64 +978,9 @@ body.po-drop-active::after {
     font-variant-numeric: tabular-nums;
 }
 
-.shimmer-stages { display: flex; flex-wrap: wrap; gap: 1px; }
-
-.shimmer-stage {
-    font-family: var(--font-flap);
-    font-size: 0.64rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--steel-dark);
-    padding: 0.25rem 0.55rem;
-    border-radius: 0;
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    display: inline-flex;
-    align-items: center;
-    transition: color var(--motion-fast), background var(--motion-fast);
-}
-
-.shimmer-stage--active { background: var(--amber); color: var(--flap-black); font-weight: 700; }
-.shimmer-stage--done { color: var(--flap-white); }
-
-.shimmer-elapsed {
-    font-family: var(--font-flap);
-    font-size: 0.7rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--steel-dark);
-    margin-top: 0.75rem;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.shimmer-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 1.25rem; }
-
-.shimmer-card {
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    border: none;
-    border-radius: 0;
-    padding: 1rem;
-}
-
-.shimmer-card--tall { min-height: 240px; }
-
-.shimmer-bar { height: 10px; background: rgba(255,255,255,0.06); border-radius: 0; }
-.shimmer-bar--w30 { width: 30%; }
-.shimmer-bar--w40 { width: 40%; }
-.shimmer-bar--w50 { width: 50%; }
-.shimmer-bar--w60 { width: 60%; }
-.shimmer-bar--w80 { width: 80%; }
-
-.shimmer-img { width: 100%; height: 160px; background: rgba(255,255,255,0.05); border-radius: 0; margin-top: 0.75rem; }
-
 /* A row waiting to turn: the unlit flap sweep, not a soft-shadow shimmer. */
 .shimmer-anim,
-.diag-skeleton__card,
-.gallery-thumb--skeleton,
-.gallery-skeleton__thumb {
+.gallery-thumb--skeleton {
     background-color: var(--flap-shadow);
     background-image: linear-gradient(90deg,
         transparent 0%, rgba(255,180,0,0.16) 45%, rgba(255,180,0,0.16) 55%, transparent 100%);
@@ -1169,8 +996,6 @@ body.po-drop-active::after {
     100% { background-position: -120% 0; }
 }
 
-.diag-skeleton__card { height: 120px; }
-
 /* Sticky working pill — a lit board row that follows you down the page. */
 .processing-pill {
     position: fixed;
@@ -1183,7 +1008,7 @@ body.po-drop-active::after {
     border-radius: 0;
     padding: 0.5rem 0.75rem;
     font-family: var(--font-flap);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -1202,27 +1027,12 @@ body.po-drop-active::after {
     color: var(--steel);
     cursor: pointer;
     padding: 0 0.1rem;
-    font-size: 0.9rem;
+    font-size: var(--text-md);
     line-height: 1;
     transition: color var(--motion-fast);
 }
 
 .processing-pill__cancel:hover { color: var(--flap-white); }
-
-/* ═══ Results ════════════════════════════════════════════════════════════ */
-
-.result-image {
-    transition: opacity var(--motion-slow) var(--motion-ease-in-out);
-    opacity: 0.35;
-    max-width: 100%;
-    max-height: 460px;
-    width: auto;
-    height: auto;
-    border-radius: 0;
-    display: block;
-    margin: 0 auto;
-    background: var(--flap-shadow);
-}
 
 .result-image.loaded { opacity: 1; }
 
@@ -1236,10 +1046,9 @@ body.po-drop-active::after {
 
 /* .results-more__toggle is gone with the "More options" disclosure it opened; the panel's
    secondary actions are always visible now. */
-
 .description-text {
     line-height: 1.65;
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
     text-align: left;
     max-width: 68ch;
     max-height: 300px;
@@ -1250,9 +1059,10 @@ body.po-drop-active::after {
 }
 
 /* ── Compare: two boards side by side ─────────────────────────────────── */
-
 .split-compare-wrapper { border: 1px solid var(--rule-strong); border-radius: 0; overflow: hidden; box-shadow: var(--shadow-md); }
+
 .split-compare { display: grid; grid-template-columns: 1fr auto 1fr; background: var(--flap-black); }
+
 .split-compare__side { position: relative; overflow: hidden; max-height: 420px; }
 
 .split-compare__img {
@@ -1273,17 +1083,20 @@ body.po-drop-active::after {
     background: var(--flap-shadow);
     box-shadow: var(--inset-cell);
     color: var(--flap-white);
-    font-size: 0.64rem;
+    font-size: var(--text-3xs);
     padding: 0.2rem 0.5rem;
     border-radius: 0;
     pointer-events: none;
 }
 
 .compare__tag { top: 0.5rem; }
+
 .compare__tag--left { left: 0.6rem; }
+
 .compare__tag--right { right: 0.6rem; left: auto; }
 
 .split-compare__divider { display: flex; flex-direction: column; align-items: center; background: var(--steel-face); width: 18px; }
+
 .split-compare__divider-line { flex: 1; width: 1px; background: rgba(0,0,0,0.5); }
 
 .split-compare__divider-pill {
@@ -1292,7 +1105,7 @@ body.po-drop-active::after {
     border-radius: 0;
     width: 18px; height: 22px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     margin: 6px 0;
     flex-shrink: 0;
 }
@@ -1304,7 +1117,7 @@ body.po-drop-active::after {
     text-transform: uppercase;
     letter-spacing: 0.16em;
     color: var(--steel-dark);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
 }
 
 .compare-modes { display: flex; gap: 1px; padding: 0.4rem; background: var(--flap-black); border-bottom: 1px solid var(--rule); }
@@ -1318,7 +1131,9 @@ body.po-drop-active::after {
 }
 
 .compare__layer { position: absolute; inset: 0; }
+
 .compare__layer--after { clip-path: inset(0 0 0 var(--wipe)); }
+
 .compare .split-compare__img { width: 100%; height: 100%; object-fit: contain; }
 
 .compare__seam {
@@ -1340,7 +1155,7 @@ body.po-drop-active::after {
     border-radius: 0;
     background: var(--amber);
     color: var(--flap-black);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     box-shadow: var(--shadow-md);
 }
 
@@ -1356,16 +1171,17 @@ body.po-drop-active::after {
 }
 
 .compare__range:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+
 .compare__range::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 100%; background: transparent; cursor: ew-resize; }
+
 .compare__range::-moz-range-thumb { width: 44px; height: 100%; border: 0; background: transparent; cursor: ew-resize; }
 
 /* ── Send result onward: the connecting-services row ──────────────────── */
 .send-to { padding: 0.85rem 1rem; }
+
 .send-to__row { display: flex; flex-wrap: wrap; gap: 1px; }
 
 /* ═══ Accordions and disclosure ══════════════════════════════════════════ */
-
-.prompt-accordion__toggle,
 .description-accordion__toggle {
     width: 100%;
     display: flex;
@@ -1377,8 +1193,6 @@ body.po-drop-active::after {
     transition: filter var(--motion-fast);
 }
 
-.prompt-accordion__toggle:hover { filter: brightness(1.08); }
-
 .description-accordion { border: 1px solid var(--rule-strong); border-radius: 0; overflow: hidden; }
 
 .description-accordion__toggle {
@@ -1388,29 +1202,20 @@ body.po-drop-active::after {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     border: none;
     padding: 0.55rem 0.9rem;
     text-shadow: 0 1px 0 rgba(255,255,255,0.35);
 }
 
 .description-accordion__toggle:hover { filter: brightness(1.08); }
-.description-accordion__meta { font-size: 0.7rem; color: #2b2f36; letter-spacing: 0.1em; }
+
+.description-accordion__meta { font-size: var(--text-2xs); color: #2b2f36; letter-spacing: 0.1em; }
+
 .description-accordion__time { font-variant-numeric: tabular-nums; }
+
 .description-accordion__body { padding: 0.85rem 1rem; background: var(--flap-black); }
 
-.prompt-accordion__badge {
-    font-family: var(--font-flap);
-    font-size: 0.64rem;
-    background: var(--flap-black);
-    color: var(--amber);
-    border-radius: 0;
-    padding: 0.1rem 0.5rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-}
-
-.diag-group__count,
 .gallery-bar__count,
 .prompt-drawer__count,
 .prompt-drawer__fab-badge {
@@ -1418,7 +1223,7 @@ body.po-drop-active::after {
     align-items: center;
     justify-content: center;
     font-family: var(--font-flap);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.08em;
     background: var(--amber);
@@ -1429,17 +1234,14 @@ body.po-drop-active::after {
     font-variant-numeric: tabular-nums;
 }
 
-.diag-group__count { background: var(--flap-black); color: var(--steel); border: 1px solid var(--rule-strong); }
-.diag-group__chevron { color: #2b2f36; font-size: 0.7rem; transition: transform var(--motion-fast); }
-
 /* ═══ Diagnostics — the board read as a manifest ═════════════════════════ */
-
 .diag-stat { padding: 0.8rem 1rem; }
+
 .diag-stat__label { margin-bottom: 0.35rem; }
 
 .diag-stat__value {
     font-family: var(--font-flap);
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
     font-weight: 700;
     letter-spacing: 0.06em;
     color: var(--flap-white);
@@ -1448,52 +1250,27 @@ body.po-drop-active::after {
 
 .diag-stat__value--env { color: var(--amber); text-transform: uppercase; }
 
-.diag-group { overflow: hidden; }
-.diag-group__header { display: flex; align-items: center; gap: 0.7rem; cursor: pointer; user-select: none; }
-.diag-group__header:hover { filter: brightness(1.08); }
-.diag-group__title { font: inherit; }
-.diag-group__body { border-top: none; }
-
-.diag-row {
-    display: grid;
-    grid-template-columns: 1fr 1.6fr;
-    gap: 1rem;
-    padding: 0.55rem 1rem;
-    border-bottom: 1px solid var(--rule);
-    align-items: baseline;
-    transition: background var(--motion-fast);
+/* The layout shell no longer pads its content slot, so the two pages that are not
+   built on FeatureShell state their own rhythm. Both are boards, not documents:
+   they take the full rail width rather than a reading measure. */
+.studio-page,
+.diag-page {
+    width: 100%;
+    max-width: var(--rail-max);
+    margin-inline: auto;
+    padding: var(--space-4) var(--space-3) var(--space-5);
 }
 
-.diag-row:last-child { border-bottom: none; }
-.diag-row:hover { background: rgba(255,255,255,0.035); }
-
-.diag-row__key {
-    font-family: var(--font-flap);
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--steel-dark);
-    word-break: break-all;
+@media (max-width: 639.98px) {
+    .studio-page,
+    .diag-page { padding: var(--space-3) var(--space-2) var(--space-4); }
 }
-
-.diag-row__val {
-    font-size: 0.8rem;
-    /* Monospace here is measurement, not costume: these are literal config values. */
-    font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
-    word-break: break-all;
-    font-variant-numeric: tabular-nums;
-}
-
-.diag-row__val--plain { color: var(--flap-white); }
-.diag-row__val--masked { color: var(--amber); letter-spacing: 0.08em; }
 
 /* ═══ Studio — the concourse board ═══════════════════════════════════════
    The board head (.studio-hero*) and the saved-images strip (.studio-gallery-row)
    were removed from Studio.razor at the user's request, so their rules are deleted
    here too rather than left as dead selectors. The page now opens on the intake bay,
    which is why .studio-body carries the top spacing the hero used to provide. */
-
 .studio-body {
     display: grid;
     grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
@@ -1502,7 +1279,8 @@ body.po-drop-active::after {
     margin-top: 1.5rem;
 }
 
-.studio-upload-col, .studio-features-col { min-width: 0; }
+.studio-upload-col,
+.studio-features-col { min-width: 0; }
 
 /* Intake sits at the head of the board at EVERY width, and the routing panel below it.
    The contract's FIRST VIEWPORT promises the intake bay first; with the AI picker on top
@@ -1511,10 +1289,12 @@ body.po-drop-active::after {
    loading the photo is the job. This is an order rule, not a breakpoint rule, which is why
    it lives outside the media query. */
 .studio-upload-col { display: flex; flex-direction: column; gap: 1rem; }
+
 .studio-upload-col > .ai-picker { order: 2; }
 
-@media (max-width: 900px) {
-    .studio-body { grid-template-columns: 1fr; gap: 1.25rem; }
+@media (max-width: 1023.98px) {
+.studio-body { grid-template-columns: 1fr; gap: 1.25rem; }
+
 }
 
 /* The five transformations are ruled board rows, not a grid of cards. */
@@ -1542,6 +1322,7 @@ body.po-drop-active::after {
 }
 
 .studio-feature-card:last-child { border-bottom: none; }
+
 .studio-feature-card:hover { background: rgba(255,255,255,0.04); color: var(--flap-white); transform: none; box-shadow: none; }
 
 .studio-feature-card__icon {
@@ -1552,7 +1333,7 @@ body.po-drop-active::after {
     background: var(--flap-shadow);
     box-shadow: var(--inset-cell);
     color: var(--steel);
-    font-size: 1rem;
+    font-size: var(--text-lg);
 }
 
 .studio-feature-card:hover .studio-feature-card__icon { color: var(--amber); }
@@ -1560,13 +1341,13 @@ body.po-drop-active::after {
 .studio-feature-card__title {
     font-family: var(--font-flap);
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
     text-transform: uppercase;
     letter-spacing: 0.12em;
 }
 
 .studio-feature-card__desc {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--steel);
     margin: 0.15rem 0 0;
     line-height: 1.45;
@@ -1575,7 +1356,7 @@ body.po-drop-active::after {
 
 .studio-feature-card__cta {
     font-family: var(--font-flap);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -1586,6 +1367,7 @@ body.po-drop-active::after {
 
 /* Image loaded: every row's departure is now callable. */
 .studio-feature-card--ready .studio-feature-card__cta { color: var(--amber); }
+
 .studio-feature-card--ready .studio-feature-card__icon { color: var(--amber); }
 
 .studio-ready {
@@ -1601,7 +1383,7 @@ body.po-drop-active::after {
 
 .studio-ready-hint {
     font-family: var(--font-flap);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -1610,9 +1392,6 @@ body.po-drop-active::after {
 }
 
 .studio-surprise { margin-left: auto; padding: 0.45rem 1rem; }
-
-/* Legacy feature-card / selector names, folded into the same row language. */
-.feature-selector { display: flex; flex-direction: column; border: 1px solid var(--rule-strong); background: var(--flap-black); margin-top: 1.5rem; }
 
 .feature-card {
     display: grid;
@@ -1630,30 +1409,33 @@ body.po-drop-active::after {
     transition: background var(--motion-fast);
 }
 
-.feature-card::before, .feature-card::after { content: none; }
+.feature-card::before,
+.feature-card::after { content: none; }
+
 .feature-card:last-child { border-bottom: none; }
+
 .feature-card:hover { background: rgba(255,255,255,0.04); transform: none; box-shadow: none; border-color: var(--rule); }
 
 .feature-card__icon {
     display: inline-flex; align-items: center; justify-content: center;
     width: 34px; height: 34px;
     background: var(--flap-shadow); box-shadow: var(--inset-cell);
-    color: var(--steel); font-size: 1rem; margin: 0;
+    color: var(--steel); font-size: var(--text-lg); margin: 0;
 }
 
 .feature-card__title {
     font-family: var(--font-flap);
-    font-size: 0.95rem; font-weight: 700;
+    font-size: var(--text-lg); font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.12em;
     color: var(--flap-white);
 }
 
-.feature-card__desc { font-size: 0.8rem; color: var(--steel); line-height: 1.45; margin: 0.15rem 0 0; max-width: 56ch; }
+.feature-card__desc { font-size: var(--text-sm); color: var(--steel); line-height: 1.45; margin: 0.15rem 0 0; max-width: 56ch; }
 
 .feature-card__cta {
     margin: 0; padding: 0;
     font-family: var(--font-flap);
-    font-size: 0.68rem; font-weight: 600;
+    font-size: var(--text-2xs); font-weight: 600;
     text-transform: uppercase; letter-spacing: 0.16em;
     color: var(--steel-dark);
     display: flex; align-items: center; gap: 0.35rem;
@@ -1661,7 +1443,6 @@ body.po-drop-active::after {
 }
 
 /* ═══ Held image bar — the source row, pinned under the chrome ═══════════ */
-
 .active-image-bar {
     background: var(--flap-shadow);
     border-bottom: 1px solid var(--rule-strong);
@@ -1694,7 +1475,7 @@ body.po-drop-active::after {
 
 .active-image-bar__thumb { width: 100%; height: 100%; object-fit: cover; }
 
-.active-image-bar__label { font-size: 0.78rem; color: var(--steel); flex-shrink: 1; min-width: 0; overflow: hidden; }
+.active-image-bar__label { font-size: var(--text-xs); color: var(--steel); flex-shrink: 1; min-width: 0; overflow: hidden; }
 
 .active-image-bar__filename {
     font-family: var(--font-flap);
@@ -1712,17 +1493,6 @@ body.po-drop-active::after {
 
 .active-image-bar__actions { display: flex; align-items: center; gap: 1px; margin-left: auto; flex-shrink: 0; }
 
-.active-image-bar__try {
-    font-family: var(--font-flap);
-    font-size: 0.66rem;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--steel-dark);
-    margin-right: 0.3rem;
-}
-
-.active-image-bar__btn { padding: 0.28rem 0.6rem; font-size: 0.68rem; }
-
 .active-image-bar__clear {
     background: none;
     border: 1px solid var(--rule-strong);
@@ -1730,7 +1500,7 @@ body.po-drop-active::after {
     color: var(--steel-dark);
     cursor: pointer;
     padding: 0.28rem 0.45rem;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     line-height: 1;
     transition: color var(--motion-fast), border-color var(--motion-fast);
 }
@@ -1738,8 +1508,6 @@ body.po-drop-active::after {
 .active-image-bar__clear:hover { color: var(--cancel-red-tx); border-color: var(--cancel-red); }
 
 /* ═══ Galleries — contact strips of turned flaps ═════════════════════════ */
-
-.recents-bar,
 .gallery-bar {
     display: flex;
     align-items: center;
@@ -1749,10 +1517,8 @@ body.po-drop-active::after {
     overflow: hidden;
 }
 
-.recents-bar { margin-bottom: 0.85rem; }
-.gallery-bar__label, .recents-bar__label { margin-bottom: 0; flex: 0 0 auto; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; }
+.gallery-bar__label { margin-bottom: 0; flex: 0 0 auto; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; }
 
-.recents-bar__scroll,
 .gallery-bar__scroll {
     display: flex;
     align-items: center;
@@ -1765,12 +1531,10 @@ body.po-drop-active::after {
     scrollbar-width: thin;
 }
 
-.recents-bar__scroll::-webkit-scrollbar { display: none; }
-
 .gallery-bar__empty-hint {
     flex: 1 1 auto;
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.16em;
     color: var(--steel-dark);
@@ -1792,7 +1556,6 @@ body.po-drop-active::after {
 
 .gallery-bar__refresh:hover { color: var(--amber); border-color: var(--amber); }
 
-.recents-thumb,
 .gallery-thumb {
     position: relative;
     flex: 0 0 auto;
@@ -1807,23 +1570,29 @@ body.po-drop-active::after {
     aspect-ratio: 1 / 1;
 }
 
-.recents-thumb:hover, .gallery-thumb:hover { border-color: var(--amber); transform: none; }
+.gallery-thumb:hover { border-color: var(--amber); transform: none; }
 
-.recents-thumb img,
 .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; display: block; }
 
 /* Kind is carried by the badge glyph in the corner, which is a drawn icon and reads
    without colour at all. The frame only echoes it as a 1px ring — a thicker coloured
    edge on one side would be the side-tab tell, and it would fight the photograph. */
-.gallery-thumb.kind-original,     .gallery-thumb--original { border-color: var(--steel); }
-.gallery-thumb.kind-regeneration, .gallery-thumb--regen    { border-color: var(--flap-white); }
-.gallery-thumb.kind-meme,         .gallery-thumb--meme     { border-color: var(--amber); }
-.gallery-thumb.kind-bulkvariation,.gallery-thumb--bulk     { border-color: var(--steel-dark); }
+.gallery-thumb.kind-original,
+.gallery-thumb--original { border-color: var(--steel); }
+
+.gallery-thumb.kind-regeneration,
+.gallery-thumb--regen { border-color: var(--flap-white); }
+
+.gallery-thumb.kind-meme,
+.gallery-thumb--meme { border-color: var(--amber); }
+
+.gallery-thumb.kind-bulkvariation,
+.gallery-thumb--bulk { border-color: var(--steel-dark); }
 
 .gallery-thumb__badge {
     position: absolute;
     bottom: 3px; right: 2px;
-    font-size: 0.62rem;
+    font-size: var(--text-3xs);
     background: var(--flap-black);
     color: var(--flap-white);
     border-radius: 0;
@@ -1833,8 +1602,19 @@ body.po-drop-active::after {
 }
 
 .gallery-thumb--skeleton { border-color: transparent; cursor: default; }
-.gallery-skeleton { display: flex; gap: 4px; flex-wrap: wrap; }
-.gallery-skeleton__thumb { width: 46px; height: 46px; }
+
+/* Skip layout, paint and style for thumbs scrolled out of the strip. A gallery grows
+   without bound — it is the one element on the board that does — and every saved image
+   was previously a fully laid-out, fully decoded DOM node whether or not it was on
+   screen. contain-intrinsic-size supplies the placeholder geometry so the scrollbar
+   still measures the whole strip and does not jump as items come into view.
+
+   NOT <Virtualize>: that component spaces items in the block axis, and this strip
+   scrolls inline. It would render every item and add a component for the privilege. */
+.gallery-thumb-wrap {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 72px;
+}
 
 .gallery-thumb-wrap { position: relative; flex: 0 0 auto; }
 
@@ -1846,7 +1626,7 @@ body.po-drop-active::after {
     padding: 0;
     border: none;
     border-radius: 0;
-    font-size: 0.58rem;
+    font-size: var(--text-3xs);
     color: var(--flap-white);
     cursor: pointer;
     opacity: 0;
@@ -1854,8 +1634,11 @@ body.po-drop-active::after {
 }
 
 .gallery-thumb__zoom { top: 2px; left: 2px; background: rgba(7,7,8,0.85); }
+
 .gallery-thumb__delete { top: 2px; right: 2px; background: var(--cancel-red); }
+
 .gallery-thumb__zoom:hover { background: var(--flap-black); }
+
 .gallery-thumb__delete:hover { background: #b71c1c; }
 
 .gallery-thumb-wrap:hover .gallery-thumb__zoom,
@@ -1864,7 +1647,9 @@ body.po-drop-active::after {
 .gallery-thumb-wrap:focus-within .gallery-thumb__delete { opacity: 1; }
 
 @media (hover: none) {
-    .gallery-thumb__zoom, .gallery-thumb__delete { opacity: 1; }
+.gallery-thumb__zoom,
+.gallery-thumb__delete { opacity: 1; }
+
 }
 
 /* Undo strip — amber, because a pending deletion is work in progress. */
@@ -1878,18 +1663,20 @@ body.po-drop-active::after {
     background: var(--flap-shadow);
     border: 1px solid var(--amber);
     box-shadow: var(--inset-cell);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
 }
 
 .gallery-undo__thumb { width: 30px; height: 30px; object-fit: cover; border-radius: 0; }
+
 .gallery-undo__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--steel); }
-.gallery-undo__btn { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
+
+.gallery-undo__btn { padding: 0.3rem 0.8rem; font-size: var(--text-2xs); }
 
 .gallery-undo__dismiss { background: transparent; border: none; color: var(--steel-dark); cursor: pointer; }
+
 .gallery-undo__dismiss:hover { color: var(--flap-white); }
 
 /* ═══ Overlays ═══════════════════════════════════════════════════════════ */
-
 .bulk-modal-backdrop,
 .gallery-lightbox {
     position: fixed;
@@ -1941,7 +1728,7 @@ body.po-drop-active::after {
 
 .bulk-modal-num {
     font-family: var(--font-flap);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -1955,7 +1742,7 @@ body.po-drop-active::after {
     border: 1px solid rgba(0,0,0,0.5);
     border-radius: 0;
     color: var(--steel);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
     width: 28px; height: 28px;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
@@ -1963,7 +1750,9 @@ body.po-drop-active::after {
 }
 
 .gallery-lightbox__close { position: absolute; top: 0.5rem; right: 0.5rem; width: 30px; height: 30px; border-color: var(--rule-strong); }
-.bulk-modal-close:hover, .gallery-lightbox__close:hover { color: var(--flap-black); background: var(--amber); }
+
+.bulk-modal-close:hover,
+.gallery-lightbox__close:hover { color: var(--flap-black); background: var(--amber); }
 
 .bulk-modal-img-wrap {
     background: var(--flap-shadow);
@@ -1978,7 +1767,7 @@ body.po-drop-active::after {
 .bulk-modal-footer { padding: 0.85rem 0.9rem; border-top: 1px solid var(--rule); }
 
 .bulk-modal-prompt {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--steel);
     margin: 0 0 0.75rem;
     line-height: 1.45;
@@ -1989,9 +1778,11 @@ body.po-drop-active::after {
 }
 
 .bulk-modal-actions { display: flex; gap: 1px; }
+
 .btn-dl-modal { flex: 1; }
 
 .gallery-lightbox__img { max-width: 100%; max-height: 65vh; object-fit: contain; border-radius: 0; background: var(--flap-shadow); }
+
 .gallery-lightbox__meta { display: flex; flex-direction: column; gap: 0.15rem; }
 
 .gallery-lightbox__name {
@@ -2003,7 +1794,7 @@ body.po-drop-active::after {
 
 .gallery-lightbox__sub {
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     color: var(--steel-dark);
@@ -2012,7 +1803,6 @@ body.po-drop-active::after {
 .gallery-lightbox__actions { display: flex; gap: 1px; flex-wrap: wrap; }
 
 /* ═══ Meme, caption battle, style director ═══════════════════════════════ */
-
 .meme-caption-reveal { text-align: center; padding: 0.5rem 1rem; }
 
 .meme-caption-line {
@@ -2035,52 +1825,6 @@ body.po-drop-active::after {
 }
 
 .meme-template-zones { background: var(--flap-shadow); box-shadow: var(--inset-cell); border-radius: 0; padding: 0.85rem; }
-
-.caption-battle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1px; margin-top: 0.5rem; }
-
-.caption-battle-cell {
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    border: 1px solid transparent;
-    border-radius: 0;
-    padding: 0.7rem 0.85rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-
-.caption-battle-cell--failed { opacity: 0.6; }
-.caption-battle-cell--failed .caption-battle-cell__head { color: var(--cancel-red-tx); }
-
-.caption-battle-cell__head {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: var(--font-flap);
-    font-size: 0.74rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--steel);
-}
-
-.caption-battle-cell__persona { letter-spacing: 0.12em; }
-.caption-battle-cell__text { font-size: 0.92rem; margin: 0 0 0.25rem; min-height: 2.5em; line-height: 1.45; color: var(--flap-white); }
-
-/* The winning caption: the flap that turned. */
-.caption-battle-cell--winner { border-color: var(--amber); background: rgba(255,180,0,0.08); }
-.caption-battle-cell--winner .caption-battle-cell__head { color: var(--amber); }
-
-.caption-battle-summary {
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    /* No side-tab: the summary is a full cell, marked by its own label. */
-    border: 1px solid var(--rule-strong);
-    padding: 0.6rem 0.8rem;
-    border-radius: 0;
-    color: var(--steel);
-    font-size: 0.85rem;
-}
 
 .style-director-intro,
 .style-director-summary,
@@ -2116,7 +1860,7 @@ body.po-drop-active::after {
     align-items: center;
     gap: 0.4rem;
     font-family: var(--font-flap);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -2133,17 +1877,18 @@ body.po-drop-active::after {
     width: 22px; height: 22px;
     border-radius: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
 }
 
 .trace-step:last-child .trace-step__head i { color: var(--amber); }
-.trace-step__body { margin: 0.3rem 0 0; font-size: 0.85rem; color: var(--steel); max-width: 66ch; }
+
+.trace-step__body { margin: 0.3rem 0 0; font-size: var(--text-md); color: var(--steel); max-width: 66ch; }
 
 .direction-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1px; }
+
 .direction-cell { flex-direction: column; cursor: default; }
 
 /* ═══ Bulk generate ══════════════════════════════════════════════════════ */
-
 .bulk-upload-preview {
     border-radius: 0;
     overflow: hidden;
@@ -2158,7 +1903,6 @@ body.po-drop-active::after {
 .bulk-upload-preview img { width: 100%; height: 100%; object-fit: cover; }
 
 /* ═══ Prompt drawer ══════════════════════════════════════════════════════ */
-
 .prompt-drawer__fab {
     position: fixed;
     left: 1rem;
@@ -2174,7 +1918,7 @@ body.po-drop-active::after {
     color: var(--flap-white);
     font-family: var(--font-flap);
     font-weight: 700;
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     box-shadow: var(--shadow-lg);
@@ -2183,7 +1927,9 @@ body.po-drop-active::after {
 }
 
 .prompt-drawer__fab:hover { border-color: var(--amber); color: var(--amber); }
-.prompt-drawer__fab i { font-size: 1rem; }
+
+.prompt-drawer__fab i { font-size: var(--text-lg); }
+
 .prompt-drawer__fab--active { border-color: var(--amber); color: var(--amber); }
 
 .prompt-drawer__backdrop {
@@ -2224,7 +1970,7 @@ body.po-drop-active::after {
     display: flex;
     align-items: center;
     font-family: var(--font-flap);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -2249,12 +1995,14 @@ body.po-drop-active::after {
 .prompt-drawer__close:hover { background: var(--amber); color: var(--flap-black); }
 
 .prompt-drawer__actions { display: flex; gap: 1px; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--rule); }
-.prompt-drawer__btn { flex: 1; padding: 0.45rem 0.5rem; font-size: 0.7rem; }
-.prompt-drawer__btn i { font-size: 0.9rem; }
+
+.prompt-drawer__btn { flex: 1; padding: 0.45rem 0.5rem; font-size: var(--text-2xs); }
+
+.prompt-drawer__btn i { font-size: var(--text-md); }
 
 .prompt-drawer__hint {
     padding: 0.5rem 0.9rem;
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
     color: var(--steel);
     background: var(--flap-shadow);
     border-bottom: 1px solid var(--rule);
@@ -2265,11 +2013,13 @@ body.po-drop-active::after {
     color: var(--amber);
     padding: 0.05rem 0.3rem;
     border-radius: 0;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
 }
 
 .prompt-drawer__list { flex: 1; padding: 0.9rem; display: grid; gap: 0.6rem; overflow-y: auto; }
+
 .prompt-drawer__item { display: flex; align-items: flex-start; gap: 0.5rem; flex-wrap: wrap; }
+
 .prompt-drawer__row { display: flex; align-items: flex-start; gap: 0.5rem; width: 100%; }
 
 /* Row numbers are the board's position column, so they stay tabular. */
@@ -2283,22 +2033,21 @@ body.po-drop-active::after {
     box-shadow: var(--inset-cell);
     color: var(--steel-dark);
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 
 .prompt-drawer__textarea,
 textarea.form-control,
-input.form-control,
-select.form-select {
+input.form-control {
     flex: 1;
     background: var(--flap-shadow);
     border: 1px solid var(--rule-strong);
     border-radius: 0;
     color: var(--flap-white);
     font-family: var(--font-ui);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
     padding: 0.5rem 0.7rem;
     box-shadow: var(--inset-cell);
     transition: border-color var(--motion-fast);
@@ -2309,8 +2058,7 @@ select.form-select {
 
 .prompt-drawer__textarea:focus,
 textarea.form-control:focus,
-input.form-control:focus,
-select.form-select:focus {
+input.form-control:focus {
     outline: none;
     border-color: var(--amber);
     box-shadow: var(--inset-cell), 0 0 0 1px var(--amber);
@@ -2345,7 +2093,9 @@ select.form-select:focus {
 .prompt-drawer__improve:hover:not(:disabled) { color: var(--amber); border-color: var(--amber); transform: none; }
 
 .prompt-drawer__improve:disabled { cursor: wait; opacity: 0.7; }
+
 .prompt-drawer__improve--busy { border-color: var(--amber); color: var(--amber); }
+
 .prompt-drawer__improve .spinner-border-sm { width: 0.85rem; height: 0.85rem; }
 
 .prompt-drawer__trace {
@@ -2356,7 +2106,7 @@ select.form-select:focus {
     box-shadow: var(--inset-cell);
     border: 1px solid var(--rule-strong);
     border-radius: 0;
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
     color: var(--steel);
 }
 
@@ -2368,9 +2118,10 @@ select.form-select:focus {
 }
 
 .prompt-drawer__trace-toggle:hover { color: var(--amber); }
-.prompt-drawer__trace-toggle .badge { font-size: 0.68rem; font-weight: 700; border-radius: 0; }
 
-.prompt-drawer__trace-rationale { flex: 1; color: var(--steel-dark); font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-drawer__trace-toggle .badge { font-size: var(--text-2xs); font-weight: 700; border-radius: 0; }
+
+.prompt-drawer__trace-rationale { flex: 1; color: var(--steel-dark); font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .prompt-drawer__trace-list {
     list-style: none;
@@ -2385,20 +2136,25 @@ select.form-select:focus {
     grid-template-columns: 1.1rem auto auto 1fr;
     gap: 0.5rem;
     align-items: baseline;
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     color: var(--steel);
 }
 
-.prompt-drawer__trace-row i { color: var(--amber); font-size: 0.82rem; }
+.prompt-drawer__trace-row i { color: var(--amber); font-size: var(--text-sm); }
+
 .prompt-drawer__trace-row strong { color: var(--flap-white); font-weight: 700; }
-.prompt-drawer__trace-ms { font-variant-numeric: tabular-nums; font-size: 0.7rem; color: var(--steel-dark); }
+
+.prompt-drawer__trace-ms { font-variant-numeric: tabular-nums; font-size: var(--text-2xs); color: var(--steel-dark); }
+
 .prompt-drawer__trace-summary { line-height: 1.4; }
 
 /* ═══ Prompt history ═════════════════════════════════════════════════════ */
-
 .prompt-history { padding: 0.5rem 0.75rem; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+
 .prompt-history__label { display: flex; align-items: center; margin-bottom: 0.4rem; }
+
 .prompt-history__target { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--steel); }
+
 .prompt-history__list { display: flex; flex-direction: column; gap: 1px; max-height: 190px; overflow-y: auto; }
 
 .prompt-history__chip {
@@ -2418,7 +2174,7 @@ select.form-select:focus {
     text-align: left;
     background: transparent; border: none;
     color: var(--steel);
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
     padding: 0.4rem 0.5rem;
     cursor: pointer;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -2431,22 +2187,23 @@ select.form-select:focus {
     background: transparent; border: none;
     color: var(--steel-dark);
     padding: 0.25rem 0.35rem;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     cursor: pointer;
     transition: color var(--motion-fast);
 }
 
-.prompt-history__pin:hover, .prompt-history__drop:hover { color: var(--flap-white); }
+.prompt-history__pin:hover,
+.prompt-history__drop:hover { color: var(--flap-white); }
+
 .prompt-history__chip--pinned .prompt-history__pin { color: var(--amber); }
 
 /* ═══ Session cost — the fare counter ════════════════════════════════════ */
-
 .session-cost {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.12em;
     padding: 0.15rem 0.5rem;
@@ -2458,14 +2215,17 @@ select.form-select:focus {
 }
 
 .session-cost__value { font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; }
+
 .session-cost__meta { color: var(--steel-dark); }
 
-@media (max-width: 575px) { .session-cost__meta { display: none; } }
+@media (max-width: 639.98px) {
+.session-cost__meta { display: none; }
+
+}
 
 /* ═══ Mobile sticky action rail ══════════════════════════════════════════ */
-
-@media (max-width: 768px) {
-    .mobile-sticky-cta {
+@media (max-width: 767.98px) {
+.mobile-sticky-cta {
         position: fixed;
         bottom: 0; left: 0; right: 0;
         background: var(--flap-shadow);
@@ -2478,23 +2238,270 @@ select.form-select:focus {
         animation: riseIn var(--motion-slow) var(--motion-ease-in-out);
     }
 
-    .mobile-sticky-cta__btn { flex: 1; padding: 0.7rem 0.9rem; font-size: 0.76rem; }
-    .has-mobile-sticky-cta { padding-bottom: 4.25rem; }
+.mobile-sticky-cta__btn { flex: 1; padding: 0.7rem 0.9rem; font-size: var(--text-xs); }
+
+    /* `.has-mobile-sticky-cta` is gone. It was a marker class each page had to remember
+       to add, and only one of five ever did — the other four parked their last control
+       under the rail. FeatureShell reserves the space structurally instead, so a page
+       cannot forget. */
+
 }
 
-@media (min-width: 769px) { .mobile-sticky-cta { display: none !important; } }
+@media (min-width: 768px) {
+.mobile-sticky-cta { display: none; }
 
-/* ═══ Bento grid — kept as a name; behaves as a board stack ══════════════ */
+}
 
-.bento-grid { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); container-type: inline-size; }
-.bento-card { box-shadow: none; }
-.bento-card:hover { transform: none; box-shadow: none; }
-.bento-card--featured { grid-column: span 2; }
-@container (max-width: 768px) { .bento-card--featured { grid-column: span 1; } }
-.bento-card__body { padding: 1rem; }
+}
 
-/* ═══ Framework overrides — Bootstrap + Radzen live inside the board ═════
-   Both stay referenced and functional; only their visual layer is replaced. */
+@layer overrides {
+/* ═══ Small components that used to come from Bootstrap ══════════════════
+   These are no longer overrides of a framework's opinion — they ARE the badge,
+   the alert, the spinner and the form control. The CDN build that previously
+   supplied them shipped ~230KB to provide these nine rules plus a grid, and the
+   sheet then spent 44 more rules and 46 !important declarations disagreeing with
+   the rest of it. Owning them outright costs less than arguing with them.       */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0;
+    background: var(--flap-shadow);
+    color: var(--steel);
+    font-family: var(--font-flap);
+    font-size: var(--text-3xs);
+    font-weight: 700;
+    letter-spacing: var(--track-caps);
+    text-transform: uppercase;
+    line-height: var(--lh-tight);
+    white-space: nowrap;
+}
+
+/* Status colours on a badge come from the four-value vocabulary, nowhere else. */
+.badge--done,
+.badge.bg-success { background: var(--flap-white); color: var(--flap-black); }
+.badge--working,
+.badge.bg-warning { background: var(--amber); color: var(--flap-black); }
+.badge--failed,
+.badge.bg-danger  { background: var(--cancel-red); color: var(--flap-white); }
+.badge.bg-info,
+.badge.bg-primary,
+.badge.bg-secondary { background: var(--flap-shadow); color: var(--steel); }
+
+.alert {
+    border-radius: 0;
+    border: 1px solid var(--rule-strong);
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    color: var(--steel);
+    font-size: var(--text-md);
+    padding: 0.85rem 1rem;
+    margin-bottom: var(--space-3);
+}
+
+.alert-danger { border-color: var(--cancel-red); color: var(--cancel-red-tx); }
+.alert-info   { border-color: var(--rule-strong); color: var(--steel); }
+
+/* The working lamp as a spinner. One authored rotation, paused under
+   prefers-reduced-motion by the global rule in foundation.css. */
+.spinner-border {
+    display: inline-block;
+    width: 1.1rem;
+    height: 1.1rem;
+    vertical-align: -0.15em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    color: var(--amber);
+    animation: flap-spin 0.75s linear infinite;
+}
+
+.spinner-border-sm { width: 0.8rem; height: 0.8rem; border-width: 1.5px; }
+
+@keyframes flap-spin { to { transform: rotate(360deg); } }
+
+/* Cards are the board panel (see Materials); these are the parts inside it. */
+.card-header {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    background: var(--flap-shadow);
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: var(--track-flap);
+    color: var(--steel-dark);
+}
+
+.card-body { padding: 1rem; }
+
+.form-label,
+.form-check-label {
+    display: block;
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--track-flap);
+    color: var(--steel-dark);
+    margin-bottom: 0.35rem;
+}
+
+.form-control {
+    display: block;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    background: var(--flap-shadow);
+    box-shadow: var(--inset-cell);
+    color: var(--flap-white);
+    font-family: var(--font-ui);
+    font-size: var(--text-lg);
+    line-height: var(--lh-snug);
+}
+
+.form-control:focus { border-color: var(--amber); outline: none; box-shadow: inset 0 0 0 1px var(--amber); }
+
+/* A switch is a checkbox that says "on/off" rather than "yes/no" — same input, wider
+   track, travelling knob. Drawn here rather than inherited from a framework because it
+   is the only toggle in the app and it has to read as a lit flap, not a Material pill. */
+.form-switch .form-check-input {
+    width: 2.1rem;
+    background-image: none;
+    background-color: var(--flap-shadow);
+    position: relative;
+}
+
+.form-switch .form-check-input::after {
+    content: "";
+    position: absolute;
+    inset: 1px auto 1px 1px;
+    width: calc(1rem - 2px);
+    background: var(--steel-dark);
+    transition: transform var(--motion-fast), background var(--motion-fast);
+}
+
+/* background-image must be reset explicitly: the checkbox tick is drawn with one and
+   would otherwise sit under the travelling knob. */
+.form-switch .form-check-input:checked { background-color: var(--flap-shadow); border-color: var(--amber); background-image: none; }
+.form-switch .form-check-input:checked::after { transform: translateX(1.05rem); background: var(--amber); }
+
+.form-control-sm { padding: 0.32rem 0.5rem; font-size: var(--text-md); }
+
+.form-check { display: flex; align-items: center; gap: 0.5rem; }
+
+.form-check-input {
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    flex-shrink: 0;
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    background-color: var(--flap-shadow);
+    cursor: pointer;
+}
+
+.form-check-input:checked {
+    background-color: var(--amber);
+    border-color: var(--amber);
+    /* The tick is drawn, not a font glyph: a checkmark character renders in whatever
+       weight the platform supplies, which is the emoji problem in a different hat. */
+    background-image: linear-gradient(45deg, transparent 44%, var(--flap-black) 44% 56%, transparent 56%),
+                      linear-gradient(-45deg, transparent 44%, var(--flap-black) 44% 56%, transparent 56%);
+    background-size: 60% 60%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.form-check-input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.form-check-label { margin-bottom: 0; }
+
+/* ═══ Radzen, retinted ═══════════════════════════════════════════════════
+   Radzen is themed through its OWN custom properties rather than by out-specifying
+   its selectors. That matters here: the previous approach listed six component
+   classes (.rz-card, .rz-panel, .rz-dropdown, .rz-textbox, .rz-notification,
+   .rz-dialog) and forced each with !important — which is why the one Radzen
+   component the app actually leans on, the /diag DataGrid, was never covered and sat
+   on the page as a white Material table inside a matte-black departure board.
+
+   Re-pointing the variables reaches every component at once, including ones this app
+   has not adopted yet, and it survives a Radzen upgrade that renames a class. */
+:root {
+    --rz-body-background-color: var(--board-ground);
+    --rz-base-background-color: var(--flap-black);
+    --rz-text-color: var(--flap-white);
+    --rz-text-secondary-color: var(--steel);
+    --rz-text-disabled-color: var(--steel-dark);
+    --rz-link-color: var(--amber);
+    --rz-border-radius: 0;
+    --rz-primary: var(--amber);
+    --rz-primary-light: var(--amber);
+    --rz-primary-dark: var(--amber-dim);
+    --rz-danger: var(--cancel-red);
+    --rz-success: var(--flap-white);
+    --rz-warning: var(--amber);
+    --rz-info: var(--steel);
+
+    /* DataGrid: a manifest printed on the board, not a spreadsheet. */
+    --rz-grid-background-color: var(--flap-black);
+    --rz-grid-border: 1px solid var(--rule-strong);
+    --rz-grid-border-radius: 0;
+    --rz-grid-cell-color: var(--flap-white);
+    --rz-grid-cell-border: 1px solid var(--rule);
+    --rz-grid-bottom-cell-border: 1px solid var(--rule);
+    --rz-grid-cell-font-size: var(--text-md);
+    --rz-grid-header-background-color: var(--flap-shadow);
+    --rz-grid-header-color: var(--steel-dark);
+    --rz-grid-header-font-size: var(--text-2xs);
+    --rz-grid-header-font-weight: 700;
+    --rz-grid-header-cell-border: 1px solid var(--rule);
+    --rz-grid-header-cell-border-bottom: 1px solid var(--rule-strong);
+    --rz-grid-header-sorted-background-color: var(--flap-shadow);
+    --rz-grid-filter-background-color: var(--flap-shadow);
+    --rz-grid-filter-color: var(--flap-white);
+    --rz-grid-filter-border: 1px solid var(--rule-strong);
+    --rz-grid-header-filter-icon-active-color: var(--amber);
+    --rz-grid-header-filter-icon-hover-color: var(--amber);
+    --rz-grid-row-hover-background-color: rgba(255,180,0,0.06);
+    --rz-grid-stripe-background-color: var(--flap-shadow);
+}
+
+/* Column heads are the board's own tracked caps, which no variable can express. */
+.rz-data-grid .rz-column-title,
+.rz-datatable .rz-column-title {
+    font-family: var(--font-flap);
+    text-transform: uppercase;
+    letter-spacing: var(--track-flap);
+}
+
+/* Radzen paints its own surfaces with hard-coded whites in a few places the theme
+   variables do not reach. These are the remaining few, named explicitly. */
+.rz-data-grid,
+.rz-datatable,
+.rz-grid-table,
+.rz-grid-table tbody tr,
+.rz-datatable-data tr { background-color: var(--flap-black); color: var(--flap-white); }
+
+.rz-notification-item,
+.rz-dialog,
+.rz-card,
+.rz-panel {
+    border-radius: 0;
+    box-shadow: var(--shadow-md);
+    background-color: var(--flap-black);
+    color: var(--flap-white);
+    border: 1px solid var(--rule-strong);
+}
+
+/* The gallery lightbox is a Radzen dialog now; it keeps its own frameless treatment. */
+.rz-dialog.gallery-lightbox .rz-dialog-content { padding: 0; }
+
+/* ═══ Chrome the framework still emits ═══════════════════════════════════ */
 
 .blazor-error-boundary {
     background: var(--cancel-red);
@@ -2502,7 +2509,7 @@ select.form-select:focus {
     color: var(--flap-white);
     font-family: var(--font-flap);
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: var(--track-caps);
 }
 
 .blazor-error-boundary::after { content: "AN ERROR HAS OCCURRED."; }
@@ -2513,7 +2520,7 @@ select.form-select:focus {
     font-family: var(--font-flap);
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     bottom: 0;
     box-shadow: 0 -1px 2px rgba(0,0,0,0.4);
     display: none;
@@ -2529,76 +2536,6 @@ select.form-select:focus {
 
 code { color: var(--amber); }
 
-.badge { border-radius: 0 !important; font-family: var(--font-flap); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
-.bg-success { background-color: var(--flap-white) !important; color: var(--flap-black) !important; }
-.bg-warning { background-color: var(--amber) !important; color: var(--flap-black) !important; }
-.bg-danger  { background-color: var(--cancel-red) !important; color: var(--flap-white) !important; }
-.bg-info, .bg-primary, .bg-secondary { background-color: var(--flap-shadow) !important; color: var(--steel) !important; }
-
-.text-success { color: var(--flap-white) !important; }
-.text-warning { color: var(--amber) !important; }
-.text-danger  { color: var(--cancel-red-tx) !important; }
-.text-muted, .text-secondary { color: var(--steel-dark) !important; }
-/* Bootstrap's primary is a blue this world does not contain; amber is the accent. */
-.text-primary { color: var(--amber) !important; }
-.text-info { color: var(--steel) !important; }
-.border-primary { border-color: var(--amber) !important; }
-
-.alert {
-    border-radius: 0;
-    border: 1px solid var(--rule-strong);
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    color: var(--steel);
-    font-size: 0.88rem;
-}
-
-.alert-danger { border-color: var(--cancel-red); color: var(--cancel-red-tx); }
-.alert-warning { border-color: var(--amber); color: var(--amber); }
-.alert-success, .alert-info { border-color: var(--rule-strong); color: var(--steel); }
-
-.spinner-border { border-right-color: transparent; color: var(--amber); }
-
-.form-label,
-.form-check-label {
-    font-family: var(--font-flap);
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--steel-dark);
-}
-
-.form-check-input { border-radius: 0 !important; background-color: var(--flap-shadow); border-color: var(--rule-strong); }
-.form-check-input:checked { background-color: var(--amber); border-color: var(--amber); }
-.form-check-input:focus { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
-
-.form-range::-webkit-slider-thumb { background: var(--amber); border-radius: 0; }
-.form-range::-moz-range-thumb { background: var(--amber); border-radius: 0; border: none; }
-
-hr { border-color: var(--rule); opacity: 1; }
-
-/* Radzen: strip Material elevation and rounding, adopt the flap surfaces. */
-.rz-card, .rz-panel, .rz-dropdown, .rz-textbox, .rz-notification, .rz-dialog {
-    border-radius: 0 !important;
-    box-shadow: var(--shadow-md) !important;
-    background-color: var(--flap-black) !important;
-    color: var(--flap-white) !important;
-    border: 1px solid var(--rule-strong) !important;
-}
-
-.rz-button {
-    border-radius: 0 !important;
-    font-family: var(--font-flap) !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.14em !important;
-    font-weight: 700 !important;
-    box-shadow: none !important;
-}
-
-.rz-button.rz-primary { background-color: var(--amber) !important; color: var(--flap-black) !important; }
-.rz-notification-item { border-radius: 0 !important; }
-
 /* ═══ Scrollbars — the board's own gutters ═══════════════════════════════ */
 
 * { scrollbar-color: var(--steel-dark) var(--flap-black); scrollbar-width: thin; }
@@ -2608,17 +2545,12 @@ hr { border-color: var(--rule); opacity: 1; }
 ::-webkit-scrollbar-thumb:hover { background: var(--steel); }
 
 /* ═══ Responsive ═════════════════════════════════════════════════════════
-   Portrait is the primary composition. Column priority narrows; the board
-   never scrolls sideways.                                                 */
+   Portrait is the primary composition. Column priority narrows; the board never
+   scrolls sideways. Four breakpoints only — see the table in foundation.css.   */
 
-@media (max-width: 576px) {
+@media (max-width: 639.98px) {
     body { background-image: none; }
     .upload-panel { padding: 0; }
-    .mode-cards { grid-template-columns: 1fr; }
-    .preset-group__buttons { grid-template-columns: repeat(3, 1fr); }
-    .shimmer-cards { grid-template-columns: 1fr; }
-    .diag-row { grid-template-columns: 1fr; gap: 0.15rem; }
-    .result-image { max-height: 300px; }
 
     /* The status column drops below the name rather than squeezing it. Once it does,
        the SERVICE / STATUS header no longer sits over the columns it names, so it is
@@ -2640,6 +2572,82 @@ hr { border-color: var(--rule); opacity: 1; }
     .split-compare__divider-line { width: auto; height: 1px; flex: 1; }
 }
 
-@media (max-width: 360px) {
-    .preset-group__buttons { grid-template-columns: 1fr 1fr; }
+@media (max-width: 479.98px) {
+    /* Three named detail levels will not sit on one line in a 320px column without
+       the labels truncating, and a truncated choice cannot be chosen confidently. */
+    .flap-choices--tight { grid-template-columns: 1fr 1fr; }
+}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TOUCH TARGETS
+   Measured on a 390×844 viewport, every one of these came in under the 44px
+   minimum: the gallery refresh and prompt-drawer close buttons at 30×30, every
+   AI picker select at 31px tall, and the small flap buttons at 38px. They are
+   fine with a mouse and awkward with a thumb, which is the width where this app
+   is most likely to be used on a photo you just took.
+
+   The rule raises the CONTROL where the layout can absorb it and extends the
+   hit area past the ink where it cannot — the guideline is about what the
+   finger can land on, not how big the paint is.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (pointer: coarse), (max-width: 767.98px) {
+
+    .gallery-bar__refresh,
+    .prompt-drawer__close {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .ai-picker__select {
+        min-height: 44px;
+        font-size: var(--text-md);
+    }
+
+    .flap-btn--sm { min-height: 44px; }
+
+    /* Hit area extended without moving the painted box, for controls whose size is
+       load-bearing on the rail or inside a dense row. */
+    .flap-choice,
+    .gallery-bar__refresh,
+    .prompt-drawer__close { position: relative; }
+
+    .flap-choice::after {
+        content: "";
+        position: absolute;
+        inset: 50% 0 auto 0;
+        min-height: 44px;
+        height: 100%;
+        transform: translateY(-50%);
+    }
+}
+
+/* The 10px step is an UPPERCASE-ONLY size by the type scale's own rule, and badges
+   using it sat at the edge of legibility on a phone. Bump the smallest two steps on
+   coarse pointers; the tracking keeps them reading as flap caps either way. */
+@media (pointer: coarse), (max-width: 767.98px) {
+    .badge,
+    .feature-page-desc .badge,
+    .ai-picker__fixed-summary { font-size: var(--text-2xs); }
+}
+
+/* ── Rap Roast: the primary action, now below the settings it reads ────────── */
+.roast-cta {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.roast-cta__btn { width: 100%; justify-content: center; }
+
+/* A disabled button that does not say why is a dead end. */
+.roast-cta__hint {
+    margin: 0;
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    text-align: center;
 }

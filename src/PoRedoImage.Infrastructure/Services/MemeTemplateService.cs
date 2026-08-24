@@ -78,43 +78,9 @@ public sealed class MemeTemplateService : IMemeTemplateService
 
     private static void DrawZoneText(IImageProcessingContext ctx, MemeTextZone zone, string text, int width, int height)
     {
-        if (!SystemFonts.TryGet("Impact", out var fontFamily) &&
-            !SystemFonts.TryGet("Liberation Sans", out fontFamily) &&
-            !SystemFonts.TryGet("DejaVu Sans", out fontFamily) &&
-            !SystemFonts.TryGet("Arial", out fontFamily) &&
-            !SystemFonts.TryGet("Helvetica", out fontFamily))
-        {
-            fontFamily = SystemFonts.Families.First();
-        }
-
         var maxFontSize = (float)(height * zone.FontSizeRatio);
         var minFontSize = Math.Max(12f, height / 40f);
         var maxWidth = (float)(width * zone.MaxWidthRatio);
-
-        // Iteratively shrink the font until the stroke-aware measured width fits.
-        // TextMeasurer.MeasureBounds does not include the rendered stroke, so we
-        // add 2 * strokeWidth when comparing. WordBreaking.Normal enforces a hard
-        // wrap so long captions split across lines instead of overflowing.
-        var fontSize = maxFontSize;
-        Font font;
-        float strokeWidth;
-        while (fontSize > minFontSize)
-        {
-            font = fontFamily.CreateFont(fontSize, FontStyle.Bold);
-            strokeWidth = Math.Max(fontSize / 8f, 1.5f);
-            var probeOptions = new TextOptions(font)
-            {
-                WrappingLength = maxWidth,
-                WordBreaking = WordBreaking.BreakWord
-            };
-            var measured = TextMeasurer.MeasureBounds(text, probeOptions);
-            if (measured.Width + (strokeWidth * 2f) <= maxWidth) break;
-            fontSize -= Math.Max(2f, fontSize * 0.08f);
-        }
-        fontSize = Math.Max(fontSize, minFontSize);
-
-        font = fontFamily.CreateFont(fontSize, FontStyle.Bold);
-        strokeWidth = Math.Max(fontSize / 8f, 1.5f);
 
         var alignment = zone.Alignment.ToLowerInvariant() switch
         {
@@ -123,16 +89,14 @@ public sealed class MemeTemplateService : IMemeTemplateService
             _ => HorizontalAlignment.Center
         };
 
-        var textOptions = new RichTextOptions(font)
-        {
-            HorizontalAlignment = alignment,
-            VerticalAlignment = VerticalAlignment.Top,
-            Origin = new PointF((float)(width * zone.X), (float)(height * zone.Y)),
-            WrappingLength = maxWidth,
-            WordBreaking = WordBreaking.BreakWord
-        };
-
-        ctx.DrawText(textOptions, text, Brushes.Solid(Color.White), Pens.Solid(Color.Black, strokeWidth));
+        MemeTextRenderer.DrawText(
+            ctx,
+            text,
+            new PointF((float)(width * zone.X), (float)(height * zone.Y)),
+            maxWidth,
+            maxFontSize,
+            minFontSize,
+            alignment);
     }
 
     /// <summary>

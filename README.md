@@ -1,14 +1,14 @@
-# PoRedoImage — AI-Powered Image Studio
+# PoRedoImage — AI-Powered Multimedia Studio
 
 > **Product Requirements Document (PRD) · v2.0 · April 2026**
 
 ---
-  ...
+
 ## Product Vision
 
-PoRedoImage is a cloud-native AI image studio that transforms ordinary photos into artistic masterpieces, memes, and stylistic variations in seconds. By chaining Azure Computer Vision, Azure OpenAI `gpt-5.4-nano` (text *and* vision), and Google `gemini-2.5-flash-image` behind a clean Blazor Web App, PoRedoImage makes professional-grade AI image manipulation accessible to anyone — no prompt engineering required.
+PoRedoImage is a cloud-native AI multimedia studio that transforms ordinary photos into artistic masterpieces, memes, stylistic variations, and multimedia audio creations in seconds. By chaining Azure Computer Vision, Azure OpenAI `gpt-5.4-nano` (text *and* vision), Google `gemini-2.5-flash-image`, and Google Lyria 3 (`lyria-3-clip-preview`) behind a clean Blazor Web App, PoRedoImage makes professional-grade AI image and multimedia creation accessible to anyone — no prompt engineering required.
 
-The core user promise: *upload a photo, choose a style, get a gallery-worthy result in under 10 seconds.*
+The core user promise: *upload a photo, choose a transformation, get a gallery-worthy visual or performed rap roast in under 10 seconds.*
 
 ---
 
@@ -17,9 +17,10 @@ The core user promise: *upload a photo, choose a style, get a gallery-worthy res
 ### Goals
 1. **Instant AI Transformation** — Users can upload any JPEG/PNG and receive an AI-regenerated image or a captioned meme within one interaction.
 2. **Bulk Art Studio** — Power users can generate 10 distinct art-style variations of a photo in a single click, with results streaming live as each slot completes.
-3. **Personal Gallery** — Every result can be saved to a persistent per-user gallery backed by Azure Table Storage, accessible across sessions.
-4. **Zero-friction Auth** — Development environment uses a one-click cookie login; production uses Microsoft Entra ID OIDC with no additional friction for M365 users.
-5. **Observable & Reliable** — Every AI call is traced via OpenTelemetry and logged via Serilog to Application Insights; a `/health` endpoint verifies all dependencies at runtime.
+3. **Multimedia AI Performances** — Users can generate rap roasts with custom lyrics and full beat performances generated via Google Lyria 3.
+4. **Personal Gallery** — Every result can be saved to a persistent per-user gallery backed by Azure Table Storage, accessible across sessions.
+5. **Zero-friction Auth** — Development environment uses a one-click cookie login; production uses Microsoft Entra ID OIDC with no additional friction for M365 users.
+6. **Observable & Reliable** — Every AI call is traced via OpenTelemetry and logged via Serilog to Application Insights; a `/health` endpoint verifies all dependencies at runtime.
 
 ### Non-Goals (v1)
 - Native mobile app (responsive web only)
@@ -147,7 +148,8 @@ dotnet run --project src/PoRedoImage.Web
 ### 4. Test
 ```bash
 dotnet test PoRedoImage.slnx                                    # Unit + Integration
-dotnet test tests/PoRedoImage.Tests.E2E                          # E2E (C# Playwright + HTTP smoke)
+dotnet test tests/PoRedoImage.Tests.E2E.ApiSmoke                # E2E API smoke
+dotnet test tests/PoRedoImage.Tests.E2E.UI                      # E2E UI (Playwright)
 ```
 
 ---
@@ -162,6 +164,8 @@ dotnet test tests/PoRedoImage.Tests.E2E                          # E2E (C# Playw
 | POST | `/api/images/analyze` | Analyze + process image |
 | GET | `/api/bulk-generate/prompts` | Load saved art prompts |
 | POST | `/api/bulk-generate/prompts` | Save art prompts |
+| POST | `/api/style-director/run` | Style Director AI prompt synthesizer |
+| POST | `/api/rap-roast` | Multimedia Rap Roast performance |
 | GET | `/scalar/v1` | Interactive API docs |
 
 ---
@@ -174,6 +178,8 @@ src/PoRedoImage.Web/        # API/BFF host
     BulkGenerate/     # Imagen3Service, parallel generation, prompt storage endpoints
     Diagnostics/      # /api/diag endpoint, middleware
     ImageAnalysis/    # ComputerVisionService, OpenAIService, MemeGeneratorService
+    RapRoast/         # RapRoast multimedia endpoints
+    StyleDirector/    # StyleDirector prompt synthesis
   Components/         # App.razor host document + _Imports (renders the Client's <Routes> as WASM)
   Configuration/      # KeyVaultSecretNameMapping
 src/PoRedoImage.Client/     # Blazor WASM SPA
@@ -183,8 +189,8 @@ src/PoRedoImage.Client/     # Blazor WASM SPA
 tests/
   PoRedoImage.Tests.Unit/            # xUnit pure logic
   PoRedoImage.Tests.Integration/     # xUnit + WebApplicationFactory + Testcontainers
-  PoRedoImage.Tests.E2EAPI/          # pure HTTP API E2E (xUnit, self-skip if no live instance)
-  PoRedoImage.Tests.E2EUI/           # C# Playwright UI E2E (self-skip if no live instance)
+  PoRedoImage.Tests.E2E.ApiSmoke/    # pure HTTP API E2E (xUnit, self-skip if no live instance)
+  PoRedoImage.Tests.E2E.UI/          # C# Playwright UI E2E (self-skip if no live instance)
 infra/
   main.bicep          # App Service + Storage provisioning
 docs/                 # All .mmd diagrams + screenshots

@@ -1,4 +1,13 @@
-﻿@page "/not-found"
+@page "/not-found"
+@* Catch-all. Without it the server's route table only knows the literal @page routes, so any
+   unmatched URL — a typo, a stale bookmark, a refresh on a sub-path like /rap-roast/extra —
+   404s in ASP.NET Core *before* the WASM host document is ever served, and the browser gets a
+   completely empty body. The Router's NotFoundPage only ever fired on client-side navigation,
+   which is the one case a user cannot reach from outside the app.
+
+   Route precedence puts every literal segment above a catch-all, so this never shadows a real
+   page. Unknown /api/* paths are kept off it by the literal-prefixed 404 route in Program.cs. *@
+@page "/{*MissingRoute}"
 @attribute [AllowAnonymous]
 @layout MainLayout
 
@@ -12,6 +21,15 @@
         <p class="not-found__hint">
             That route isn’t on the board — it may have been moved or never existed.
         </p>
-        <a href="/" class="btn-process not-found__back">Back to departures</a>
+        @if (!string.IsNullOrWhiteSpace(MissingRoute))
+        {
+            <p class="not-found__route"><code>/@MissingRoute</code></p>
+        }
+        <a href="/" class="flap-btn flap-btn--primary not-found__back">Back to departures</a>
     </div>
 </div>
+
+@code {
+    /// <summary>The path that did not match, echoed back so a mistyped link is obvious.</summary>
+    [Parameter] public string? MissingRoute { get; set; }
+}

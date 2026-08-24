@@ -1,0 +1,6 @@
+
+/* Gallery unreachable — the amber warning state. Distinct from the empty state next to it,
+   because "no images yet" and "cannot reach your images" must not look the same. */
+.gallery-bar--error { border-color: var(--amber-dim, rgba(255,180,0,0.4)); }
+
+.gallery-bar__empty-hint--error { color: var(--amber); }

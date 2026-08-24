@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
@@ -12,6 +12,16 @@ namespace PoRedoImage.Web.Features.BulkGenerate;
 
 public static class BulkGenerateEndpoints
 {
+    /// <summary>
+    /// Concurrent calls to the image model per batch. Three, matching the re-roll path — the
+    /// provider rate-limits above that and a 429 storm costs more wall clock than queueing does.
+    /// </summary>
+    private const int BatchConcurrency = 3;
+
+    /// <summary>The NDJSON record separator.</summary>
+    private static readonly ReadOnlyMemory<byte> Newline = new byte[] { 10 };
+
+
     public static IEndpointRouteBuilder MapBulkGenerateEndpoints(this IEndpointRouteBuilder app)
     {
         // Prompt persistence endpoints require authentication (use the caller's user identity).
@@ -115,6 +125,116 @@ public static class BulkGenerateEndpoints
         })
         .WithName("GenerateBulkVariation")
         .WithSummary("Generate a single art-style variation image");
+
+        // Generate every slot in one request, streaming each result the moment it lands.
+        //
+        // The client used to drive this with a `for` loop of one-at-a-time POSTs — ten sequential
+        // round-trips, each re-uploading the whole source image. Both costs are gone: the image
+        // arrives once, and the fan-out runs under the same concurrency cap the re-roll path already
+        // uses.
+        //
+        // NDJSON rather than SSE. The payloads are base64 images measured in hundreds of KB, and
+        // SSE's `data: ` line framing would have to re-chunk every one of them; a JSON object per
+        // line is the same streaming behaviour with none of that. It also degrades honestly — a
+        // client that does not stream still gets a parseable body, just all at once.
+        aiGroup.MapPost("/batch", async (
+            BulkBatchRequest request,
+            HttpContext http,
+            IImageGenerationRouter router,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.ImageData))
+                return Results.BadRequest("ImageData is required.");
+            if (request.Prompts is null || request.Prompts.Length is 0 or > 10)
+                return Results.BadRequest("Between 1 and 10 prompts are required.");
+            if (request.Prompts.Any(p => string.IsNullOrWhiteSpace(p) || p.Length > 2000))
+                return Results.BadRequest("Each prompt must be non-empty and at most 2000 characters.");
+
+            ImageBytes imageBytes;
+            try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
+            catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
+
+            var imagen3 = router.Resolve(request.ImageGenModelId);
+            if (!imagen3.IsConfigured)
+                return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
+
+            var logger = loggerFactory.CreateLogger("BulkGenerateEndpoints.Batch");
+            var source = imageBytes.Bytes.ToArray();
+            var prompts = request.Prompts;
+
+            http.Response.ContentType = "application/x-ndjson";
+            // Proxies that buffer would defeat the entire point of streaming these.
+            http.Response.Headers["Cache-Control"] = "no-cache, no-store";
+            http.Response.Headers["X-Accel-Buffering"] = "no";
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var succeeded = 0;
+
+            // Same cap as /reroll — three concurrent calls to the image model. Higher is not better:
+            // the provider rate-limits, and a 429 storm costs more wall clock than the queueing does.
+            using var gate = new SemaphoreSlim(BatchConcurrency, BatchConcurrency);
+            // One writer at a time, or two slots finishing together interleave their JSON mid-line
+            // and the client's line reader sees corruption.
+            using var writeLock = new SemaphoreSlim(1, 1);
+
+            var tasks = prompts.Select(async (prompt, index) =>
+            {
+                await gate.WaitAsync(ct);
+                BulkBatchItem item;
+                try
+                {
+                    var (data, contentType, _) = await imagen3.GenerateImageAsync(prompt, source, ct: ct);
+                    item = new BulkBatchItem(index, Convert.ToBase64String(data), contentType, null);
+                    Interlocked.Increment(ref succeeded);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // One slot failing is a normal outcome the board already renders. Reporting it
+                    // as a line keeps the other nine running.
+                    logger.LogWarning(ex, "Batch slot {Index} failed", index);
+                    item = new BulkBatchItem(index, null, null, "Generation failed for this variation.");
+                }
+                finally { gate.Release(); }
+
+                await writeLock.WaitAsync(ct);
+                try
+                {
+                    // Source-generated JsonTypeInfo, not the reflective overload: the solution-wide trim
+                    // analyzer rejects the latter (IL2026), and this endpoint writes to the response
+                    // body directly rather than going through the framework's serializer.
+                    await JsonSerializer.SerializeAsync(
+                        http.Response.Body, item, SharedJsonContext.Default.BulkBatchItem, ct);
+                    await http.Response.Body.WriteAsync(Newline, ct);
+                    await http.Response.Body.FlushAsync(ct);
+                }
+                finally { writeLock.Release(); }
+            }).ToArray();
+
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogInformation("Batch cancelled by the client after {Elapsed}ms.", sw.ElapsedMilliseconds);
+                return Results.Empty;
+            }
+
+            sw.Stop();
+            logger.LogInformation(
+                "Batch complete. Requested={Requested}, Succeeded={Succeeded}, Elapsed={Elapsed}ms",
+                prompts.Length, succeeded, sw.ElapsedMilliseconds);
+
+            // The body is already written; returning Empty stops the framework appending to it.
+            return Results.Empty;
+        })
+        .WithName("GenerateBulkBatch")
+        .WithSummary("Generate every art-style variation in one request, streamed as NDJSON");
 
         // Idea #11 — One-Tap Re-roll x3: spawn N parallel variations from a winning prompt.
         // Uses a deterministic seed hint so re-rolls are reproducible per session and

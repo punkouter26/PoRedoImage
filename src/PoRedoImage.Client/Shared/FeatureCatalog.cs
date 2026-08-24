@@ -32,7 +32,7 @@ public static class FeatureCatalog
         new("/rap-roast", "Rap Roast", "bi-mic",
             "AI writes a roast verse about your photo, then performs it over a beat."),
         new("/style-director", "Style Director", "bi-sliders",
-            "Four AI agents collaborate to design the perfect art-style prompt, then Gemini paints it."),
+            "AI synthesizes the optimal art-style direction and refined prompt, then Gemini paints it."),
     ];
 
     /// <summary>Every feature except the one at <paramref name="route"/> (case-insensitive).</summary>

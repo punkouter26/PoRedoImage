@@ -1,4 +1,4 @@
-﻿using Azure;
+using Azure;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -122,25 +122,32 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
     public async Task<IReadOnlyList<UserImage>> GetByUserAsync(string userId, CancellationToken ct = default)
     {
         if (_tableClient is null) return [];
-        await EnsureInitializedAsync(ct);
-
-        var results = new List<UserImage>();
-        await foreach (var entity in _tableClient.QueryAsync<UserImageTableEntity>(
-            filter: $"PartitionKey eq '{userId}'", cancellationToken: ct))
+        try
         {
-            results.Add(MapToDomain(entity));
-        }
+            await EnsureInitializedAsync(ct);
 
-        return results.OrderByDescending(i => i.CreatedAt).ToList().AsReadOnly();
+            var results = new List<UserImage>();
+            await foreach (var entity in _tableClient.QueryAsync<UserImageTableEntity>(
+                filter: $"PartitionKey eq '{userId}'", cancellationToken: ct))
+            {
+                results.Add(MapToDomain(entity));
+            }
+
+            return results.OrderByDescending(i => i.CreatedAt).ToList().AsReadOnly();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to retrieve user images for user {UserId}", userId);
+            return [];
+        }
     }
 
     public async Task<(byte[] Bytes, string ContentType)?> GetBlobAsync(string userId, UserImageId imageId, CancellationToken ct = default)
     {
         if (_blobContainer is null) return null;
-        await EnsureInitializedAsync(ct);
-
         try
         {
+            await EnsureInitializedAsync(ct);
             var blobClient = _blobContainer.GetBlobClient($"{userId}/{imageId}");
             var response = await blobClient.DownloadContentAsync(ct);
             var props = await blobClient.GetPropertiesAsync(cancellationToken: ct);
@@ -148,6 +155,11 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to retrieve user image blob {UserId}/{ImageId}", userId, imageId);
             return null;
         }
     }
@@ -159,16 +171,20 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
     public async Task<IReadOnlyList<string>?> GetTagsAsync(string userId, UserImageId imageId, CancellationToken ct = default)
     {
         if (_blobContainer is null) return null;
-        await EnsureInitializedAsync(ct);
-
         try
         {
+            await EnsureInitializedAsync(ct);
             var blobClient = _blobContainer.GetBlobClient($"{userId}/{imageId}");
             var props = await blobClient.GetPropertiesAsync(cancellationToken: ct);
             return ParseTagsMetadata(props.Value.Metadata);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to retrieve tags metadata for {UserId}/{ImageId}", userId, imageId);
             return null;
         }
     }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
@@ -162,22 +162,6 @@ try
                 SegmentsPerWindow = 6,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 2
-            });
-        });
-
-        // Telemetry writes (client vitals) are cheap compared to an AI call, so they get their own
-        // looser budget — but not an unlimited one: this is still an authenticated write path into
-        // Table Storage. One sample per page load means a real user never approaches 30/minute.
-        options.AddPolicy("telemetry", context =>
-        {
-            var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                ?? context.Connection.RemoteIpAddress?.ToString()
-                ?? "anonymous";
-            return RateLimitPartition.GetFixedWindowLimiter(userId, _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
             });
         });
     });
@@ -359,7 +343,6 @@ try
     app.MapAuthEndpoints();
     app.MapImageAnalysisEndpoints();
     app.MapDiagnosticsEndpoints();
-    app.MapVitalsEndpoints();
     app.MapBulkGenerateEndpoints();
     app.MapUserImageEndpoints();
     app.MapMemeTemplateEndpoints();
@@ -369,6 +352,15 @@ try
 
     // Redirect /favicon.ico → /favicon.png so browsers don't get a 404.
     app.MapGet("/favicon.ico", () => Results.Redirect("/favicon.png", permanent: true))
+        .ExcludeFromDescription()
+        .AllowAnonymous();
+
+    // Unknown API paths must stay JSON 404s. NotFound.razor carries a catch-all @page so that a
+    // mistyped *page* URL boots the SPA and renders the board's Not Found screen instead of the
+    // empty body ASP.NET Core used to return; that catch-all would otherwise also swallow
+    // /api/does-not-exist and answer it with an HTML document. This route wins over it because a
+    // literal first segment outranks a catch-all in route precedence.
+    app.Map("/api/{**rest}", () => Results.NotFound())
         .ExcludeFromDescription()
         .AllowAnonymous();
 

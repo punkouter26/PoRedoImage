@@ -23,7 +23,7 @@ namespace PoRedoImage.Infrastructure.Services;
 /// process lifetime so the probe costs one wasted call, not one per image.
 /// </para>
 /// </remarks>
-public sealed class AzureSceneDetailService : ISceneDetailProvider
+public sealed class AzureSceneDetailService : ISceneDetailProvider, ICombinedVisionAnalyzer
 {
     /// <summary>Features available everywhere.</summary>
     private const VisualFeatures BaseFeatures =
@@ -31,6 +31,16 @@ public sealed class AzureSceneDetailService : ISceneDetailProvider
 
     /// <summary>Everything, including the region-limited region captions.</summary>
     private const VisualFeatures RichFeatures = BaseFeatures | VisualFeatures.DenseCaptions;
+
+    /// <summary>
+    /// The detail features PLUS the two <see cref="IVisionService"/> needs. Requesting all of them
+    /// at once is what lets one call answer both interfaces — see <see cref="ICombinedVisionAnalyzer"/>
+    /// for why Rap Roast used to pay for two.
+    /// </summary>
+    private const VisualFeatures CombinedFeatures = RichFeatures | VisualFeatures.Caption | VisualFeatures.Tags;
+
+    /// <summary>Combined, minus the two region-limited features.</summary>
+    private const VisualFeatures CombinedBaseFeatures = BaseFeatures | VisualFeatures.Tags;
 
     private readonly ILogger<AzureSceneDetailService> _logger;
     private readonly IConfiguration _configuration;
@@ -119,6 +129,72 @@ public sealed class AzureSceneDetailService : ISceneDetailProvider
         }
     }
 
+    /// <inheritdoc />
+    public bool SupportsCombinedAnalysis => IsConfigured;
+
+    /// <inheritdoc />
+    public async Task<CombinedVisionResult> AnalyzeAllAsync(byte[] imageData, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(imageData);
+        if (!IsConfigured || imageData.Length == 0)
+            return new CombinedVisionResult(string.Empty, [], 0, SceneDetails.Empty, 0);
+
+        if (!string.IsNullOrWhiteSpace(CurrentKey) && _credential is not null)
+            _credential.Update(CurrentKey);
+
+        var start = Stopwatch.GetTimestamp();
+
+        // Caption and DenseCaptions are the two region-limited features and they travel together:
+        // an endpoint that has one has the other. The probe result recorded for the detail path is
+        // therefore reused here rather than re-discovered.
+        var rich = _supportedFeatures is null || _supportedFeatures == RichFeatures;
+        var features = rich ? CombinedFeatures : CombinedBaseFeatures;
+
+        try
+        {
+            return MapCombined(await AnalyzeAsync(imageData, features, ct), start);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 400 && features == CombinedFeatures)
+        {
+            _logger.LogInformation(
+                "Region does not support Caption/DenseCaptions; continuing with the base feature set.");
+            _supportedFeatures = BaseFeatures;
+            return MapCombined(await AnalyzeAsync(imageData, CombinedBaseFeatures, ct), start);
+        }
+    }
+
+    /// <summary>
+    /// Maps one analysis result onto both interfaces' shapes.
+    /// </summary>
+    /// <remarks>
+    /// The description falls back to joined tags exactly as <c>AzureVisionService</c> does, because
+    /// the regions that lack Caption are the same regions, and callers already understand that a
+    /// keyword-derived description is not a real one — <c>SceneDescriber</c> is built around it.
+    /// </remarks>
+    private CombinedVisionResult MapCombined(ImageAnalysisResult result, long start)
+    {
+        var details = Map(result, start);
+
+        var tags = result.Tags?.Values
+            .Where(t => t.Confidence >= _minConfidence)
+            .Select(t => t.Name)
+            .ToList() ?? [];
+
+        var caption = result.Caption?.Text;
+        var description = !string.IsNullOrWhiteSpace(caption)
+            ? caption
+            : tags.Count > 0
+                ? $"A photo showing {string.Join(", ", tags.Take(8))}"
+                : "No description available";
+
+        return new CombinedVisionResult(
+            description,
+            tags,
+            result.Caption?.Confidence ?? 0,
+            details,
+            (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds);
+    }
+
     private async Task<ImageAnalysisResult> AnalyzeAsync(
         byte[] imageData, VisualFeatures features, CancellationToken ct)
     {
@@ -170,10 +246,16 @@ public sealed class AzureSceneDetailService : ISceneDetailProvider
 }
 
 /// <summary>Scene-detail provider used when the feature is mocked or unavailable.</summary>
-public sealed class NullSceneDetailProvider : ISceneDetailProvider
+public sealed class NullSceneDetailProvider : ISceneDetailProvider, ICombinedVisionAnalyzer
 {
     public bool IsConfigured => false;
 
+    /// <summary>False: there is nothing to combine, so callers take their two-call path.</summary>
+    public bool SupportsCombinedAnalysis => false;
+
     public Task<SceneDetails> GetDetailsAsync(byte[] imageData, CancellationToken ct = default)
         => Task.FromResult(SceneDetails.Empty);
+
+    public Task<CombinedVisionResult> AnalyzeAllAsync(byte[] imageData, CancellationToken ct = default)
+        => Task.FromResult(new CombinedVisionResult(string.Empty, [], 0, SceneDetails.Empty, 0));
 }

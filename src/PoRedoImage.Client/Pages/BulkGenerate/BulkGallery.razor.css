@@ -30,11 +30,11 @@
     min-height: 260px;
 }
 
-.bulk-empty-state__icon { font-size: 2rem; color: var(--steel-dark); margin-bottom: var(--spacing-md); }
+.bulk-empty-state__icon { font-size: var(--text-3xl); color: var(--steel-dark); margin-bottom: var(--spacing-md); }
 
 .bulk-empty-state__title {
     font-family: var(--font-flap);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -42,7 +42,7 @@
     margin-bottom: 0.5rem;
 }
 
-.bulk-empty-state__hint { font-size: 0.86rem; color: var(--steel); max-width: 42ch; margin: 0 auto; line-height: 1.55; }
+.bulk-empty-state__hint { font-size: var(--text-md); color: var(--steel); max-width: 42ch; margin: 0 auto; line-height: 1.55; }
 
 /* ── Board progress header ───────────────────────────────────────────────── */
 .bulk-progress-header {
@@ -50,7 +50,7 @@
     justify-content: space-between;
     align-items: baseline;
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -92,11 +92,11 @@
 
 /* Portrait: two bays across keeps the images large enough to judge. A single
    column would push slot 10 far below the fold on a phone. */
-@media (max-width: 576px) {
+@media (max-width: 639.98px) {
     .bulk-gallery { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 340px) {
+@media (max-width: 479.98px) {
     .bulk-gallery { grid-template-columns: 1fr; }
 }
 
@@ -124,7 +124,7 @@
     gap: 0.4rem;
     padding: 0.35rem 0.5rem;
     font-family: var(--font-flap);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     border-bottom: 1px solid var(--rule);
@@ -139,7 +139,7 @@
     letter-spacing: 0.08em;
 }
 
-.bulk-slot__status--queued { font-size: 0.68rem; }
+.bulk-slot__status--queued { font-size: var(--text-2xs); }
 
 /* ── Image bay (1:1, so the grid's rows stay aligned across the board) ───── */
 .bulk-slot__img-area {
@@ -170,7 +170,7 @@
 .bulk-slot__img-area--pending {
     color: var(--steel-dark);
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     letter-spacing: 0.16em;
 }
 
@@ -179,14 +179,14 @@
     gap: 0.5rem;
     color: var(--amber);
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.16em;
 }
 
 .bulk-slot__img-area--failed {
     color: var(--cancel-red-tx);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     flex-direction: column;
     gap: 0.4rem;
     padding: 0.75rem;
@@ -239,7 +239,7 @@
 }
 
 .bulk-slot__prompt-preview {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     color: var(--steel-dark);
     white-space: nowrap;
     overflow: hidden;
@@ -258,7 +258,7 @@
     border-radius: 0;
     color: var(--steel-dark);
     font-family: var(--font-flap);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em;

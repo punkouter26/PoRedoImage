@@ -24,10 +24,7 @@ public class StyleDirectorWorkflowTests
     private static readonly IChatCompletionService Chat = new NotConfiguredChat();
 
     private static StyleDirectorWorkflow CreateWorkflow() => new(
-        new VisionAnalystAgent(Chat, NullLogger<VisionAnalystAgent>.Instance),
-        new StyleStrategistAgent(Chat, NullLogger<StyleStrategistAgent>.Instance),
-        new PromptRefinerAgent(Chat, NullLogger<PromptRefinerAgent>.Instance),
-        new CriticAgent(Chat, NullLogger<CriticAgent>.Instance),
+        Chat,
         NullLogger<StyleDirectorWorkflow>.Instance);
 
     [Fact]

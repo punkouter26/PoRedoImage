@@ -49,19 +49,47 @@ public sealed class SceneDescriber(
     /// Describes the image. Falls back through progressively simpler sources and only returns
     /// <paramref name="fallbackDescription"/> when no model is available at all.
     /// </summary>
-    public async Task<SceneDescription> DescribeAsync(
+    public Task<SceneDescription> DescribeAsync(
         byte[] image,
         string fallbackDescription,
         IReadOnlyList<string> tags,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-
-        var sw = Stopwatch.StartNew();
-
         // Ground truth first — OCR in particular, because a language model will happily invent the
         // text on a sign it cannot actually read.
-        var details = await SafeDetailsAsync(image, ct);
+        return DescribeCoreAsync(image, fallbackDescription, tags, details: null, ct);
+    }
+
+    /// <summary>
+    /// Describes the image using scene detail the CALLER already has.
+    /// </summary>
+    /// <remarks>
+    /// The orchestrator can now obtain description, tags and detail from one combined Computer
+    /// Vision request (see <see cref="ICombinedVisionAnalyzer"/>). When it does, re-fetching the
+    /// detail here would reinstate exactly the duplicate call that change removed.
+    /// </remarks>
+    public Task<SceneDescription> DescribeAsync(
+        byte[] image,
+        string fallbackDescription,
+        IReadOnlyList<string> tags,
+        SceneDetails details,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        return DescribeCoreAsync(image, fallbackDescription, tags, details, ct);
+    }
+
+    private async Task<SceneDescription> DescribeCoreAsync(
+        byte[] image,
+        string fallbackDescription,
+        IReadOnlyList<string> tags,
+        SceneDetails? details,
+        CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+
+        details ??= await SafeDetailsAsync(image, ct);
 
         if (!chat.IsConfigured)
         {

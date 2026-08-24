@@ -36,14 +36,17 @@
    scoped-CSS attribute never lands on its markup and every rule in this file misses it —
    the same trap already documented for .app-nav__user. Its rules live in app.css. */
 
-/* Radzen paints anchors; keep the rail's own colours. */
+/* Radzen used to paint anchors out from under this rule. It now loads into the
+   `vendor` cascade layer (see css/foundation.css), so these no longer need
+   !important — they win on ordinary source order. Keep them: the rail is steel and
+   must never inherit the board's amber link colour. */
 .app-header a,
 .app-header a:link,
 .app-header a:visited,
 .app-header a:hover {
-    background: transparent !important;
-    box-shadow: none !important;
-    text-decoration: none !important;
+    background: transparent;
+    box-shadow: none;
+    text-decoration: none;
 }
 
 .app-nav {
@@ -52,7 +55,7 @@
     justify-content: space-between;
     padding: 0 1.25rem;
     height: 60px;
-    max-width: 1280px;
+    max-width: var(--rail-max);
     margin: 0 auto;
     width: 100%;
     gap: 0.75rem;
@@ -63,13 +66,13 @@
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
-    text-decoration: none !important;
-    background: transparent !important;
+    text-decoration: none;
+    background: transparent;
 }
 
 /* The wordmark sits in real flap cells, so the brand is the board naming itself. */
 .app-nav__brand .flapstrip { gap: 1px; }
-.app-nav__brand .flap { font-size: 0.82rem; min-width: 0.7em; padding: 0.24em 0.1em; }
+.app-nav__brand .flap { font-size: var(--text-sm); min-width: 0.7em; padding: 0.24em 0.1em; }
 
 .app-nav__brand-icon {
     display: inline-flex;
@@ -87,10 +90,10 @@
 
 /* Nav links sit on steel, so they invert: dark ink, amber underline when active. */
 .app-nav__link {
-    color: #22252b !important;
-    text-decoration: none !important;
+    color: var(--steel-ink);
+    text-decoration: none;
     font-family: var(--font-flap);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -98,7 +101,7 @@
     border-radius: 0;
     border-bottom: 2px solid transparent;
     transition: color var(--motion-fast), border-color var(--motion-fast);
-    background: transparent !important;
+    background: transparent;
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
@@ -107,22 +110,22 @@
 }
 
 .app-nav__link:hover {
-    background: transparent !important;
-    color: #000 !important;
+    background: transparent;
+    color: var(--flap-black);
     border-bottom-color: rgba(0,0,0,0.45);
 }
 
 .app-nav__link.active {
-    background: var(--flap-black) !important;
-    color: var(--amber) !important;
+    background: var(--flap-black);
+    color: var(--amber);
     border-bottom-color: var(--amber);
-    box-shadow: none !important;
+    box-shadow: none;
 }
 
 .app-nav__user {
-    color: #22252b;
+    color: var(--steel-ink);
     font-family: var(--font-flap);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -149,17 +152,17 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    max-width: 1280px;
+    max-width: var(--rail-max);
     margin: 0 auto;
     padding: 0 1.25rem;
     font-family: var(--font-flap);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #22252b;
+    color: var(--steel-ink);
 }
 
-.app-footer__center { color: #22252b; font-weight: 600; }
+.app-footer__center { color: var(--steel-ink); font-weight: 600; }
 
 .app-footer__hint kbd {
     background: var(--flap-black);
@@ -167,7 +170,7 @@
     border: 1px solid rgba(0,0,0,0.5);
     border-radius: 0;
     padding: 0.1rem 0.4rem;
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
 }
 
 .app-footer__env-badge {
@@ -176,7 +179,7 @@
     border: 1px solid rgba(0,0,0,0.5);
     border-radius: 0;
     padding: 0.15rem 0.5rem;
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -190,18 +193,18 @@
 }
 
 /* ── Narrow widths: column priority narrows, the rail never wraps ────────── */
-@media (max-width: 639px) {
+@media (max-width: 639.98px) {
     .app-nav { padding: 0 0.6rem; height: 54px; gap: 0.4rem; }
-    .app-nav__link { padding: 0.4rem 0.45rem; font-size: 0.68rem; letter-spacing: 0.1em; }
+    .app-nav__link { padding: 0.4rem 0.45rem; font-size: var(--text-2xs); letter-spacing: 0.1em; }
     .app-nav__user { display: none; }
     .app-main { min-height: calc(100vh - 54px); }
 
     .d-flex.align-items-center.gap-2.ms-3,
-    .app-nav__link.ms-3 { margin-left: 0 !important; }
+    .app-nav__link.ms-3 { margin-left: 0; }
 }
 
 /* Below 480px the wordmark's cells cost more than they earn; the mark holds. */
-@media (max-width: 479px) {
+@media (max-width: 479.98px) {
     .app-nav__brand-text { display: none; }
     .app-nav__brand .flapstrip { display: none; }
 }

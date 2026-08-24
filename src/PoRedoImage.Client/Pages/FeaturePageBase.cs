@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
@@ -7,6 +7,7 @@ using PoRedoImage.Client.Models;
 using PoRedoImage.Client.Services;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Client.Shared;
+using Microsoft.JSInterop;
 using Radzen;
 using System.Security.Claims;
 
@@ -28,6 +29,7 @@ public abstract class FeaturePageBase : ComponentBase
     [Inject] protected AiSelectionState AiSelection { get; set; } = default!;
     [Inject] protected LocalAiService LocalAi { get; set; } = default!;
     [Inject] protected UserImageSaveService UserImageSave { get; set; } = default!;
+    [Inject] protected IJSRuntime Js { get; set; } = default!;
 
     private ILogger? _logger;
     protected ILogger Logger => _logger ??= LoggerFactory.CreateLogger(GetType());
@@ -35,12 +37,38 @@ public abstract class FeaturePageBase : ComponentBase
     protected IBrowserFile? selectedFile;
     protected string? imagePreviewUrl;
     protected string? errorMessage;
-    protected bool isProcessing;
-    protected bool isComplete;
-    protected int progressPercentage;
-    protected string progressMessage = string.Empty;
     protected MyImagesGallery? _gallery;
     protected string? _userId;
+
+    /// <summary>
+    /// This page's run. The four independent fields that used to live here — isProcessing,
+    /// isComplete, progressPercentage, progressMessage — could contradict each other and did;
+    /// <see cref="FeatureRunState"/> is the BoardStatus machine the app already defined, given
+    /// an owner. The properties below keep the existing page markup compiling against it.
+    /// </summary>
+    protected readonly FeatureRunState Run = new();
+
+    // Setting isProcessing=false does NOT mean success. Pages set isComplete first and clear
+    // isProcessing in a finally block, so the run is already Done by then and this is a no-op;
+    // when it is still Working the attempt ended without a result, which is a Reset, not a Succeed.
+    // Getting that backwards would report a failed run as finished.
+    protected bool isProcessing
+    {
+        get => Run.IsRunning;
+        set { if (value) Run.Start(Run.Stage); else if (Run.IsRunning) Run.Reset(); }
+    }
+
+    protected bool isComplete
+    {
+        get => Run.IsComplete;
+        set { if (value) Run.Succeed(); else if (Run.IsComplete) Run.Reset(); }
+    }
+
+    protected string progressMessage
+    {
+        get => Run.Stage;
+        set => Run.Advance(value);
+    }
 
     protected bool canProcessImage => selectedFile != null || imagePreviewUrl != null;
 
@@ -96,7 +124,7 @@ public abstract class FeaturePageBase : ComponentBase
         errorMessage = null;
         imagePreviewUrl = null;
 
-        var (result, error) = await ImageLoadHelper.LoadAsync(selectedFile);
+        var (result, error) = await ImageLoadHelper.LoadAsync(selectedFile, Js);
         if (error is not null) { errorMessage = error; selectedFile = null; return; }
 
         AdoptImage(result!.PreviewUrl, result.Bytes, result.ContentType, selectedFile.Name);
@@ -108,7 +136,7 @@ public abstract class FeaturePageBase : ComponentBase
     /// Accepts an image that arrived via clipboard paste or a window-level drop
     /// (see <see cref="IntakeImage"/>), applying the same session + auto-save path as an upload.
     /// </summary>
-    protected void HandleImageIntake(IntakeImage payload)
+    protected async Task HandleImageIntake(IntakeImage payload)
     {
         if (payload.Error is not null) { errorMessage = payload.Error; StateHasChanged(); return; }
 
@@ -118,12 +146,19 @@ public abstract class FeaturePageBase : ComponentBase
         var contentType = payload.ContentType ?? "image/png";
         var fileName = payload.FileName ?? "pasted-image.png";
 
+        // A pasted screenshot goes through the same downscale an uploaded photo does — the intake
+        // path should not decide how many pixels the pipeline pays for.
+        var shrunk = await ImageLoadHelper.ShrinkAsync(
+            $"data:{contentType};base64,{payload.Base64}", contentType, bytes, Js);
+        bytes = shrunk.Bytes;
+        contentType = shrunk.ContentType;
+
         // A pasted image has no IBrowserFile; clearing selectedFile keeps the two intake paths
         // from disagreeing about which file the page is currently working on.
         selectedFile = null;
         errorMessage = null;
         isComplete = false;
-        AdoptImage($"data:{contentType};base64,{payload.Base64}", bytes, contentType, fileName);
+        AdoptImage(shrunk.PreviewUrl, bytes, contentType, fileName);
         OnGalleryImageSelected(); // clears derived result state on the concrete page
 
         NotificationService.Notify(NotificationSeverity.Success,
@@ -224,7 +259,53 @@ public abstract class FeaturePageBase : ComponentBase
 
         request.PrecomputedDescription = outcome.Text;
         request.PrecomputedTags = ExtractTags(outcome.Text);
+
+        await AddLocalEnhancementAsync(request, descriptionLength, ct);
         return request;
+    }
+
+    /// <summary>
+    /// Runs the description-to-prompt rewrite on-device when the user selected a browser model for
+    /// that capability, so the server can skip its metered enhancement call.
+    /// </summary>
+    /// <remarks>
+    /// A best-effort step, deliberately. If the local text model is unavailable, still downloading,
+    /// or returns nothing usable, the request simply goes out without a precomputed prompt and the
+    /// server does what it always did. Failing the whole regeneration because a free optimisation
+    /// did not land would be a strictly worse trade — which is why this swallows rather than
+    /// surfacing, unlike the analyze path where a LocalInferenceException is the user's answer.
+    /// </remarks>
+    private async Task AddLocalEnhancementAsync(
+        ImageAnalysisRequest request, int descriptionLength, CancellationToken ct)
+    {
+        if (!AiSelection.GetOption(AiCapability.EnhanceDescription).ExecutesInBrowser) return;
+        if (string.IsNullOrWhiteSpace(request.PrecomputedDescription)) return;
+
+        // Mirrors the server prompt in AzureOpenAiService.EnhanceDescriptionAsync: clauses, not
+        // prose, and a budget a quarter of the preset's nominal word count.
+        var clauseBudget = Math.Clamp(descriptionLength / 4, 40, 120);
+        var prompt =
+            $"Subject: \"{request.PrecomputedDescription}\"" + Environment.NewLine
+            + $"Detected elements: {string.Join(", ", request.PrecomputedTags ?? [])}" + Environment.NewLine + Environment.NewLine
+            + $"Write an image-generation prompt for this subject in at most {clauseBudget} words. "
+            + "Comma-separated visual clauses only — subject, composition, lighting, colour, texture, "
+            + "lens or medium. No sentences, no narration, no preamble. Reply with the prompt only.";
+
+        try
+        {
+            progressMessage = "Writing the prompt on your device…";
+            await InvokeAsync(StateHasChanged);
+
+            var outcome = await LocalAi.CompleteTextAsync(
+                prompt, new Progress<LocalInferenceStatus>(OnLocalProgress), ct);
+
+            if (!string.IsNullOrWhiteSpace(outcome.Text))
+                request.PrecomputedEnhancedPrompt = outcome.Text.Trim();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogInformation(ex, "On-device enhancement unavailable; the server will do it.");
+        }
     }
 
     /// <summary>

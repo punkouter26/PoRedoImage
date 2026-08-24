@@ -3,6 +3,7 @@
 @inject NotificationService NotificationService
 @inject PoRedoImage.Client.Services.UserImageSaveService UserImageSave
 @inject IJSRuntime JSRuntime
+@inject DialogService DialogService
 @inject ILogger<MyImagesGallery> Logger
 
 @if (_loading)
@@ -32,12 +33,12 @@ else if (_images.Count > 0)
                     <button class="gallery-thumb @KindClass(item.Kind)"
                             title="@item.FileName (@item.Kind.ToString()) — click to use"
                             @onclick="@(() => SelectImage(item))">
-                        <img src="@item.ImageUrl" alt="@item.FileName" loading="lazy" />
+                        <img src="@item.ImageUrl" alt="@item.FileName" loading="lazy" decoding="async" fetchpriority="low" />
                         <span class="gallery-thumb__badge" aria-label="@item.Kind"><i class="bi @KindIcon(item.Kind)" aria-hidden="true"></i></span>
                     </button>
                     <button class="gallery-thumb__zoom" title="View full size"
                             aria-label="@($"View {item.FileName} full size")"
-                            @onclick="@(() => _lightbox = item)">
+                            @onclick="@(() => OpenLightboxAsync(item))">
                         <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>
                     </button>
                     <button class="gallery-thumb__delete" title="Delete from My Images"
@@ -54,10 +55,28 @@ else if (_images.Count > 0)
         </button>
     </div>
 }
+else if (_loadError is not null)
+{
+    @* NOT the same thing as an empty gallery, and it used to render as one. Every failure
+       path — 401, 500, a storage account that is down, an 8-second timeout — collapsed to
+       `_images = []` and the user was told "No images yet", i.e. that their saved work did
+       not exist. A gallery that cannot be reached has to say so; silently reporting absence
+       as emptiness is the degradation this project forbids. *@
+    <div class="gallery-bar gallery-bar--error" role="status">
+        <span class="gallery-bar__label"><i class="bi bi-images me-1"></i><span class="d-none d-sm-inline">My Images</span></span>
+        <div class="gallery-bar__empty-hint gallery-bar__empty-hint--error">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            <span>@_loadError</span>
+        </div>
+        <button class="gallery-bar__refresh" @onclick="LoadAsync" title="Retry loading gallery" aria-label="Retry loading gallery">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+}
 else
 {
     // F8 mitigation: explicit empty state so the bar doesn't disappear silently.
-    // Most common cause: user signed in but Storage:ConnectionString is unset, or new user.
+    // Reached only when the request SUCCEEDED and returned nothing — see _loadError above.
     <div class="gallery-bar gallery-bar--empty" role="status">
         <span class="gallery-bar__label"><i class="bi bi-images me-1"></i><span class="d-none d-sm-inline">My Images</span></span>
         <div class="gallery-bar__empty-hint">
@@ -78,7 +97,7 @@ else
     <div class="gallery-undo" role="status">
         <img class="gallery-undo__thumb" src="@_undo.PreviewUrl" alt="" />
         <span class="gallery-undo__text">Deleted <strong>@_undo.FileName</strong></span>
-        <button class="gallery-undo__btn" @onclick="UndoDeleteAsync" disabled="@_restoring">
+        <button class="flap-btn flap-btn--sm" @onclick="UndoDeleteAsync" disabled="@_restoring">
             <i class="bi @(_restoring ? "bi-hourglass" : "bi-arrow-counterclockwise") me-1"></i>Undo
         </button>
         <button class="gallery-undo__dismiss" @onclick="@(() => _undo = null)" aria-label="Dismiss">
@@ -87,41 +106,18 @@ else
     </div>
 }
 
-@* ── Lightbox ─────────────────────────────────────────────────────────── *@
-@if (_lightbox is not null)
-{
-    <div class="gallery-lightbox" role="dialog" aria-modal="true" aria-label="@_lightbox.FileName"
-         @onclick="@(() => _lightbox = null)">
-        @* stopPropagation so a click inside the panel doesn't dismiss it *@
-        <div class="gallery-lightbox__panel" @onclick:stopPropagation="true">
-            <img class="gallery-lightbox__img" src="@_lightbox.ImageUrl" alt="@_lightbox.FileName" />
-            <div class="gallery-lightbox__meta">
-                <span class="gallery-lightbox__name"><i class="bi @KindIcon(_lightbox.Kind) me-2" aria-hidden="true"></i>@_lightbox.FileName</span>
-                <span class="gallery-lightbox__sub">
-                    @_lightbox.Kind · @FormatSize(_lightbox.SizeBytes) · @_lightbox.CreatedAt.ToLocalTime().ToString("g")
-                </span>
-            </div>
-            <div class="gallery-lightbox__actions">
-                <button class="btn btn-sm btn-primary" @onclick="UseLightboxImage">
-                    <i class="bi bi-check2 me-1"></i>Use this image
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadLightboxImage">
-                    <i class="bi bi-download me-1"></i>Download
-                </button>
-            </div>
-            <button class="gallery-lightbox__close" @onclick="@(() => _lightbox = null)" aria-label="Close">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-    </div>
-}
-
 @code {
     [Parameter] public EventCallback<GalleryItem> OnImageSelected { get; set; }
 
     private List<GalleryItem> _images = [];
     private bool _loading = true;
-    private GalleryItem? _lightbox;
+
+    /// <summary>
+    /// Why the gallery could not be read, or null when the read succeeded. Distinct from an empty
+    /// <see cref="_images"/>: "you have no images" and "I could not find out" are different answers
+    /// and only one of them is reassuring.
+    /// </summary>
+    private string? _loadError;
     private string? _deletingId;
     private PendingUndo? _undo;
     private bool _restoring;
@@ -138,27 +134,39 @@ else
     public async Task LoadAsync()
     {
         _loading = true;
+        _loadError = null;
         StateHasChanged();
         try
         {
             // The gallery is a non-critical widget. Cap the wait so a slow/unreachable backend
             // (e.g. storage emulator down locally, which otherwise retries for ~37s before 500ing)
-            // degrades quickly to the empty state instead of shimmering skeletons indefinitely.
+            // degrades quickly instead of shimmering skeletons indefinitely.
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
             var httpResponse = await Http.GetAsync("/api/user-images", cts.Token);
             var contentType = httpResponse.Content.Headers.ContentType?.MediaType;
             if (!httpResponse.IsSuccessStatusCode || contentType != "application/json")
             {
                 _images = [];
+                _loadError = httpResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                    ? "Sign in to see your saved images."
+                    : "Your gallery is unavailable right now — this isn't a sign your images are gone.";
+                Logger.LogWarning(
+                    "User image gallery returned {Status} ({ContentType})", httpResponse.StatusCode, contentType);
                 return;
             }
             var result = await httpResponse.Content.ReadFromJsonAsync<List<GalleryItem>>(SharedJsonOptions.Default,cts.Token);
             _images = result ?? [];
         }
+        catch (OperationCanceledException)
+        {
+            _images = [];
+            _loadError = "Your gallery took too long to answer. Retry?";
+        }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to load user image gallery");
             _images = [];
+            _loadError = "Your gallery is unavailable right now — this isn't a sign your images are gone.";
         }
         finally
         {
@@ -248,18 +256,29 @@ else
         }
     }
 
-    private async Task UseLightboxImage()
+    /// <summary>
+    /// Opens the full-size view as a real modal and acts on what the viewer chose.
+    /// </summary>
+    /// <remarks>
+    /// Radzen owns the focus trap and the Escape key here; this method owns only the
+    /// outcome. A dismissal returns null, which correctly does nothing.
+    /// </remarks>
+    private async Task OpenLightboxAsync(GalleryItem item)
     {
-        var item = _lightbox;
-        if (item is null) return;
-        _lightbox = null;
-        await SelectImage(item);
-    }
+        var choice = await DialogService.OpenAsync<GalleryLightbox>(
+            item.FileName,
+            new Dictionary<string, object> { ["Item"] = item, ["IconClass"] = KindIcon(item.Kind) },
+            new DialogOptions { CloseDialogOnOverlayClick = true, ShowClose = true, CssClass = "gallery-lightbox" });
 
-    private async Task DownloadLightboxImage()
-    {
-        if (_lightbox is null) return;
-        await JSRuntime.InvokeAsync<bool>("downloadImage", _lightbox.ImageUrl, _lightbox.FileName);
+        switch (choice as GalleryLightbox.LightboxResult?)
+        {
+            case GalleryLightbox.LightboxResult.Use:
+                await SelectImage(item);
+                break;
+            case GalleryLightbox.LightboxResult.Download:
+                await JSRuntime.InvokeAsync<bool>("downloadImage", item.ImageUrl, item.FileName);
+                break;
+        }
     }
 
     private static string FormatSize(long bytes) =>

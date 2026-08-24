@@ -2,10 +2,17 @@
 @inject IWebAssemblyHostEnvironment Env
 
 <MockDataBanner />
-<ClientVitalsProbe />
+
+@* Skip link. The rail now carries five feature links plus the brand and the account
+   controls, so a keyboard or screen-reader user met seven stops before the page's own
+   first control on every single navigation. It is visually hidden until focused. *@
+<a class="skip-link" href="#main-content">Skip to main content</a>
 
 <header class="app-header">
-    <nav class="app-nav container-fluid">
+    @* A plain div, not a <nav>: NavMenu inside it IS the navigation landmark, and wrapping
+       it in a second one gave assistive tech two nested "navigation" regions to choose
+       between when only one of them held links. *@
+    <div class="app-nav container-fluid">
         @* The wordmark is painted on real flap cells — the board naming itself. The mark beside
            it is a single flap mid-turn, which is this product's whole idea in one glyph. *@
         <a class="app-nav__brand" href="/" aria-label="PoRedoImage home">
@@ -20,12 +27,20 @@
         </a>
         <NavMenu />
         <LoginDisplay />
-    </nav>
+    </div>
 </header>
 <ActiveImageBar />
 
-<main class="app-main">
-    <article class="content px-4 py-4">
+@*
+    The shell adds NO padding of its own. It used to carry `px-4 py-4` plus a
+    `.content { padding-top: 1rem }` rule, and every page then set its own
+    `container py-4` on top — three independent decisions stacked into ~3.5rem of
+    dead space above every screen's first control. Spacing now belongs to whatever
+    the page puts here: FeatureShell for the feature pages, the page itself for the
+    Studio board and /diag.
+*@
+<main class="app-main" id="main-content" tabindex="-1">
+    <article class="content">
         @Body
     </article>
 </main>
@@ -44,7 +59,11 @@
     </div>
 </footer>
 
+@* Radzen hosts. Notification was already here; Dialog is new and is what gives the
+   gallery lightbox a focus trap, an Escape handler and focus restore — see
+   Shared/GalleryLightbox.razor for why that is worth a dependency. *@
 <RadzenNotification />
+<RadzenDialog />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

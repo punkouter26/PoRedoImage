@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PoRedoImage.Application.Features.ImageAnalysis;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
@@ -31,27 +31,6 @@ public static class ImageAnalysisEndpoints
             .RequireAuthorization()
             .RequireRateLimiting("ai-endpoints")
             .AddEndpointFilter<ValidationFilter<ImageAnalysisRequest>>();
-
-        group.MapGet("/health", (IConfiguration config) =>
-        {
-            var cvHealthy = !string.IsNullOrEmpty(config[ConfigKeys.ComputerVisionEndpoint])
-                            && !string.IsNullOrEmpty(config[ConfigKeys.ComputerVisionApiKey]);
-            var oaiHealthy = !string.IsNullOrEmpty(config[ConfigKeys.OpenAiEndpoint])
-                             && !string.IsNullOrEmpty(config[ConfigKeys.OpenAiKey]);
-            var status = cvHealthy && oaiHealthy ? "Healthy" : "Degraded";
-            return Results.Ok(new
-            {
-                status,
-                services = new
-                {
-                    computerVision = cvHealthy ? "Healthy" : "Degraded",
-                    openAI = oaiHealthy ? "Healthy" : "Degraded"
-                }
-            });
-        })
-        .WithName("ImageAnalysisHealth")
-        .WithSummary("Configuration readiness check for AI image services")
-        .Produces(StatusCodes.Status200OK);
     }
 
     private static async Task<IResult> AnalyzeImageAsync(

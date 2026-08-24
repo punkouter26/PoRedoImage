@@ -17,12 +17,12 @@
             <div class="bulk-modal-footer">
                 <p class="bulk-modal-prompt">@Result.Prompt</p>
                 <div class="bulk-modal-actions">
-                    <button class="btn-heart-modal @(IsFavorite ? "btn-heart-modal--active" : "")"
+                    <button class="flap-btn flap-btn--icon @(IsFavorite ? "flap-btn--active" : "")"
                             @onclick="() => OnToggleFavorite.InvokeAsync(Result.Index)">
                         <i class="bi @(IsFavorite ? "bi-heart-fill" : "bi-heart")"></i>
                         <span class="ms-1">@(IsFavorite ? "Saved" : "Save")</span>
                     </button>
-                    <button class="btn-dl-modal" @onclick="() => OnDownload.InvokeAsync(Result.Index)">
+                    <button class="flap-btn flap-btn--sm" @onclick="() => OnDownload.InvokeAsync(Result.Index)">
                         <i class="bi bi-download me-1"></i>Download
                     </button>
                 </div>

@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Configuration;
 using PoRedoImage.Application.Agents;
@@ -73,10 +75,30 @@ public static class InfrastructureServiceExtensions
             // The router picks per-request based on the selected model id.
             services.AddSingleton<AzureVisionService>();
             services.AddSingleton<OllamaVisionService>();
-            services.AddSingleton<IVisionService>(sp => sp.GetRequiredService<AzureVisionService>());
-            services.AddSingleton<IVisionServiceRouter, VisionServiceRouter>();
+            services.AddSingleton<OpenAiVisionService>();
 
-            services.AddSingleton<IGenerativeAiService, AzureOpenAiService>();
+            // Vision is memoised by image content hash. The decorator wraps the DEFAULT service
+            // only — the router hands out the concrete backends, so Ollama and the OpenAI vision
+            // path get their own wrappers below rather than sharing one and colliding on a key
+            // that says nothing about which model produced the answer.
+            services.AddSingleton<IVisionService>(sp => new CachingVisionService(
+                sp.GetRequiredService<AzureVisionService>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                sp.GetRequiredService<ILogger<CachingVisionService>>(),
+                "vision:azure-cv"));
+
+            services.AddSingleton<IVisionServiceRouter>(sp => new VisionServiceRouter(
+                sp.GetRequiredService<AzureVisionService>(),
+                sp.GetRequiredService<OllamaVisionService>(),
+                sp.GetRequiredService<OpenAiVisionService>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                sp.GetRequiredService<ILoggerFactory>()));
+
+            services.AddSingleton<AzureOpenAiService>();
+            services.AddSingleton<IGenerativeAiService>(sp => new CachingGenerativeAiService(
+                sp.GetRequiredService<AzureOpenAiService>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                sp.GetRequiredService<ILogger<CachingGenerativeAiService>>()));
 
             // Image generation: Google Gemini/Imagen, the only provider.
             //
@@ -101,7 +123,17 @@ public static class InfrastructureServiceExtensions
             // tag-derived description. That makes a broken backend invisible in the UI and expensive
             // to diagnose — which is exactly how the HuggingFace outage above went unnoticed. A new
             // backend needs its failures surfaced, not swallowed.
-            services.AddSingleton<IChatCompletionService, AzureOpenAiChatCompletionService>();
+            // Ollama takes over reasoning when a local chat model is named, so a self-hosted
+            // deployment stops paying Azure for a mood word and three style directions. Resolved
+            // once at startup: this is a deployment decision, not a per-request one.
+            if (!string.IsNullOrWhiteSpace(configuration?[ConfigKeys.OllamaChatModel]))
+            {
+                services.AddSingleton<IChatCompletionService, OllamaChatCompletionService>();
+            }
+            else
+            {
+                services.AddSingleton<IChatCompletionService, AzureOpenAiChatCompletionService>();
+            }
 
             // Music generation for the Rap Roast slice: Google Lyria, which performs supplied
             // lyrics rather than producing an instrumental bed.
@@ -119,11 +151,6 @@ public static class InfrastructureServiceExtensions
         // Repository: Singleton — TableClient is thread-safe; avoids redundant CreateIfNotExists calls per-request
         services.AddSingleton<IBulkPromptRepository, AzureTableBulkPromptRepository>();
 
-        // Client vitals: Singleton for the same reason as the other table-backed repositories.
-        // Registered unconditionally — a mocked AI run still produces real browser timings, and
-        // suppressing them would make mock-mode sessions silently invisible in the dashboard.
-        services.AddSingleton<IClientVitalsRepository, AzureTableClientVitalsRepository>();
-
         // User image gallery: Singleton — BlobContainerClient + TableClient are both thread-safe
         services.AddSingleton<IUserImageRepository, AzureBlobUserImageRepository>();
         services.AddScoped<IUserImageService, UserImageService>();
@@ -137,12 +164,7 @@ public static class InfrastructureServiceExtensions
         services.AddTransient<RoastLyricsWriter>();
         services.AddScoped<IRapRoastOrchestrator, RapRoastOrchestrator>();
 
-        // Idea #1 — Agentic Style Director: 4-agent sequential workflow.
-        // Registered as transient so per-request scoped DI services (logger) flow correctly.
-        services.AddTransient<VisionAnalystAgent>();
-        services.AddTransient<StyleStrategistAgent>();
-        services.AddTransient<PromptRefinerAgent>();
-        services.AddTransient<CriticAgent>();
+        // Style Director prompt synthesis workflow
         services.AddTransient<StyleDirectorWorkflow>();
 
         // Defense-in-depth budget guardrail: an HTTP-pipeline interceptor that blocks any outbound AI

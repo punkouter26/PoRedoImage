@@ -3,7 +3,15 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 
-<div class="upload-panel" @onkeydown="HandleKeyDown" tabindex="0" role="region" aria-label="Image upload">
+@* No tabindex, and no container-level Enter handler.
+
+   The panel used to be `tabindex="0"` so that Enter anywhere in it submitted. That put a tab
+   stop on a role="region" — a landmark, not a control — immediately before the file input it
+   contains, so reaching the uploader by keyboard cost two stops for one control and the first
+   of them did nothing visible. The shortcut it bought was undiscoverable (nothing said "press
+   Enter") and every caller either renders this panel's own submit button or supplies one
+   directly beneath it. *@
+<div class="upload-panel" role="region" aria-label="Image upload">
 
     @* ── Description Length Presets (Image Regeneration only) ─────── *@
     @* Placed above the drop zone so the user can choose detail level   *@
@@ -11,26 +19,31 @@
     @if (ShowDescriptionLength)
     {
         <div class="preset-section mb-4">
-            <span class="preset-section__label"><i class="bi bi-sliders me-1"></i>AI Detail Level</span>
-            <div class="preset-group__buttons">
+            @* The sub-labels used to read "~200 / ~350 / ~500 words". They no longer do, because the
+       enhancement step no longer produces paragraphs — it produces a comma-separated visual
+       specification for an image generator, which is what those models actually read. The preset
+       now buys more distinct visual clauses, not more prose. See
+       AzureOpenAiService.EnhanceDescriptionAsync. *@
+    <span class="preset-section__label"><i class="bi bi-sliders me-1"></i>Prompt detail</span>
+            <div class="flap-choices flap-choices--tight">
                 <button type="button"
-                        class="preset-btn @(DescriptionLength <= 220 ? "preset-btn--active" : "")"
+                        class="flap-choice flap-choice--stack @(DescriptionLength <= 220 ? "flap-choice--active" : "")"
                         @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(200))">
-                    <span class="preset-btn__name">Quick</span>
-                    <span class="preset-btn__words">~200 words</span>
+                    <span class="flap-choice__name">Quick</span>
+                    <span class="flap-choice__meta">Fewest clauses</span>
                 </button>
                 <button type="button"
-                        class="preset-btn @(DescriptionLength > 220 && DescriptionLength <= 420 ? "preset-btn--active" : "")"
+                        class="flap-choice flap-choice--stack @(DescriptionLength > 220 && DescriptionLength <= 420 ? "flap-choice--active" : "")"
                         @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(350))">
-                    <span class="preset-btn__name">Standard</span>
-                    <span class="preset-btn__words">~350 words</span>
-                    <span class="preset-btn__badge">Recommended</span>
+                    <span class="flap-choice__name">Standard</span>
+                    <span class="flap-choice__meta">Balanced</span>
+                    <span class="flap-choice__badge">Recommended</span>
                 </button>
                 <button type="button"
-                        class="preset-btn @(DescriptionLength > 420 ? "preset-btn--active" : "")"
+                        class="flap-choice flap-choice--stack @(DescriptionLength > 420 ? "flap-choice--active" : "")"
                         @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(500))">
-                    <span class="preset-btn__name">Detailed</span>
-                    <span class="preset-btn__words">~500 words</span>
+                    <span class="flap-choice__name">Detailed</span>
+                    <span class="flap-choice__meta">Most clauses</span>
                 </button>
             </div>
         </div>
@@ -91,7 +104,7 @@
     @* ── Process Button ────────────────────────────────────────────── *@
     @if (ShowProcessButton)
     {
-        <button class="btn-process mt-4 w-100" @onclick="OnProcessClicked" disabled="@(!CanProcess)">
+        <button class="flap-btn flap-btn--primary flap-btn--block mt-4" @onclick="OnProcessClicked" disabled="@(!CanProcess)">
             <i class="bi @ButtonIcon me-2"></i>@ButtonLabel
         </button>
     }
@@ -139,13 +152,6 @@
         catch (JSDisconnectedException) { /* page tearing down */ }
         catch (JSException) { }
         _selfRef.Dispose();
-    }
-
-    private Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && CanProcess)
-            return OnProcessClicked.InvokeAsync();
-        return Task.CompletedTask;
     }
 
     private Task HandleDrop(DragEventArgs e)

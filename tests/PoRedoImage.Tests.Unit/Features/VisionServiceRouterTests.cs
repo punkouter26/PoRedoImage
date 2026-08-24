@@ -1,5 +1,6 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 using Moq;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services;
@@ -14,7 +15,8 @@ namespace PoRedoImage.Tests.Unit.Features;
 /// </summary>
 public class VisionServiceRouterTests
 {
-    private static VisionServiceRouter BuildRouter(out AzureVisionService azure, out OllamaVisionService ollama)
+    private static VisionServiceRouter BuildRouter(
+        out AzureVisionService azure, out OllamaVisionService ollama, out OpenAiVisionService openAi)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -29,20 +31,36 @@ public class VisionServiceRouterTests
         factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient());
         ollama = new OllamaVisionService(factory.Object, config, Mock.Of<ILogger<OllamaVisionService>>());
 
-        return new VisionServiceRouter(azure, ollama);
+        var chat = new Mock<IChatCompletionService>();
+        chat.SetupGet(c => c.IsConfigured).Returns(true);
+        openAi = new OpenAiVisionService(chat.Object, Mock.Of<ILogger<OpenAiVisionService>>());
+
+        return new VisionServiceRouter(
+            azure, ollama, openAi,
+            new MemoryCache(new MemoryCacheOptions()),
+            new LoggerFactory());
     }
 
     [Theory]
-    [InlineData(AiProviderIds.OllamaVision, true)]
+    [InlineData(AiProviderIds.OllamaVision, "ollama")]
+    [InlineData(AiProviderIds.AzureOpenAiVision, "openai")]
     // Regression: "qwen..." previously matched the Ollama prefix rule.
-    [InlineData(AiProviderIds.BrowserQwen25, false)]
-    [InlineData(null, false)]
-    [InlineData("gemma4", false)]
-    public void Resolve_RoutesByNamespace_NotByModelNamePrefix(string? modelId, bool expectOllama)
+    [InlineData(AiProviderIds.BrowserQwen25, "azure")]
+    [InlineData(null, "azure")]
+    [InlineData("gemma4", "azure")]
+    public void Resolve_RoutesByNamespace_NotByModelNamePrefix(string? modelId, string expectedBackend)
     {
-        var router = BuildRouter(out var azure, out var ollama);
-        IVisionService expected = expectOllama ? ollama : azure;
+        var router = BuildRouter(out var azure, out var ollama, out var openAi);
+        IVisionService expected = expectedBackend switch
+        {
+            "ollama" => ollama,
+            "openai" => openAi,
+            _ => azure,
+        };
 
-        Assert.Same(expected, router.Resolve(modelId));
+        // Each backend is wrapped in its own cache decorator, so the routed instance is the wrapper
+        // and the assertion has to look through it.
+        var resolved = Assert.IsType<CachingVisionService>(router.Resolve(modelId));
+        Assert.Same(expected, resolved.Inner);
     }
 }

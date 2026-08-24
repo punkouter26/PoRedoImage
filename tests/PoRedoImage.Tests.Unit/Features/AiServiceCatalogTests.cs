@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using PoRedoImage.Client.LocalAi;
 using PoRedoImage.Client.Models;
 using PoRedoImage.Shared.Configuration;
@@ -24,22 +24,41 @@ public class AiServiceCatalogTests
     [Fact]
     public void SingleProviderCapabilities_HaveExactlyOneOption()
     {
-        // EnhanceDescription is single-provider: browser-local text enhancement is unimplemented,
-        // so offering Qwen2.5 here would claim a capability the code does not have.
-        Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.EnhanceDescription));
+        // These three genuinely have one implementation each. EnhanceDescription used to be here
+        // too, on the grounds that "browser-local text enhancement is unimplemented" — it is
+        // implemented now (ImageAnalysisRequest.PrecomputedEnhancedPrompt), so it moved out.
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.StyleDirector));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.SceneDetail));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.CreateAudio));
     }
 
     [Fact]
-    public void AnalyzeImage_IsTheOnlyCapabilityWithABrowserOption()
+    public void A_browser_option_is_offered_only_where_a_local_model_can_actually_run_it()
     {
-        var withBrowser = AiServiceCatalog.All
-            .Where(c => AiServiceCatalog.OptionsFor(c).Any(o => o.ExecutesInBrowser))
-            .ToList();
+        // The rule, not a snapshot of which capabilities happen to have one today. Offering an
+        // on-device option with no registered model is the failure this guards: the picker would
+        // advertise free local execution and then fall through to a metered call, which is the
+        // silent-degradation pattern the architecture notes single out as the worst kind of bug
+        // here — the user believes they opted out of spending and the bill says otherwise.
+        var expected = new Dictionary<AiCapability, LocalCapability>
+        {
+            [AiCapability.AnalyzeImage] = LocalCapability.Vision,
+            [AiCapability.EnhanceDescription] = LocalCapability.Text,
+        };
 
-        Assert.Equal([AiCapability.AnalyzeImage], withBrowser);
+        foreach (var capability in AiServiceCatalog.All)
+        {
+            var browserOptions = AiServiceCatalog.OptionsFor(capability).Where(o => o.ExecutesInBrowser).ToList();
+
+            if (!expected.TryGetValue(capability, out var localCapability))
+            {
+                Assert.Empty(browserOptions);
+                continue;
+            }
+
+            Assert.Single(browserOptions);
+            Assert.NotNull(LocalModelRegistry.DefaultFor(localCapability));
+        }
     }
 
     [Fact]

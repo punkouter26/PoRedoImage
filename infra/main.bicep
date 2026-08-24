@@ -203,8 +203,6 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
 output appServiceDefaultHostName string = webApp.properties.defaultHostName
 output appServicePrincipalId string = webApp.identity.principalId
 output storageAccountName string = storageAccount.name
-output webAppPrincipalId string = webApp.identity.principalId
-output webAppDefaultHostName string = webApp.properties.defaultHostName
 
 // NOTE: Key Vault role assignment (Key Vault Secrets User) is applied post-deploy via the
 // GitHub Actions workflow (deploy.yml → "Bind Key Vault Secrets User role"). The workflow

@@ -1,4 +1,4 @@
-namespace PoRedoImage.Shared.Configuration;
+﻿namespace PoRedoImage.Shared.Configuration;
 
 /// <summary>
 /// The namespaced provider-id vocabulary shared by the client catalog and the server routers.
@@ -18,6 +18,14 @@ public static class AiProviderIds
     // Remote (hosted APIs)
     public const string AzureComputerVision = "remote:azure-cv";
     public const string AzureOpenAi = "remote:azure-openai";
+
+    /// <summary>
+    /// Vision analysis performed by the chat deployment instead of Computer Vision — one call that
+    /// returns a real caption plus tags. See <c>OpenAiVisionService</c> for why that is worth an id
+    /// of its own rather than being folded into <see cref="AzureOpenAi"/>: it is a different
+    /// capability on the same resource, and the picker offers them separately.
+    /// </summary>
+    public const string AzureOpenAiVision = "remote:azure-openai-vision";
     public const string GeminiImagen3 = "remote:gemini-imagen3";
     public const string GoogleLyria = "remote:google-lyria";
 

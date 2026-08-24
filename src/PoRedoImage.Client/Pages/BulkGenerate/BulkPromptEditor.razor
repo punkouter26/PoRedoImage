@@ -4,13 +4,13 @@
 <div class="prompt-editor">
     <div class="prompt-editor__header">
         <div class="prompt-editor__actions">
-            <button class="btn btn-sm btn-outline-secondary" @onclick="ResetDefaults" title="Clear all prompts">
+            <button class="flap-btn flap-btn--sm" @onclick="ResetDefaults" title="Clear all prompts">
                 <i class="bi bi-eraser"></i><span class="ms-1 d-none d-sm-inline">Clear</span>
             </button>
-            <button class="btn btn-sm btn-outline-primary" @onclick="() => OnLoadRequested.InvokeAsync()" title="Load saved prompts">
+            <button class="flap-btn flap-btn--sm" @onclick="() => OnLoadRequested.InvokeAsync()" title="Load saved prompts">
                 <i class="bi bi-cloud-download"></i><span class="ms-1 d-none d-sm-inline">Load</span>
             </button>
-            <button class="btn btn-sm btn-primary" @onclick="() => OnSaveRequested.InvokeAsync()" disabled="@IsSaving" title="Save prompts">
+            <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="() => OnSaveRequested.InvokeAsync()" disabled="@IsSaving" title="Save prompts">
                 @if (IsSaving)
                 {
                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>

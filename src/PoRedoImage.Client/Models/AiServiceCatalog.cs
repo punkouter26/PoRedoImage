@@ -1,4 +1,4 @@
-using PoRedoImage.Client.LocalAi;
+﻿using PoRedoImage.Client.LocalAi;
 using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Client.Models;
@@ -35,6 +35,11 @@ public static class AiServiceCatalog
         [AiCapability.AnalyzeImage] =
         [
             new(AiProviderIds.AzureComputerVision, "Azure Computer Vision", CategoryRemote, "Fastest, uses your API quota"),
+            // One call that returns a real caption AND tags. Azure CV's Caption feature is
+            // region-limited and unavailable on the configured resource, so that backend always
+            // falls back to joining its top tags — a keyword list, not a description. See
+            // OpenAiVisionService.
+            new(AiProviderIds.AzureOpenAiVision, "Azure OpenAI vision", CategoryRemote, "Best descriptions, one call"),
             BrowserOption(AiProviderIds.BrowserFlorence2, LocalCapability.Vision),
             new(AiProviderIds.OllamaVision, "Ollama", CategoryOllama, "Local service, dev only"),
         ],
@@ -45,11 +50,14 @@ public static class AiServiceCatalog
             new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image (only)"),
         ],
 
-        // Single provider: browser-local text enhancement is unimplemented, so Qwen2.5 is not
-        // offered here. Re-add it only alongside a working client-side execution path.
+        // Browser-local enhancement is implemented now: the client writes the image-generation
+        // prompt on-device and the server skips its own call (ImageAnalysisRequest
+        // .PrecomputedEnhancedPrompt). Qwen2.5-0.5B was already in LocalModelRegistry and wired to
+        // nothing before this.
         [AiCapability.EnhanceDescription] =
         [
-            new(AiProviderIds.AzureOpenAi, "Azure OpenAI", CategoryRemote, "Only provider configured"),
+            new(AiProviderIds.AzureOpenAi, "Azure OpenAI", CategoryRemote, "Fastest, uses your API quota"),
+            BrowserOption(AiProviderIds.BrowserQwen25, LocalCapability.Text),
         ],
 
         // The Style Director agents reason through IChatCompletionService, which is Azure OpenAI —

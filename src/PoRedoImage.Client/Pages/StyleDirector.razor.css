@@ -1,0 +1,15 @@
+
+/* A step that fell back to rules rather than the model. Amber, because it is the same
+   "this is not what you think it is" signal the mock banner uses. */
+.trace-step__fallback {
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.45rem;
+    font-family: var(--font-flap);
+    font-size: var(--text-3xs);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    white-space: nowrap;
+}

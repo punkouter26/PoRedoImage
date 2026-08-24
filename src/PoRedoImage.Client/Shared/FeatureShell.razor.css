@@ -1,0 +1,66 @@
+/* The three measures, as CSS Grid rather than a 12-column flex grid.
+
+   Grid is the right tool here and the old markup was using the wrong one: a
+   `row`/`col-lg-7 col-md-9` pair expresses "seven twelfths at large, nine twelfths
+   at medium", which is a proportion of a container nobody chose. What the page
+   actually wants is "as wide as reads well, centred" — a measure, which `max-width`
+   states directly and a column count only approximates. */
+
+.feature-shell {
+    /* One padding decision for every feature page. MainLayout no longer adds its own,
+       so this is the only vertical rhythm at the top of a feature. */
+    width: 100%;
+    max-width: var(--rail-max);
+    margin-inline: auto;
+    padding-inline: var(--space-3);
+}
+
+/* ── Focused ──────────────────────────────────────────────────────────────
+   Setting the column from the text it holds — instead of from a twelfth of a
+   viewport — is why this stays comfortable from a 1280px laptop to a 4K monitor,
+   where `col-lg-7` would have grown to a 900px line nobody can track.
+
+   The measure is on the SHELL, not on the body: constraining only the body left the
+   page title ranged full-width above a centred column, an L-shape with the heading
+   detached from the thing it titles. A measure is a column of content, and the
+   heading is the top of that column. */
+.feature-shell--focused {
+    max-width: 46rem;
+}
+
+/* ── Split ────────────────────────────────────────────────────────────────
+   The rail is sized to its contents (an upload panel and its controls), not to a
+   fraction; the workspace takes the rest. minmax(0, 1fr) rather than 1fr because a
+   grid item's automatic minimum size is its content, and a wide result image inside
+   the workspace would otherwise push the whole layout past the viewport. */
+.feature-shell__split {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+    .feature-shell__split { grid-template-columns: minmax(280px, 22rem) minmax(0, 1fr); }
+}
+
+.feature-shell__rail { min-width: 0; }
+.feature-shell__work { min-width: 0; }
+
+/* ── Board ────────────────────────────────────────────────────────────────
+   Full width. Nothing to constrain: the content is a grid of its own. */
+.feature-shell--board .feature-shell__body { max-width: none; }
+
+/* ── Vertical rhythm ─────────────────────────────────────────────────────── */
+.feature-shell { padding-block: var(--space-4) var(--space-5); }
+
+@media (max-width: 639.98px) {
+    .feature-shell { padding-inline: var(--space-2); padding-block: var(--space-3) var(--space-4); }
+}
+
+/* Room for the fixed action rail, so the last control on the page is never parked
+   underneath it. Applied unconditionally on small screens rather than via a marker
+   class the way it used to be — a page that forgets the class gets an unreachable
+   control, and that is not a failure worth leaving available. */
+@media (max-width: 767.98px) {
+    .feature-shell:has(~ .mobile-sticky-cta) { padding-bottom: 5rem; }
+}

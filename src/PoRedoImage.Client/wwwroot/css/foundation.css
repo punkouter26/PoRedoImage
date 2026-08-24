@@ -1,0 +1,561 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PoRedoImage — FOUNDATION
+   Tokens, reset, grid and utilities. This file replaces the Bootstrap CDN build.
+
+   Why it exists: the app used ~90 distinct Bootstrap classes out of the thousands
+   in the framework, then spent 44 rules and 46 !important declarations overriding
+   the components it did not want. Shipping ~230KB of render-blocking CSS from a
+   third-party origin to obtain a 12-column grid and a spacing scale was a bad
+   trade. Everything Bootstrap was actually used for is reimplemented here, in the
+   board's own terms, at a fraction of the weight.
+
+   Bootstrap Icons is NOT replaced — it is a font, and the app uses it heavily.
+
+   CASCADE LAYERS. The order below is the whole architecture: anything in a later
+   layer beats anything in an earlier one, regardless of specificity. That is what
+   lets a single-class component rule override a utility without !important, and it
+   is why this sheet has none.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer vendor, tokens, reset, grid, utilities, components, overrides;
+
+/* Radzen is pulled in HERE rather than by its own <link>, and the reason is the one
+   rule of cascade layers that bites hardest: UNLAYERED styles beat layered ones, at
+   any specificity. Left as a plain <link>, Radzen's `a { color: … }` would outrank
+   this app's `.app-nav__link` and there would be no way to win except !important —
+   which is exactly the tax the old sheet was paying, 46 times over. Importing it
+   into the lowest layer puts it back underneath the board, where it belongs.
+
+   Cost: one serialized request (this file must parse before Radzen's starts). That
+   is acceptable for a stylesheet only two screens actually need. */
+@import url("../_content/Radzen.Blazor/css/default.css") layer(vendor);
+
+/* ═══ Tokens ═════════════════════════════════════════════════════════════ */
+
+@layer tokens {
+:root {
+    /* ── Board palette (fixed; this world does not re-theme) ─────────────── */
+    --flap-black:    #0D0D0F;   /* flap face — the ground of every panel */
+    --flap-shadow:   #1B1B1E;   /* recessed cell / elevated face */
+    --flap-white:    #F2F2F2;   /* painted letters, and the DONE state */
+    --amber:         #FFB400;   /* WORKING. Also the single accent. */
+    --amber-dim:     #8a6200;   /* amber at rest, for unlit lamps */
+    --cancel-red:    #D32F2F;   /* FAILED — fills and borders only */
+    --cancel-red-tx: #F0736F;   /* FAILED — small text (6.4:1 on flap-black) */
+    --steel:         #B6BBC2;   /* frame highlight, secondary text */
+    /* Label grey. Was #7D838C, which measures 4.498:1 on --flap-shadow — axe failed it for
+       missing the 4.5:1 AA floor by 0.002. Contrast must be checked against flap-SHADOW, the
+       recessed cell colour, not flap-black: the cell is the lighter of the two grounds and so
+       the worse case. This value clears 5.07:1 there and 5.73:1 on flap-black. */
+    --steel-dark:    #868C95;
+
+    --board-ground:  #070708;   /* concourse wall behind the boards */
+    --rule:          rgba(242,242,242,0.10);  /* hairline row rule */
+    --rule-strong:   rgba(242,242,242,0.20);
+    --cell-split:    rgba(0,0,0,0.62);        /* the split across a flap face */
+
+    /* Brushed steel — fine vertical streaks, used for frames and chrome. */
+    --steel-face:
+        repeating-linear-gradient(90deg,
+            rgba(255,255,255,0.055) 0 1px,
+            rgba(0,0,0,0.05) 1px 2px,
+            rgba(255,255,255,0.02) 2px 4px),
+        linear-gradient(180deg, #9DA3AB 0%, #6E747D 42%, #555A62 58%, #7C828A 100%);
+    /* Ink on steel. Steel is a LIGHT surface, so every board grey is illegal on it —
+       this is the only text colour the rails may use (#14161a on #6E747D ≈ 5.6:1). */
+    --steel-ink:     #22252b;
+
+    /* Row lamp — amber dot matrix, lit only while a row is WORKING. */
+    --lamp-lit:
+        radial-gradient(circle at 50% 50%, var(--amber) 0 22%, transparent 24%) 0 0 / 5px 5px;
+    --lamp-dark:
+        radial-gradient(circle at 50% 50%, var(--amber-dim) 0 22%, transparent 24%) 0 0 / 5px 5px;
+
+    /* ── Status. Four values, never a fifth. ────────────────────────────── */
+    --status-queued:  var(--steel-dark);
+    --status-working: var(--amber);
+    --status-done:    var(--flap-white);
+    --status-failed:  var(--cancel-red);
+
+    /* ── Type families ──────────────────────────────────────────────────── */
+    --font-flap: 'Archivo Narrow', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+    --font-ui:   'Archivo', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* ── Type scale ─────────────────────────────────────────────────────────
+       Nine steps on a 1px-ish rhythm from 10px to 24px. The sheet previously
+       carried 24 distinct font-size literals between 0.6 and 1.2rem — 0.74 next
+       to 0.75 next to 0.76 — which is not a scale, it is twenty-four independent
+       decisions. A signage system needs many small steps (this is mostly ruled
+       micro-caps), but it needs them named and finite.
+
+       3xs/2xs are UPPERCASE-ONLY steps: at 10–11px they are legible as tracked
+       flap caps and nowhere near it as running prose. Never set a sentence in one. */
+    --text-3xs:  0.625rem;    /* 10px — cell legends, badge caps */
+    --text-2xs:  0.6875rem;   /* 11px — column heads, status caps */
+    --text-xs:   0.75rem;     /* 12px — hints, meta, footnotes */
+    --text-sm:   0.8125rem;   /* 13px — secondary body */
+    --text-md:   0.875rem;    /* 14px — dense body */
+    --text-lg:   0.9375rem;   /* 15px — body */
+    --text-xl:   1.0625rem;   /* 17px — lead body, section titles */
+    --text-2xl:  1.25rem;     /* 20px — panel headings */
+    --text-3xl:  1.5rem;      /* 24px — page headings */
+
+    --lh-tight:  1.15;   /* flap caps — they must not open up */
+    --lh-snug:   1.45;   /* hints and meta */
+    --lh-normal: 1.6;    /* running copy */
+    --lh-loose:  1.7;    /* lyrics and other read-aloud text */
+
+    /* Tracking. Condensed caps need air; body text needs none. */
+    --track-caps:  0.1em;
+    --track-flap:  0.16em;
+    --track-wide:  0.18em;
+
+    /* ── Geometry. Flaps are rectangles; nothing here rounds. ───────────── */
+    --radius-sm: 0;
+    --radius-md: 0;
+    --radius-lg: 0;
+    --radius-xl: 0;
+    --radius-full: 0;
+    --frame: 6px;              /* steel frame thickness */
+    --rail-max: 1280px;        /* the gantry's measure — header, footer, board */
+
+    /* ── Depth: neutral, offset, soft. No colored halos. ────────────────── */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.55);
+    --shadow-md: 0 3px 10px rgba(0,0,0,0.55);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,0.55);
+    --shadow-xl: 0 24px 64px rgba(0,0,0,0.7);
+    --inset-cell: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.5);
+
+    /* ── Motion. Exponential ease-out; the flap is the only cascade. ────── */
+    --motion-ease-in-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);   /* was bounce; flaps do not bounce */
+    --motion-fast: 120ms;
+    --motion-base: 200ms;
+    --motion-slow: 320ms;
+
+    /* ── Spacing ─────────────────────────────────────────────────────────────
+       Steps 0–5 are numerically identical to Bootstrap's so the ~200 m-*/p-*
+       utilities in existing markup keep their exact rendering after the CDN goes. */
+    --space-0: 0;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 1rem;
+    --space-4: 1.5rem;
+    --space-5: 3rem;
+
+    /* Named aliases for authored component CSS. */
+    --spacing-2xs: 0.125rem;
+    --spacing-xs:  var(--space-1);
+    --spacing-sm:  var(--space-2);
+    --spacing-md:  var(--space-3);
+    --spacing-lg:  var(--space-4);
+    --spacing-xl:  2rem;
+    --spacing-2xl: var(--space-5);
+
+    /* ── Legacy token names, remapped so any rule this sheet misses still
+          lands inside the world instead of reverting to navy/plum. ───────── */
+    --color-primary:          var(--amber);
+    --color-border:           var(--rule-strong);
+    --color-border-hover:     var(--steel-dark);
+    --color-surface:          var(--flap-black);
+    --color-surface-elevated: var(--flap-shadow);
+    --color-bg:               var(--board-ground);
+    --color-body:             var(--flap-white);
+    --color-muted:            var(--steel);
+    --color-muted-light:      var(--steel-dark);
+    --color-focus-ring:       rgba(255,180,0,0.45);
+    --color-success:          var(--flap-white);
+    --color-warning:          var(--amber);
+    --color-danger:           var(--cancel-red);
+
+    color-scheme: dark;
+}
+
+/* ── Breakpoints ─────────────────────────────────────────────────────────────
+   Four, and only four. The sheet previously used ten ad-hoc widths — 340, 360,
+   479, 575, 576, 639, 768, 769, 900 — of which 575/576 and 768/769 are off-by-one
+   pairs that both match at exactly one CSS pixel and disagree about what to do.
+
+   Custom properties cannot be used in media conditions, so these cannot be tokens.
+   They are stated here as the single reference and every query below and in
+   app.css / *.razor.css uses one of them verbatim:
+
+       max-width:  479.98px   xs — one hand, one column
+       max-width:  639.98px   sm — phone landscape
+       max-width:  767.98px   md — tablet portrait; the mobile/desktop line
+       max-width: 1023.98px   lg — tablet landscape / small laptop
+       min-width:  768px      the desktop side of the md line
+       min-width: 1024px      the desktop side of the lg line
+
+   The .98 is deliberate: it closes the one-pixel gap that a max-width:767px /
+   min-width:768px pair leaves on fractional-DPI displays. */
+}
+
+/* ═══ Reset + base ═══════════════════════════════════════════════════════ */
+
+@layer reset {
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+body {
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    line-height: var(--lh-normal);
+    color: var(--flap-white);
+    background-color: var(--board-ground);
+    /* The concourse wall: a faint vertical ruling, like the board's own mullions.
+       Neutral, no hue — this is texture, not a glow. */
+    background-image: repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.014) 0 1px, transparent 1px 96px);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-flap);
+    text-transform: uppercase;
+    letter-spacing: var(--track-caps);
+    font-weight: 700;
+    color: var(--flap-white);
+    line-height: var(--lh-tight);
+    text-wrap: balance;
+    margin: 0 0 var(--space-2);
+}
+
+h1 { font-size: clamp(var(--text-3xl), 6vw, 2.4rem); }
+h2 { font-size: clamp(var(--text-2xl), 4vw, 1.6rem); }
+h3 { font-size: var(--text-xl); }
+h4, h5, h6 { font-size: var(--text-lg); }
+
+p { max-width: 68ch; margin: 0 0 var(--space-3); }
+
+h1:focus { outline: none; }
+
+a { color: var(--amber); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--flap-white); }
+
+/* One focus treatment, everywhere. Amber, square, always visible. */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+::selection { background: var(--amber); color: var(--flap-black); }
+
+img, svg, video, canvas { max-width: 100%; }
+img, svg, video { height: auto; }
+
+/* Form controls do not inherit type by default, and the board has exactly one voice. */
+button, input, select, textarea { font: inherit; color: inherit; }
+
+hr { border: 0; border-top: 1px solid var(--rule); margin: var(--space-3) 0; }
+
+code, kbd, samp, pre { font-family: var(--font-mono); }
+
+/* Accent every native control at once — range thumbs, checkboxes, radios. */
+input, progress { accent-color: var(--amber); }
+
+/* Long-form scrollers in this app are always inside a dark cell. */
+* { scrollbar-color: var(--steel-dark) transparent; }
+}
+
+/* ═══ Grid ═══════════════════════════════════════════════════════════════
+   A 12-column flex grid with Bootstrap's geometry and gutter behaviour, so the
+   ~40 row/col usages in existing markup render identically without the CDN.  */
+
+@layer grid {
+.container,
+.container-fluid {
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: var(--space-3);
+}
+
+/* Bootstrap's container step ladder, capped at the gantry's own measure so a
+   page's content column can never grow wider than the rails framing it. */
+@media (min-width: 576px)  { .container { max-width: 540px; } }
+@media (min-width: 768px)  { .container { max-width: 720px; } }
+@media (min-width: 992px)  { .container { max-width: 960px; } }
+@media (min-width: 1200px) { .container { max-width: 1140px; } }
+@media (min-width: 1400px) { .container { max-width: var(--rail-max); } }
+
+.row {
+    --gutter-x: var(--space-4);
+    --gutter-y: 0;
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: calc(-1 * var(--gutter-y));
+    margin-inline: calc(-0.5 * var(--gutter-x));
+}
+
+.row > * {
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 100%;
+    padding-inline: calc(var(--gutter-x) * 0.5);
+    margin-top: var(--gutter-y);
+}
+
+.g-0 { --gutter-x: 0; --gutter-y: 0; }
+.g-1 { --gutter-x: var(--space-1); --gutter-y: var(--space-1); }
+.g-2 { --gutter-x: var(--space-2); --gutter-y: var(--space-2); }
+.g-3 { --gutter-x: var(--space-3); --gutter-y: var(--space-3); }
+.g-4 { --gutter-x: var(--space-4); --gutter-y: var(--space-4); }
+.g-5 { --gutter-x: var(--space-5); --gutter-y: var(--space-5); }
+
+.col { flex: 1 0 0%; }
+.col-auto { flex: 0 0 auto; width: auto; }
+
+.col-1  { flex: 0 0 auto; width: 8.33333333%; }
+.col-2  { flex: 0 0 auto; width: 16.66666667%; }
+.col-3  { flex: 0 0 auto; width: 25%; }
+.col-4  { flex: 0 0 auto; width: 33.33333333%; }
+.col-5  { flex: 0 0 auto; width: 41.66666667%; }
+.col-6  { flex: 0 0 auto; width: 50%; }
+.col-7  { flex: 0 0 auto; width: 58.33333333%; }
+.col-8  { flex: 0 0 auto; width: 66.66666667%; }
+.col-9  { flex: 0 0 auto; width: 75%; }
+.col-10 { flex: 0 0 auto; width: 83.33333333%; }
+.col-11 { flex: 0 0 auto; width: 91.66666667%; }
+.col-12 { flex: 0 0 auto; width: 100%; }
+
+@media (min-width: 576px) {
+    .col-sm-3  { flex: 0 0 auto; width: 25%; }
+    .col-sm-4  { flex: 0 0 auto; width: 33.33333333%; }
+    .col-sm-6  { flex: 0 0 auto; width: 50%; }
+    .col-sm-8  { flex: 0 0 auto; width: 66.66666667%; }
+    .col-sm-12 { flex: 0 0 auto; width: 100%; }
+}
+
+@media (min-width: 768px) {
+    .col-md-3  { flex: 0 0 auto; width: 25%; }
+    .col-md-4  { flex: 0 0 auto; width: 33.33333333%; }
+    .col-md-5  { flex: 0 0 auto; width: 41.66666667%; }
+    .col-md-6  { flex: 0 0 auto; width: 50%; }
+    .col-md-7  { flex: 0 0 auto; width: 58.33333333%; }
+    .col-md-8  { flex: 0 0 auto; width: 66.66666667%; }
+    .col-md-9  { flex: 0 0 auto; width: 75%; }
+    .col-md-12 { flex: 0 0 auto; width: 100%; }
+}
+
+@media (min-width: 992px) {
+    .col-lg-3  { flex: 0 0 auto; width: 25%; }
+    .col-lg-4  { flex: 0 0 auto; width: 33.33333333%; }
+    .col-lg-5  { flex: 0 0 auto; width: 41.66666667%; }
+    .col-lg-6  { flex: 0 0 auto; width: 50%; }
+    .col-lg-7  { flex: 0 0 auto; width: 58.33333333%; }
+    .col-lg-8  { flex: 0 0 auto; width: 66.66666667%; }
+    .col-lg-9  { flex: 0 0 auto; width: 75%; }
+    .col-lg-12 { flex: 0 0 auto; width: 100%; }
+}
+
+@media (min-width: 1200px) {
+    .col-xl-3 { flex: 0 0 auto; width: 25%; }
+    .col-xl-4 { flex: 0 0 auto; width: 33.33333333%; }
+    .col-xl-8 { flex: 0 0 auto; width: 66.66666667%; }
+    .col-xl-9 { flex: 0 0 auto; width: 75%; }
+}
+}
+
+/* ═══ Utilities ══════════════════════════════════════════════════════════
+   Exactly the set the app uses, plus the obvious siblings of each family so a
+   later edit does not have to come back here. Layered below components, so a
+   component rule wins on its own single class — no !important anywhere.       */
+
+@layer utilities {
+
+/* ── Display ── */
+.d-none         { display: none; }
+.d-block        { display: block; }
+.d-inline       { display: inline; }
+.d-inline-block { display: inline-block; }
+.d-flex         { display: flex; }
+.d-inline-flex  { display: inline-flex; }
+.d-grid         { display: grid; }
+
+@media (min-width: 576px) {
+    .d-sm-none   { display: none; }
+    .d-sm-block  { display: block; }
+    .d-sm-inline { display: inline; }
+    .d-sm-flex   { display: flex; }
+}
+@media (min-width: 768px) {
+    .d-md-none   { display: none; }
+    .d-md-block  { display: block; }
+    .d-md-inline { display: inline; }
+    .d-md-flex   { display: flex; }
+}
+@media (min-width: 992px) {
+    .d-lg-none  { display: none; }
+    .d-lg-block { display: block; }
+    .d-lg-flex  { display: flex; }
+}
+
+/* ── Flexbox ── */
+.flex-row       { flex-direction: row; }
+.flex-column    { flex-direction: column; }
+.flex-wrap      { flex-wrap: wrap; }
+.flex-nowrap    { flex-wrap: nowrap; }
+.flex-fill      { flex: 1 1 auto; }
+.flex-grow-0    { flex-grow: 0; }
+.flex-grow-1    { flex-grow: 1; }
+.flex-shrink-0  { flex-shrink: 0; }
+.flex-shrink-1  { flex-shrink: 1; }
+
+.justify-content-start   { justify-content: flex-start; }
+.justify-content-end     { justify-content: flex-end; }
+.justify-content-center  { justify-content: center; }
+.justify-content-between { justify-content: space-between; }
+.justify-content-around  { justify-content: space-around; }
+.justify-content-evenly  { justify-content: space-evenly; }
+
+.align-items-start    { align-items: flex-start; }
+.align-items-end      { align-items: flex-end; }
+.align-items-center   { align-items: center; }
+.align-items-baseline { align-items: baseline; }
+.align-items-stretch  { align-items: stretch; }
+
+.align-self-start  { align-self: flex-start; }
+.align-self-center { align-self: center; }
+.align-self-end    { align-self: flex-end; }
+
+.gap-0 { gap: 0; }
+.gap-1 { gap: var(--space-1); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+.gap-4 { gap: var(--space-4); }
+.gap-5 { gap: var(--space-5); }
+
+/* ── Spacing. Steps match Bootstrap's 0/.25/.5/1/1.5/3rem exactly. ── */
+.m-0{margin:0}        .m-1{margin:var(--space-1)}   .m-2{margin:var(--space-2)}
+.m-3{margin:var(--space-3)} .m-4{margin:var(--space-4)} .m-5{margin:var(--space-5)}
+.m-auto{margin:auto}
+
+.mt-0{margin-top:0}   .mt-1{margin-top:var(--space-1)}   .mt-2{margin-top:var(--space-2)}
+.mt-3{margin-top:var(--space-3)} .mt-4{margin-top:var(--space-4)} .mt-5{margin-top:var(--space-5)}
+.mt-auto{margin-top:auto}
+
+.mb-0{margin-bottom:0} .mb-1{margin-bottom:var(--space-1)} .mb-2{margin-bottom:var(--space-2)}
+.mb-3{margin-bottom:var(--space-3)} .mb-4{margin-bottom:var(--space-4)} .mb-5{margin-bottom:var(--space-5)}
+.mb-auto{margin-bottom:auto}
+
+.ms-0{margin-left:0}  .ms-1{margin-left:var(--space-1)}  .ms-2{margin-left:var(--space-2)}
+.ms-3{margin-left:var(--space-3)} .ms-4{margin-left:var(--space-4)} .ms-5{margin-left:var(--space-5)}
+.ms-auto{margin-left:auto}
+
+.me-0{margin-right:0} .me-1{margin-right:var(--space-1)} .me-2{margin-right:var(--space-2)}
+.me-3{margin-right:var(--space-3)} .me-4{margin-right:var(--space-4)} .me-5{margin-right:var(--space-5)}
+.me-auto{margin-right:auto}
+
+.mx-0{margin-inline:0} .mx-1{margin-inline:var(--space-1)} .mx-2{margin-inline:var(--space-2)}
+.mx-3{margin-inline:var(--space-3)} .mx-auto{margin-inline:auto}
+.my-0{margin-block:0} .my-1{margin-block:var(--space-1)} .my-2{margin-block:var(--space-2)}
+.my-3{margin-block:var(--space-3)} .my-4{margin-block:var(--space-4)} .my-5{margin-block:var(--space-5)}
+
+.p-0{padding:0}       .p-1{padding:var(--space-1)}  .p-2{padding:var(--space-2)}
+.p-3{padding:var(--space-3)} .p-4{padding:var(--space-4)} .p-5{padding:var(--space-5)}
+
+.pt-0{padding-top:0}  .pt-1{padding-top:var(--space-1)}  .pt-2{padding-top:var(--space-2)}
+.pt-3{padding-top:var(--space-3)} .pt-4{padding-top:var(--space-4)} .pt-5{padding-top:var(--space-5)}
+
+.pb-0{padding-bottom:0} .pb-1{padding-bottom:var(--space-1)} .pb-2{padding-bottom:var(--space-2)}
+.pb-3{padding-bottom:var(--space-3)} .pb-4{padding-bottom:var(--space-4)} .pb-5{padding-bottom:var(--space-5)}
+
+.ps-0{padding-left:0} .ps-1{padding-left:var(--space-1)} .ps-2{padding-left:var(--space-2)}
+.ps-3{padding-left:var(--space-3)}
+.pe-0{padding-right:0} .pe-1{padding-right:var(--space-1)} .pe-2{padding-right:var(--space-2)}
+.pe-3{padding-right:var(--space-3)}
+
+.px-0{padding-inline:0} .px-1{padding-inline:var(--space-1)} .px-2{padding-inline:var(--space-2)}
+.px-3{padding-inline:var(--space-3)} .px-4{padding-inline:var(--space-4)}
+.py-0{padding-block:0} .py-1{padding-block:var(--space-1)} .py-2{padding-block:var(--space-2)}
+.py-3{padding-block:var(--space-3)} .py-4{padding-block:var(--space-4)} .py-5{padding-block:var(--space-5)}
+
+@media (min-width: 576px) { .ms-sm-auto { margin-left: auto; } .me-sm-auto { margin-right: auto; } }
+
+/* ── Sizing ── */
+.w-100 { width: 100%; }
+.w-auto { width: auto; }
+.h-100 { height: 100%; }
+.mw-100 { max-width: 100%; }
+
+/* ── Type ──
+   These map onto the scale rather than restating Bootstrap's rem values, which is
+   the point of having a scale: `small` is one step down from body, everywhere. */
+.small { font-size: var(--text-sm); }
+.lead  { font-size: var(--text-xl); line-height: var(--lh-snug); }
+
+.fw-light    { font-weight: 300; }
+.fw-normal   { font-weight: 400; }
+.fw-medium   { font-weight: 500; }
+.fw-semibold { font-weight: 600; }
+.fw-bold     { font-weight: 700; }
+
+.fs-1 { font-size: var(--text-3xl); }
+.fs-2 { font-size: var(--text-2xl); }
+.fs-3 { font-size: var(--text-xl); }
+.fs-4 { font-size: var(--text-lg); }
+.fs-5 { font-size: var(--text-md); }
+.fs-6 { font-size: var(--text-sm); }
+
+.text-start  { text-align: left; }
+.text-center { text-align: center; }
+.text-end    { text-align: right; }
+.text-uppercase { text-transform: uppercase; }
+.text-nowrap { white-space: nowrap; }
+.text-break  { word-break: break-word; overflow-wrap: anywhere; }
+.text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Colour utilities resolve to board values only. There is no blue in this world,
+   so `text-primary` is amber; there is no fifth status, so `text-info` is steel. */
+.text-body      { color: var(--flap-white); }
+.text-muted     { color: var(--steel); }
+.text-secondary { color: var(--steel); }
+.text-primary   { color: var(--amber); }
+.text-warning   { color: var(--amber); }
+.text-success   { color: var(--flap-white); }
+.text-danger    { color: var(--cancel-red-tx); }
+.text-info      { color: var(--steel); }
+.text-white     { color: var(--flap-white); }
+
+/* ── Borders + surface ── */
+.border         { border: 1px solid var(--rule-strong); }
+.border-0       { border: 0; }
+.border-top     { border-top: 1px solid var(--rule-strong); }
+.border-bottom  { border-bottom: 1px solid var(--rule-strong); }
+.rounded, .rounded-0, .rounded-1, .rounded-2, .rounded-3, .rounded-circle, .rounded-pill { border-radius: 0; }
+
+/* ── Position + overflow ── */
+.position-relative { position: relative; }
+.position-absolute { position: absolute; }
+.position-sticky   { position: sticky; }
+.position-fixed    { position: fixed; }
+.overflow-hidden   { overflow: hidden; }
+.overflow-auto     { overflow: auto; }
+
+/* ── Accessibility ──
+   clip-path over the legacy clip:rect — same effect, no deprecated property, and
+   it does not defeat text selection the way width:1px;overflow:hidden can. */
+.visually-hidden,
+.sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+}

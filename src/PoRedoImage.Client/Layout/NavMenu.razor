@@ -1,2 +1,30 @@
-@* Top nav intentionally has no feature links — the home page (reached via the
-   PoRedoImage brand logo) lists and describes every function. *@
+@*
+    Feature switching. This used to be an empty file with a comment saying the home page
+    "lists and describes every function" — true, but it meant the only route out of a
+    feature was the brand logo, and moving from Rap Roast to Meme cost a trip through
+    home and past six model pickers. ActiveImageBar still carried a comment calling this
+    "the single source of truth" for feature switching, which had quietly become false.
+
+    The active image survives navigation, so switching here is genuinely cheap: you keep
+    your photo and change what happens to it. That is the board's own idea — one photo,
+    many destinations — so the rail names the destinations.
+*@
+<nav class="app-nav__links" aria-label="Features">
+    @foreach (var (href, label) in Features)
+    {
+        <NavLink class="app-nav__link" href="@href" Match="NavLinkMatch.All">@label</NavLink>
+    }
+</nav>
+
+@code {
+    // Order matches the Studio board's rows, so the rail and the home page cannot disagree
+    // about what this app does or what order it does it in.
+    private static readonly (string Href, string Label)[] Features =
+    [
+        ("/image-regeneration", "Regenerate"),
+        ("/meme-generation",    "Meme"),
+        ("/bulk-generate",      "Bulk"),
+        ("/rap-roast",          "Roast"),
+        ("/style-director",     "Style"),
+    ];
+}

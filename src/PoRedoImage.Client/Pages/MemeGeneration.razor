@@ -5,126 +5,173 @@
 
 <PageTitle>Meme Generation — PoRedoImage</PageTitle>
 
-<div class="container py-4">
-    <FeatureLayout 
-        IconClass="bi-emoji-laughing"
-        Title="Meme Generation"
-        Description="Upload a photo and AI will write a witty caption and overlay it on your image."
-        Steps="@(new[] {
-            ("bi-upload", "Upload photo"),
-            ("bi-cpu", "AI writes caption"),
-            ("bi-image", "Download your meme")
-        })" />
+<FeatureShell IconClass="bi-emoji-laughing"
+              Title="Meme Generation"
+              Description="Upload a photo and AI will write a witty caption and overlay it on your image."
+              Steps="@(new[] {
+                  ("bi-upload", "Upload photo"),
+                  ("bi-cpu", "AI writes caption"),
+                  ("bi-image", "Download your meme")
+              })">
+    <ChildContent>
 
     @if (!isProcessing && !isComplete)
     {
-        <div class="row justify-content-center">
-            <div class="col-lg-7 col-md-9">
-                <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
-                <ImageUploadPanel
-                    ShowDescriptionLength="false"
-                    ButtonLabel="@(_useTemplate ? "Render Template" : "Generate Meme")"
-                    ButtonIcon="@(_useTemplate ? "bi-grid-3x3-gap" : "bi-emoji-laughing")"
-                    DescriptionLength="350"
-                    ImagePreviewUrl="@imagePreviewUrl"
-                    ErrorMessage="@errorMessage"
-                    CanProcess="@canProcessImage"
-                    OnFileChange="LoadFile"
-                    OnImageIntake="HandleImageIntake"
-                    OnProcessClicked="ProcessImage" />
+        <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
+        <ImageUploadPanel
+            ShowDescriptionLength="false"
+            ButtonLabel="@(_useTemplate ? "Render Template" : "Generate Meme")"
+            ButtonIcon="@(_useTemplate ? "bi-grid-3x3-gap" : "bi-emoji-laughing")"
+            DescriptionLength="350"
+            ImagePreviewUrl="@imagePreviewUrl"
+            ErrorMessage="@errorMessage"
+            CanProcess="@canProcessImage"
+            OnFileChange="LoadFile"
+            OnImageIntake="HandleImageIntake"
+            OnProcessClicked="ProcessImage" />
 
-                @* ── Idea #17 — Meme Template Library toggle ────────────── *@
-                <div class="meme-template-card mt-3 p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <i class="bi bi-grid-3x3-gap-fill"></i>
-                        <strong>Template Library</strong>
-                        <div class="form-check form-switch ms-auto">
-                            <input class="form-check-input" type="checkbox" id="tplToggle"
-                                   checked="@_useTemplate" @onchange="OnTemplateToggleChanged" />
-                            <label class="form-check-label small" for="tplToggle">
-                                @(_useTemplate ? "On" : "Off")
-                            </label>
-                        </div>
-                    </div>
-                    @if (_useTemplate)
-                    {
-                        @if (_templates is null)
-                        {
-                            <div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Loading templates…</div>
-                        }
-                        else
-                        {
-                            <div class="meme-template-grid">
-                                @foreach (var t in _templates)
-                                {
-                                    var isSelected = _selectedTemplateId == t.Id;
-                                    <button class="meme-template-tile @(isSelected ? "meme-template-tile--selected" : "")"
-                                            @onclick="@(() => SelectTemplate(t.Id))"
-                                            title="@t.Description">
-                                        <span class="meme-template-tile__name">@t.Name</span>
-                                        <span class="meme-template-tile__cat">@t.Category · @t.RequiredZoneCount zone@(t.RequiredZoneCount == 1 ? "" : "s")</span>
-                                    </button>
-                                }
-                            </div>
-
-                            @if (_selectedTemplate is not null)
-                            {
-                                <div class="meme-template-zones mt-3">
-                                    <p class="small text-muted mb-2">
-                                        <i class="bi bi-info-circle me-1"></i>@_selectedTemplate.Description
-                                    </p>
-                                    @for (var i = 0; i < _selectedTemplate.RequiredZoneCount; i++)
-                                    {
-                                        var zone = _selectedTemplate.Zones[i];
-                                        <div class="mb-2">
-                                            <label class="form-label small fw-semibold">@zone.Label</label>
-                                            <input class="form-control form-control-sm"
-                                                   placeholder="Type the text for this zone…"
-                                                   maxlength="120"
-                                                   value="@(_zoneTexts.Count > i ? _zoneTexts[i] : string.Empty)"
-                                                   @onchange="@(e => UpdateZoneText(i, e.Value?.ToString() ?? string.Empty))" />
-                                        </div>
-                                    }
-                                </div>
-                            }
-                        }
-                    }
-                    else
-                    {
-                        <p class="small text-muted mb-0">
-                            <i class="bi bi-lightbulb me-1"></i>
-                            AI will write a witty caption automatically. Toggle on to pick from
-                            20 classic formats instead.
-                        </p>
-                    }
+        @* ── Idea #17 — Meme Template Library toggle ────────────── *@
+        <div class="meme-template-card mt-3 p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-grid-3x3-gap-fill"></i>
+                <strong>Template Library</strong>
+                <div class="form-check form-switch ms-auto">
+                    <input class="form-check-input" type="checkbox" id="tplToggle"
+                           checked="@_useTemplate" @onchange="OnTemplateToggleChanged" />
+                    <label class="form-check-label small" for="tplToggle">
+                        @(_useTemplate ? "On" : "Off")
+                    </label>
                 </div>
             </div>
+            @if (_useTemplate)
+            {
+                @if (_templates is null)
+                {
+                    <div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Loading templates…</div>
+                }
+                else
+                {
+                    <div class="meme-template-grid">
+                        @foreach (var t in _templates)
+                        {
+                            var isSelected = _selectedTemplateId == t.Id;
+                            <button class="flap-choice flap-choice--tile @(isSelected ? "flap-choice--active" : "")"
+                                    @onclick="@(() => SelectTemplate(t.Id))"
+                                    title="@t.Description">
+                                <span class="flap-choice__name">@t.Name</span>
+                                <span class="flap-choice__meta">@t.Category · @t.RequiredZoneCount zone@(t.RequiredZoneCount == 1 ? "" : "s")</span>
+                            </button>
+                        }
+                    </div>
+
+                    @if (_selectedTemplate is not null)
+                    {
+                        <div class="meme-template-zones mt-3">
+                            <p class="small text-muted mb-2">
+                                <i class="bi bi-info-circle me-1"></i>@_selectedTemplate.Description
+                            </p>
+                            @for (var i = 0; i < _selectedTemplate.RequiredZoneCount; i++)
+                            {
+                                var zone = _selectedTemplate.Zones[i];
+                                <div class="mb-2">
+                                    <label class="form-label small fw-semibold">@zone.Label</label>
+                                    <input class="form-control form-control-sm"
+                                           placeholder="Type the text for this zone…"
+                                           maxlength="120"
+                                           value="@(_zoneTexts.Count > i ? _zoneTexts[i] : string.Empty)"
+                                           @onchange="@(e => UpdateZoneText(i, e.Value?.ToString() ?? string.Empty))" />
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            }
+            else
+            {
+                <p class="small text-muted mb-0">
+                    <i class="bi bi-lightbulb me-1"></i>
+                    AI will write a witty caption automatically. Toggle on to pick from
+                    20 classic formats instead.
+                </p>
+            }
         </div>
     }
 
     @if (isProcessing)
     {
-        <div class="row justify-content-center mt-4">
-            <div class="col-lg-7 col-md-9">
-                <ProcessingProgressBar Percentage="@progressPercentage" Message="@progressMessage" />
-            </div>
-        </div>
+        <ProcessingProgressBar Message="@progressMessage" />
     }
 
     @if (isComplete)
     {
-        <MemeResultsPanel
-            ImagePreviewUrl="@imagePreviewUrl"
-            AnalysisResult="@analysisResult"
-            OnDownloadOriginal="DownloadOriginal"
-            OnDownloadMeme="DownloadMeme"
-            OnManualSave="ManualSaveMemeAsync"
-            OnStartOver="StartOver" />
+        <ResultsPanel ImagePreviewUrl="@imagePreviewUrl"
+                      RightLabel="Meme"
+                      DividerIcon="bi-emoji-laughing"
+                      OnDownloadOriginal="DownloadOriginal"
+                      OnStartOver="StartOver"
+                      ResultImageUrl="@MemeImageUrl"
+                      ResultFileName="meme.png">
+            <RightSide>
+                @if (MemeImageUrl is not null)
+                {
+                    <img src="@MemeImageUrl" class="split-compare__img" alt="Meme"
+                         onload="this.classList.add('loaded')" />
+                }
+                else
+                {
+                    <div class="split-compare__unavailable">Meme not available</div>
+                }
+            </RightSide>
+            <CaptionContent>
+                @if (!string.IsNullOrEmpty(analysisResult?.MemeCaption))
+                {
+                    <div class="meme-caption-reveal mb-4">
+                        @foreach (var line in analysisResult.MemeCaption.Split('\n'))
+                        {
+                            <h3 class="meme-caption-line fw-bold text-uppercase">@line</h3>
+                        }
+                    </div>
+                }
+            </CaptionContent>
+            <PrimaryAction>
+                @if (!string.IsNullOrEmpty(analysisResult?.MemeImageData))
+                {
+                    <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="DownloadMeme">
+                        <i class="bi bi-download me-2"></i>Save &amp; Download Meme
+                    </button>
+                    <button class="flap-btn flap-btn--sm" @onclick="ManualSaveMemeAsync" title="Save the meme to My Images gallery">
+                        <i class="bi bi-images me-2"></i>Save to My Images
+                    </button>
+                }
+            </PrimaryAction>
+            <AdditionalMoreOptions>
+                @if (analysisResult?.Metrics != null)
+                {
+                    <span class="flap-btn flap-btn--sm">
+                        <i class="bi bi-clock me-1"></i>@((analysisResult.Metrics.TotalProcessingTimeMs / 1000.0).ToString("F1"))s
+                    </span>
+                }
+            </AdditionalMoreOptions>
+        </ResultsPanel>
     }
-</div>
+    </ChildContent>
+
+    <StickyAction>
+        @if (!isProcessing && !isComplete)
+        {
+            <button class="flap-btn flap-btn--primary mobile-sticky-cta__btn"
+                    @onclick="ProcessImage" disabled="@(!canProcessImage)">
+                <i class="bi @(_useTemplate ? "bi-grid-3x3-gap" : "bi-emoji-laughing") me-1"></i>@(_useTemplate ? "Render Template" : "Generate Meme")
+            </button>
+        }
+    </StickyAction>
+</FeatureShell>
 
 @code {
     private ImageAnalysisResponse? analysisResult;
+    private string? MemeImageUrl => string.IsNullOrEmpty(analysisResult?.MemeImageData)
+        ? null
+        : $"data:image/png;base64,{analysisResult.MemeImageData}";
 
     // ── Idea #17 — Meme Template Library state ─────────────────────
     private bool _useTemplate;
@@ -216,7 +263,6 @@
         {
             isProcessing = true;
             errorMessage = null;
-            progressPercentage = 10;
             progressMessage = "Preparing image for analysis...";
             StateHasChanged();
 
@@ -243,7 +289,6 @@
             {
                 errorMessage = LocalAiErrorClassifier.Describe(ex.Failure);
                 isProcessing = false;
-                progressPercentage = 0;
                 return;
             }
             catch (OperationCanceledException)
@@ -255,11 +300,9 @@
                 errorMessage = "On-device model setup took too long, likely the first-run model "
                     + "download. Try again on a faster connection, or pick a remote provider in AI services.";
                 isProcessing = false;
-                progressPercentage = 0;
                 return;
             }
 
-            progressPercentage = 30;
             progressMessage = "Analyzing image...";
             StateHasChanged();
 
@@ -309,11 +352,9 @@
                     };
                     // ReadAsStringAsync first so we can show progress and avoid a stuck-progress state
                     // when deserialization of a multi-MB payload takes a noticeable moment on the WASM side.
-                    progressPercentage = 85;
                     progressMessage = "Decoding meme…";
                     try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
                     var rawJson = await httpResponse.Content.ReadAsStringAsync(cts.Token);
-                    progressPercentage = 92;
                     progressMessage = "Rendering result…";
                     try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
                     analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(rawJson, jsonOpts);
@@ -335,7 +376,6 @@
             }
             finally
             {
-                progressPercentage = 100;
                 progressMessage = string.IsNullOrEmpty(errorMessage) ? "Meme generated!" : "Generation failed.";
                 isProcessing = false;
                 isComplete = string.IsNullOrEmpty(errorMessage);
@@ -379,7 +419,6 @@
         {
             isProcessing = true;
             errorMessage = null;
-            progressPercentage = 40;
             progressMessage = $"Rendering '{_selectedTemplate.Name}'…";
             StateHasChanged();
 
@@ -433,7 +472,6 @@
         }
         finally
         {
-            progressPercentage = 100;
             progressMessage = string.IsNullOrEmpty(errorMessage) ? "Done!" : "Failed.";
             isProcessing = false;
             isComplete = string.IsNullOrEmpty(errorMessage);
@@ -464,7 +502,6 @@
         errorMessage = null;
         isProcessing = false;
         isComplete = false;
-        progressPercentage = 0;
         progressMessage = string.Empty;
         analysisResult = null;
         Logger.LogInformation("Meme Generation reset");

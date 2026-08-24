@@ -1,4 +1,4 @@
-@page "/bulk-generate"
+﻿@page "/bulk-generate"
 @attribute [Authorize]
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
@@ -13,17 +13,77 @@
 
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
-<div class="container py-4 has-mobile-sticky-cta">
-    <FeatureLayout
-        IconClass="bi-images"
-        Title="Bulk Generate"
-        Description="@("Upload a photo and generate 10 artistic variations. Use <PERSON> in prompts — AI replaces it with a description of your image.")"
-        ModelBadge="Gemini 2.0 Flash (img2img)" />
+@* Split measure: a setup rail beside the ten-slot board. The rail used to be
+   `col-lg-4 col-xl-3` and the board `col-lg-8 col-xl-9` — a proportion nobody chose,
+   which at 1200px handed the rail 25% whether or not an upload panel fits in it. The
+   shell sizes the rail from its contents and gives the board everything else. *@
+@* ModelBadge comes from the server's live pricing payload — the same source the cost row
+   further down already used. It was hardcoded here as "Gemini 2.0 Flash (img2img)" while that
+   row rendered "Google Gemini 2.5 Flash Image": two different model names for one operation on
+   one screen. A literal cannot track a provider swap, so this page no longer holds one. *@
+<FeatureShell Measure="FeatureShell.FeatureMeasure.Split"
+              IconClass="bi-images"
+              Title="Bulk Generate"
+              Description="@("Upload a photo and generate 10 artistic variations. Use <PERSON> in prompts — AI replaces it with a description of your image.")"
+              ModelBadge="@Cost.Pricing?.ImageProviderLabel">
 
+    <Aside>
+    @if (!_isGenerating)
+    {
+        <MyImagesGallery @ref="_gallery" OnImageSelected="ApplyGalleryImage" />
+        <ImageUploadPanel
+            ShowDescriptionLength="false"
+            ShowProcessButton="false"
+            ImagePreviewUrl="@_imagePreviewUrl"
+            ErrorMessage="@_uploadError"
+            CanProcess="false"
+            OnFileChange="LoadFile"
+            OnImageIntake="HandleImageIntake" />
+    }
+    else
+    {
+        @if (_imagePreviewUrl is not null)
+        {
+            <div class="bulk-upload-preview mb-3">
+                <img src="@_imagePreviewUrl" alt="Source image" />
+            </div>
+        }
+    }
+
+    @if (!_isGenerating)
+    {
+        <button class="flap-btn flap-btn--primary flap-btn--block mt-3"
+                @onclick="StartGeneration"
+                disabled="@(string.IsNullOrEmpty(_imagePreviewUrl) || _activePromptCount == 0)">
+            <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString()) Variation@(_activePromptCount == 1 ? "" : "s")
+        </button>
+        @if (_completedResults.Count > 0)
+        {
+            <button class="flap-btn flap-btn--block mt-2" @onclick="DownloadAllAsZip" disabled="@_zipping">
+                <i class="bi @(_zipping ? "bi-hourglass-split" : "bi-file-earmark-zip") me-1"></i>
+                @(_zipping ? "Packing…" : $"Download All ({_completedResults.Count}) as ZIP")
+            </button>
+        }
+        @if (_favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
+        {
+            <button class="flap-btn flap-btn--block mt-2" @onclick="DownloadFavorites" disabled="@_zipping">
+                <i class="bi bi-heart-fill me-1"></i>Download Favorites (@_favorites.Count)
+            </button>
+        }
+    }
+    else
+    {
+        <button class="flap-btn flap-btn--danger flap-btn--block mt-3" @onclick="CancelGeneration">
+            <i class="bi bi-stop-circle me-1"></i>Cancel
+        </button>
+    }
+    </Aside>
+
+    <ChildContent>
     @if (Cost.Pricing is not null)
     {
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3 small text-secondary">
-            <span class="badge text-bg-light border"><i class="bi bi-cpu me-1"></i>@Cost.Pricing.ImageProviderLabel</span>
+            <span class="badge"><i class="bi bi-cpu me-1"></i>@Cost.Pricing.ImageProviderLabel</span>
             <span><i class="bi bi-cash-coin me-1"></i>≈ @Cost.Format(Cost.Pricing.ImageToImageUsd) / image (estimate)</span>
             @if (Cost.EstimatedTotal > 0)
             {
@@ -32,74 +92,15 @@
         </div>
     }
 
-    <div class="row g-4">
-        @* Left: Upload + Action Button *@
-        <div class="col-lg-4 col-xl-3">
-            @if (!_isGenerating)
-            {
-                <MyImagesGallery @ref="_gallery" OnImageSelected="ApplyGalleryImage" />
-                <ImageUploadPanel
-                    ShowDescriptionLength="false"
-                    ShowProcessButton="false"
-                    ImagePreviewUrl="@_imagePreviewUrl"
-                    ErrorMessage="@_uploadError"
-                    CanProcess="false"
-                    OnFileChange="LoadFile"
-                    OnImageIntake="HandleImageIntake" />
-            }
-            else
-            {
-                @if (_imagePreviewUrl is not null)
-                {
-                    <div class="bulk-upload-preview mb-3">
-                        <img src="@_imagePreviewUrl" alt="Source image" />
-                    </div>
-                }
-            }
-
-            @if (!_isGenerating)
-            {
-                <button class="btn-generate-all w-100 mt-3"
-                        @onclick="StartGeneration"
-                        disabled="@(string.IsNullOrEmpty(_imagePreviewUrl) || _activePromptCount == 0)">
-                    <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString()) Variation@(_activePromptCount == 1 ? "" : "s")
-                </button>
-                @if (_completedResults.Count > 0)
-                {
-                    <button class="btn-download-favs w-100 mt-2" @onclick="DownloadAllAsZip" disabled="@_zipping">
-                        <i class="bi @(_zipping ? "bi-hourglass-split" : "bi-file-earmark-zip") me-1"></i>
-                        @(_zipping ? "Packing…" : $"Download All ({_completedResults.Count}) as ZIP")
-                    </button>
-                }
-                @if (_favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
-                {
-                    <button class="btn-download-favs w-100 mt-2" @onclick="DownloadFavorites" disabled="@_zipping">
-                        <i class="bi bi-heart-fill me-1"></i>Download Favorites (@_favorites.Count)
-                    </button>
-                }
-            }
-            else
-            {
-                <button class="btn btn-outline-danger w-100 mt-3" @onclick="CancelGeneration">
-                    <i class="bi bi-stop-circle me-1"></i>Cancel
-                </button>
-            }
-        </div>
-
-        @* Right: Gallery *@
-        <div class="col-lg-8 col-xl-9">
-            <BulkGallery
-                @ref="_bulkGallery"
-                Results="@_results"
-                CompletedCount="@_completedCount"
-                Favorites="@_favorites"
-                OnDownloadImage="DownloadImage"
-                OnToggleFavorite="ToggleFavorite"
-                OnReroll="RerollFromSlot"
-                OnAcceptReroll="AcceptReroll" />
-        </div>
-    </div>
-
+    <BulkGallery
+        @ref="_bulkGallery"
+        Results="@_results"
+        CompletedCount="@_completedCount"
+        Favorites="@_favorites"
+        OnDownloadImage="DownloadImage"
+        OnToggleFavorite="ToggleFavorite"
+        OnReroll="RerollFromSlot"
+        OnAcceptReroll="AcceptReroll" />
     @* Prompt Drawer (Radzen Drawer) *@
     <PromptDrawer
         Prompts="@_prompts"
@@ -123,30 +124,32 @@
     }
 
     @* Mobile sticky bottom CTA *@
-    <div class="mobile-sticky-cta">
+    </ChildContent>
+
+    <StickyAction>
         @if (!_isGenerating && !string.IsNullOrEmpty(_imagePreviewUrl) && _activePromptCount > 0)
-        {
-            <button class="mobile-sticky-cta__btn mobile-sticky-cta__btn--primary"
-                    @onclick="StartGeneration">
-                <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString())
-            </button>
-        }
-        @if (_isGenerating)
-        {
-            <button class="mobile-sticky-cta__btn mobile-sticky-cta__btn--secondary"
-                    @onclick="CancelGeneration">
-                <i class="bi bi-stop-circle me-1"></i>Cancel
-            </button>
-        }
-        @if (!_isGenerating && _favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
-        {
-            <button class="mobile-sticky-cta__btn mobile-sticky-cta__btn--secondary"
-                    @onclick="DownloadFavorites">
-                <i class="bi bi-heart-fill me-1"></i>Save Favorites
-            </button>
-        }
-    </div>
-</div>
+    {
+        <button class="flap-btn flap-btn--primary mobile-sticky-cta__btn"
+                @onclick="StartGeneration">
+            <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString())
+        </button>
+    }
+    @if (_isGenerating)
+    {
+        <button class="flap-btn mobile-sticky-cta__btn"
+                @onclick="CancelGeneration">
+            <i class="bi bi-stop-circle me-1"></i>Cancel
+        </button>
+    }
+    @if (!_isGenerating && _favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
+    {
+        <button class="flap-btn mobile-sticky-cta__btn"
+                @onclick="DownloadFavorites">
+            <i class="bi bi-heart-fill me-1"></i>Save Favorites
+        </button>
+    }
+    </StickyAction>
+</FeatureShell>
 
 @code {
     private IBrowserFile? _selectedFile;
@@ -325,53 +328,100 @@
                 Logger.LogInformation("Bulk Generate: Vision description acquired: {Description}", description);
             }
 
-            // Generate each variation sequentially
-            for (int i = 0; i < _results.Count; i++)
+            // ── One request, streamed ────────────────────────────────────────────
+            // This was a `for` loop of one-at-a-time POSTs, each re-uploading the whole source
+            // image: ten sequential round-trips for a batch of ten, and roughly 53MB of base64
+            // upload for a 4MB photo. The server now fans out under its own concurrency cap and
+            // streams each slot back as NDJSON, so the board still fills in one card at a time —
+            // it just stops taking three times longer than it needs to.
+            //
+            // Slots complete OUT OF ORDER under concurrency, which is why each line carries its
+            // index rather than relying on arrival sequence.
+            var safeDescription = SanitizeDescription(description);
+            var finalPrompts = activePrompts
+                .Select(p => string.IsNullOrEmpty(safeDescription)
+                    ? p.prompt
+                    : p.prompt.Replace(DefaultPrompts.PersonToken, safeDescription, StringComparison.Ordinal))
+                .ToArray();
+
+            foreach (var slot in _results) slot.Status = BulkGenerateStatus.Processing;
+            StateHasChanged();
+
+            using var batchRequest = new HttpRequestMessage(HttpMethod.Post, "/api/bulk-generate/batch")
             {
-                if (_cts.Token.IsCancellationRequested) break;
+                Content = JsonContent.Create(
+                    new BulkBatchRequest(
+                        Convert.ToBase64String(_imageBytes),
+                        _imageContentType,
+                        finalPrompts,
+                        AiSelection.Get(AiCapability.GenerateImage)),
+                    options: SharedJsonOptions.Default),
+            };
 
-                _results[i].Status = BulkGenerateStatus.Processing;
-                StateHasChanged();
+            // Without this the browser buffers the whole response and the stream arrives as one
+            // lump at the end — which would preserve the latency win but throw away the live board.
+            batchRequest.SetBrowserResponseStreamingEnabled(true);
 
+            using var batchResponse = await Http.SendAsync(
+                batchRequest, HttpCompletionOption.ResponseHeadersRead, _cts.Token);
+
+            if (!batchResponse.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Batch API returned {batchResponse.StatusCode}");
+
+            await using var stream = await batchResponse.Content.ReadAsStreamAsync(_cts.Token);
+            using var reader = new StreamReader(stream);
+
+            while (await reader.ReadLineAsync(_cts.Token) is { } line)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                BulkBatchItem? item;
                 try
                 {
-                    var rawPrompt = activePrompts[i].prompt;
-                    // BOMB-3 mitigation: length-cap the vision description before string substitution
-                    // to prevent token-quota drain + reflected XSS via GPT-4o vision content.
-                    var safeDescription = SanitizeDescription(description);
-                    var finalPrompt = string.IsNullOrEmpty(safeDescription)
-                        ? rawPrompt
-                        : rawPrompt.Replace(DefaultPrompts.PersonToken, safeDescription, StringComparison.Ordinal);
+                    item = System.Text.Json.JsonSerializer.Deserialize<BulkBatchItem>(line, SharedJsonOptions.Default);
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    // A malformed line loses one slot, not the batch.
+                    Logger.LogWarning(ex, "Unparseable batch line skipped");
+                    continue;
+                }
 
-                    // True image-to-image via API: Gemini 2.0 Flash uses the uploaded photo as subject reference
-                    var varResp = await Http.PostAsJsonAsync("/api/bulk-generate/variation",
-                        new BulkVariationRequest(Convert.ToBase64String(_imageBytes), _imageContentType, finalPrompt, AiSelection.Get(AiCapability.GenerateImage)), SharedJsonOptions.Default);
-                    if (!varResp.IsSuccessStatusCode)
-                        throw new InvalidOperationException($"Variation API returned {varResp.StatusCode}");
-                    var varResult = await varResp.Content.ReadFromJsonAsync<BulkVariationResponse>(SharedJsonOptions.Default);
+                if (item is null || item.Index < 0 || item.Index >= _results.Count) continue;
 
-                    _results[i].Status = BulkGenerateStatus.Complete;
-                    _results[i].Prompt = rawPrompt;
-                    _results[i].ImageUrl = $"data:{varResult!.ContentType};base64,{varResult.ImageData}";
+                var slot = _results[item.Index];
+
+                if (item.ImageData is null || item.ContentType is null)
+                {
+                    slot.Status = BulkGenerateStatus.Failed;
+                    slot.ErrorMessage = item.Error ?? "Generation failed for this variation.";
+                    Logger.LogError("Bulk slot {Index} failed: {Error}", item.Index, slot.ErrorMessage);
+                    _ = Audio.FailureAsync();
+                }
+                else
+                {
+                    slot.Status = BulkGenerateStatus.Complete;
+                    slot.Prompt = activePrompts[item.Index].prompt;
+                    slot.ImageUrl = $"data:{item.ContentType};base64,{item.ImageData}";
                     _completedCount++;
                     Cost.RecordImages();
                     _ = Audio.TickAsync();
-                    // Fire-and-forget: save variation to gallery
                     if (_userId is not null)
-                        _ = AutoSaveVariationAsync(varResult.ImageData, varResult.ContentType);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _results[i].Status = BulkGenerateStatus.Failed;
-                    _results[i].ErrorMessage = ex.Message;
-                    Logger.LogError(ex, "Failed to generate bulk image {Index}", i);
-                    _ = Audio.FailureAsync();
+                        _ = AutoSaveVariationAsync(item.ImageData, item.ContentType);
                 }
 
                 StateHasChanged();
                 // Persist results to localStorage so they survive circuit disconnection
                 _ = JSRuntime.InvokeVoidAsync("bulkStateManager.save",
                     System.Text.Json.JsonSerializer.Serialize(new { Results = _results })).AsTask();
+            }
+
+            // Any slot the server never reported is a slot that did not land — mark it rather than
+            // leaving it spinning forever.
+            foreach (var slot in _results.Where(r => r.Status == BulkGenerateStatus.Processing))
+            {
+                slot.Status = BulkGenerateStatus.Failed;
+                slot.ErrorMessage = "No result was returned for this variation.";
             }
 
             if (!_cts.Token.IsCancellationRequested)

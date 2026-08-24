@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using PoRedoImage.Application.Features.UserImages;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Shared.DTOs;
@@ -74,8 +74,18 @@ public static class UserImageEndpoints
         try { image = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
         catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-        var result = await service.SaveOriginalAsync(userId, image.Bytes.ToArray(), image.ContentType, request.FileName, request.Tags, ct);
-        return Results.Ok(result);
+        try
+        {
+            var result = await service.SaveOriginalAsync(userId, image.Bytes.ToArray(), image.ContentType, request.FileName, request.Tags, ct);
+            return Results.Ok(result);
+        }
+        catch (Exception)
+        {
+            return Results.Problem(
+                title: "Storage Service Unavailable",
+                detail: "Unable to connect to Azure Storage. Please ensure Azurite or storage is running.",
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     private static async Task<IResult> SaveResultAsync(
@@ -94,8 +104,18 @@ public static class UserImageEndpoints
         try { image = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
         catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-        var result = await service.SaveResultAsync(userId, image.Bytes.ToArray(), image.ContentType, request.Kind, request.Tags, ct);
-        return Results.Ok(result);
+        try
+        {
+            var result = await service.SaveResultAsync(userId, image.Bytes.ToArray(), image.ContentType, request.Kind, request.Tags, ct);
+            return Results.Ok(result);
+        }
+        catch (Exception)
+        {
+            return Results.Problem(
+                title: "Storage Service Unavailable",
+                detail: "Unable to connect to Azure Storage. Please ensure Azurite or storage is running.",
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     private static async Task<IResult> GetImageAsync(

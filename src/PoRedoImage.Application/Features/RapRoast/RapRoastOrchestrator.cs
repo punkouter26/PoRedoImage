@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Shared.Configuration;
 using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Application.Features.RapRoast;
@@ -19,6 +20,7 @@ public sealed class RapRoastOrchestrator(
     SceneDescriber sceneDescriber,
     RoastLyricsWriter lyricsWriter,
     IMusicGenerationService musicService,
+    ISceneDetailProvider sceneDetails,
     ILogger<RapRoastOrchestrator> logger) : IRapRoastOrchestrator
 {
     /// <summary>
@@ -34,16 +36,63 @@ public sealed class RapRoastOrchestrator(
         var total = Stopwatch.StartNew();
         var imageBytes = Convert.FromBase64String(request.ImageData);
 
-        // Step 1 — vision for tags. Routed exactly as the analyze pipeline is, so the roast honours
-        // whichever backend the caller selected.
-        var vision = visionRouter.Resolve(request.ModelId);
-        var (baseDescription, tags, _, _) = await vision.AnalyzeAsync(imageBytes, ct);
+        // Steps 1 + 2 — look at the photo, once.
+        //
+        // This used to be two Computer Vision calls with identical bytes: AnalyzeAsync for
+        // Caption|Tags here, then GetDetailsAsync for Read|Objects|People|DenseCaptions inside the
+        // scene describer. Azure CV takes every one of those features in a single request, so the
+        // second call bought a round-trip and a charge and nothing else.
+        //
+        // When the backend cannot combine them — Ollama and the browser-local models have no OCR or
+        // dense captions — the two calls still happen, but concurrently rather than one after the
+        // other. Neither depends on the other's output.
+        string baseDescription;
+        IReadOnlyList<string> tags;
+        SceneDetails? details = null;
 
-        // Step 2 — a genuinely detailed scene description. The vision backend's own description is
+        var vision = visionRouter.Resolve(request.ModelId);
+
+        // A caller that explicitly chose Ollama gets Ollama, even though combining would be
+        // cheaper — honouring the model selection matters more than saving a call.
+        if (!AiProviderIds.IsOllama(request.ModelId)
+            && sceneDetails is ICombinedVisionAnalyzer { SupportsCombinedAnalysis: true } combined)
+        {
+            try
+            {
+                var all = await combined.AnalyzeAllAsync(imageBytes, ct);
+                baseDescription = all.Description;
+                tags = all.Tags;
+                details = all.Details;
+                logger.LogInformation(
+                    "Combined vision analysis in {Elapsed}ms — one call instead of two.", all.ElapsedMs);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The combined call is an OPTIMISATION over two independent services, so its failure
+                // must cost what it saved and nothing more.
+                //
+                // This is not hypothetical — it is what the integration suite caught. Detail
+                // extraction has always swallowed its own errors (losing OCR degrades the bars, it
+                // does not fail the request), and folding the primary vision call into it quietly
+                // moved that call behind a component whose credentials can be broken independently.
+                // In the Test environment the vision service is a working mock while the Computer
+                // Vision client holds a fake key, and the whole roast started 500ing.
+                logger.LogWarning(ex,
+                    "Combined vision analysis failed; falling back to separate vision + detail calls.");
+                (baseDescription, tags, details) = await SeparateAnalysisAsync(vision, imageBytes, ct);
+            }
+        }
+        else
+        {
+            (baseDescription, tags, details) = await SeparateAnalysisAsync(vision, imageBytes, ct);
+        }
+
+        // Step 3 — a genuinely detailed scene description. The vision backend's own description is
         // often just its top tags joined together (Azure's Caption feature is region-limited), and
         // keywords produce generic bars. A vision-capable chat model gives the specifics a roast
-        // needs; without one this returns the tag-derived text unchanged.
-        var scene = await sceneDescriber.DescribeAsync(imageBytes, baseDescription, tags, ct);
+        // needs; without one this returns the tag-derived text unchanged. The detail is handed in
+        // rather than re-fetched — that is the whole point of the combined call above.
+        var scene = await sceneDescriber.DescribeAsync(imageBytes, baseDescription, tags, details, ct);
         var description = scene.Text;
 
         var response = new RapRoastResponse
@@ -92,6 +141,38 @@ public sealed class RapRoastOrchestrator(
         logger.LogInformation("Music provider refused every attempt; returning lyrics only.");
         return Finish(response, lyrics!, music: null, total, music?.RefusalReason
             ?? "The music provider declined to perform these lyrics.");
+    }
+
+    /// <summary>
+    /// The two-call path: vision and scene detail run CONCURRENTLY, because neither reads the
+    /// other's output. Used when the backend cannot combine them, and as the fallback when the
+    /// combined call fails.
+    /// </summary>
+    private async Task<(string Description, IReadOnlyList<string> Tags, SceneDetails Details)>
+        SeparateAnalysisAsync(IVisionService vision, byte[] imageBytes, CancellationToken ct)
+    {
+        var analyzeTask = vision.AnalyzeAsync(imageBytes, ct);
+        var detailTask = SafeDetailsAsync(imageBytes, ct);
+        await Task.WhenAll(analyzeTask, detailTask);
+
+        var (description, tags, _, _) = await analyzeTask;
+        return (description, tags, await detailTask);
+    }
+
+    /// <summary>
+    /// Scene detail is an enhancement: losing it must degrade the bars, never fail the request.
+    /// </summary>
+    private async Task<SceneDetails> SafeDetailsAsync(byte[] image, CancellationToken ct)
+    {
+        try
+        {
+            return await sceneDetails.GetDetailsAsync(image, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Scene detail extraction failed; continuing without it.");
+            return SceneDetails.Empty;
+        }
     }
 
     private static RapRoastResponse Finish(

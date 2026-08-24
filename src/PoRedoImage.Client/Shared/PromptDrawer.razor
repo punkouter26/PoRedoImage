@@ -37,13 +37,13 @@
         </div>
 
         <div class="prompt-drawer__actions">
-            <button type="button" class="prompt-drawer__btn" @onclick="ResetDefaults" disabled="@IsSaving">
+            <button type="button" class="flap-btn flap-btn--sm" @onclick="ResetDefaults" disabled="@IsSaving">
                 <i class="bi bi-eraser"></i><span>Clear</span>
             </button>
-            <button type="button" class="prompt-drawer__btn" @onclick="() => OnLoadRequested.InvokeAsync()" disabled="@IsSaving">
+            <button type="button" class="flap-btn flap-btn--sm" @onclick="() => OnLoadRequested.InvokeAsync()" disabled="@IsSaving">
                 <i class="bi bi-cloud-download"></i><span>Load</span>
             </button>
-            <button type="button" class="prompt-drawer__btn prompt-drawer__btn--primary" @onclick="() => OnSaveRequested.InvokeAsync()" disabled="@IsSaving">
+            <button type="button" class="flap-btn flap-btn--primary flap-btn--sm" @onclick="() => OnSaveRequested.InvokeAsync()" disabled="@IsSaving">
                 <i class="bi bi-cloud-upload"></i><span>Save</span>
             </button>
         </div>

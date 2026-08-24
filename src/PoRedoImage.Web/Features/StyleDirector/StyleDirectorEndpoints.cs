@@ -98,7 +98,7 @@ public static class StyleDirectorEndpoints
 
     private static StyleDirectorReasoningEntryDto MapReasoning(AgentReasoningEntry e) => new(
         e.AgentId, e.AgentDisplayName, e.IconClass, e.Summary,
-        e.ElapsedMs, e.TokensUsed, e.Timestamp);
+        e.ElapsedMs, e.TokensUsed, e.Timestamp, e.FallbackReason);
 
     private static StyleDirectionDto MapDirection(StyleDirection d) =>
         new(d.Name, d.Palette, d.Technique, d.ReferenceEra);

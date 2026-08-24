@@ -5,15 +5,24 @@
 @inject LocalAiService LocalAi
 @inject AiSelectionState Selection
 
-@* One selector per capability. The categories are not interchangeable — Ollama and the browser
-   models cannot generate images — so a single global picker could never be correct. *@
+@*
+    One selector per capability — but only for the capabilities that actually offer a choice.
+
+    Four of the six (Style Director, Scene detail, Create audio, Generate image) have exactly one
+    entry in the catalog and rendered as `disabled` selects reading "Only provider configured".
+    They still cost a label, a full-width control and a row of vertical rhythm each, and on the home
+    page they owned the left rail on desktop and an entire screen above the feature list on mobile.
+    A control that cannot be operated is not a control; it is a fact. Facts belong on one line.
+
+    The categories are not interchangeable — Ollama and the browser models cannot generate images —
+    so a single global picker could never be correct, which is why this is per-capability at all.
+*@
 <fieldset class="ai-picker">
     <legend class="ai-picker__legend">AI services</legend>
 
-    @foreach (var capability in AiServiceCatalog.All)
+    @foreach (var capability in Choosable)
     {
         var options = AiServiceCatalog.OptionsFor(capability);
-        var single = options.Count == 1;
         var selectId = $"ai-picker-{capability}";
 
         <div class="ai-picker__row">
@@ -21,8 +30,6 @@
 
             <select id="@selectId"
                     class="ai-picker__select"
-                    disabled="@single"
-                    title="@(single ? "Only provider configured for this capability" : null)"
                     value="@Selection.Get(capability)"
                     @onchange="@(e => OnSelected(capability, e.Value?.ToString()))">
                 @foreach (var group in options.GroupBy(o => o.Category))
@@ -36,6 +43,28 @@
                 }
             </select>
         </div>
+    }
+
+    @if (Fixed.Count > 0)
+    {
+        @* The single-provider capabilities, stated rather than offered. Kept visible because
+           WHICH model runs is still information the user is entitled to — it is the choosing
+           that was fictional, not the fact. *@
+        <details class="ai-picker__fixed">
+            <summary class="ai-picker__fixed-summary">
+                @Fixed.Count more @(Fixed.Count == 1 ? "capability has" : "capabilities have") one provider
+            </summary>
+            <ul class="ai-picker__fixed-list">
+                @foreach (var capability in Fixed)
+                {
+                    var only = AiServiceCatalog.OptionsFor(capability)[0];
+                    <li class="ai-picker__fixed-item">
+                        <span class="ai-picker__fixed-label">@AiServiceCatalog.LabelFor(capability)</span>
+                        <span class="ai-picker__fixed-value">@only.DisplayName</span>
+                    </li>
+                }
+            </ul>
+        </details>
     }
 
     @if (ShowsBrowserModel)
@@ -62,6 +91,14 @@
 @code {
     private DeviceCapabilities? _capabilities;
     private bool _browserUnsupported;
+
+    /// <summary>Capabilities with a real decision behind them — these get a select.</summary>
+    private static IReadOnlyList<AiCapability> Choosable { get; } =
+        AiServiceCatalog.All.Where(c => AiServiceCatalog.OptionsFor(c).Count > 1).ToArray();
+
+    /// <summary>Capabilities with exactly one provider — stated, not offered.</summary>
+    private static IReadOnlyList<AiCapability> Fixed { get; } =
+        AiServiceCatalog.All.Where(c => AiServiceCatalog.OptionsFor(c).Count == 1).ToArray();
 
     // Only meaningful once a browser-executed model is actually chosen — showing GPU status while
     // every capability is remote would be noise.

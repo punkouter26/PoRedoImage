@@ -7,11 +7,11 @@
 
 <div class="split-compare-wrapper mb-4">
     <div class="compare-modes">
-        <button type="button" class="compare-modes__btn @(_wipeMode ? "compare-modes__btn--active" : "")"
+        <button type="button" class="flap-btn flap-btn--sm @(_wipeMode ? "flap-btn--active" : "")"
                 @onclick="@(() => _wipeMode = true)" aria-pressed="@_wipeMode">
             <i class="bi bi-arrow-left-right me-1"></i>Wipe
         </button>
-        <button type="button" class="compare-modes__btn @(!_wipeMode ? "compare-modes__btn--active" : "")"
+        <button type="button" class="flap-btn flap-btn--sm @(!_wipeMode ? "flap-btn--active" : "")"
                 @onclick="@(() => _wipeMode = false)" aria-pressed="@(!_wipeMode)">
             <i class="bi bi-layout-split me-1"></i>Side by side
         </button>
@@ -70,11 +70,11 @@
     @PrimaryAction
     @if (ResultImageUrl is not null)
     {
-        <button class="btn-result-secondary" @onclick="ShareResult" disabled="@_sharing" title="Share this result">
+        <button class="flap-btn flap-btn--sm" @onclick="ShareResult" disabled="@_sharing" title="Share this result">
             <i class="bi @(_sharing ? "bi-hourglass-split" : "bi-share") me-1"></i>Share
         </button>
     }
-    <button class="btn-result-secondary" @onclick="OnStartOver">
+    <button class="flap-btn flap-btn--sm" @onclick="OnStartOver">
         <i class="bi bi-arrow-repeat me-1"></i>Try Again
     </button>
 </div>
@@ -90,7 +90,7 @@
             @foreach (var feature in FeatureCatalog.Except(_currentRoute))
             {
                 var target = feature;
-                <button type="button" class="send-to__btn" @onclick="@(() => SendResultTo(target))"
+                <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => SendResultTo(target))"
                         title="@target.Description">
                     <i class="bi @target.Icon me-1"></i>@target.Title
                 </button>
@@ -103,7 +103,7 @@
    no protective reason, and the secondary actions are cheap enough to just show. *@
 <div class="results-more mb-4">
     <div class="results-more__panel d-flex gap-2 flex-wrap">
-        <button class="btn btn-outline-secondary btn-sm" @onclick="OnDownloadOriginal">
+        <button class="flap-btn flap-btn--sm" @onclick="OnDownloadOriginal">
             <i class="bi bi-download me-1"></i>Download Original
         </button>
         @if (AdditionalMoreOptions != null)

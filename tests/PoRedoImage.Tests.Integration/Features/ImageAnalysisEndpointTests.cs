@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
@@ -103,17 +103,7 @@ public class ImageAnalysisEndpointTests : IClassFixture<MockedServicesWebApplica
         Assert.NotNull(root.GetProperty("memeImageData").GetString());
     }
 
-    // ─── Health sub-endpoint ────────────────────────────────────────
 
-    [Fact]
-    public async Task ImageAnalysisHealth_Returns200()
-    {
-        var response = await _client.GetAsync("/api/images/health");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Healthy", content);
-    }
 
     // ─── Metrics verification ───────────────────────────────────────
 
@@ -279,38 +269,32 @@ public class ImageAnalysisEndpointFailureTests : IClassFixture<ThrowingComputerV
         _client = factory.CreateClient();
     }
 
-    [Fact]
-    public async Task AnalyzeImage_WhenComputerVisionThrows_Returns500()
+    // Both processing modes surface an upstream vision failure the same way: a 500 carrying
+    // ProblemDetails JSON rather than an HTML error page. Was two facts asserting one half of that
+    // each; consolidated to keep the Integration tier inside its 50-method ceiling.
+    [Theory]
+    [InlineData(ProcessingMode.ImageRegeneration, "image/png")]
+    [InlineData(ProcessingMode.MemeGeneration, "image/jpeg")]
+    public async Task AnalyzeImage_WhenComputerVisionThrows_Returns500ProblemDetails(
+        ProcessingMode mode, string contentType)
     {
-        var validBase64 = Convert.ToBase64String(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 });
+        var bytes = contentType == "image/png"
+            ? new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00 }
+            : [0xFF, 0xD8, 0xFF, 0xE0, 0x00];
+
         var request = new ImageAnalysisRequest
         {
-            ImageData = validBase64,
-            ContentType = "image/png",
-            Mode = ProcessingMode.ImageRegeneration,
-            DescriptionLength = 200
-        };
-
-        var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task AnalyzeImage_WhenComputerVisionThrows_ReturnsJsonProblemDetails()
-    {
-        var validBase64 = Convert.ToBase64String(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00 });
-        var request = new ImageAnalysisRequest
-        {
-            ImageData = validBase64,
-            ContentType = "image/jpeg",
-            Mode = ProcessingMode.MemeGeneration
+            ImageData = Convert.ToBase64String(bytes),
+            ContentType = contentType,
+            Mode = mode,
+            DescriptionLength = 200,
         };
 
         var response = await _client.PostAsJsonWithTokenAsync("/api/images/analyze", request);
         var content = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        // Should be ProblemDetails JSON, not a raw HTML error page
+        // ProblemDetails JSON, not a raw HTML error page.
         using var doc = JsonDocument.Parse(content);
         Assert.True(doc.RootElement.TryGetProperty("title", out var title));
         Assert.Equal("Processing Error", title.GetString());

@@ -1,0 +1,84 @@
+@*
+    The page frame every feature shares: measure, header, body and the mobile action rail.
+
+    WHY THIS EXISTS. Before it, the five feature pages used four different column
+    recipes for the same job — `col-lg-7 col-md-9` (Regeneration, Meme),
+    `col-lg-8` (Rap Roast results, which did not even match its own setup column),
+    `col-lg-5` + `col-lg-7` (Style Director) and `col-lg-4 col-xl-3` + `col-lg-8 col-xl-9`
+    (Bulk Generate). Nothing chose those numbers; they accreted. Each page then set its
+    own `container py-4` on top of the layout's `.content px-4 py-4`, so every screen
+    paid for its top padding twice.
+
+    A measure is a decision about reading, not a column count, so this component names
+    the three the app actually has and lets the pages pick one by intent.
+*@
+<div class="feature-shell feature-shell--@Measure.ToString().ToLowerInvariant()">
+
+    <FeatureLayout IconClass="@IconClass"
+                   Title="@Title"
+                   Description="@Description"
+                   ModelBadge="@ModelBadge"
+                   Steps="@Steps" />
+
+    @if (Aside is not null)
+    {
+        @* Split: a setup rail beside the workspace. The rail is first in the DOM, so it is
+           also first in the tab order and first on a narrow screen — which is correct, because
+           on both you configure before you look at output. *@
+        <div class="feature-shell__split">
+            <div class="feature-shell__rail">@Aside</div>
+            <div class="feature-shell__work">@ChildContent</div>
+        </div>
+    }
+    else
+    {
+        <div class="feature-shell__body">@ChildContent</div>
+    }
+</div>
+
+@if (StickyAction is not null)
+{
+    @*
+        The primary action, pinned above the fold on small screens.
+
+        This pattern already existed and only Bulk Generate used it, so on the other four
+        pages the one button the page is FOR scrolled away the moment you opened the
+        options below it. It is part of the shell now, which is the only way that stays
+        true for the next feature too. `aria-hidden` is deliberately NOT set: the rail is
+        the same button, and hiding it from assistive tech on the viewport where it is the
+        only copy would remove the action entirely.
+    *@
+    <div class="mobile-sticky-cta">@StickyAction</div>
+}
+
+@code {
+    /// <summary>How wide the page reads. Not a column count — a decision about reading.</summary>
+    public enum FeatureMeasure
+    {
+        /// <summary>One centred column. Upload, choose, look at one result.</summary>
+        Focused,
+
+        /// <summary>A setup rail beside a workspace. Use with <see cref="Aside"/>.</summary>
+        Split,
+
+        /// <summary>Full board width. Grids of output that benefit from every pixel.</summary>
+        Board,
+    }
+
+    [Parameter] public FeatureMeasure Measure { get; set; } = FeatureMeasure.Focused;
+
+    [Parameter] public string IconClass { get; set; } = "bi-cpu";
+    [Parameter] public string Title { get; set; } = "Feature";
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public string? ModelBadge { get; set; }
+    [Parameter] public (string IconClass, string Label)[]? Steps { get; set; }
+
+    /// <summary>The page body, or the workspace half when <see cref="Aside"/> is supplied.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Setup rail. Supplying it selects the split composition.</summary>
+    [Parameter] public RenderFragment? Aside { get; set; }
+
+    /// <summary>Primary action, repeated in a fixed rail below the md breakpoint.</summary>
+    [Parameter] public RenderFragment? StickyAction { get; set; }
+}

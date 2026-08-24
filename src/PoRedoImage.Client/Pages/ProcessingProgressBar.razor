@@ -1,23 +1,61 @@
+@*
+    A job in flight, drawn as a board row.
+
+    It used to be a bar with a message and a percentage and no status word — the third
+    surface in the app that showed work happening, and the only one that did not say so
+    in the board's own vocabulary. It now carries the same status column a bulk slot and
+    a Studio row carry, so "working" looks identical wherever the eye finds it.
+*@
 <div class="shimmer-wrapper">
     <div class="shimmer-header">
         @* A running row lamp, not a spinning ring: this world signals work with amber
            dots stepping across a dark strip. Colours come from the tokens so the strip
            cannot drift away from the board. *@
-        <div class="shimmer-spinner" role="status" aria-label="Working">
-            <span class="lamp-run" aria-hidden="true"></span>
+        <div class="shimmer-spinner" aria-hidden="true">
+            <span class="lamp-run"></span>
         </div>
         <div class="flex-grow-1">
-            <div class="shimmer-status-label">@Message</div>
-            <div class="shimmer-progress mt-2">
-                <div class="shimmer-progress__bar" style="--progress: @((Percentage / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));"></div>
+            <div class="shimmer-head-line">
+                <StatusCell Status="@Status" Label="@StatusLabel" />
+                @* One live region for the whole row. The lamp is decorative and the
+                   percentage is already in the message's sibling, so announcing the stage
+                   text alone is what a screen-reader user actually needs — and `polite`
+                   means it waits its turn rather than interrupting on every tick. *@
+                <div class="shimmer-status-label" role="status" aria-live="polite">@Message</div>
+            </div>
+            @* Determinate only when the caller actually measured something. An indeterminate
+               bar omits aria-valuenow, which is exactly how ARIA says to express "running,
+               length unknown" — and is what the four feature pages that used to publish
+               invented milestones (15 → 45 → 85) should have been saying all along. *@
+            <div class="shimmer-progress shimmer-progress--@(Percentage is null ? "indeterminate" : "determinate") mt-2"
+                 role="progressbar"
+                 aria-valuenow="@(Percentage?.ToString())" aria-valuemin="0" aria-valuemax="100"
+                 aria-label="@(string.IsNullOrEmpty(Message) ? "Progress" : Message)">
+                <div class="shimmer-progress__bar"
+                     style="--progress: @(((Percentage ?? 0) / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));"></div>
             </div>
         </div>
-        <span class="shimmer-pct">@Percentage%</span>
+        @if (Percentage is { } pct)
+        {
+            <span class="shimmer-pct">@pct%</span>
+        }
     </div>
 </div>
 
 @code {
-    [Parameter] public int Percentage { get; set; }
+    /// <summary>
+    /// Completion 0–100, or null for an indeterminate bar. Null is the right answer whenever the
+    /// caller cannot measure progress — see <see cref="PoRedoImage.Client.Shared.FeatureRunState.Determinate"/>.
+    /// </summary>
+    [Parameter] public int? Percentage { get; set; }
     [Parameter] public string Message { get; set; } = string.Empty;
-}
 
+    /// <summary>
+    /// Overridable so a caller that already knows it has failed can say so here rather
+    /// than swapping the whole component out. Defaults to Working, which is the only
+    /// reason this component is on screen at all.
+    /// </summary>
+    [Parameter] public BoardStatus Status { get; set; } = BoardStatus.Working;
+
+    [Parameter] public string? StatusLabel { get; set; }
+}

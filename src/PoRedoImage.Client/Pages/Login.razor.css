@@ -34,7 +34,7 @@
 
 .login-title {
     font-family: var(--font-flap);
-    font-size: 0.86rem;
+    font-size: var(--text-md);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.16em;
@@ -44,7 +44,7 @@
 }
 
 .login-subtitle {
-    font-size: 0.86rem;
+    font-size: var(--text-md);
     color: var(--steel);
     margin: 0 0 1.25rem;
     line-height: 1.55;
@@ -63,7 +63,7 @@
     border-radius: 0;
     padding: 0.7rem 1rem;
     font-family: var(--font-flap);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -83,7 +83,7 @@
     gap: 0.75rem;
     color: var(--steel-dark);
     font-family: var(--font-flap);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.2em;
     margin: 1.25rem 0;
@@ -108,7 +108,7 @@
     border-radius: 0;
     padding: 0.7rem 1rem;
     font-family: var(--font-flap);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -125,7 +125,7 @@
 /* A guest pass is provisional work, so it takes amber — the working colour. */
 .anon-badge {
     font-family: var(--font-flap);
-    font-size: 0.62rem;
+    font-size: var(--text-3xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;

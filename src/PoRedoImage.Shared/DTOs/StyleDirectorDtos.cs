@@ -19,7 +19,13 @@ public record StyleDirectorReasoningEntryDto(
     string Summary,
     long ElapsedMs,
     int? TokensUsed,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    /// <summary>
+    /// Why this step ran without the model, or null when the model produced it. Carried to the
+    /// browser so the trace can say which of the two the user is reading — the AI and rule-based
+    /// paths are otherwise indistinguishable on screen.
+    /// </summary>
+    string? FallbackReason = null);
 
 public record StyleDirectorResultDto(
     bool Succeeded,

@@ -8,299 +8,317 @@
 
 <PageTitle>Rap Roast — PoRedoImage</PageTitle>
 
-<div class="container py-4">
-    <FeatureLayout
-        IconClass="bi-mic-fill"
-        Title="Rap Roast"
-        Description="Upload a photo and AI writes a roast verse, then performs it over a beat."
-        Steps="@(new[] {
-            ("bi-upload", "Upload photo"),
-            ("bi-pencil", "AI writes the bars"),
-            ("bi-music-note-beamed", "Hear the track")
-        })" />
+<FeatureShell IconClass="bi-mic-fill"
+              Title="Rap Roast"
+              Description="Upload a photo and AI writes a roast verse, then performs it over a beat."
+              Steps="@(new[] {
+                  ("bi-upload", "Upload photo"),
+                  ("bi-pencil", "AI writes the bars"),
+                  ("bi-music-note-beamed", "Hear the track")
+              })">
+    <ChildContent>
 
     @if (!isProcessing && !isComplete)
     {
-        <div class="row justify-content-center">
-            <div class="col-lg-7 col-md-9">
-                <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
+        <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
 
-                <ImageUploadPanel
-                    ShowDescriptionLength="false"
-                    ButtonLabel="Roast It"
-                    ButtonIcon="bi-mic-fill"
-                    ImagePreviewUrl="@imagePreviewUrl"
-                    ErrorMessage="@errorMessage"
-                    CanProcess="@canProcessImage"
-                    OnFileChange="LoadFile"
-                    OnProcessClicked="RoastAsync" />
+        @* Upload WITHOUT its submit button: the button is rendered after the settings below,
+           because "Roast It" consumes the beat style and the intensity and used to sit above
+           both of them. You were asked to submit before you were asked to configure. *@
+        <ImageUploadPanel
+            ShowDescriptionLength="false"
+            ShowProcessButton="false"
+            ImagePreviewUrl="@imagePreviewUrl"
+            ErrorMessage="@errorMessage"
+            CanProcess="@canProcessImage"
+            OnFileChange="LoadFile" />
 
-                <fieldset class="roast-style mt-3">
-                    <legend class="roast-style__legend">Beat style</legend>
-                    <div class="roast-style__options">
-                        @foreach (var option in StyleOptions)
-                        {
-                            <label class="roast-style__option @(_style == option.Value ? "roast-style__option--selected" : "")">
-                                <input type="radio" name="rap-style" value="@option.Value"
-                                       checked="@(_style == option.Value)"
-                                       @onchange="@(() => _style = option.Value)" />
-                                <span class="roast-style__name">@option.Label</span>
-                                <span class="roast-style__hint">@option.Hint</span>
-                            </label>
-                        }
-                    </div>
-                </fieldset>
-
-                @* ── Intensity dial ───────────────────────────────────────────────
-                   A three-stop dial rather than a slider: the levels are named tones the
-                   ghostwriter is actually instructed in, not a continuum, and a slider would
-                   promise a granularity the prompt cannot deliver. *@
-                <fieldset class="roast-dial mt-3">
-                    <legend class="roast-style__legend">How hard should it hit</legend>
-                    <div class="roast-dial__track" role="radiogroup" aria-label="Roast intensity">
-                        @foreach (var option in IntensityOptions)
-                        {
-                            <label class="roast-dial__stop @(_intensity == option.Value ? "roast-dial__stop--selected" : "")">
-                                <input type="radio" name="roast-intensity" value="@option.Value"
-                                       checked="@(_intensity == option.Value)"
-                                       @onchange="@(() => _intensity = option.Value)" />
-                                <span class="roast-dial__lamp" aria-hidden="true"></span>
-                                <span class="roast-style__name">@option.Label</span>
-                                <span class="roast-style__hint">@option.Hint</span>
-                            </label>
-                        }
-                    </div>
-                </fieldset>
-
-                <p class="roast-disclaimer">
-                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-                    Every setting stays on styling, pose and vibe — never on appearance traits like
-                    race, body size, age or disability. <strong>Scorched</strong> changes how hard the
-                    jab lands, not what it lands on. Best used on photos of yourself and friends.
-                </p>
+        <fieldset class="flap-fieldset mt-3">
+            <legend class="flap-fieldset__legend">Beat style</legend>
+            <div class="flap-choices">
+                @foreach (var option in StyleOptions)
+                {
+                    <label class="flap-choice flap-choice--stack @(_style == option.Value ? "flap-choice--active" : "")">
+                        <input type="radio" name="rap-style" value="@option.Value"
+                               checked="@(_style == option.Value)"
+                               @onchange="@(() => _style = option.Value)" />
+                        <span class="flap-choice__name">@option.Label</span>
+                        <span class="flap-choice__meta">@option.Hint</span>
+                    </label>
+                }
             </div>
+        </fieldset>
+
+        @* ── Intensity dial ───────────────────────────────────────────────
+           A three-stop dial rather than a slider: the levels are named tones the
+           ghostwriter is actually instructed in, not a continuum, and a slider would
+           promise a granularity the prompt cannot deliver. *@
+        <fieldset class="flap-fieldset mt-3">
+            <legend class="flap-fieldset__legend">How hard should it hit</legend>
+            <div class="flap-choices" role="radiogroup" aria-label="Roast intensity">
+                @foreach (var option in IntensityOptions)
+                {
+                    <label class="flap-choice flap-choice--lamp @(_intensity == option.Value ? "flap-choice--active" : "")">
+                        <input type="radio" name="roast-intensity" value="@option.Value"
+                               checked="@(_intensity == option.Value)"
+                               @onchange="@(() => _intensity = option.Value)" />
+                        <span class="flap-choice__lamp" aria-hidden="true"></span>
+                        <span class="flap-choice__name">@option.Label</span>
+                        <span class="flap-choice__meta">@option.Hint</span>
+                    </label>
+                }
+            </div>
+        </fieldset>
+
+        <p class="roast-disclaimer">
+            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+            Every setting stays on styling, pose and vibe — never on appearance traits like
+            race, body size, age or disability. <strong>Scorched</strong> changes how hard the
+            jab lands, not what it lands on. Best used on photos of yourself and friends.
+        </p>
+
+        @* The action, now downstream of everything it reads. Disabled until there is a photo —
+           and it says why, which the bare disabled button did not. *@
+        <div class="roast-cta">
+            <button class="flap-btn flap-btn--primary roast-cta__btn"
+                    disabled="@(!canProcessImage)"
+                    @onclick="RoastAsync">
+                <i class="bi bi-mic-fill me-2" aria-hidden="true"></i>Roast It
+            </button>
+            @if (!canProcessImage)
+            {
+                <p class="roast-cta__hint" role="status">Upload a photo above to enable this.</p>
+            }
         </div>
+
     }
 
     @if (isProcessing)
     {
-        <ProcessingProgressBar Percentage="progressPercentage" Message="@progressMessage" />
+        <ProcessingProgressBar Message="@progressMessage" />
     }
 
     @if (isComplete && _result is not null)
     {
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                @* The photo the roast is about — without it the bars have no referent, and you
-                   cannot tell whether the AI actually saw what it claims to have seen. *@
-                @if (!string.IsNullOrEmpty(_roastedImageUrl))
-                {
-                    <figure class="roast-subject">
-                        <img src="@_roastedImageUrl" alt="The photo this roast is about" class="roast-subject__img" />
-                        <figcaption class="roast-subject__caption">The subject of this roast</figcaption>
-                    </figure>
-                }
+        @* The photo the roast is about — without it the bars have no referent, and you
+           cannot tell whether the AI actually saw what it claims to have seen. *@
+        @if (!string.IsNullOrEmpty(_roastedImageUrl))
+        {
+            <figure class="roast-subject">
+                <img src="@_roastedImageUrl" alt="The photo this roast is about" class="roast-subject__img" />
+                <figcaption class="roast-subject__caption">The subject of this roast</figcaption>
+            </figure>
+        }
 
-                @if (_result.AudioRefused)
-                {
-                    <div class="roast-refused" role="status">
-                        <i class="bi bi-volume-mute me-2" aria-hidden="true"></i>
-                        <div>
-                            <strong>The music model declined this one.</strong>
-                            <p class="mb-0 small">
-                                Your bars are below — the track just didn't get made.
-                                @if (!string.IsNullOrWhiteSpace(_result.RefusalReason))
-                                {
-                                    <span class="d-block text-break">@_result.RefusalReason</span>
-                                }
-                            </p>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <div class="roast-player">
-                        <audio @ref="_audioRef" controls preload="metadata" class="roast-player__audio"
-                               src="@($"data:{_result.AudioContentType};base64,{_result.AudioData}")">
-                            Your browser does not support audio playback.
-                        </audio>
-
-                        @* The nudge only appears once the karaoke view is actually running — offering
-                           a sync control over a lyric block that never moves would be a lie. *@
-                        @if (_karaokeLive)
+        @if (_result.AudioRefused)
+        {
+            <div class="roast-refused" role="status">
+                <i class="bi bi-volume-mute me-2" aria-hidden="true"></i>
+                <div>
+                    <strong>The music model declined this one.</strong>
+                    <p class="mb-0 small">
+                        Your bars are below — the track just didn't get made.
+                        @if (!string.IsNullOrWhiteSpace(_result.RefusalReason))
                         {
-                            <div class="roast-sync">
-                                <label class="roast-sync__label" for="roast-sync">
-                                    Sync
-                                    <span class="roast-sync__value">@FormatOffset(_syncOffset)</span>
-                                </label>
-                                <input id="roast-sync" class="roast-sync__range" type="range"
-                                       min="-3" max="3" step="0.1"
-                                       value="@_syncOffset.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
-                                       @oninput="OnSyncChanged"
-                                       aria-describedby="roast-sync-hint" />
-                                <p id="roast-sync-hint" class="roast-sync__hint mb-0">
-                                    Line timings are estimated from the length of each bar — the music
-                                    model returns audio, not timings. Drag if the highlight runs ahead
-                                    or behind.
-                                </p>
-                            </div>
+                            <span class="d-block text-break">@_result.RefusalReason</span>
                         }
-                    </div>
-                }
-
-                @if (_result.LyricsSoftened)
-                {
-                    <p class="roast-softened small" role="status">
-                        <i class="bi bi-emoji-smile me-1" aria-hidden="true"></i>
-                        The first draft was too spicy for the music model, so this is the friendlier cut.
                     </p>
-                }
-
-                <section class="roast-lyrics" aria-label="Roast lyrics">
-                    <h2 class="roast-lyrics__heading">The bars</h2>
-
-                    @if (_lines.Count > 0)
-                    {
-                        @* Every sung bar is a button, so the list is operable by keyboard and by
-                           screen reader without an aria-live region narrating each highlight — which
-                           on a 12-bar verse would be constant interruption, not information. The lit
-                           state is decoration on top of a list that reads correctly with none of it. *@
-                        <ol class="roast-script" @ref="_lyricsRef">
-                            @foreach (var line in _lines)
-                            {
-                                var index = line.Index;
-                                if (line.IsSection)
-                                {
-                                    <li class="roast-script__section" data-roast-line="@index">@line.Text</li>
-                                }
-                                else
-                                {
-                                    <li class="roast-script__row">
-                                        <button type="button" class="roast-script__line" data-roast-line="@index"
-                                                disabled="@(!_karaokeLive)"
-                                                title="@(_karaokeLive ? "Jump the track to this bar" : null)"
-                                                @onclick="@(() => SeekToLineAsync(index))">@line.Text</button>
-                                    </li>
-                                }
-                            }
-                        </ol>
-                    }
-                    else
-                    {
-                        @* Nothing parseable to time — show the lyrics exactly as the model wrote them. *@
-                        <pre class="roast-lyrics__text">@_result.Lyrics</pre>
-                    }
-                </section>
-
-                @* ── Export ──────────────────────────────────────────────────────
-                   The card needs nothing but a 2D canvas, so it is offered even when the track was
-                   refused: a refusal still produced bars worth keeping. The video needs
-                   MediaRecorder + captureStream and is hidden outright where they are missing,
-                   rather than shown as a button that fails on click. *@
-                <div class="roast-export">
-                    <span class="roast-export__label">
-                        <i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Take it with you
-                    </span>
-                    <div class="roast-export__actions">
-                        <button class="btn-result-secondary" @onclick="SaveCardAsync" disabled="@_exporting">
-                            <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-image") me-1" aria-hidden="true"></i>Save card
-                        </button>
-                        @if (_canRecord && !_result.AudioRefused)
-                        {
-                            <button class="btn-result-secondary" @onclick="ExportVideoAsync" disabled="@_exporting">
-                                <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-camera-video") me-1" aria-hidden="true"></i>Export video
-                            </button>
-                        }
-                    </div>
-                    @if (_exportProgress >= 0)
-                    {
-                        <div class="roast-export__progress" role="status">
-                            <div class="roast-export__bar" style="--export: @_exportProgress%"></div>
-                            <span class="roast-export__pct">
-                                Recording @_exportProgress% — the track plays through in real time.
-                            </span>
-                        </div>
-                    }
-                </div>
-
-                <details class="roast-seen" open="@(!_result.DescriptionIsDetailed)">
-                    <summary>What the AI saw</summary>
-
-                    @if (_result.Scene is { } scene)
-                    {
-                        @* Named slots rather than a paragraph — you can see at a glance whether the
-                           model actually read the scene, and which detail the bars leaned on. *@
-                        <dl class="scene-slots">
-                            @if (scene.TextInImage.Count > 0)
-                            {
-                                <dt>Text in frame</dt>
-                                <dd>
-                                    @foreach (var line in scene.TextInImage)
-                                    {
-                                        <span class="scene-slots__chip">@line</span>
-                                    }
-                                </dd>
-                            }
-                            @if (scene.Outfit.Count > 0)
-                            {
-                                <dt>Wearing</dt>
-                                <dd>@string.Join(", ", scene.Outfit)</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(scene.Pose))
-                            {
-                                <dt>Pose</dt>
-                                <dd>@scene.Pose</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(scene.Expression))
-                            {
-                                <dt>Expression</dt>
-                                <dd>@scene.Expression</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(scene.Setting))
-                            {
-                                <dt>Setting</dt>
-                                <dd>@scene.Setting</dd>
-                            }
-                            @if (scene.Props.Count > 0)
-                            {
-                                <dt>Props</dt>
-                                <dd>@string.Join(", ", scene.Props)</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(scene.MostIncongruousDetail))
-                            {
-                                <dt>Funniest detail</dt>
-                                <dd>@scene.MostIncongruousDetail</dd>
-                            }
-                        </dl>
-                    }
-                    else
-                    {
-                        <p class="mb-0 small">@_result.ImageDescription</p>
-                    }
-                    @if (!_result.DescriptionIsDetailed)
-                    {
-                        @* The reason comes from the server, which knows whether the vision call was
-                           throttled, filtered, misconfigured, or simply absent. This used to assert
-                           one cause for all four and pointed at a setting that was already correct. *@
-                        <p class="roast-seen__thin mb-0">
-                            <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
-                            That's a keyword list, not a description.
-                            @(_result.DescriptionFallbackReason
-                                ?? "The bars are working from image labels alone.")
-                        </p>
-                    }
-                </details>
-
-                <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-primary" @onclick="Reset">
-                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Roast another
-                    </button>
                 </div>
             </div>
+        }
+        else
+        {
+            <div class="roast-player">
+                <audio @ref="_audioRef" controls preload="metadata" class="roast-player__audio"
+                       src="@($"data:{_result.AudioContentType};base64,{_result.AudioData}")">
+                    Your browser does not support audio playback.
+                </audio>
+
+                @* The nudge only appears once the karaoke view is actually running — offering
+                   a sync control over a lyric block that never moves would be a lie. *@
+                @if (_karaokeLive)
+                {
+                    <div class="roast-sync">
+                        <label class="roast-sync__label" for="roast-sync">
+                            Sync
+                            <span class="roast-sync__value">@FormatOffset(_syncOffset)</span>
+                        </label>
+                        <input id="roast-sync" class="roast-sync__range" type="range"
+                               min="-3" max="3" step="0.1"
+                               value="@_syncOffset.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                               @oninput="OnSyncChanged"
+                               aria-describedby="roast-sync-hint" />
+                        <p id="roast-sync-hint" class="roast-sync__hint mb-0">
+                            Line timings are estimated from the length of each bar — the music
+                            model returns audio, not timings. Drag if the highlight runs ahead
+                            or behind.
+                        </p>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_result.LyricsSoftened)
+        {
+            <p class="roast-softened small" role="status">
+                <i class="bi bi-emoji-smile me-1" aria-hidden="true"></i>
+                The first draft was too spicy for the music model, so this is the friendlier cut.
+            </p>
+        }
+
+        <section class="roast-lyrics" aria-label="Roast lyrics">
+            <h2 class="roast-lyrics__heading">The bars</h2>
+
+            @if (_lines.Count > 0)
+            {
+                @* Every sung bar is a button, so the list is operable by keyboard and by
+                   screen reader without an aria-live region narrating each highlight — which
+                   on a 12-bar verse would be constant interruption, not information. The lit
+                   state is decoration on top of a list that reads correctly with none of it. *@
+                <ol class="roast-script" @ref="_lyricsRef">
+                    @foreach (var line in _lines)
+                    {
+                        var index = line.Index;
+                        if (line.IsSection)
+                        {
+                            <li class="roast-script__section" data-roast-line="@index">@line.Text</li>
+                        }
+                        else
+                        {
+                            <li class="roast-script__row">
+                                <button type="button" class="roast-script__line" data-roast-line="@index"
+                                        disabled="@(!_karaokeLive)"
+                                        title="@(_karaokeLive ? "Jump the track to this bar" : null)"
+                                        @onclick="@(() => SeekToLineAsync(index))">@line.Text</button>
+                            </li>
+                        }
+                    }
+                </ol>
+            }
+            else
+            {
+                @* Nothing parseable to time — show the lyrics exactly as the model wrote them. *@
+                <pre class="roast-lyrics__text">@_result.Lyrics</pre>
+            }
+        </section>
+
+        @* ── Export ──────────────────────────────────────────────────────
+           The card needs nothing but a 2D canvas, so it is offered even when the track was
+           refused: a refusal still produced bars worth keeping. The video needs
+           MediaRecorder + captureStream and is hidden outright where they are missing,
+           rather than shown as a button that fails on click. *@
+        <div class="roast-export">
+            <span class="roast-export__label">
+                <i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Take it with you
+            </span>
+            <div class="roast-export__actions">
+                <button class="flap-btn flap-btn--sm" @onclick="SaveCardAsync" disabled="@_exporting">
+                    <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-image") me-1" aria-hidden="true"></i>Save card
+                </button>
+                @if (_canRecord && !_result.AudioRefused)
+                {
+                    <button class="flap-btn flap-btn--sm" @onclick="ExportVideoAsync" disabled="@_exporting">
+                        <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-camera-video") me-1" aria-hidden="true"></i>Export video
+                    </button>
+                }
+            </div>
+            @if (_exportProgress >= 0)
+            {
+                <div class="roast-export__progress" role="status">
+                    <div class="roast-export__bar" style="--export: @_exportProgress%"></div>
+                    <span class="roast-export__pct">
+                        Recording @_exportProgress% — the track plays through in real time.
+                    </span>
+                </div>
+            }
+        </div>
+
+        <details class="roast-seen" open="@(!_result.DescriptionIsDetailed)">
+            <summary>What the AI saw</summary>
+
+            @if (_result.Scene is { } scene)
+            {
+                @* Named slots rather than a paragraph — you can see at a glance whether the
+                   model actually read the scene, and which detail the bars leaned on. *@
+                <dl class="scene-slots">
+                    @if (scene.TextInImage.Count > 0)
+                    {
+                        <dt>Text in frame</dt>
+                        <dd>
+                            @foreach (var line in scene.TextInImage)
+                            {
+                                <span class="scene-slots__chip">@line</span>
+                            }
+                        </dd>
+                    }
+                    @if (scene.Outfit.Count > 0)
+                    {
+                        <dt>Wearing</dt>
+                        <dd>@string.Join(", ", scene.Outfit)</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(scene.Pose))
+                    {
+                        <dt>Pose</dt>
+                        <dd>@scene.Pose</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(scene.Expression))
+                    {
+                        <dt>Expression</dt>
+                        <dd>@scene.Expression</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(scene.Setting))
+                    {
+                        <dt>Setting</dt>
+                        <dd>@scene.Setting</dd>
+                    }
+                    @if (scene.Props.Count > 0)
+                    {
+                        <dt>Props</dt>
+                        <dd>@string.Join(", ", scene.Props)</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(scene.MostIncongruousDetail))
+                    {
+                        <dt>Funniest detail</dt>
+                        <dd>@scene.MostIncongruousDetail</dd>
+                    }
+                </dl>
+            }
+            else
+            {
+                <p class="mb-0 small">@_result.ImageDescription</p>
+            }
+            @if (!_result.DescriptionIsDetailed)
+            {
+                @* The reason comes from the server, which knows whether the vision call was
+                   throttled, filtered, misconfigured, or simply absent. This used to assert
+                   one cause for all four and pointed at a setting that was already correct. *@
+                <p class="roast-seen__thin mb-0">
+                    <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
+                    That's a keyword list, not a description.
+                    @(_result.DescriptionFallbackReason
+                        ?? "The bars are working from image labels alone.")
+                </p>
+            }
+        </details>
+
+        <div class="d-flex gap-2 mt-3">
+            <button class="flap-btn flap-btn--primary" @onclick="Reset">
+                <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Roast another
+            </button>
         </div>
     }
-</div>
+    </ChildContent>
+
+    <StickyAction>
+        @if (!isProcessing && !isComplete)
+        {
+            <button class="flap-btn flap-btn--primary mobile-sticky-cta__btn"
+                    @onclick="RoastAsync" disabled="@(!canProcessImage)">
+                <i class="bi bi-mic-fill me-1"></i>Roast It
+            </button>
+        }
+    </StickyAction>
+</FeatureShell>
 
 @code {
     private RapRoastResponse? _result;
@@ -356,7 +374,6 @@
         isComplete = false;
         errorMessage = null;
         _result = null;
-        progressPercentage = 15;
         progressMessage = "Looking at your photo…";
         StateHasChanged();
 
@@ -369,7 +386,6 @@
                 return;
             }
 
-            progressPercentage = 45;
             progressMessage = "Writing your bars…";
             StateHasChanged();
 
@@ -414,7 +430,6 @@
                 return;
             }
 
-            progressPercentage = 85;
             progressMessage = "Cutting the track…";
             StateHasChanged();
 
@@ -430,7 +445,6 @@
         finally
         {
             isProcessing = false;
-            progressPercentage = 100;
             StateHasChanged();
         }
     }

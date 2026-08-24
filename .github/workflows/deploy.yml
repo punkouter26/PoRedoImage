@@ -15,16 +15,6 @@ env:
   AZURE_RESOURCE_GROUP: PoRedoImage
   SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
-  # Expected App Service Plan (F1 Free, westus2 Linux), dedicated to this app and owned by
-  # the PoShared RG. infra/main.bicep only references it; it does NOT create or delete it.
-  # It sits in PoShared rather than PoRedoImage because this site's webSpace is
-  # PoShared-WestUS2webspace-Linux — stamped at creation and NOT rewritten by a
-  # resource-group move — and a site can only bind a plan in its own webspace. Patching
-  # serverFarmId across webspaces fails with extended error 59602, so relocating the plan
-  # into PoRedoImage needs a destroy+recreate of the site (see ADR-031).
-  # Documentation only: nothing in this workflow reads EXPECTED_PLAN. The binding is
-  # asserted by infra/main.bicep, whose appServicePlanName param must be kept in step.
-  EXPECTED_PLAN: asp-PoRedoImage-f1
 concurrency:
   group: deploy-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true

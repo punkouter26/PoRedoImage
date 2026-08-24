@@ -1,0 +1,54 @@
+@*
+    The gallery's full-size view, hosted by Radzen's DialogService.
+
+    WHY RADZEN HERE, when almost nothing else in this app uses it. The previous version
+    was a hand-rolled `div[role=dialog][aria-modal=true]` — correct roles, and nothing
+    behind them: Escape did not close it, focus was never moved into it, Tab walked
+    straight out into the page underneath, and closing left focus wherever it had been.
+    That is the failure mode a modal dialog exists to prevent, and it is not a styling
+    problem, so re-skinning would not have fixed it.
+
+    DialogService brings the focus trap, the Escape handler, the inert backdrop and the
+    focus restore. What it does NOT bring is a look — `.rz-dialog` is restyled onto the
+    flap surfaces in app.css's overrides layer, so the board is unchanged.
+
+    The rule this follows, and the reason the rest of the app still hand-rolls its
+    surfaces: adopt a component library for BEHAVIOUR that is hard to get right, never
+    for appearance this design system already owns.
+*@
+<div class="gallery-lightbox__panel">
+    <img class="gallery-lightbox__img" src="@Item.ImageUrl" alt="@Item.FileName" />
+
+    <div class="gallery-lightbox__meta">
+        <span class="gallery-lightbox__name">
+            <i class="bi @IconClass me-2" aria-hidden="true"></i>@Item.FileName
+        </span>
+        <span class="gallery-lightbox__sub">
+            @Item.Kind · @FormatSize(Item.SizeBytes) · @Item.CreatedAt.ToLocalTime().ToString("g")
+        </span>
+    </div>
+
+    <div class="gallery-lightbox__actions">
+        <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="@(() => Dialog.Close(LightboxResult.Use))">
+            <i class="bi bi-check2 me-1" aria-hidden="true"></i>Use this image
+        </button>
+        <button class="flap-btn flap-btn--sm" @onclick="@(() => Dialog.Close(LightboxResult.Download))">
+            <i class="bi bi-download me-1" aria-hidden="true"></i>Download
+        </button>
+    </div>
+</div>
+
+@code {
+    /// <summary>What the viewer asked for on the way out. Null when they simply dismissed.</summary>
+    public enum LightboxResult { Use, Download }
+
+    [Inject] private DialogService Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public MyImagesGallery.GalleryItem Item { get; set; } = default!;
+
+    /// <summary>Bootstrap-icon class for the kind badge, passed in so the mapping stays in one place.</summary>
+    [Parameter, EditorRequired] public string IconClass { get; set; } = "bi-image";
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:0.#} MB" : $"{bytes / 1024.0:0} KB";
+}

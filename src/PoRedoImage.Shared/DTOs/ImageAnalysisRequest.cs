@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using PoRedoImage.Shared.Validation;
 
 namespace PoRedoImage.Shared.DTOs;
@@ -58,4 +58,18 @@ public class ImageAnalysisRequest
     [MaxCount(20)]
     [MaxItemLength(100)]
     public IReadOnlyList<string>? PrecomputedTags { get; set; }
+
+    /// <summary>
+    /// An image-generation prompt the client already produced on-device, so the server skips the
+    /// metered enhancement call entirely.
+    /// </summary>
+    /// <remarks>
+    /// The exact counterpart of <see cref="PrecomputedDescription"/> one step further down the
+    /// pipeline. Browser-local execution previously covered analysis only, which left the cheapest
+    /// remaining call — a short text rewrite — on a metered API for no reason: a 0.5B WebGPU model
+    /// is entirely adequate at turning a caption plus tags into a comma-separated visual clause
+    /// list, and the user who selected an on-device model has already said that is the trade they
+    /// want. Ignored when null or whitespace.
+    /// </remarks>
+    public string? PrecomputedEnhancedPrompt { get; set; }
 }

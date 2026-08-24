@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
 
@@ -31,6 +31,8 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(BulkVariationRequest))]
 [JsonSerializable(typeof(BulkVariationResponse))]
 [JsonSerializable(typeof(BulkGenerateImageResult))]
+[JsonSerializable(typeof(BulkBatchRequest))]
+[JsonSerializable(typeof(BulkBatchItem))]
 [JsonSerializable(typeof(SavePromptsRequest))]
 [JsonSerializable(typeof(UserImageDto))]
 [JsonSerializable(typeof(SaveOriginalRequest))]
@@ -50,9 +52,6 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(RapRoastRequest))]
 [JsonSerializable(typeof(RapRoastResponse))]
 [JsonSerializable(typeof(SceneSnapshotDto))]
-[JsonSerializable(typeof(ClientVitalsSampleRequest))]
-[JsonSerializable(typeof(ClientVitalsHistoryDto))]
-[JsonSerializable(typeof(ClientVitalsPointDto))]
 [JsonSerializable(typeof(ImageBytes))]
 // Not a DTO, but the persisted shape of the bulk-prompt column: BulkGenerateEndpoints
 // round-trips the 10 saved prompts through it, and the reflective JsonSerializer overload

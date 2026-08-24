@@ -95,21 +95,34 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         _logger.EnhanceStarting(targetLength);
         var start = Stopwatch.GetTimestamp();
 
+        // `targetLength` arrives from the UI's detail presets as a WORD count (200/350/500). It is
+        // reinterpreted here as a density budget roughly a quarter that size, and the reason is
+        // worth stating plainly: this text is never read by a human. It is a prompt for an image
+        // generator, and generators weight the front of a prompt heavily and taper off well before
+        // 350 words. Asking for 350 bought several hundred output tokens per regeneration, on every
+        // regeneration, that the downstream model largely ignored — and long prose actively hurts,
+        // because a generator given a paragraph of narrative connective tissue renders the
+        // connective tissue.
+        //
+        // The preset still means something: more budget buys more distinct visual clauses, not more
+        // sentences about them.
+        var clauseBudget = Math.Clamp(targetLength / 4, 40, 120);
+
         var prompt = $"""
-            I have an image with the following basic description:
-            "{description}"
+            Subject: "{description}"
+            Detected elements: {string.Join(", ", tags)}
 
-            The image has been tagged with these elements: {string.Join(", ", tags)}
-
-            Please enhance this description to be more detailed and comprehensive.
-            The enhanced description should be approximately {targetLength} words and suitable for image generation.
-
-            Enhanced description:
+            Write an image-generation prompt for this subject in at most {clauseBudget} words.
+            Comma-separated visual clauses only — subject, composition, lighting, colour, texture,
+            lens or medium. No sentences, no narration, no preamble, no "the image shows".
+            Front-load the most important visual facts.
             """;
 
         var messages = new List<ChatMessage>
         {
-            new SystemChatMessage("You are an expert image description enhancer."),
+            new SystemChatMessage(
+                "You write prompts for image-generation models. You reply with the prompt itself and "
+                + "nothing else — no preamble, no explanation, no markdown."),
             new UserChatMessage(prompt)
         };
 

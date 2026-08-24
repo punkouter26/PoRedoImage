@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 
@@ -64,11 +64,26 @@ public sealed class ImageAnalysisOrchestrator(
         }
         else
         {
-            // ImageRegeneration branch: enhance description → Gemini image generation
-            var (enhanced, tokens, enhanceMs) = await aiService.EnhanceDescriptionAsync(
-                description, tags, request.DescriptionLength, ct);
-            metrics.DescriptionGenerationTimeMs = enhanceMs;
-            metrics.DescriptionTokensUsed = tokens;
+            // ImageRegeneration branch: enhance description → Gemini image generation.
+            // Skipped entirely when the client produced the prompt on-device, exactly as the vision
+            // step above is — re-running it would bill a metered API for work already done free.
+            string enhanced;
+            if (!string.IsNullOrWhiteSpace(request.PrecomputedEnhancedPrompt))
+            {
+                enhanced = request.PrecomputedEnhancedPrompt;
+                metrics.DescriptionGenerationTimeMs = 0;
+                metrics.DescriptionTokensUsed = 0;
+                logger.LogInformation("Using the client's on-device prompt; skipped the enhancement call.");
+            }
+            else
+            {
+                var (enhancedText, tokens, enhanceMs) = await aiService.EnhanceDescriptionAsync(
+                    description, tags, request.DescriptionLength, ct);
+                metrics.DescriptionGenerationTimeMs = enhanceMs;
+                metrics.DescriptionTokensUsed = tokens;
+                enhanced = enhancedText;
+            }
+
             response.Description = enhanced;
 
             var imageGenService = imageGenRouter.Resolve(request.ImageGenModelId);

@@ -221,6 +221,9 @@ public class RapRoastTests
                 NullLogger<SceneDescriber>.Instance),
             new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance),
             music,
+            // NullSceneDetailProvider reports SupportsCombinedAnalysis=false, so the orchestrator
+            // takes its two-call-in-parallel path — which is what these tests want exercised.
+            new NullSceneDetailProvider(),
             NullLogger<RapRoastOrchestrator>.Instance);
 
         return await orchestrator.ProcessAsync(new RapRoastRequest
