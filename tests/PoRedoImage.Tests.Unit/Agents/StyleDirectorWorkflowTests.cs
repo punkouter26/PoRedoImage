@@ -21,7 +21,23 @@ public class StyleDirectorWorkflowTests
             => throw new NotSupportedException("Heuristic path should be used when IsConfigured is false.");
     }
 
+    /// <summary>Configured chat that replays a fixed JSON payload, to drive the AI path.</summary>
+    private sealed class ScriptedChat(string prompt) : IChatCompletionService
+    {
+        public bool IsConfigured => true;
+        public Task<ChatCompletionResult> CompleteAsync(
+            string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+            => Task.FromResult(new ChatCompletionResult(
+                $$"""{"subject":"A man","mood":"Wry","themes":["corporate"],"prompt":{{System.Text.Json.JsonSerializer.Serialize(prompt)}},"confidence":82}""",
+                TokensUsed: 100,
+                ElapsedMs: 5));
+    }
+
     private static readonly IChatCompletionService Chat = new NotConfiguredChat();
+
+    private static StyleDirectorWorkflow ScriptedWorkflow(string prompt) => new(
+        new ScriptedChat(prompt),
+        NullLogger<StyleDirectorWorkflow>.Instance);
 
     private static StyleDirectorWorkflow CreateWorkflow() => new(
         Chat,
@@ -74,5 +90,31 @@ public class StyleDirectorWorkflowTests
         // Agents are tolerant of empty input — workflow should still complete.
         Assert.True(result.Succeeded);
         Assert.NotNull(result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_PromptRequestingTypography_KeepsTextGuardOff()
+    {
+        // The blanket "no text" guard used to contradict the very prompt it guarded: a captioned
+        // portrait came back asking for `top text reads "..."` alongside `no text`.
+        var workflow = ScriptedWorkflow(
+            "Portrait with bold typographic overlay; top text reads \"WHEN THE SUIT SPEAKS\".");
+
+        var result = await workflow.RunAsync(new VisionAnalystInput([0x89], ["person"], 0.9));
+
+        var prompt = result.Output.Decision.FinalPrompt;
+        Assert.DoesNotContain("no text", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No watermarks, no logos.", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_PromptWithoutTypography_KeepsFullTextGuard()
+    {
+        var workflow = ScriptedWorkflow("A serene watercolour landscape at dawn.");
+
+        var result = await workflow.RunAsync(new VisionAnalystInput([0x89], ["landscape"], 0.9));
+
+        var prompt = result.Output.Decision.FinalPrompt;
+        Assert.Contains("No watermarks, no text, no logos.", prompt, StringComparison.Ordinal);
     }
 }

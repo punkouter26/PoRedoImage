@@ -46,6 +46,14 @@ public sealed class ImageSessionService
     /// </summary>
     public string? LastFinalPrompt { get; private set; }
 
+    /// <summary>
+    /// A prompt handed from one feature page to another (Style Director's "Use in Bulk Generate"),
+    /// staged but not yet submitted. Consumed once via <see cref="TakeStagedPrompt"/> so that
+    /// returning to the receiving page later does not silently re-apply a stale seed.
+    /// Distinct from <see cref="LastFinalPrompt"/>, which records what was already submitted.
+    /// </summary>
+    public string? StagedPrompt { get; private set; }
+
     /// <summary>Raised whenever the active image or cross-page state changes (set or cleared).</summary>
     public event Action? OnChange;
 
@@ -83,6 +91,29 @@ public sealed class ImageSessionService
         OnChange?.Invoke();
     }
 
+    /// <summary>
+    /// Stages <paramref name="prompt"/> for the next feature page to pick up. Blank input is
+    /// ignored so a failed upstream run cannot wipe a good staged prompt.
+    /// </summary>
+    public void StagePrompt(string? prompt)
+    {
+        if (string.IsNullOrWhiteSpace(prompt)) return;
+        StagedPrompt = prompt;
+        OnChange?.Invoke();
+    }
+
+    /// <summary>
+    /// Returns the staged prompt and clears it, so it is applied at most once. Deliberately does
+    /// not raise <see cref="OnChange"/>: the receiving page reads this during its own
+    /// initialisation, and re-entrant renders there buy nothing — nothing renders this value.
+    /// </summary>
+    public string? TakeStagedPrompt()
+    {
+        var staged = StagedPrompt;
+        StagedPrompt = null;
+        return staged;
+    }
+
     public void Clear()
     {
         Bytes = null;
@@ -90,6 +121,7 @@ public sealed class ImageSessionService
         FileName = null;
         LastVisitedFeatureRoute = null;
         LastFinalPrompt = null;
+        StagedPrompt = null;
         _cachedPreviewUrl = null;
         OnChange?.Invoke();
     }

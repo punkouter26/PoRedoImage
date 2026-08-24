@@ -1,4 +1,4 @@
-﻿<Project>
+<Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
@@ -52,6 +52,10 @@
     <!-- Transitive pin: Radzen pulls System.Linq.Dynamic.Core; 1.3.7 has a high-severity
          advisory (GHSA-4cv2-4hjh-77rx). Pin a patched build via transitive pinning. -->
     <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.6.10" />
+    <!-- MAUI & Mobile -->
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.10" />
     <!-- Versioning -->
     <PackageVersion Include="MinVer" Version="5.0.0" />
     <!-- Testing -->

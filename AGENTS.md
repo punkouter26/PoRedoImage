@@ -46,6 +46,7 @@ $env:Mocks__UseMockAi='true'; $env:Storage__ConnectionString=''; dotnet run --pr
 
 ## Layout
 - `src/PoRedoImage.Client/` — Blazor WASM SPA. **All interactive UI lives here.**
+- `src/PoRedoImage.Mobile/` — .NET MAUI mobile client (Android-first, fast camera intake + minimalist UI).
 - `src/PoRedoImage.Web/` — ASP.NET Core BFF/API host. `Components/App.razor` is a
   host document only. Server code is **Vertical Slice** under `Features/`.
 - `src/PoRedoImage.Shared/` — DTOs + FluentValidation across the WASM/API boundary; keep trim-safe.

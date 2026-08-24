@@ -299,14 +299,16 @@
         NotificationService.Notify(NotificationSeverity.Info, "Copied", "Prompt copied to clipboard.", duration: 2500);
     }
 
-    private async Task UseInBulk()
+    private void UseInBulk()
     {
         if (_directorResult?.FinalPrompt is null) return;
-        // Stage the prompt for the Bulk Generate page by writing it to the bulk prompt storage
-        // via a friendly URL. For simplicity, redirect with a query string the BulkGenerate page can pick up.
-        var encoded = Uri.EscapeDataString(_directorResult.FinalPrompt);
-        await JSRuntime.InvokeVoidAsync("eval",
-            $"window.location.href = '/bulk-generate?seed={encoded}'");
+        // Hand the prompt over in the shared session singleton rather than on the query string.
+        // Two reasons the old `window.location.href = '/bulk-generate?seed=...'` could not work:
+        // BulkGenerate never read a `seed` parameter, and a raw location assignment reboots the
+        // WASM runtime — which drops ImageSessionService, and with it the very image Bulk
+        // Generate needs to run image-to-image. NavigateTo keeps both the image and the prompt.
+        SessionService.StagePrompt(_directorResult.FinalPrompt);
+        NavigationManager.NavigateTo("/bulk-generate");
     }
 
     private void StartOver()

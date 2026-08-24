@@ -185,6 +185,20 @@
         // the Active Image Bar can deep-link back here.
         SessionService.RecordFeatureVisit("/bulk-generate");
 
+        // A prompt handed over from Style Director lands in slot 1, so the run the user just
+        // asked for is the first one generated. Taken once: coming back to this page later
+        // must not silently re-seed a prompt they have since edited or cleared.
+        var staged = SessionService.TakeStagedPrompt();
+        if (staged is not null)
+        {
+            _prompts[0] = staged;
+            NotificationService.Notify(
+                NotificationSeverity.Success,
+                "Prompt Loaded",
+                "Style Director's prompt is in slot 1. Upload or keep your photo, then Generate.",
+                duration: 5000);
+        }
+
         // Active image-gen provider + indicative per-image pricing, shared with the footer chip
         // so the page total and the session total can't disagree. Non-critical: a failure just
         // hides the pricing note.

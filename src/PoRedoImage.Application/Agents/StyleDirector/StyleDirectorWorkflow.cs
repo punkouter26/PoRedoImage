@@ -211,11 +211,36 @@ public sealed class StyleDirectorWorkflow
         if (!prompt.Contains("watermark", StringComparison.OrdinalIgnoreCase) &&
             !prompt.Contains("no text", StringComparison.OrdinalIgnoreCase))
         {
-            suggestions.Add("Added anti-watermark and anti-text guard.");
-            prompt += " No watermarks, no text, no logos.";
+            if (WantsTypography(prompt))
+            {
+                suggestions.Add("Added anti-watermark guard; kept text (prompt requests typography).");
+                prompt += " No watermarks, no logos.";
+            }
+            else
+            {
+                suggestions.Add("Added anti-watermark and anti-text guard.");
+                prompt += " No watermarks, no text, no logos.";
+            }
         }
         return prompt;
     }
+
+    /// <summary>
+    /// Cues that the prompt deliberately asks for rendered lettering — meme captions, poster
+    /// titles, wanted-poster headlines. The blanket "no text" guard contradicts such a prompt:
+    /// a run on a captioned portrait once emitted <c>top text reads "WHEN THE SUIT SPEAKS"</c>
+    /// and <c>no text</c> in the same paragraph, leaving the generator to pick a winner. When a
+    /// cue is present only the watermark/logo half of the guard is applied.
+    /// </summary>
+    private static readonly string[] TypographyCues =
+    [
+        "typograph", "text reads", "caption", "lettering", "block letters", "drop-cap",
+        "title treatment", "headline", "subtitle", "billing block", "blackletter",
+        "serif", "sans-serif", "typeface", "word mark", "wordmark", "text overlay",
+    ];
+
+    private static bool WantsTypography(string prompt) =>
+        TypographyCues.Any(cue => prompt.Contains(cue, StringComparison.OrdinalIgnoreCase));
 
     private static ParsedAiResponse ParseAiResponse(string json, IReadOnlyList<string> fallbackTags)
     {

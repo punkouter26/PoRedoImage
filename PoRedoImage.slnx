@@ -5,6 +5,7 @@
     <Project Path="src/PoRedoImage.Infrastructure/PoRedoImage.Infrastructure.csproj" />
     <Project Path="src/PoRedoImage.Shared/PoRedoImage.Shared.csproj" />
     <Project Path="src/PoRedoImage.Client/PoRedoImage.Client.csproj" />
+    <Project Path="src/PoRedoImage.Mobile/PoRedoImage.Mobile.csproj" />
     <Project Path="src/PoRedoImage.Web/PoRedoImage.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">

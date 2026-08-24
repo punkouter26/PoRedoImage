@@ -1,4 +1,4 @@
-﻿# PoRedoImage — AI Agent Context
+# PoRedoImage — AI Agent Context
 
 ## Overview
 PoRedoImage is a Blazor WebAssembly (global Interactive WebAssembly, no prerender) SPA for AI-powered
@@ -31,6 +31,7 @@ src/
 ├── PoRedoImage.Infrastructure/ # Repositories, external services, IMockable mocks
 ├── PoRedoImage.Shared/       # DTOs + FluentValidation shared between WASM and API
 ├── PoRedoImage.Client/       # Blazor WASM SPA — Routes, Layout, Pages, Shared, Models, wwwroot
+├── PoRedoImage.Mobile/       # .NET MAUI mobile app (Android camera intake + minimalist UI)
 └── PoRedoImage.Web/          # API/BFF host (App.razor host doc + Features/*/ endpoints)
 tests/                          # 4 projects per spec §2.2 — the E2EAPI/E2EUI split is DONE.
 ├── PoRedoImage.Tests.Unit/        # xUnit + Moq — pure logic
