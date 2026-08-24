@@ -1,4 +1,4 @@
-﻿@page "/rap-roast"
+@page "/rap-roast"
 @attribute [Authorize]
 @inherits FeaturePageBase
 @implements IDisposable
@@ -435,6 +435,13 @@
 
             _result = await response.Content.ReadFromJsonAsync<RapRoastResponse>(SharedJsonOptions.Default);
             isComplete = _result is not null;
+            if (isComplete)
+            {
+                Cost.RecordVision(1);
+                Cost.RecordTextReasoning(1);
+                if (!string.IsNullOrEmpty(_result?.AudioData) || _result?.AudioRefused == false)
+                    Cost.RecordMusic(1);
+            }
             _lines = RoastScript.Parse(_result?.Lyrics);
         }
         catch (Exception ex)

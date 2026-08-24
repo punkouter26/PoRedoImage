@@ -360,6 +360,10 @@
                     analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(rawJson, jsonOpts);
                     if (analysisResult == null)
                         throw new InvalidOperationException("No response received from API.");
+
+                    Cost.RecordVision(1);
+                    Cost.RecordTextReasoning(1);
+
                     if (_userId is not null && !string.IsNullOrEmpty(analysisResult.MemeImageData))
                         _ = AutoSaveMemeAsync(analysisResult.MemeImageData, "image/png");
                 }

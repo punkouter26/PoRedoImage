@@ -249,6 +249,11 @@
                         ? $"data:{analysisResult.RegeneratedImageContentType};base64,{analysisResult.RegeneratedImageData}"
                         : null;
 
+            Cost.RecordVision(1);
+            Cost.RecordTextReasoning(1);
+            if (!string.IsNullOrEmpty(analysisResult.RegeneratedImageData))
+                Cost.RecordImages(1);
+
             if (_userId is not null && !string.IsNullOrEmpty(analysisResult.RegeneratedImageData))
                         _ = AutoSaveResultAsync(
                             Convert.FromBase64String(analysisResult.RegeneratedImageData),

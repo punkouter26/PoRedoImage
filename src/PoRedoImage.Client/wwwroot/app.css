@@ -2198,6 +2198,11 @@ input.form-control:focus {
 .prompt-history__chip--pinned .prompt-history__pin { color: var(--amber); }
 
 /* ═══ Session cost — the fare counter ════════════════════════════════════ */
+.session-cost-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
 .session-cost {
     display: inline-flex;
     align-items: center;
@@ -2212,15 +2217,46 @@ input.form-control:focus {
     box-shadow: var(--inset-cell);
     color: var(--steel);
     white-space: nowrap;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.session-cost:hover {
+    color: var(--flap-white);
+    background: var(--flap-black);
 }
 
 .session-cost__value { font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; }
 
 .session-cost__meta { color: var(--steel-dark); }
 
+.session-cost-popover {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    z-index: 1050;
+    min-width: 290px;
+    background: var(--flap-black);
+    border: 1px solid var(--rule-strong);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.85);
+    padding: 0.75rem;
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--flap-white);
+}
+
+.session-cost-popover__header {
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 0.4rem;
+    font-size: var(--text-2xs);
+}
+
 @media (max-width: 639.98px) {
 .session-cost__meta { display: none; }
-
+.session-cost-popover { right: auto; left: 0; max-width: calc(100vw - 2rem); }
 }
 
 /* ═══ Mobile sticky action rail ══════════════════════════════════════════ */

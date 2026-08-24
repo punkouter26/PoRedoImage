@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
@@ -29,6 +29,7 @@ public abstract class FeaturePageBase : ComponentBase
     [Inject] protected AiSelectionState AiSelection { get; set; } = default!;
     [Inject] protected LocalAiService LocalAi { get; set; } = default!;
     [Inject] protected UserImageSaveService UserImageSave { get; set; } = default!;
+    [Inject] protected SessionCostService Cost { get; set; } = default!;
     [Inject] protected IJSRuntime Js { get; set; } = default!;
 
     private ILogger? _logger;

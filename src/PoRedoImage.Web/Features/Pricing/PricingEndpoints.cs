@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Web.Configuration;
 using PoRedoImage.Shared.Configuration;
@@ -26,13 +26,16 @@ public static class PricingEndpoints
             return Results.Ok(new AiPricingDto(
                 ImageProvider: key,
                 ImageProviderLabel: p?.Label ?? key,
-                TextToImageUsd: p?.TextToImageUsd ?? 0m,
-                ImageToImageUsd: p?.ImageToImageUsd ?? 0m,
-                Currency: pricing.Value.Currency));
+                TextToImageUsd: p?.TextToImageUsd ?? 0.039m,
+                ImageToImageUsd: p?.ImageToImageUsd ?? 0.039m,
+                Currency: pricing.Value.Currency,
+                VisionAnalysisUsd: pricing.Value.VisionAnalysisUsd,
+                TextReasoningUsd: pricing.Value.TextReasoningUsd,
+                MusicGenerationUsd: pricing.Value.MusicGenerationUsd));
         })
         .WithName("GetAiPricing")
         .WithTags("Pricing")
-        .WithSummary("Active image-generation provider + indicative per-image pricing for the UI estimate");
+        .WithSummary("Active AI providers + indicative pricing for the UI estimate");
 
         return app;
     }

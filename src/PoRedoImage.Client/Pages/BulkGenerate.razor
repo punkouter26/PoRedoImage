@@ -1,4 +1,4 @@
-﻿@page "/bulk-generate"
+@page "/bulk-generate"
 @attribute [Authorize]
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
@@ -314,6 +314,7 @@
                 new BulkDescribeRequest(Convert.ToBase64String(_imageBytes), _imageContentType), SharedJsonOptions.Default);
             descResp.EnsureSuccessStatusCode();
             var descResult = await descResp.Content.ReadFromJsonAsync<BulkDescribeResponse>(SharedJsonOptions.Default);
+            Cost.RecordVision(1);
             var description = descResult?.Description ?? string.Empty;
 
             if (string.IsNullOrEmpty(description))

@@ -1,13 +1,17 @@
 namespace PoRedoImage.Shared.DTOs;
 
 /// <summary>
-/// Estimated per-image pricing for the currently-active image-generation provider, surfaced to the
-/// client so the UI can show "≈ $X per image" and a running session estimate as the user generates.
+/// Estimated pricing for AI services across capabilities, surfaced to the
+/// client so the UI can show running session totals as different AI services are used.
 /// Prices are indicative list prices from config (AiPricing section), not billed amounts.
 /// </summary>
-public record AiPricingDto(
+public sealed record AiPricingDto(
     string ImageProvider,
     string ImageProviderLabel,
     decimal TextToImageUsd,
     decimal ImageToImageUsd,
-    string Currency);
+    string Currency,
+    decimal VisionAnalysisUsd = 0.001m,
+    decimal TextReasoningUsd = 0.0015m,
+    decimal MusicGenerationUsd = 0.040m);
+
