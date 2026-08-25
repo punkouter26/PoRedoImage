@@ -49,8 +49,8 @@ public static class ImageAnalysisEndpoints
 
         try
         {
-            var image = ImageBytes.FromBase64(request.ImageData, request.ContentType);
-            var imageBytes = image.Bytes.ToArray();
+            // Validate up front so a malformed payload is a 400 here rather than a 500 from deeper in.
+            _ = ImageBytes.FromBase64(request.ImageData, request.ContentType);
             var result = await orchestrator.ProcessAsync(request, ct);
             return Results.Ok(result);
         }

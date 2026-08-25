@@ -6,6 +6,7 @@ using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Configuration;
 using PoRedoImage.Application.Agents;
 using PoRedoImage.Application.Agents.StyleDirector;
+using PoRedoImage.Application.Features.BulkGenerate;
 using PoRedoImage.Application.Features.ImageAnalysis;
 using PoRedoImage.Application.Features.RapRoast;
 using PoRedoImage.Application.Features.UserImages;
@@ -157,6 +158,9 @@ public static class InfrastructureServiceExtensions
 
         // Application layer orchestrator
         services.AddScoped<IImageAnalysisOrchestrator, ImageAnalysisOrchestrator>();
+
+        // Bulk board fan-out (concurrency cap, per-slot failure policy, re-roll seeding)
+        services.AddScoped<IBulkGenerationService, BulkGenerationService>();
 
         // Rap Roast slice: lyric writer + orchestrator (Transient so scoped logger flows correctly,
         // matching the Style Director agent registrations below).

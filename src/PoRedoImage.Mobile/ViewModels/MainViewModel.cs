@@ -89,23 +89,67 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public async Task TakePhotoAsync()
     {
+        await CaptureAsync(
+            stage => _cameraService.CapturePhotoAsync(stage),
+            "Opening camera…",
+            "Camera error");
+    }
+
+    [RelayCommand]
+    public async Task PickPhotoAsync()
+    {
+        await CaptureAsync(
+            stage => _cameraService.PickPhotoAsync(stage),
+            "Selecting photo…",
+            "Gallery error");
+    }
+
+    /// <summary>
+    /// Shared camera/gallery flow. The progress bar only starts once the picker hands the
+    /// photo back, so it tracks the on-device optimization the user actually waits through
+    /// rather than the time they spent composing the shot.
+    /// </summary>
+    private async Task CaptureAsync(
+        Func<IProgress<string>, Task<ImageCaptureResult?>> capture,
+        string openingStage,
+        string errorPrefix)
+    {
         ClearError();
-        ProcessingStage = "Opening camera…";
+        ProcessingStage = openingStage;
+        ProcessingProgress = 0;
+
+        var creep = new CancellationTokenSource();
+        var creepStarted = false;
         try
         {
-            var result = await _cameraService.CapturePhotoAsync();
+            var stage = new Progress<string>(text =>
+            {
+                ProcessingStage = text;
+                IsProcessing = true;
+                if (!creepStarted)
+                {
+                    creepStarted = true;
+                    _ = CreepProgressAsync(creep.Token);
+                }
+            });
+
+            var result = await capture(stage);
             if (result != null)
             {
+                ProcessingProgress = 1.0;
                 SetCapturedPhoto(result);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Camera error: {ex.Message}";
+            ErrorMessage = $"{errorPrefix}: {ex.Message}";
             HasError = true;
         }
         finally
         {
+            creep.Cancel();
+            IsProcessing = false;
+            ProcessingProgress = 0;
             if (!HasPhoto)
             {
                 ProcessingStage = "Ready";
@@ -113,30 +157,30 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    public async Task PickPhotoAsync()
+    /// <summary>
+    /// Eases the progress bar toward — but never to — completion while the optimizer runs.
+    /// ImageSharp reports no real progress, so the curve is time-based against the ~7s a
+    /// full-resolution phone photo takes; the caller snaps it to 1.0 on success.
+    /// </summary>
+    private async Task CreepProgressAsync(CancellationToken ct)
     {
-        ClearError();
-        ProcessingStage = "Selecting photo…";
+        const double ceiling = 0.92;
+        const double expectedSeconds = 7.0;
+        var elapsed = 0.0;
         try
         {
-            var result = await _cameraService.PickPhotoAsync();
-            if (result != null)
+            while (!ct.IsCancellationRequested)
             {
-                SetCapturedPhoto(result);
+                await Task.Delay(100, ct);
+                elapsed += 0.1;
+                ProcessingProgress = ceiling * (1 - Math.Exp(-elapsed / (expectedSeconds / 2.5)));
             }
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            ErrorMessage = $"Gallery error: {ex.Message}";
-            HasError = true;
         }
-        finally
+        catch (ObjectDisposedException)
         {
-            if (!HasPhoto)
-            {
-                ProcessingStage = "Ready";
-            }
         }
     }
 

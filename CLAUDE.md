@@ -38,6 +38,34 @@ are stale — the real projects are `Tests.E2E.ApiSmoke` and `Tests.E2E.UI`.
 Playwright browsers install once after a build:
 `pwsh tests/PoRedoImage.Tests.E2E.UI/bin/Release/net10.0/playwright.ps1 install`
 
+## Mobile (MAUI Android)
+
+`src/PoRedoImage.Mobile` is a MAUI Android head. It is the only project using `TargetFrameworks`
+(plural), which matters: [Directory.Build.props](Directory.Build.props) is imported *before* the
+project body, so its "no TFM set yet" guard stamps on `TargetFramework=net10.0`. Left in place that
+beats `TargetFrameworks` and the solution build tries to build the MAUI head as plain net10.0
+(`NETSDK1005`). The csproj clears it with an empty `<TargetFramework></TargetFramework>` — don't
+remove that line.
+
+```powershell
+dotnet build src/PoRedoImage.Mobile -f net10.0-android -r android-arm64 -t:Install "-p:AdbTarget=-s <serial>"  # phone
+dotnet build src/PoRedoImage.Mobile -f net10.0-android -r android-x64   -t:Install "-p:AdbTarget=-s emulator-5554"  # emulator
+```
+
+Pick the RID to match the device: physical phones are `arm64-v8a`, the emulator images here are
+`x86_64`. Installing the wrong one fails with Android's misleading *"not enough storage space"*.
+`AdbTarget` is required whenever more than one device is attached.
+
+**The app talks to the API over HTTP** — it holds no provider keys, by design. The default server URL
+is `http://10.0.2.2:4000` on the emulator and `http://localhost:4000` everywhere else, so a USB-
+attached phone needs a reverse tunnel or it resolves `localhost` to itself:
+
+```powershell
+adb -s <serial> reverse tcp:4000 tcp:4000
+```
+
+Untethered, set the PC's LAN IP in the app's Settings tab instead.
+
 **CI does not run tests.** [deploy.yml](.github/workflows/deploy.yml) is build + publish + deploy
 only, by explicit policy. Nothing catches a broken test but a local run.
 

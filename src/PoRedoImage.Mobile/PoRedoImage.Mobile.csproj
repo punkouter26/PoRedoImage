@@ -2,6 +2,12 @@
 
   <PropertyGroup>
     <TargetFrameworks>net10.0-android</TargetFrameworks>
+    <!-- Directory.Build.props is imported before this body runs, so its
+         "no TFM set yet" guard stamps on TargetFramework=net10.0. Left in place that
+         wins over TargetFrameworks and the solution build tries to build this MAUI head
+         as plain net10.0 (NETSDK1005). Clearing it restores normal cross-targeting. -->
+    <TargetFramework></TargetFramework>
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
     <OutputType>Exe</OutputType>
     <RootNamespace>PoRedoImage.Mobile</RootNamespace>
     <UseMaui>true</UseMaui>

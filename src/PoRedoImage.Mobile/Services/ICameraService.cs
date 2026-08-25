@@ -15,11 +15,11 @@ public interface ICameraService
     /// <summary>
     /// Launches the device camera, captures a photo, and returns the optimized image payload.
     /// </summary>
-    Task<ImageCaptureResult?> CapturePhotoAsync(CancellationToken ct = default);
+    Task<ImageCaptureResult?> CapturePhotoAsync(IProgress<string>? stage = null, CancellationToken ct = default);
 
     /// <summary>
     /// Opens the device photo library to select an existing picture.
     /// </summary>
-    Task<ImageCaptureResult?> PickPhotoAsync(CancellationToken ct = default);
+    Task<ImageCaptureResult?> PickPhotoAsync(IProgress<string>? stage = null, CancellationToken ct = default);
 }
 

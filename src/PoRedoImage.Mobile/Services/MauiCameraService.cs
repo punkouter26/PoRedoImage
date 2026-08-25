@@ -16,7 +16,7 @@ public class MauiCameraService : ICameraService
 
     public bool IsCaptureSupported => MediaPicker.Default.IsCaptureSupported;
 
-    public async Task<ImageCaptureResult?> CapturePhotoAsync(CancellationToken ct = default)
+    public async Task<ImageCaptureResult?> CapturePhotoAsync(IProgress<string>? stage = null, CancellationToken ct = default)
     {
         try
         {
@@ -42,6 +42,9 @@ public class MauiCameraService : ICameraService
                 return null;
             }
 
+            stage?.Report("Optimizing photo…");
+
+
             await using var stream = await photo.OpenReadAsync();
             var fileName = photo.FileName ?? $"camera_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
             var contentType = photo.ContentType ?? "image/jpeg";
@@ -55,7 +58,7 @@ public class MauiCameraService : ICameraService
         }
     }
 
-    public async Task<ImageCaptureResult?> PickPhotoAsync(CancellationToken ct = default)
+    public async Task<ImageCaptureResult?> PickPhotoAsync(IProgress<string>? stage = null, CancellationToken ct = default)
     {
         try
         {
@@ -70,6 +73,9 @@ public class MauiCameraService : ICameraService
                 Console.WriteLine("[MauiCameraService] User cancelled photo picking.");
                 return null;
             }
+
+            stage?.Report("Optimizing photo…");
+
 
             await using var stream = await photo.OpenReadAsync();
             var fileName = photo.FileName ?? $"gallery_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";

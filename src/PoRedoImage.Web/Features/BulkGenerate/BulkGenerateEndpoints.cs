@@ -7,17 +7,12 @@ using PoRedoImage.Shared.Imaging;
 using PoRedoImage.Shared.Json;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Web.Features.Shared;
+using PoRedoImage.Application.Features.BulkGenerate;
 
 namespace PoRedoImage.Web.Features.BulkGenerate;
 
 public static class BulkGenerateEndpoints
 {
-    /// <summary>
-    /// Concurrent calls to the image model per batch. Three, matching the re-roll path — the
-    /// provider rate-limits above that and a 429 storm costs more wall clock than queueing does.
-    /// </summary>
-    private const int BatchConcurrency = 3;
-
     /// <summary>The NDJSON record separator.</summary>
     private static readonly ReadOnlyMemory<byte> Newline = new byte[] { 10 };
 
@@ -140,8 +135,7 @@ public static class BulkGenerateEndpoints
         aiGroup.MapPost("/batch", async (
             BulkBatchRequest request,
             HttpContext http,
-            IImageGenerationRouter router,
-            ILoggerFactory loggerFactory,
+            IBulkGenerationService bulk,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
@@ -155,80 +149,36 @@ public static class BulkGenerateEndpoints
             try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
             catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-            var imagen3 = router.Resolve(request.ImageGenModelId);
-            if (!imagen3.IsConfigured)
+            if (!bulk.IsConfigured(request.ImageGenModelId))
                 return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
-
-            var logger = loggerFactory.CreateLogger("BulkGenerateEndpoints.Batch");
-            var source = imageBytes.Bytes.ToArray();
-            var prompts = request.Prompts;
 
             http.Response.ContentType = "application/x-ndjson";
             // Proxies that buffer would defeat the entire point of streaming these.
             http.Response.Headers["Cache-Control"] = "no-cache, no-store";
             http.Response.Headers["X-Accel-Buffering"] = "no";
 
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var succeeded = 0;
-
-            // Same cap as /reroll — three concurrent calls to the image model. Higher is not better:
-            // the provider rate-limits, and a 429 storm costs more wall clock than the queueing does.
-            using var gate = new SemaphoreSlim(BatchConcurrency, BatchConcurrency);
-            // One writer at a time, or two slots finishing together interleave their JSON mid-line
-            // and the client's line reader sees corruption.
-            using var writeLock = new SemaphoreSlim(1, 1);
-
-            var tasks = prompts.Select(async (prompt, index) =>
+            try
             {
-                await gate.WaitAsync(ct);
-                BulkBatchItem item;
-                try
+                // Enumerated sequentially, so the writes cannot interleave — the old write lock
+                // existed only because the fan-out wrote to the body directly.
+                await foreach (var item in bulk.GenerateBatchAsync(
+                    request.Prompts, imageBytes.Bytes.ToArray(), request.ImageGenModelId, ct))
                 {
-                    var (data, contentType, _) = await imagen3.GenerateImageAsync(prompt, source, ct: ct);
-                    item = new BulkBatchItem(index, Convert.ToBase64String(data), contentType, null);
-                    Interlocked.Increment(ref succeeded);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // One slot failing is a normal outcome the board already renders. Reporting it
-                    // as a line keeps the other nine running.
-                    logger.LogWarning(ex, "Batch slot {Index} failed", index);
-                    item = new BulkBatchItem(index, null, null, "Generation failed for this variation.");
-                }
-                finally { gate.Release(); }
-
-                await writeLock.WaitAsync(ct);
-                try
-                {
-                    // Source-generated JsonTypeInfo, not the reflective overload: the solution-wide trim
-                    // analyzer rejects the latter (IL2026), and this endpoint writes to the response
-                    // body directly rather than going through the framework's serializer.
+                    // Source-generated JsonTypeInfo, not the reflective overload: the solution-wide
+                    // trim analyzer rejects the latter (IL2026), and this endpoint writes to the
+                    // response body directly rather than going through the framework's serializer.
                     await JsonSerializer.SerializeAsync(
                         http.Response.Body, item, SharedJsonContext.Default.BulkBatchItem, ct);
                     await http.Response.Body.WriteAsync(Newline, ct);
                     await http.Response.Body.FlushAsync(ct);
                 }
-                finally { writeLock.Release(); }
-            }).ToArray();
-
-            try
-            {
-                await Task.WhenAll(tasks);
             }
             catch (OperationCanceledException)
             {
-                logger.LogInformation("Batch cancelled by the client after {Elapsed}ms.", sw.ElapsedMilliseconds);
+                // Client hung up mid-stream. The body is partially written; there is nothing left
+                // to say on this response.
                 return Results.Empty;
             }
-
-            sw.Stop();
-            logger.LogInformation(
-                "Batch complete. Requested={Requested}, Succeeded={Succeeded}, Elapsed={Elapsed}ms",
-                prompts.Length, succeeded, sw.ElapsedMilliseconds);
 
             // The body is already written; returning Empty stops the framework appending to it.
             return Results.Empty;
@@ -237,10 +187,10 @@ public static class BulkGenerateEndpoints
         .WithSummary("Generate every art-style variation in one request, streamed as NDJSON");
 
         // Idea #11 — One-Tap Re-roll x3: spawn N parallel variations from a winning prompt.
-        // Uses a deterministic seed hint so re-rolls are reproducible per session and
-        // visibly distinct from the winner, but stay close in style. Routed via the router
-        // so a client can pick a different image provider per re-roll.
-        aiGroup.MapPost("/reroll", async (BulkRerollRequest request, IImageGenerationRouter router, ILoggerFactory loggerFactory) =>
+        aiGroup.MapPost("/reroll", async (
+            BulkRerollRequest request,
+            IBulkGenerationService bulk,
+            CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
                 return Results.BadRequest("ImageData is required.");
@@ -253,49 +203,13 @@ public static class BulkGenerateEndpoints
             try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
             catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-            var imagen3 = router.Resolve(request.ImageGenModelId);
-            if (!imagen3.IsConfigured)
+            if (!bulk.IsConfigured(request.ImageGenModelId))
                 return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
 
-            var rerollImageBytes = imageBytes.Bytes.ToArray();
+            var response = await bulk.RerollAsync(
+                request.SeedPrompt, imageBytes.Bytes.ToArray(), request.Count, request.ImageGenModelId, ct);
 
-            var logger = loggerFactory.CreateLogger("BulkGenerateEndpoints.Reroll");
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var startedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-            // Cap parallelism to avoid hammering the upstream model with simultaneous calls.
-            using var gate = new SemaphoreSlim(initialCount: 3, maxCount: 3);
-            var tasks = Enumerable.Range(0, request.Count).Select(async i =>
-            {
-                await gate.WaitAsync();
-                try
-                {
-                    // Seed = wall-clock ms delta from batch start + slot index — guarantees uniqueness
-                    // within the batch and reproducibility if the user retries within the same second.
-                    var seed = (int)((Environment.TickCount ^ (i * 2654435761)) & 0x7FFFFFFF);
-                    var (data, ct2, _) = await imagen3.GenerateImageAsync(request.SeedPrompt, rerollImageBytes, seed);
-                    return new BulkRerollVariation(i, Convert.ToBase64String(data), ct2);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Re-roll slot {Index} failed", i);
-                    return null;
-                }
-                finally { gate.Release(); }
-            }).ToArray();
-
-            var results = await Task.WhenAll(tasks);
-            var variations = results.Where(r => r is not null).Select(r => r!).ToList();
-
-            sw.Stop();
-            logger.LogInformation("Re-roll batch complete. Requested={Requested}, Succeeded={Succeeded}, Elapsed={Elapsed}ms",
-                request.Count, variations.Count, sw.ElapsedMilliseconds);
-
-            return Results.Ok(new BulkRerollResponse(
-                Variations: variations,
-                Requested: request.Count,
-                Succeeded: variations.Count,
-                ElapsedMs: sw.ElapsedMilliseconds));
+            return Results.Ok(response);
         })
         .WithName("RerollBulkVariations")
         .WithSummary("Generate N parallel re-rolls of a winning prompt (Idea #11 — One-Tap Re-roll x3)");
