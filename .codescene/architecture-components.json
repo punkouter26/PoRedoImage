@@ -1,0 +1,75 @@
+{
+  "$schema": "https://codescene.io/schemas/architectural-components.json",
+  "_comment": [
+    "Architectural component mapping for CodeScene's inter-module coupling and architectural",
+    "decay analysis. These components mirror the boundaries enforced as tests in",
+    "tests/PoRedoImage.Tests.Architecture/ArchitectureRules.cs - the same model measured two ways:",
+    "NetArchTest answers 'is the boundary violated right now?' (binary, build-gating), CodeScene",
+    "answers 'are these components drifting toward each other over time?' (trend, advisory).",
+    "Keep the two in step: adding a feature slice means adding it in both places."
+  ],
+
+  "components": [
+    {
+      "name": "Domain",
+      "paths": ["src/PoRedoImage.Domain/**"],
+      "_role": "Entities and interfaces. Depends on nothing; every arrow points inward to here."
+    },
+    {
+      "name": "Application",
+      "paths": ["src/PoRedoImage.Application/**"],
+      "_role": "Use cases and agents. May depend on Domain and Shared only."
+    },
+    {
+      "name": "Infrastructure",
+      "paths": ["src/PoRedoImage.Infrastructure/**"],
+      "_role": "AI providers, storage, caching decorators. Implements Domain abstractions."
+    },
+    {
+      "name": "Shared-Contracts",
+      "paths": ["src/PoRedoImage.Shared/**"],
+      "_role": "DTOs and validation crossing the WASM/API boundary. Must stay trim-safe."
+    },
+    {
+      "name": "Web-BFF",
+      "paths": ["src/PoRedoImage.Web/**"],
+      "_role": "API/BFF host and vertical feature slices. Composition root."
+    },
+    {
+      "name": "Client-WASM",
+      "paths": ["src/PoRedoImage.Client/**"],
+      "_role": "The only assembly shipped to the browser. All interactive UI."
+    },
+    {
+      "name": "Mobile-MAUI",
+      "paths": ["src/PoRedoImage.Mobile/**"],
+      "_role": "Android head. Talks to the API over HTTP; holds no provider keys."
+    },
+    {
+      "name": "Tests",
+      "paths": ["tests/**"],
+      "_role": "All four-plus test tiers. Separated so test churn does not read as product decay."
+    }
+  ],
+
+  "_coupling_expectations": {
+    "_comment": [
+      "Pairs CodeScene should treat as EXPECTED coupling (they share a deliberate contract), so",
+      "that change-coupling between them is not reported as architectural decay. Everything not",
+      "listed is unexpected coupling and worth a look."
+    ],
+    "expected": [
+      ["Shared-Contracts", "Client-WASM"],
+      ["Shared-Contracts", "Web-BFF"],
+      ["Shared-Contracts", "Mobile-MAUI"],
+      ["Domain", "Infrastructure"],
+      ["Web-BFF", "Client-WASM"]
+    ],
+    "_forbidden_rationale": [
+      "Client-WASM <-> Infrastructure and Client-WASM <-> Web-BFF are absent deliberately: server",
+      "code must never ship to the browser. NetArchTest gates those as hard rules",
+      "(client-no-infrastructure, client-no-web); CodeScene surfacing change-coupling there would",
+      "be an early warning that someone is about to break one."
+    ]
+  }
+}

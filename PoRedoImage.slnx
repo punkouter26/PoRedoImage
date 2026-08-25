@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PoRedoImage.Tests.Unit/PoRedoImage.Tests.Unit.csproj" />
+    <Project Path="tests/PoRedoImage.Tests.Architecture/PoRedoImage.Tests.Architecture.csproj" />
     <Project Path="tests/PoRedoImage.Tests.Integration/PoRedoImage.Tests.Integration.csproj" />
     <Project Path="tests/PoRedoImage.Tests.E2E.ApiSmoke/PoRedoImage.Tests.E2E.ApiSmoke.csproj" />
     <Project Path="tests/PoRedoImage.Tests.E2E.UI/PoRedoImage.Tests.E2E.UI.csproj" />
