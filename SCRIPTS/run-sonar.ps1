@@ -38,7 +38,10 @@
 [CmdletBinding()]
 param(
     [string]$ProjectKey  = $(if ($env:SONAR_PROJECT_KEY)  { $env:SONAR_PROJECT_KEY }  else { 'punkouter26_PoRedoImage' }),
-    [string]$Organization = $(if ($env:SONAR_ORGANIZATION) { $env:SONAR_ORGANIZATION } else { 'punkouter26' }),
+    # NOTE: the SonarCloud ORG KEY is 'punkouter26-1', not the display name 'punkouter26'.
+    # Sonar shows it as "Key:" under the org name. Using the display name yields a confusing
+    # "project not found" / "not authorized" rather than a clear error.
+    [string]$Organization = $(if ($env:SONAR_ORGANIZATION) { $env:SONAR_ORGANIZATION } else { 'punkouter26-1' }),
     [string]$HostUrl     = $(if ($env:SONAR_HOST_URL)     { $env:SONAR_HOST_URL }     else { 'https://sonarcloud.io' }),
     [switch]$SkipTests
 )
