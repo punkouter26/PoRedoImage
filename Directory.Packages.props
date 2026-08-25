@@ -56,6 +56,10 @@
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.10" />
+    <!-- On-device inference for the MAUI head. The android asset group ships an AAR with
+         arm64-v8a + x86_64 JNI libs at minSdk 24, which lines up with the project's
+         SupportedOSPlatformVersion; model weights are side-loaded, never packed in the APK. -->
+    <PackageVersion Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.15.2" />
     <!-- Versioning -->
     <PackageVersion Include="MinVer" Version="5.0.0" />
     <!-- Testing -->

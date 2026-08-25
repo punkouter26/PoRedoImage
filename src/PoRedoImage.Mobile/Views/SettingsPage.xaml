@@ -105,6 +105,49 @@
                 </Grid>
             </Border>
 
+            <!-- ── On-Device Meme Captions ───────────────────────── -->
+            <Border BackgroundColor="{StaticResource BgCard}"
+                    Stroke="{StaticResource BorderLight}"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="On-Device Meme Captions"
+                                   FontSize="14"
+                                   FontAttributes="Bold" />
+                            <Label Text="Write the caption on this phone instead of on the server"
+                                   FontSize="11"
+                                   TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding UseOnDeviceCaptions}"
+                                OnColor="{StaticResource AccentPurple}" />
+                    </Grid>
+
+                    <Label Text="{Binding OnDeviceModelName}"
+                           FontSize="12"
+                           TextColor="{StaticResource TextPrimary}" />
+
+                    <Label Text="{Binding OnDeviceModelStatus}"
+                           FontSize="11"
+                           LineBreakMode="WordWrap"
+                           TextColor="{StaticResource TextSecondary}" />
+
+                    <Label Text="The photo is still described by the server's vision model — only the caption is local."
+                           FontSize="11"
+                           TextColor="{StaticResource TextSecondary}" />
+
+                    <Button Text="🔄 Re-check Model"
+                            Command="{Binding RefreshOnDeviceModelCommand}"
+                            BackgroundColor="{StaticResource BgCardHover}"
+                            TextColor="{StaticResource TextPrimary}"
+                            FontSize="12"
+                            HeightRequest="38" />
+                </VerticalStackLayout>
+            </Border>
+
             <!-- ── Save Button ───────────────────────────────────── -->
             <Button Text="💾 Save Settings"
                     Clicked="OnSaveSettingsClicked"

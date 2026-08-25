@@ -10,6 +10,7 @@ public class MobileSettingsService : IMobileSettingsService
     private const string StyleKey = "poredo_selected_style";
     private const string AutoSaveKey = "poredo_auto_save";
     private const string DefaultModeKey = "poredo_default_mode";
+    private const string OnDeviceCaptionsKey = "poredo_on_device_captions";
 
     public string ServerUrl
     {
@@ -48,6 +49,12 @@ public class MobileSettingsService : IMobileSettingsService
     {
         get => Preferences.Default.Get(DefaultModeKey, "Meme");
         set => Preferences.Default.Set(DefaultModeKey, value);
+    }
+
+    public bool UseOnDeviceCaptions
+    {
+        get => Preferences.Default.Get(OnDeviceCaptionsKey, false);
+        set => Preferences.Default.Set(OnDeviceCaptionsKey, value);
     }
 
     public Uri GetBaseUri()

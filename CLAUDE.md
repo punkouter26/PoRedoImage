@@ -66,6 +66,31 @@ adb -s <serial> reverse tcp:4000 tcp:4000
 
 Untethered, set the PC's LAN IP in the app's Settings tab instead.
 
+### On-device meme captions
+
+Meme captions can be written by Qwen2.5 0.5B Instruct (int4) running on the phone through ONNX
+Runtime GenAI rather than by the server. Opt-in via *Settings → On-Device Meme Captions*, off by
+default, because the ~800 MB of weights are **side-loaded and never bundled** —
+`EmbedAssembliesIntoApk` would otherwise try to pack them into the APK.
+
+```powershell
+pwsh ./SCRIPTS/push-mobile-model.ps1                                  # download + adb push
+pwsh ./SCRIPTS/push-mobile-model.ps1 -SkipPush                        # cache only, no device yet
+pwsh ./SCRIPTS/push-mobile-model.ps1 -SkipDownload -Serial <serial>   # push an already-cached copy
+```
+
+The target is `/sdcard/Android/data/com.poredoimage.mobile/files/models/qwen2.5-0.5b-instruct` — the
+app's **external** files directory, not `FileSystem.AppDataDirectory`. That is the whole trick:
+`/data/data` is unreadable to the adb shell user, so a model pushed there would need root. Install
+the app before pushing (the parent is app-scoped storage), and use *Re-check Model* in Settings to
+re-probe without restarting.
+
+Qwen2.5 is text-only, so this path still calls the server to describe the photo — only the caption is
+local, and the result is the photo plus caption text rather than a composited meme. When the model is
+missing or inference fails, `OnDeviceCaptionException` surfaces verbatim and does **not** fall back
+to the server, for the same reason `LocalInferenceException` doesn't on the web client: the user
+chose the free model, and silently re-running the work against a metered one is a surprise charge.
+
 **CI does not run tests.** [deploy.yml](.github/workflows/deploy.yml) is build + publish + deploy
 only, by explicit policy. Nothing catches a broken test but a local run.
 

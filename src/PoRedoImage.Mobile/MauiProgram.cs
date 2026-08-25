@@ -19,6 +19,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<IMobileApiClient, MobileApiClient>();
         builder.Services.AddSingleton<IShareService, MauiShareService>();
 
+        // ── On-Device AI ──────────────────────────────────────
+        // Singleton because the caption service caches several hundred megabytes of loaded
+        // weights; a transient would re-map them on every meme.
+        builder.Services.AddSingleton<IOnDeviceModelStore, OnDeviceModelStore>();
+        builder.Services.AddSingleton<IOnDeviceCaptionService, QwenCaptionService>();
+
         // ── ViewModels ────────────────────────────────────────
         builder.Services.AddTransient<MainViewModel>();
         builder.Services.AddTransient<SettingsViewModel>();

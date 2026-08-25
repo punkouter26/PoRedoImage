@@ -21,6 +21,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IMobileApiClient _apiClient;
     private readonly IShareService _shareService;
     private readonly IMobileSettingsService _settings;
+    private readonly IOnDeviceCaptionService _onDeviceCaptions;
 
     [ObservableProperty]
     private ImageCaptureResult? _capturedImage;
@@ -73,16 +74,26 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _selectedStyle = "Cyberpunk";
 
+    /// <summary>
+    /// Says where the caption came from. Shown under every meme, because "the AI wrote this on your
+    /// phone" and "the AI wrote this in Azure" are different products and the user should not have
+    /// to guess which one they got.
+    /// </summary>
+    [ObservableProperty]
+    private string _captionSourceNote = string.Empty;
+
     public MainViewModel(
         ICameraService cameraService,
         IMobileApiClient apiClient,
         IShareService shareService,
-        IMobileSettingsService settings)
+        IMobileSettingsService settings,
+        IOnDeviceCaptionService onDeviceCaptions)
     {
         _cameraService = cameraService;
         _apiClient = apiClient;
         _shareService = shareService;
         _settings = settings;
+        _onDeviceCaptions = onDeviceCaptions;
         _selectedStyle = _settings.SelectedStyle;
     }
 
@@ -194,6 +205,7 @@ public partial class MainViewModel : ObservableObject
         ResultImageSource = null;
         ResultImageBytes = null;
         ResultText = string.Empty;
+        CaptionSourceNote = string.Empty;
         CurrentResultMode = ResultMode.None;
     }
 
@@ -203,32 +215,81 @@ public partial class MainViewModel : ObservableObject
         if (CapturedImage == null) return;
         await ExecuteProcessingAsync("Meme Magic", async () =>
         {
-            ProcessingStage = "Analyzing photo scene…";
-            ProcessingProgress = 0.25;
-
-            var response = await _apiClient.ProcessMemeAsync(CapturedImage);
-
-            ProcessingStage = "Composing meme layout…";
-            ProcessingProgress = 0.75;
-
-            if (!string.IsNullOrEmpty(response.MemeImageData))
+            if (_settings.UseOnDeviceCaptions)
             {
-                var base64 = ExtractBase64(response.MemeImageData);
-                ResultImageBytes = Convert.FromBase64String(base64);
-                ResultImageSource = Microsoft.Maui.Controls.ImageSource.FromStream(() => new MemoryStream(ResultImageBytes));
+                await ProcessMemeOnDeviceAsync(CapturedImage);
             }
             else
             {
-                ResultImageBytes = CapturedImage.Bytes;
-                ResultImageSource = PhotoImageSource;
+                await ProcessMemeOnServerAsync(CapturedImage);
             }
 
-            ResultTitle = "🎭 AI Meme Created";
-            ResultSubtitle = response.Description;
-            ResultText = response.MemeCaption ?? response.Description;
             CurrentResultMode = ResultMode.Meme;
             HasResult = true;
         });
+    }
+
+    private async Task ProcessMemeOnServerAsync(ImageCaptureResult photo)
+    {
+        ProcessingStage = "Analyzing photo scene…";
+        ProcessingProgress = 0.25;
+
+        var response = await _apiClient.ProcessMemeAsync(photo);
+
+        ProcessingStage = "Composing meme layout…";
+        ProcessingProgress = 0.75;
+
+        if (!string.IsNullOrEmpty(response.MemeImageData))
+        {
+            var base64 = ExtractBase64(response.MemeImageData);
+            ResultImageBytes = Convert.FromBase64String(base64);
+            ResultImageSource = Microsoft.Maui.Controls.ImageSource.FromStream(() => new MemoryStream(ResultImageBytes));
+        }
+        else
+        {
+            ResultImageBytes = photo.Bytes;
+            ResultImageSource = PhotoImageSource;
+        }
+
+        ResultTitle = "🎭 AI Meme Created";
+        ResultSubtitle = response.Description;
+        ResultText = response.MemeCaption ?? response.Description;
+        CaptionSourceNote = string.Empty;
+    }
+
+    /// <summary>
+    /// Splits the meme between the two machines: the server still describes the photo, because
+    /// Qwen2.5 is text-only and the phone has no vision model, and the caption itself is written
+    /// locally. The result is the untouched photo plus caption text rather than a composited image —
+    /// the layout step lives on the server with the fonts.
+    /// </summary>
+    /// <remarks>
+    /// There is deliberately no automatic fall back to <see cref="ProcessMemeOnServerAsync"/> when
+    /// the local model is missing or fails. Choosing the on-device model is a choice not to send the
+    /// work to a metered service, and quietly overriding it would bill the user for a call they
+    /// opted out of — the same rule the web client's LocalInferenceException follows.
+    /// </remarks>
+    private async Task ProcessMemeOnDeviceAsync(ImageCaptureResult photo)
+    {
+        ProcessingStage = "Analyzing photo scene…";
+        ProcessingProgress = 0.2;
+
+        var description = await _apiClient.DescribeImageAsync(photo);
+
+        ProcessingProgress = 0.45;
+        var stage = new Progress<string>(text => ProcessingStage = text);
+        var caption = await _onDeviceCaptions.GenerateMemeCaptionAsync(description, stage);
+
+        ProcessingProgress = 0.9;
+
+        ResultImageBytes = photo.Bytes;
+        ResultImageSource = PhotoImageSource;
+        ResultTitle = "🎭 On-Device Meme";
+        ResultSubtitle = description;
+        ResultText = caption;
+        CaptionSourceNote =
+            $"Caption written on this phone by {_onDeviceCaptions.Model.DisplayName}. " +
+            "The scene description still came from the server's vision model.";
     }
 
     [RelayCommand]
@@ -346,6 +407,7 @@ public partial class MainViewModel : ObservableObject
         ResultImageSource = null;
         ResultImageBytes = null;
         ResultText = string.Empty;
+        CaptionSourceNote = string.Empty;
         CurrentResultMode = ResultMode.None;
         ClearError();
     }

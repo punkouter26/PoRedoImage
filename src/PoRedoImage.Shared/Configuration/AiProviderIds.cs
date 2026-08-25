@@ -4,16 +4,24 @@
 /// The namespaced provider-id vocabulary shared by the client catalog and the server routers.
 /// </summary>
 /// <remarks>
-/// Ids are namespaced by execution location — <c>remote:</c>, <c>ollama:</c>, <c>browser:</c> —
-/// because the previous scheme matched bare model-name prefixes and could not tell a browser model
-/// apart from an Ollama one. Const strings only: this type is consumed by the trim-analysed
-/// <c>.Shared</c> assembly.
+/// Ids are namespaced by execution location — <c>remote:</c>, <c>ollama:</c>, <c>browser:</c>,
+/// <c>device:</c> — because the previous scheme matched bare model-name prefixes and could not tell
+/// a browser model apart from an Ollama one. Const strings only: this type is consumed by the
+/// trim-analysed <c>.Shared</c> assembly.
 /// </remarks>
 public static class AiProviderIds
 {
     public const string RemotePrefix = "remote:";
     public const string OllamaPrefix = "ollama:";
     public const string BrowserPrefix = "browser:";
+
+    /// <summary>
+    /// Native execution inside the MAUI head, on the phone's own CPU. Distinct from
+    /// <see cref="BrowserPrefix"/>: the same weights can exist in both namespaces, but the runtime,
+    /// the packaging, and the failure modes are entirely different, so nothing may treat one as the
+    /// other.
+    /// </summary>
+    public const string DevicePrefix = "device:";
 
     // Remote (hosted APIs)
     public const string AzureComputerVision = "remote:azure-cv";
@@ -42,6 +50,15 @@ public static class AiProviderIds
     /// </summary>
     public const string BrowserQwen25 = "browser:qwen2.5-0.5b-instruct";
 
+    // Device (ONNX Runtime GenAI, executed natively by the MAUI head)
+
+    /// <summary>
+    /// Meme-caption text generation on the phone itself. Same base weights as
+    /// <see cref="BrowserQwen25"/>, but an int4 ONNX Runtime GenAI build rather than an MLC one —
+    /// side-loaded to app storage by <c>SCRIPTS/push-mobile-model.ps1</c>, never bundled in the APK.
+    /// </summary>
+    public const string DeviceQwen25 = "device:qwen2.5-0.5b-instruct";
+
     /// <summary>True when the id names the local Ollama service.</summary>
     public static bool IsOllama(string? id) =>
         id?.StartsWith(OllamaPrefix, StringComparison.OrdinalIgnoreCase) == true;
@@ -49,4 +66,8 @@ public static class AiProviderIds
     /// <summary>True when the id names a model that executes in the browser.</summary>
     public static bool IsBrowser(string? id) =>
         id?.StartsWith(BrowserPrefix, StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>True when the id names a model that executes natively on the device.</summary>
+    public static bool IsDevice(string? id) =>
+        id?.StartsWith(DevicePrefix, StringComparison.OrdinalIgnoreCase) == true;
 }

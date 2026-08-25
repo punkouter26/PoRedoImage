@@ -164,9 +164,9 @@ Selection is **per-capability**, not a single three-way category choice: the Stu
 `AiServicePicker` offers one provider selector per AI capability (analyze image, generate image,
 enhance description, style director, scene detail, create audio), each populated from the models
 available in that capability's category. `AiProviderIds` (in `PoRedoImage.Shared.Configuration`)
-namespaces every provider id by where it executes — `remote:`, `ollama:`, `browser:` — so a
-selection stamped onto a request self-describes its execution location without a separate lookup.
-The three categories a given capability's models are drawn from:
+namespaces every provider id by where it executes — `remote:`, `ollama:`, `browser:`, `device:` — so
+a selection stamped onto a request self-describes its execution location without a separate lookup.
+The categories a given capability's models are drawn from:
 1. **Remote** — Azure OpenAI (gpt-4o chat/vision) + Google Gemini (image generation)
 2. **Web Browser** — Models that run client-side on a Web Worker via WebGPU (falling back to
    WebAssembly). Implemented in `src/PoRedoImage.Client/LocalAi/`: `LocalModelRegistry` is the
@@ -176,6 +176,11 @@ The three categories a given capability's models are drawn from:
    for vision. Both workers speak the same postMessage protocol, and **all fallback policy lives
    in C#** so two runtimes never become two policies.
 3. **Ollama** — Local models (dev only, requires Ollama running locally)
+4. **Device** — Models executed natively by the MAUI head via ONNX Runtime GenAI. These never reach
+   the Studio picker: the phone has its own switch in Settings, and the ids exist in
+   `AiProviderIds` so nothing can confuse a `device:` model with the `browser:` build of the same
+   weights. Implemented in `src/PoRedoImage.Mobile/Services/`: `OnDeviceModelCatalog` is the
+   catalog, `OnDeviceModelStore` locates side-loaded weights, `QwenCaptionService` runs them.
 
 **Browser-local execution currently covers Analyze image only.** When the user picks a
 `browser:`-prefixed model for that capability, `FeaturePageBase.BuildAnalysisRequestAsync` runs
@@ -188,6 +193,14 @@ director, scene detail, create audio, generate image) do not yet have a browser-
 path; a `browser:` id for text (`AiProviderIds.BrowserQwen25`) exists but is deliberately not
 offered in the catalog. The original design spec proposed extending browser execution to
 description enhancement too, but that was deliberately dropped from scope.
+
+**Device-local execution currently covers meme captions on Android only** (`device:` ids,
+`AiProviderIds.DeviceQwen25`). Qwen2.5 0.5B Instruct int4 runs under ONNX Runtime GenAI on the
+phone's CPU; the ~800 MB of weights are side-loaded to the app's external files directory by
+`SCRIPTS/push-mobile-model.ps1` rather than shipped in the APK. Because Qwen2.5 is text-only, the
+phone still asks the server to describe the photo and generates only the caption locally.
+`OnDeviceCaptionException` follows `LocalInferenceException`'s rule exactly — surfaced verbatim,
+never silently re-run against the metered server path.
 
 ## Image Generation Provider (Google only, via a per-request router)
 `IImageGenerationService` has exactly one real implementation: `GeminiImagen3Service`

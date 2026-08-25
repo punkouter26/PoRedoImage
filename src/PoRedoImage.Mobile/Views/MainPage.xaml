@@ -312,6 +312,13 @@
                                LineBreakMode="WordWrap" />
                     </Border>
 
+                    <!-- Where the caption was generated -->
+                    <Label Text="{Binding CaptionSourceNote}"
+                           FontSize="11"
+                           TextColor="{StaticResource TextSecondary}"
+                           LineBreakMode="WordWrap"
+                           IsVisible="{Binding CaptionSourceNote, Converter={StaticResource StringNotEmptyConverter}}" />
+
                     <!-- Result Action Buttons -->
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                         <Button Grid.Column="0"
