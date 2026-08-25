@@ -13,7 +13,6 @@ env:
   DOTNET_VERSION: '10.0.x'
   AZURE_WEBAPP_NAME: poredoimage-web
   AZURE_RESOURCE_GROUP: PoRedoImage
-  SOLUTION_PATH: PoRedoImage.slnx
   API_PROJECT_PATH: src/PoRedoImage.Web/PoRedoImage.Web.csproj
 concurrency:
   group: deploy-${{ github.repository }}-${{ github.ref }}
@@ -32,16 +31,28 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          # Keyed on the projects this pipeline actually restores, NOT '**/*.csproj'. The glob
+          # matched src/PoRedoImage.Mobile and the four test projects, so editing a MAUI head or
+          # a test csproj busted the NuGet cache for a build that never touches either.
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'src/PoRedoImage.Web/*.csproj', 'src/PoRedoImage.Client/*.csproj', 'src/PoRedoImage.Infrastructure/*.csproj', 'src/PoRedoImage.Application/*.csproj', 'src/PoRedoImage.Domain/*.csproj', 'src/PoRedoImage.Shared/*.csproj') }}
           restore-keys: nuget-${{ runner.os }}-
-      - run: dotnet restore ${{ env.SOLUTION_PATH }}
-      - run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -c Release
-      # No test execution in this pipeline. Per project policy (see README, AGENT.MD), all
-      # automated testing happens pre-merge on the ci.yml workflow / branch-protection
-      # check, and locally via `dotnet test` / `SCRIPTS/run-e2e.ps1`. This pipeline stays
-      # focused on build + deploy orchestration. Integration + E2E suites need Docker
-      # (Testcontainers) and Playwright browsers; unit tests run in <1s and live next
-      # to code reviews, not in the deploy pipeline.
+      # Build the DEPLOYED project graph, not the whole solution. PoRedoImage.slnx also
+      # contains PoRedoImage.Mobile, a net10.0-android MAUI head that nothing references and
+      # that this pipeline never publishes. Restoring the solution drags it in and fails on
+      # ubuntu-latest with NETSDK1147 ("the following workloads must be installed:
+      # maui-android"). Installing the workload here would add minutes to every deploy to
+      # produce an APK no step consumes; building the API project instead covers exactly what
+      # ships — Web → Client + Shared + Infrastructure → Application → Domain.
+      # Consequence to know about: the test projects are no longer COMPILED here. This
+      # pipeline never ran them anyway (see below), so a test-only compile break now surfaces
+      # on the next local `dotnet test` rather than on a deploy that would not have run it.
+      - run: dotnet restore ${{ env.API_PROJECT_PATH }}
+      - run: dotnet build ${{ env.API_PROJECT_PATH }} --no-restore -c Release
+      # No test execution in this pipeline, by explicit policy: it stays focused on build +
+      # deploy orchestration. Integration + E2E suites need Docker (Testcontainers) and
+      # Playwright browsers; unit tests run in <1s and belong next to code reviews. Run them
+      # locally with `dotnet test` / `SCRIPTS/run-e2e.ps1` — this is the only workflow in the
+      # repo, so nothing else catches a broken test.
       - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
       - uses: actions/upload-artifact@v7
         with:
