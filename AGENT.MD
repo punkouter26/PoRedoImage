@@ -11,6 +11,14 @@ projects supply cross-cutting primitives (entities, interfaces, repository imple
 by the slices. **VSA wins over Onion when both would apply** to a feature; Onion layering is
 preserved only for cross-slice concerns.
 
+## Branching — master only
+This repository uses **exactly one branch: `master`**. Commit to it directly and push it directly.
+
+Do **not** create feature, fix, or release branches, and do not open pull requests against this repo.
+No other branch may exist locally or on `origin`; if one appears, merge it into `master` and delete
+it on both sides. This overrides the usual "branch before committing" default that agents apply to a
+default branch — here, committing straight to `master` is the intended workflow, not an accident.
+
 ## Quick Facts
 - **Solution**: PoRedoImage (.slnx format)
 - **Master Prefix**: `PoRedoImage` for namespaces, Azure resources

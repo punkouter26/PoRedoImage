@@ -200,6 +200,7 @@ Trim analysis is off for test projects only.
 | `<UserSecretsId>` / `dotnet user-secrets` | Secrets come from Key Vault, local and Azure alike |
 | `Task.Result` / `.Wait()` | Async all the way |
 | Leaving dead code behind | Zero-Waste policy — delete it in the same change |
+| Creating any branch other than `master` | Master-only repo — see [AGENT.MD](AGENT.MD) "Branching" |
 
 ## Testing conventions
 
