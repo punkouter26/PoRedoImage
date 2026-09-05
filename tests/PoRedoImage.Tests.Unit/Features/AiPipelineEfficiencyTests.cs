@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -30,7 +30,7 @@ public class AiPipelineEfficiencyTests
         var calls = 0;
         var inner = new Mock<IVisionService>();
         inner.Setup(v => v.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => { calls++; return ("a cat", (IReadOnlyList<string>)["cat"], 0.9, 800L); });
+            .ReturnsAsync(() => { calls++; return ("a cat", (IReadOnlyList<string>)["cat"], 0.9, 800L, (string?)null); });
 
         var sut = new CachingVisionService(
             inner.Object, new MemoryCache(new MemoryCacheOptions()),

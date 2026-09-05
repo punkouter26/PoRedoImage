@@ -19,10 +19,11 @@
                 Sign in to reach your saved images, variations, and prompts.
             </p>
 
-            @* Microsoft sign-in — available in both environments. target="_self" ensures
+            @* Microsoft sign-in — available in both environments. Uses forceLoad to ensure
                Blazor WASM client router does not intercept the server-side OIDC endpoint. *@
             <a href="@($"/challenge-microsoft?returnUrl={Uri.EscapeDataString(_returnUrl)}")"
-               target="_self"
+               @onclick="SignInWithMicrosoft"
+               @onclick:preventDefault="true"
                class="btn-ms-signin w-100">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
                     <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
@@ -37,9 +38,10 @@
             {
                 <div class="login-divider"><span>or</span></div>
 
-                @* target="_self" ensures browser performs a full GET to the Minimal API /dev-login endpoint. *@
-                <a href="/dev-login?email=guest%40guest.local&returnUrl=@Uri.EscapeDataString(_returnUrl)"
-                   target="_self"
+                @* Uses forceLoad to ensure browser performs a full GET to the Minimal API /dev-login endpoint. *@
+                <a href="@($"/dev-login?email=guest%40guest.local&returnUrl={Uri.EscapeDataString(_returnUrl)}")"
+                   @onclick="SignInAsGuest"
+                   @onclick:preventDefault="true"
                    class="btn-anon-signin w-100">
                     <i class="bi bi-incognito" aria-hidden="true"></i>Continue as guest
                     <span class="anon-badge">testing</span>
@@ -89,5 +91,15 @@
                 NavigationManager.NavigateTo($"/dev-login?guestId={Uri.EscapeDataString(storedGuestId)}&returnUrl={Uri.EscapeDataString(_returnUrl)}", forceLoad: true);
             }
         }
+    }
+
+    private void SignInWithMicrosoft()
+    {
+        NavigationManager.NavigateTo($"/challenge-microsoft?returnUrl={Uri.EscapeDataString(_returnUrl)}", forceLoad: true);
+    }
+
+    private void SignInAsGuest()
+    {
+        NavigationManager.NavigateTo($"/dev-login?email=guest%40guest.local&returnUrl={Uri.EscapeDataString(_returnUrl)}", forceLoad: true);
     }
 }

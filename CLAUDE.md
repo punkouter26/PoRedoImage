@@ -7,15 +7,21 @@ This file provides guidance to AI coding agents (Claude Code, Antigravity, etc.)
 1. **Master Branch Only**: Only use the `master` branch for all work and only use other branches if specifically asked to.
 2. **Never Push Without Asking**: Never push code to remote without me specifically asking.
 3. **Restart and Verify**: Always restart app and verify it restart successfully after making code change.
-4. **Project Documentation**: Check for a `DOCS` folder in the root to get an overall summary of the project.
+4. **Project Documentation**: This file is the project summary. There is no `DOCS` folder — it was removed deliberately; do not re-add references to one.
 5. **No dotnet secrets**: Do not use dotnet secrets to store data locally / Put it in appSettings or Azure Key Vault (if one exists).
 6. **Git Commits in American Slang**: When git sync happen create a git commit that is short and uses american slang so it seems a human wrote it.
 7. **Response TLDR**: At the end of any prompt that has an answer longer than 100 words, at a TLDR 20 word summary.
 
 ## Source of truth
 
-`CLAUDE.md` and `AGENT.md` are the agent-facing docs in the repo. Check the [DOCS/](DOCS/) directory in the root for an overall summary of the project. [README.md](README.md) is a PRD, not a
-dev guide, and its test commands and `docs/` paths are wrong (see below).
+`CLAUDE.md` is the agent-facing doc in the repo and the overall summary of the project;
+`AGENT.md` is a pointer to it, not a second copy (the two were byte-identical 298-line duplicates
+and had no mechanism keeping them in sync). [README.md](README.md) is a PRD, not a dev guide, and
+its test commands and `docs/` paths are wrong (see below).
+
+There is **no `DOCS/` directory**. It was tracked once and deleted deliberately, along with
+`.codescene/`, `CODE-HEALTH-SCORECARD.md` and the `SCRIPTS/generate-scorecard.ps1` that produced
+it. Don't cite `DOCS/` or `docs/` as a source of truth — nothing in the repo generates them.
 
 Several code comments cite ADRs by number (ADR-019, ADR-025, ADR-031) and section numbers (§1
 Trimming, §2 Security, Po2Logic R3/F7). No such documents exist in this repo — the reasoning lives
@@ -48,8 +54,8 @@ pwsh ./SCRIPTS/cleanup-testcontainers.ps1   # reap leaked Azurite containers aft
 ```
 
 README.md's `dotnet test tests/PoRedoImage.Tests.E2E` and its `Tests.E2EAPI`/`Tests.E2EUI` names are
-stale — the real projects are `Tests.E2E.ApiSmoke` and `Tests.E2E.UI`. Its `docs/` links are also
-wrong; the directory is [DOCS/](DOCS/).
+stale — the real projects are `Tests.E2E.ApiSmoke` and `Tests.E2E.UI`. Its `docs/` links are dead
+too; no documentation directory exists.
 
 Playwright browsers install once after a build:
 `pwsh tests/PoRedoImage.Tests.E2E.UI/bin/Release/net10.0/playwright.ps1 install`
@@ -254,10 +260,29 @@ to empty and the host fail-fasts at startup. Everywhere else, use `ConfigValue.B
 
 ## Testing conventions
 
-Four tiers with method ceilings of 100/50/25/25 (Unit / Integration / E2E.ApiSmoke / E2E.UI) enforced
-by `TestCountCeilingTests` in each project (counting logic is shared via
-[tests/TestCounting.cs](tests/TestCounting.cs); a `[Theory]` counts once regardless of `InlineData`).
-Adding tests past a ceiling breaks the build — consolidate rather than raising it silently.
+**Five** tiers with method ceilings of 100/50/25/25/10 — Unit / Integration / E2E.ApiSmoke /
+E2E.UI / **Architecture** — enforced by `TestCountCeilingTests` in each project (counting logic is
+shared via [tests/TestCounting.cs](tests/TestCounting.cs); a `[Theory]` counts once regardless of
+`InlineData`). Adding tests past a ceiling breaks the build — consolidate rather than raising it
+silently.
+
+`PoRedoImage.Tests.Architecture` is easy to miss: it is in the slnx and enforced like the rest, but
+went undocumented here for a while. It holds a rule *registry* rather than one method per rule, so
+its whole ruleset costs two methods against the ceiling however many rules it grows.
+
+Approximate headroom, so you know which tier can absorb a new test:
+
+| Tier | Methods | Ceiling |
+|---|---|---|
+| Unit | ~95 | 100 |
+| Integration | ~47 | 50 |
+| E2E.ApiSmoke | ~10 | 25 |
+| E2E.UI | ~11 | 25 |
+| Architecture | ~8 | 10 |
+
+Unit and Integration are the tight ones. Integration sat at exactly 50/50 — one test from breaking
+the build — until the per-rule pass/fail method pairs in `Contracts/` were folded into single
+theories covering both sides. Do that before reaching for the ceiling constant.
 
 Integration and E2E run under `ASPNETCORE_ENVIRONMENT=Test`, which swaps in `FakeAuthHandler`
 (header-driven `X-Fake-User`/`X-Fake-Roles`). Note that the environment check gating antiforgery

@@ -1,4 +1,4 @@
-using PoRedoImage.Domain.Interfaces;
+﻿using PoRedoImage.Domain.Interfaces;
 
 namespace PoRedoImage.Infrastructure.Services.Mocks;
 
@@ -12,13 +12,14 @@ public sealed class MockVisionService : IVisionService, IMockable
 {
     public string MockReason => "Computer Vision (mock)";
 
-    public Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs)>
+    public Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs, string? FallbackReason)>
         AnalyzeAsync(byte[] imageData, CancellationToken ct = default)
         => Task.FromResult((
             "A mock analysis of the uploaded image — generated locally with no AI call.",
             (IReadOnlyList<string>)["mock", "sample", "placeholder"],
             0.99,
-            1L));
+            1L,
+            (string?)null));
 }
 
 /// <summary>Canned text generation — never calls Azure OpenAI.</summary>

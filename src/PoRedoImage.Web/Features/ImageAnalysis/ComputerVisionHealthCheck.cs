@@ -4,9 +4,21 @@ using PoRedoImage.Shared.Configuration;
 namespace PoRedoImage.Web.Features.ImageAnalysis;
 
 /// <summary>
-/// Health check that verifies both connectivity and authentication for Azure Computer Vision.
-/// Sends a HEAD request with the configured API key so that auth failures (401/403)
-/// are surfaced as Degraded rather than falsely reported as Healthy.
+/// Health check that verifies connectivity, routing AND authentication for Azure Computer Vision.
+/// <remarks>
+/// Probes with a deliberately empty <c>{}</c> POST to the analyze route. That is the only request
+/// shape that distinguishes all three failure modes without submitting an image (so it processes
+/// nothing and bills nothing):
+/// <list type="bullet">
+///   <item>HTTP 400 <c>InvalidRequest</c> — the route exists and the key was accepted. Healthy.</item>
+///   <item>HTTP 401/403 — endpoint reachable, key rejected. Degraded.</item>
+///   <item>HTTP 404 — wrong endpoint or wrong API version. Degraded.</item>
+/// </list>
+/// The previous implementation sent a GET and treated <em>every</em> status except 401/403 as
+/// Healthy. On this account a GET to the analyze route returns 404 (the path is POST-only), so the
+/// check reported "Healthy (HTTP 404)" unconditionally — it could not have failed, and the
+/// post-deploy smoke test that asserts on it was equally incapable of catching a broken deploy.
+/// </remarks>
 /// </summary>
 public sealed class ComputerVisionHealthCheck : IHealthCheck
 {
@@ -44,22 +56,43 @@ public sealed class ComputerVisionHealthCheck : IHealthCheck
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(TimeSpan.FromSeconds(5));
 
-            // Probe the Azure AI Vision 4.0 endpoint path that the ImageAnalysisClient SDK uses.
-            // GET returns 405 (Method Not Allowed) when auth is valid, 401/403 when the key is wrong.
-            var probeUrl = endpoint.TrimEnd('/') + "/computervision/imageanalysis:analyze?api-version=2024-02-01&features=caption";
-            var request = new HttpRequestMessage(HttpMethod.Get, probeUrl);
+            // Empty JSON body: the service validates auth and routing before it looks for an image,
+            // so this returns 400 InvalidRequest on success without analysing (or billing for) one.
+            var probeUrl = endpoint.TrimEnd('/') + "/computervision/imageanalysis:analyze?api-version=2024-02-01&features=tags";
+            using var request = new HttpRequestMessage(HttpMethod.Post, probeUrl)
+            {
+                Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json"),
+            };
             request.Headers.TryAddWithoutValidation("Ocp-Apim-Subscription-Key", apiKey);
             var response = await client.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
             var statusCode = (int)response.StatusCode;
+
+            // 400 is the success signal here — request rejected on content, not on identity.
+            if (statusCode == 400)
+                return HealthCheckResult.Healthy("ComputerVision endpoint reachable and key accepted.");
+
             if (statusCode is 401 or 403)
                 return HealthCheckResult.Degraded(
                     $"ComputerVision endpoint reachable but authentication failed (HTTP {statusCode}). Check ComputerVision:ApiKey.");
 
-            // 405 Method Not Allowed or any non-401/403 = auth is valid, endpoint is reachable
-            return HealthCheckResult.Healthy(
-                $"ComputerVision endpoint reachable (HTTP {statusCode})");
+            if (statusCode == 404)
+                return HealthCheckResult.Degraded(
+                    $"ComputerVision analyze route returned HTTP 404 for endpoint '{endpoint}'. The endpoint or api-version is wrong — image analysis will fail.");
+
+            if (statusCode == 429)
+                return HealthCheckResult.Degraded(
+                    "ComputerVision is rate limiting (HTTP 429). Image analysis will fall back to degraded output.");
+
+            if (statusCode >= 500)
+                return HealthCheckResult.Degraded(
+                    $"ComputerVision returned a server error (HTTP {statusCode}).");
+
+            // 200 would mean the service accepted an empty body, which it should not; report it
+            // rather than silently calling an unexpected shape healthy.
+            return HealthCheckResult.Degraded(
+                $"ComputerVision probe returned an unexpected HTTP {statusCode}.");
         }
         catch (Exception ex)
         {

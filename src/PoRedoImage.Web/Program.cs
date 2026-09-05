@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
@@ -25,6 +25,7 @@ using PoRedoImage.Web.Features.StyleDirector;
 using PoRedoImage.Web.Features.UserImages;
 using Radzen;
 using Serilog;
+using Serilog.Events;
 using Scalar.AspNetCore;
 
 // ─── Bootstrap logger ───────────────────────────────────────────────
@@ -244,7 +245,9 @@ try
         app.UseHttpsRedirection();
     }
 
-    // Pushes CorrelationId, UserId, and SessionId into Serilog LogContext for every request
+    // Pushes CorrelationId and SessionId into Serilog LogContext for every request.
+    // UserId is pushed later by UserContextMiddleware — see the note on that class for why it
+    // cannot be done here.
     app.UseMiddleware<RequestContextMiddleware>();
 
     // Structured request logging: one entry per request with timing and status
@@ -252,17 +255,44 @@ try
     {
         opts.MessageTemplate =
             "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+
+        // Static assets are logged at Verbose, which the configured minimum level (Information)
+        // discards. Without this every WASM boot wrote ~200 Information lines — one per
+        // /_framework/*.wasm, /_content/* and .styles.css fetch — for 26,267 entries and 12.5 MB
+        // of log file in a single day of local use, and the identical volume billed as
+        // Application Insights ingestion in production. A failed or slow asset fetch still logs:
+        // the level only drops for successful, fast, uninteresting ones.
+        opts.GetLevel = (httpContext, elapsedMs, ex) =>
+        {
+            if (ex is not null || httpContext.Response.StatusCode >= 500)
+                return LogEventLevel.Error;
+            if (httpContext.Response.StatusCode >= 400)
+                return LogEventLevel.Warning;
+            if (StaticAssetPaths.IsStaticAsset(httpContext.Request.Path))
+                return LogEventLevel.Verbose;
+            return LogEventLevel.Information;
+        };
+
         opts.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
         {
             diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
             diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
             diagnosticContext.Set("CorrelationId",
                 httpContext.Response.Headers["X-Correlation-ID"].FirstOrDefault() ?? string.Empty);
+            // This callback runs as the response unwinds — i.e. after UseAuthentication has decoded
+            // the cookie — so unlike the pre-auth LogContext push it sees the real principal. The
+            // request-completion line is the highest-volume log event in the app; stamping it
+            // "anonymous" made per-user tracing impossible.
+            diagnosticContext.Set("UserId", UserContextMiddleware.ResolveUserId(httpContext.User));
         };
     });
 
     app.UseRateLimiter();
     app.UseAuthentication();
+
+    // Must follow UseAuthentication: context.User is not populated before it, which is exactly the
+    // bug this replaced (every log line stamped UserId="anonymous", including 53 signed-in sessions).
+    app.UseMiddleware<UserContextMiddleware>();
 
     // The Blazor WebAssembly boot assets under /_framework must load for anonymous users: the whole
     // UI — including the /login page — is Interactive WebAssembly and cannot boot without them. Most

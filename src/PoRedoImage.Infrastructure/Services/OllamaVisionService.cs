@@ -24,7 +24,7 @@ public sealed class OllamaVisionService(
 {
     private string Model => configuration[ConfigKeys.OllamaVisionModel] ?? "gemma4";
 
-    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs)>
+    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs, string? FallbackReason)>
         AnalyzeAsync(byte[] imageData, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(imageData);
@@ -75,7 +75,7 @@ public sealed class OllamaVisionService(
 
         // Local models don't emit a calibrated confidence; report 1.0 so downstream gating treats the
         // result as usable (the pipeline only uses this value for display).
-        return (description, tags, 1.0, elapsed);
+        return (description, tags, 1.0, elapsed, null);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace PoRedoImage.Tests.Architecture;
 
@@ -34,7 +34,7 @@ public sealed class ArchitectureRuleTests
     }
 
     /// <summary>
-    /// Writes <c>artifacts/architecture-results.json</c> for <c>SCRIPTS/generate-scorecard.ps1</c>.
+    /// Writes <c>artifacts/architecture-results.json</c> as a machine-readable record of the run.
     /// Always passes: this reports the score, it does not enforce it (the [Theory] above does).
     /// </summary>
     [Fact]

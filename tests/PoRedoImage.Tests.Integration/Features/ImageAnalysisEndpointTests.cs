@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
@@ -217,7 +217,7 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
     {
         var mock = new Mock<IVisionService>();
         mock.Setup(s => s.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("A test description", (IReadOnlyList<string>)new List<string> { "cat", "animal", "pet" }, 0.92, 150L));
+            .ReturnsAsync(("A test description", (IReadOnlyList<string>)new List<string> { "cat", "animal", "pet" }, 0.92, 150L, (string?)null));
         return mock.Object;
     }
 
@@ -462,7 +462,7 @@ public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Pro
 
             var mockVision = new Mock<IVisionService>();
             mockVision.Setup(s => s.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(("A test description", (IReadOnlyList<string>)new List<string> { "cat" }, 0.92, 150L));
+                .ReturnsAsync(("A test description", (IReadOnlyList<string>)new List<string> { "cat" }, 0.92, 150L, (string?)null));
             MockedServicesWebApplicationFactory.ReplaceService<IVisionService>(services, mockVision.Object);
             MockedServicesWebApplicationFactory.ReplaceService<IVisionServiceRouter>(
                 services, new SingleVisionServiceRouter(mockVision.Object));

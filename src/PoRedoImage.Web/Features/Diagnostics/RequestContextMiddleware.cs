@@ -3,11 +3,24 @@ using Serilog.Context;
 namespace PoRedoImage.Web.Features.Diagnostics;
 
 /// <summary>
-/// Middleware that combines correlation ID propagation and user/session context into one pipeline hop.
+/// Middleware that combines correlation ID propagation and session context into one pipeline hop.
 /// - Reads the client-stamped X-Correlation-ID / X-Session-ID (§6.9), generating fallbacks, and echoes
 ///   both in the response headers.
-/// - Pushes CorrelationId, UserId, and SessionId into Serilog LogContext for every log entry.
+/// - Pushes CorrelationId and SessionId into Serilog LogContext for every log entry.
 /// </summary>
+/// <remarks>
+/// This runs BEFORE <c>UseAuthentication()</c> — it has to, because the response headers it echoes
+/// must be set before anything can start writing a response, and because a request rejected by the
+/// rate limiter (which also sits ahead of authentication) still needs a correlation id.
+/// <para>
+/// That ordering is exactly why <c>UserId</c> is NOT pushed here. It used to be, reading
+/// <c>context.User.Identity.Name</c> at a point in the pipeline where the cookie has not been
+/// decoded yet, so the property was the literal string "anonymous" on every log line ever written —
+/// 26,247 of 26,247 entries on a day with 53 successful logins. User identity is pushed by
+/// <see cref="UserContextMiddleware"/>, which is registered immediately after
+/// <c>UseAuthentication()</c>.
+/// </para>
+/// </remarks>
 public sealed class RequestContextMiddleware
 {
     /// <summary>Correlation header name, shared with <see cref="OutboundCorrelationHandler"/>.</summary>
@@ -37,10 +50,7 @@ public sealed class RequestContextMiddleware
         context.Items[CorrelationHeader] = correlationId;
         context.Items[SessionHeader] = sessionId;
 
-        var userId = context.User?.Identity?.Name ?? "anonymous";
-
         using (LogContext.PushProperty("CorrelationId", correlationId))
-        using (LogContext.PushProperty("UserId", userId))
         using (LogContext.PushProperty("SessionId", sessionId))
         {
             await _next(context);

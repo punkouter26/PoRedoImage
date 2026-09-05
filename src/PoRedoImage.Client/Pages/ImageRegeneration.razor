@@ -1,4 +1,4 @@
-@page "/image-regeneration"
+﻿@page "/image-regeneration"
 @attribute [Authorize]
 @inherits FeaturePageBase
 @inject IJSRuntime JSRuntime
@@ -40,7 +40,6 @@
                       RightLabel="AI Regenerated"
                       DividerIcon="bi-arrows-expand-vertical"
                       OnDownloadOriginal="DownloadOriginal"
-                      OnStartOver="StartOver"
                       ResultImageUrl="@regeneratedImageUrl"
                       ResultFileName="regenerated.png">
             <RightSide>
@@ -60,9 +59,6 @@
                 {
                     <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="DownloadRegenerated">
                         <i class="bi bi-download me-2"></i>Save &amp; Download Result
-                    </button>
-                    <button class="flap-btn flap-btn--sm" @onclick="ManualSaveResultAsync" title="Save the regenerated image to My Images gallery">
-                        <i class="bi bi-images me-2"></i>Save to My Images
                     </button>
                 }
             </PrimaryAction>
@@ -88,6 +84,16 @@
                             </div>
                         }
                     </div>
+                }
+                @* The server names the reason when the description did not come from a model
+                   that actually looked at the photo. Without this the user sees tag-derived text
+                   and concludes the AI ignored their image. *@
+                @if (!string.IsNullOrEmpty(analysisResult?.DescriptionFallbackReason))
+                {
+                    <p class="description-fallback small mb-3" role="status">
+                        <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
+                        @analysisResult.DescriptionFallbackReason
+                    </p>
                 }
             </FooterContent>
         </ResultsPanel>
@@ -137,13 +143,6 @@
         var savedId = await UserImageSave.SaveResultAsync(bytes, contentType, UserImageKind.Regeneration, tags);
         if (savedId is not null && _gallery is not null)
             await _gallery.LoadAsync();
-    }
-
-    private async Task ManualSaveResultAsync()
-    {
-        if (regeneratedImageUrl is null || analysisResult?.RegeneratedImageData is null) return;
-        var bytes = Convert.FromBase64String(analysisResult.RegeneratedImageData);
-        await AutoSaveResultAsync(bytes, analysisResult.RegeneratedImageContentType);
     }
 
     private async Task ProcessImage()
@@ -331,16 +330,4 @@
         else Logger.LogInformation("Regenerated image download initiated");
     }
 
-    private void StartOver()
-    {
-        selectedFile = null;
-        regeneratedImageUrl = null;
-        imageDescription = null;
-        errorMessage = null;
-        isProcessing = false;
-        isComplete = false;
-        progressMessage = string.Empty;
-        analysisResult = null;
-        Logger.LogInformation("Image Regeneration reset");
-    }
 }

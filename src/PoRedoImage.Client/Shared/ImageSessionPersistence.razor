@@ -2,37 +2,21 @@
 @inject ImageSessionService SessionService
 @inject IJSRuntime JSRuntime
 
-@if (SessionService.HasImage)
-{
-    <div class="active-image-bar" role="region" aria-label="Active image bar">
-        <div class="container-fluid active-image-bar__inner">
-            <div class="active-image-bar__thumb-wrap">
-                <img src="@SessionService.PreviewUrl" class="active-image-bar__thumb" alt="Active image" />
-            </div>
-            <span class="active-image-bar__label">
-                <i class="bi bi-images me-1 d-none d-sm-inline" aria-hidden="true"></i>
-                <span class="active-image-bar__filename">@(SessionService.FileName ?? "Active Image")</span>
-            </span>
-            <div class="active-image-bar__actions">
-                @* Feature switching lives in the top nav (single source of truth); the active image
-                   persists across navigation, so this bar only indicates and clears it. *@
-                <button class="active-image-bar__clear" @onclick="SessionService.Clear" title="Clear active image" aria-label="Clear active image">
-                    <i class="bi bi-x-lg" aria-hidden="true"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-}
+@* Renders nothing on purpose.
+
+   This was ActiveImageBar, a visible strip showing the held photo's thumbnail and filename with
+   a clear button. The strip was removed at the user's request, but the component stays because
+   the bar was never only a bar: it is what mirrors the active image into sessionStorage and
+   restores it after a full-page navigation (a new WASM circuit starts with an empty
+   ImageSessionService). Deleting it with the markup would have silently dropped the held photo
+   on every hard navigation between features. Mounted once in MainLayout. *@
 
 @code {
     protected override void OnInitialized() => SessionService.OnChange += OnSessionChanged;
     public void Dispose()              => SessionService.OnChange -= OnSessionChanged;
 
-    private void OnSessionChanged()
-    {
-        StateHasChanged();
-        _ = PersistSessionAsync();
-    }
+    // No StateHasChanged: this component has no markup, so a re-render would paint nothing.
+    private void OnSessionChanged() => _ = PersistSessionAsync();
 
     private async Task PersistSessionAsync()
     {
@@ -56,8 +40,8 @@
             var stored = await JSRuntime.InvokeAsync<ImageSessionState?>("imageSession.load");
             if (stored is { DataUrl: not null, FileName: not null, ContentType: not null })
             {
+                // Fires OnChange, which is what repaints the pages that actually show the photo.
                 SessionService.SetImage(stored.DataUrl, stored.ContentType, stored.FileName);
-                StateHasChanged();
             }
         }
         catch { /* non-critical */ }

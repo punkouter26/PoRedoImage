@@ -26,6 +26,7 @@ public sealed class ImageAnalysisOrchestrator(
         string description;
         IReadOnlyList<string> tags;
         double confidence;
+        string? visionFallbackReason = null;
 
         if (!string.IsNullOrWhiteSpace(request.PrecomputedDescription))
         {
@@ -39,16 +40,18 @@ public sealed class ImageAnalysisOrchestrator(
         else
         {
             var visionService = visionRouter.Resolve(request.ModelId);
-            var (visionDescription, visionTags, visionConfidence, analysisMs) =
+            var (visionDescription, visionTags, visionConfidence, analysisMs, visionFallback) =
                 await visionService.AnalyzeAsync(imageBytes, ct);
             description = visionDescription;
             tags = visionTags;
             confidence = visionConfidence;
             metrics.ImageAnalysisTimeMs = analysisMs;
+            visionFallbackReason = visionFallback;
         }
 
         response.Tags = [.. tags];
         response.ConfidenceScore = confidence;
+        response.DescriptionFallbackReason = visionFallbackReason;
 
         if (request.Mode == ProcessingMode.MemeGeneration)
         {

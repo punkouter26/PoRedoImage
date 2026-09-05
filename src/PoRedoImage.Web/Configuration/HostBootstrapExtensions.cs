@@ -148,6 +148,11 @@ public static class HostBootstrapExtensions
                 path: logFilePath,
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 7,
+                // A daily roll alone bounds nothing: one day of traffic produced a 12.5 MB file
+                // locally before static-asset requests were dropped to Verbose. Cap each file and
+                // let it roll within the day so a burst cannot fill the App Service LogFiles share.
+                fileSizeLimitBytes: 32L * 1024 * 1024,
+                rollOnFileSizeLimit: true,
                 outputTemplate:
                     "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj} {Properties:j}{NewLine}{Exception}")
             .WriteTo.Conditional(_ => !string.IsNullOrEmpty(appInsightsConnectionString),

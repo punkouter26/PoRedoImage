@@ -36,7 +36,7 @@ public sealed class ImageSessionService
     /// <summary>
     /// Route of the most recent feature page the user worked on
     /// (e.g. <c>/studio</c>, <c>/bulk-generate</c>, <c>/meme-generation</c>).
-    /// Used by <c>ActiveImageBar</c> to deep-link back into the originating flow.
+    /// Used to deep-link back into the originating flow.
     /// </summary>
     public string? LastVisitedFeatureRoute { get; private set; }
 

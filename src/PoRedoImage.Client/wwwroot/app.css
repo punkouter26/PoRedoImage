@@ -750,8 +750,7 @@ body.po-drop-active::after {
 .prompt-history__label,
 .gallery-bar__label,
 .diag-stat__label,
-.split-compare__label,
-.compare__tag {
+.split-compare__label {
     display: block;
     font-family: var(--font-flap);
     font-size: var(--text-2xs);
@@ -1074,18 +1073,7 @@ body.po-drop-active::after {
 
 .split-compare__img.loaded { opacity: 1; }
 
-.split-compare--loupe .split-compare__img {
-    transform: scale(2.2);
-    transform-origin: center center;
-    transition: transform 0.25s ease-in-out;
-    cursor: zoom-out;
-}
-.split-compare--loupe .split-compare__side {
-    cursor: crosshair;
-}
-
-.split-compare__label,
-.compare__tag {
+.split-compare__label {
     position: absolute;
     top: 8px;
     left: 8px;
@@ -1098,12 +1086,6 @@ body.po-drop-active::after {
     border-radius: 0;
     pointer-events: none;
 }
-
-.compare__tag { top: 0.5rem; }
-
-.compare__tag--left { left: 0.6rem; }
-
-.compare__tag--right { right: 0.6rem; left: auto; }
 
 .split-compare__divider { display: flex; flex-direction: column; align-items: center; background: var(--steel-face); width: 18px; }
 
@@ -1129,62 +1111,6 @@ body.po-drop-active::after {
     color: var(--steel-dark);
     font-size: var(--text-xs);
 }
-
-.compare-modes { display: flex; gap: 1px; padding: 0.4rem; background: var(--flap-black); border-bottom: 1px solid var(--rule); }
-
-.compare {
-    position: relative;
-    height: clamp(260px, 46vh, 520px);
-    background: var(--flap-black);
-    overflow: hidden;
-    touch-action: pan-y;
-}
-
-.compare__layer { position: absolute; inset: 0; }
-
-.compare__layer--after { clip-path: inset(0 0 0 var(--wipe)); }
-
-.compare .split-compare__img { width: 100%; height: 100%; object-fit: contain; }
-
-.compare__seam {
-    position: absolute;
-    top: 0; bottom: 0;
-    left: var(--wipe);
-    width: 2px;
-    margin-left: -1px;
-    background: var(--amber);
-    pointer-events: none;
-}
-
-.compare__seam-pill {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 26px; height: 30px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 0;
-    background: var(--amber);
-    color: var(--flap-black);
-    font-size: var(--text-sm);
-    box-shadow: var(--shadow-md);
-}
-
-.compare__range {
-    position: absolute;
-    inset: 0;
-    width: 100%; height: 100%;
-    margin: 0;
-    appearance: none;
-    -webkit-appearance: none;
-    background: transparent;
-    cursor: ew-resize;
-}
-
-.compare__range:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
-
-.compare__range::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 100%; background: transparent; cursor: ew-resize; }
-
-.compare__range::-moz-range-thumb { width: 44px; height: 100%; border: 0; background: transparent; cursor: ew-resize; }
 
 /* ── Send result onward: the connecting-services row ──────────────────── */
 .send-to { padding: 0.85rem 1rem; }
@@ -1380,29 +1306,6 @@ body.po-drop-active::after {
 
 .studio-feature-card--ready .studio-feature-card__icon { color: var(--amber); }
 
-.studio-ready {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    margin-top: 0.9rem;
-    padding: 0.6rem 0.85rem;
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-}
-
-.studio-ready-hint {
-    font-family: var(--font-flap);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--amber);
-    margin: 0;
-}
-
-.studio-surprise { margin-left: auto; padding: 0.45rem 1rem; }
-
 .feature-card {
     display: grid;
     grid-template-columns: 34px minmax(0,1fr) auto;
@@ -1451,71 +1354,6 @@ body.po-drop-active::after {
     display: flex; align-items: center; gap: 0.35rem;
     white-space: nowrap;
 }
-
-/* ═══ Held image bar — the source row, pinned under the chrome ═══════════ */
-.active-image-bar {
-    background: var(--flap-shadow);
-    border-bottom: 1px solid var(--rule-strong);
-    box-shadow: var(--inset-cell);
-    padding: 0.35rem 0;
-    z-index: 90;
-    animation: dropIn var(--motion-base) var(--motion-ease-in-out);
-}
-
-@keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-
-.active-image-bar__inner {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1rem;
-    flex-wrap: nowrap;
-    overflow: hidden;
-}
-
-.active-image-bar__thumb-wrap {
-    width: 30px; height: 30px;
-    border-radius: 0;
-    overflow: hidden;
-    flex-shrink: 0;
-    border: 1px solid var(--rule-strong);
-}
-
-.active-image-bar__thumb { width: 100%; height: 100%; object-fit: cover; }
-
-.active-image-bar__label { font-size: var(--text-xs); color: var(--steel); flex-shrink: 1; min-width: 0; overflow: hidden; }
-
-.active-image-bar__filename {
-    font-family: var(--font-flap);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--flap-white);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
-    max-width: 160px;
-    vertical-align: bottom;
-}
-
-.active-image-bar__actions { display: flex; align-items: center; gap: 1px; margin-left: auto; flex-shrink: 0; }
-
-.active-image-bar__clear {
-    background: none;
-    border: 1px solid var(--rule-strong);
-    border-radius: 0;
-    color: var(--steel-dark);
-    cursor: pointer;
-    padding: 0.28rem 0.45rem;
-    font-size: var(--text-xs);
-    line-height: 1;
-    transition: color var(--motion-fast), border-color var(--motion-fast);
-}
-
-.active-image-bar__clear:hover { color: var(--cancel-red-tx); border-color: var(--cancel-red); }
 
 /* ═══ Galleries — contact strips of turned flaps ═════════════════════════ */
 .gallery-bar {
@@ -2064,7 +1902,15 @@ input.form-control {
     line-height: 1.5;
 }
 
-.prompt-drawer__textarea { resize: vertical; min-height: 64px; }
+/* Autosized (ux.js, plus field-sizing natively where supported), so the box always fits its
+   text and never scrolls inside the already-scrolling drawer list. resize is off because a
+   hand-dragged height is overwritten on the next keystroke. */
+.prompt-drawer__textarea {
+    resize: none;
+    min-height: 48px;
+    overflow-y: hidden;
+    field-sizing: content;
+}
 
 .prompt-drawer__textarea:focus,
 textarea.form-control:focus,
@@ -2607,12 +2453,10 @@ code { color: var(--amber); }
     .feature-card { grid-template-columns: 30px minmax(0,1fr); row-gap: 0.35rem; }
     .feature-card__cta { grid-column: 2; }
 
-    .active-image-bar__filename { max-width: 90px; }
     .processing-pill { bottom: 0.75rem; right: 0.75rem; left: 0.75rem; justify-content: center; }
     .bulk-modal-panel { max-height: 92vh; overflow-y: auto; }
     .bulk-modal-img-wrap { max-height: 45vh; }
     .prompt-drawer__fab { left: 0.75rem; bottom: 0.75rem; }
-    .studio-surprise { margin-left: 0; width: 100%; }
     .split-compare { grid-template-columns: 1fr; }
     .split-compare__divider { width: auto; height: 14px; flex-direction: row; }
     .split-compare__divider-line { width: auto; height: 1px; flex: 1; }
@@ -2696,4 +2540,14 @@ code { color: var(--amber); }
     text-transform: uppercase;
     color: var(--steel);
     text-align: center;
+}
+
+/* Named reason shown when a description was synthesised from tags rather than produced by a
+   model that looked at the photo. Amber, not red: the result is usable, just degraded. */
+.description-fallback {
+    color: var(--flap-amber, #e0a63a);
+    border-left: 3px solid var(--flap-amber, #e0a63a);
+    background: rgba(224, 166, 58, 0.08);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0 4px 4px 0;
 }

@@ -12,13 +12,13 @@ namespace PoRedoImage.Client.Services;
 /// Centralised saver for /api/user-images/{original,result} with two important properties:
 ///
 /// 1. Idempotency. Every save attempt mints a UUID and sends it as <c>Idempotency-Key</c>.
-///    The server's <c>IdempotencyKeyFilter</c> returns the cached response on retry, so the
-///    user can click the "Save to My Images" button a second time without creating a duplicate
-///    row in the gallery or a duplicate blob in storage.
+///    The server's <c>IdempotencyKeyFilter</c> returns the cached response on retry, so a
+///    repeated save never creates a duplicate row in the gallery or a duplicate blob in
+///    storage.
 ///
-/// 2. UX. Failures surface through Radzen with a clear instruction to click the manual
-///    "Save to My Images" button. Success surfaces as a "Saved to My Images" toast. The
-///    caller decides whether to refresh the gallery based on the returned id.
+/// 2. UX. Failures surface through Radzen as a long-lived toast. Success surfaces as a
+///    "Saved to My Images" toast. The caller decides whether to refresh the gallery based
+///    on the returned id.
 /// </summary>
 public sealed class UserImageSaveService
 {
@@ -118,16 +118,15 @@ public sealed class UserImageSaveService
             return saved;
         }
 
-        // Surface the failure as a long-lived toast with a "Retry" instruction. The Radzen
-        // 5.5 NotificationMessage shape doesn't expose action buttons, so we ask the user to
-        // click the corresponding "Save to My Images" button on the result panel. This still
-        // gives them an obvious path back without silently dropping the upload — and the
-        // server-side IdempotencyKey makes that manual retry safe (no duplicate rows).
+        // Surface the failure as a long-lived toast rather than dropping the upload silently.
+        // It used to tell the user to click the manual "Save to My Images" button; that button
+        // was removed from the result panel, so pointing at it would be worse than saying
+        // nothing. Saving is automatic on generation, so the actionable advice is to re-run.
         _notify.Notify(new NotificationMessage
         {
             Severity = NotificationSeverity.Error,
             Summary = "Couldn't " + label,
-            Detail = BuildFailureDetail(response) + " Click \"Save to My Images\" below — the Idempotency-Key prevents duplicates if it succeeds.",
+            Detail = BuildFailureDetail(response) + " The image is still on screen — generate again to retry the save.",
             Duration = 15000
         });
         return null;

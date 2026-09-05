@@ -1,4 +1,4 @@
-@page "/meme-generation"
+﻿@page "/meme-generation"
 @attribute [Authorize]
 @inherits FeaturePageBase
 @inject IJSRuntime JSRuntime
@@ -104,59 +104,10 @@
 
     @if (isComplete)
     {
-        @* ── Custom Meme Studio & Interactive Typography Editor ── *@
-        <div class="card bg-dark border-secondary p-3 mb-3">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-warning fw-semibold"><i class="bi bi-fonts me-2"></i>Meme Studio &amp; Typography Editor</span>
-                <button type="button" class="flap-btn flap-btn--sm flap-btn--primary" @onclick="UpdateCustomTypographyAsync" disabled="@_isRestamping">
-                    <i class="bi bi-magic me-1"></i>@(_isRestamping ? "Applying…" : "Re-Stamp Meme")
-                </button>
-            </div>
-            <div class="row g-2">
-                <div class="col-md-6">
-                    <label class="form-label small text-muted mb-1">Top Caption</label>
-                    <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
-                           @bind="_customTopText" @bind:event="oninput" placeholder="TOP TEXT..." />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small text-muted mb-1">Bottom Caption</label>
-                    <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
-                           @bind="_customBottomText" @bind:event="oninput" placeholder="BOTTOM TEXT..." />
-                </div>
-                <div class="col-6 col-md-4">
-                    <label class="form-label small text-muted mb-1">Font Family</label>
-                    <select class="form-select form-select-sm bg-dark text-light border-secondary" @bind="_customFont">
-                        <option value="Impact">Impact (Classic)</option>
-                        <option value="Montserrat">Montserrat (Clean)</option>
-                        <option value="Comic Neue">Comic Neue (Fun)</option>
-                        <option value="Arial Black">Arial Black (Bold)</option>
-                    </select>
-                </div>
-                <div class="col-6 col-md-4">
-                    <label class="form-label small text-muted mb-1">Font Color</label>
-                    <div class="d-flex gap-2 align-items-center mt-1">
-                        @foreach (var c in new[] { ("#FFFFFF", "White"), ("#FFE600", "Yellow"), ("#00FFFF", "Cyan"), ("#00FF66", "Neon") })
-                        {
-                            <button type="button" class="btn btn-sm p-0 rounded-circle border @(_customColor == c.Item1 ? "border-2 border-white shadow" : "border-secondary")"
-                                    style="width: 24px; height: 24px; background-color: @c.Item1;"
-                                    title="@c.Item2"
-                                    @onclick="@(() => _customColor = c.Item1)"></button>
-                        }
-                    </div>
-                </div>
-                <div class="col-12 col-md-4 d-flex align-items-end">
-                    <button type="button" class="flap-btn flap-btn--sm w-100" @onclick="UpdateCustomTypographyAsync" disabled="@_isRestamping">
-                        <i class="bi bi-paint-bucket me-1"></i>Apply Style
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <ResultsPanel ImagePreviewUrl="@imagePreviewUrl"
                       RightLabel="Meme"
                       DividerIcon="bi-emoji-laughing"
                       OnDownloadOriginal="DownloadOriginal"
-                      OnStartOver="StartOver"
                       ResultImageUrl="@MemeImageUrl"
                       ResultFileName="meme.png">
             <RightSide>
@@ -180,15 +131,22 @@
                         }
                     </div>
                 }
+                    @* The server names the reason when the description did not come from a model
+                       that actually looked at the photo. Without this the user sees tag-derived text
+                       and concludes the AI ignored their image. *@
+                    @if (!string.IsNullOrEmpty(analysisResult?.DescriptionFallbackReason))
+                    {
+                        <p class="description-fallback small mb-3" role="status">
+                            <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
+                            @analysisResult.DescriptionFallbackReason
+                        </p>
+                    }
             </CaptionContent>
             <PrimaryAction>
                 @if (!string.IsNullOrEmpty(analysisResult?.MemeImageData))
                 {
                     <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="DownloadMeme">
                         <i class="bi bi-download me-2"></i>Save &amp; Download Meme
-                    </button>
-                    <button class="flap-btn flap-btn--sm" @onclick="ManualSaveMemeAsync" title="Save the meme to My Images gallery">
-                        <i class="bi bi-images me-2"></i>Save to My Images
                     </button>
                 }
             </PrimaryAction>
@@ -217,59 +175,9 @@
 
 @code {
     private ImageAnalysisResponse? analysisResult;
-    private string? _customMemeDataUrl;
-    private string? MemeImageUrl => _customMemeDataUrl ?? (string.IsNullOrEmpty(analysisResult?.MemeImageData)
+    private string? MemeImageUrl => string.IsNullOrEmpty(analysisResult?.MemeImageData)
         ? null
-        : $"data:image/png;base64,{analysisResult.MemeImageData}");
-
-    private string _customTopText = "";
-    private string _customBottomText = "";
-    private string _customFont = "Impact";
-    private string _customColor = "#FFFFFF";
-    private int _customOutline = 6;
-    private bool _isRestamping;
-
-    private async Task UpdateCustomTypographyAsync()
-    {
-        if (string.IsNullOrEmpty(imagePreviewUrl) || _isRestamping) return;
-        _isRestamping = true;
-        try
-        {
-            var res = await JSRuntime.InvokeAsync<string?>("poUx.renderCustomMeme", imagePreviewUrl, _customTopText, _customBottomText, _customFont, _customColor, _customOutline);
-            if (!string.IsNullOrEmpty(res))
-            {
-                _customMemeDataUrl = res;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error restamping meme typography");
-        }
-        finally
-        {
-            _isRestamping = false;
-            StateHasChanged();
-        }
-    }
-
-    private void InitCustomCaptions()
-    {
-        _customMemeDataUrl = null;
-        if (!string.IsNullOrEmpty(analysisResult?.MemeCaption))
-        {
-            var parts = analysisResult.MemeCaption.Split(new[] { '\n', '/' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (parts.Length > 1)
-            {
-                _customTopText = parts[0];
-                _customBottomText = string.Join(" ", parts.Skip(1));
-            }
-            else if (parts.Length == 1)
-            {
-                _customTopText = string.Empty;
-                _customBottomText = parts[0];
-            }
-        }
-    }
+        : $"data:image/png;base64,{analysisResult.MemeImageData}";
 
     // ── Idea #17 — Meme Template Library state ─────────────────────
     private bool _useTemplate;
@@ -334,16 +242,6 @@
         var savedId = await UserImageSave.SaveResultFromBase64Async(memeBase64, contentType, UserImageKind.Meme, tags);
         if (savedId is not null && _gallery is not null)
             await _gallery.LoadAsync();
-    }
-
-    private async Task ManualSaveMemeAsync()
-    {
-        var rawData = !string.IsNullOrEmpty(_customMemeDataUrl) 
-            ? ExtractBase64(_customMemeDataUrl) 
-            : analysisResult?.MemeImageData;
-        if (rawData is null) return;
-        const string mime = "image/png";
-        await AutoSaveMemeAsync(rawData, mime);
     }
 
     /// <summary>Studio "Surprise me" hand-off — the photo is all the AI-caption path needs.</summary>
@@ -461,7 +359,6 @@
                     analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(rawJson, jsonOpts);
                     if (analysisResult == null)
                         throw new InvalidOperationException("No response received from API.");
-                    InitCustomCaptions();
 
                     Cost.RecordVision(1);
                     Cost.RecordTextReasoning(1);
@@ -568,7 +465,6 @@
             if (_userId is not null)
                 _ = AutoSaveMemeAsync(rendered.ImageData, rendered.ContentType);
 
-            InitCustomCaptions();
 
             NotificationService.Notify(NotificationSeverity.Success, "Template Ready!",
                 $"'{_selectedTemplate.Name}' rendered in {rendered.ElapsedMs}ms.", duration: 3500);
@@ -604,17 +500,4 @@
         else Logger.LogInformation("Meme image download initiated");
     }
 
-    private void StartOver()
-    {
-        selectedFile = null;
-        errorMessage = null;
-        isProcessing = false;
-        isComplete = false;
-        progressMessage = string.Empty;
-        analysisResult = null;
-        _customMemeDataUrl = null;
-        _customTopText = string.Empty;
-        _customBottomText = string.Empty;
-        Logger.LogInformation("Meme Generation reset");
-    }
 }

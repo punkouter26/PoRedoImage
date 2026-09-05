@@ -155,7 +155,7 @@ public sealed class RapRoastOrchestrator(
         var detailTask = SafeDetailsAsync(imageBytes, ct);
         await Task.WhenAll(analyzeTask, detailTask);
 
-        var (description, tags, _, _) = await analyzeTask;
+        var (description, tags, _, _, _) = await analyzeTask;
         return (description, tags, await detailTask);
     }
 

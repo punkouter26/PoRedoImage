@@ -1,6 +1,5 @@
 ﻿@page "/"
 @inject ImageSessionService SessionService
-@inject NavigationManager Nav
 @inject IJSRuntime Js
 
 <PageTitle>PoRedoImage — Studio</PageTitle>
@@ -71,19 +70,6 @@
                     </a>
                 }
             </div>
-
-            @if (_hasImage)
-            {
-                <div class="studio-ready">
-                    <p class="studio-ready-hint mb-0">
-                        <span class="lamp lamp--lit me-2" aria-hidden="true"></span>Photo loaded — pick a service
-                    </p>
-                    <button class="flap-btn flap-btn--primary flap-btn--sm studio-surprise" @onclick="SurpriseMe"
-                            title="Pick a transformation at random and run it on this image">
-                        Any service
-                    </button>
-                </div>
-            }
         </div>
     </div>
 
@@ -132,24 +118,6 @@
         SessionService.SetImage(
             shrunk.PreviewUrl, shrunk.ContentType, payload.FileName ?? "pasted-image.png", shrunk.Bytes);
         StateHasChanged();
-    }
-
-    /// <summary>
-    /// Picks a transformation at random and opens it with <c>?auto=1</c>, which
-    /// <see cref="FeaturePageBase.AutoStartAsync"/> turns into an immediate run.
-    /// </summary>
-    /// <remarks>
-    /// Bulk Generate is deliberately not in the pool: it produces ten images, and spending ten
-    /// generations on a dice roll is a cost surprise, not a delight. The pool is the four
-    /// single-output features, each of which needs nothing but the photo.
-    /// </remarks>
-    private void SurpriseMe()
-    {
-        if (!_hasImage) return;
-
-        var pool = FeatureCatalog.Except("/bulk-generate").ToArray();
-        var pick = pool[Random.Shared.Next(pool.Length)];
-        Nav.NavigateTo($"{pick.Route}?auto=1");
     }
 
     public void Dispose() => SessionService.OnChange -= OnSessionChanged;

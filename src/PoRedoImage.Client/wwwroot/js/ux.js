@@ -145,42 +145,6 @@ window.poUx = (function () {
 
         // ── Share ───────────────────────────────────────────────────────────
         // Returns one of: 'shared' | 'copied' | 'cancelled' | 'unsupported' | 'failed'.
-        // The caller decides what to say; this only reports what the browser actually did.
-        shareImage: async function (url, fileName, title, text) {
-            let blob;
-            try {
-                const res = await fetch(url);
-                if (!res.ok) return 'failed';
-                blob = await res.blob();
-            } catch { return 'failed'; }
-
-            const file = new File([blob], fileName || 'image.png', { type: blob.type || 'image/png' });
-
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({ files: [file], title: title || 'PoRedoImage', text: text || '' });
-                    return 'shared';
-                } catch (e) {
-                    // The user dismissing the native sheet is not an error worth a red toast.
-                    return (e && e.name === 'AbortError') ? 'cancelled' : 'failed';
-                }
-            }
-
-            // Desktop fallback: put the image itself on the clipboard. Chromium only accepts
-            // image/png in a ClipboardItem, so a JPEG is re-encoded through a canvas first.
-            try {
-                if (navigator.clipboard && window.ClipboardItem) {
-                    const png = blob.type === 'image/png' ? blob : await toPng(blob);
-                    if (png) {
-                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
-                        return 'copied';
-                    }
-                }
-            } catch { /* fall through */ }
-
-            return 'unsupported';
-        },
-
         // ── Zip ─────────────────────────────────────────────────────────────
         // files: [{ name, url }]. Packs them uncompressed and triggers a download.
         // Returns the number of entries actually written.
@@ -240,241 +204,6 @@ window.poUx = (function () {
                 return 'failed';
             }
         },
-
-        // ── Multi-format Export (PNG, JPEG, WebP) ────────────────────────────
-        exportFormatted: async function (url, format, quality, fileName) {
-            return new Promise(async function (resolve) {
-                try {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = function () {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.naturalWidth;
-                        canvas.height = img.naturalHeight;
-                        const ctx = canvas.getContext('2d');
-                        if (format === 'jpeg') {
-                            ctx.fillStyle = '#FFFFFF';
-                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        }
-                        ctx.drawImage(img, 0, 0);
-                        const mime = format === 'jpeg' ? 'image/jpeg' : (format === 'webp' ? 'image/webp' : 'image/png');
-                        canvas.toBlob(function (blob) {
-                            if (!blob) { resolve(false); return; }
-                            const ext = format === 'jpeg' ? '.jpg' : (format === 'webp' ? '.webp' : '.png');
-                            const baseName = (fileName || 'image').replace(/\.[^/.]+$/, '');
-                            const cleanName = baseName + ext;
-                            const blobUrl = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = blobUrl;
-                            a.download = cleanName;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 4000);
-                            resolve(true);
-                        }, mime, quality || 0.92);
-                    };
-                    img.onerror = function () { resolve(false); };
-                    img.src = url;
-                } catch {
-                    resolve(false);
-                }
-            });
-        },
-
-        // ── Interactive Crop & Transform ─────────────────────────────────────
-        cropAndTransform: async function (url, cropBox, rotation, flip) {
-            return new Promise(function (resolve) {
-                try {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = function () {
-                        const nw = img.naturalWidth;
-                        const nh = img.naturalHeight;
-                        let bx = 0, by = 0, bw = nw, bh = nh;
-                        if (typeof cropBox === 'string' && cropBox !== 'free') {
-                            let targetRatio = null;
-                            if (cropBox === '1:1') targetRatio = 1.0;
-                            else if (cropBox === '16:9') targetRatio = 16 / 9;
-                            else if (cropBox === '9:16') targetRatio = 9 / 16;
-                            else if (cropBox === '4:3') targetRatio = 4 / 3;
-                            if (targetRatio) {
-                                const currentRatio = nw / nh;
-                                if (currentRatio > targetRatio) {
-                                    bw = nh * targetRatio;
-                                    bh = nh;
-                                    bx = (nw - bw) / 2;
-                                    by = 0;
-                                } else {
-                                    bw = nw;
-                                    bh = nw / targetRatio;
-                                    bx = 0;
-                                    by = (nh - bh) / 2;
-                                }
-                            }
-                        } else if (cropBox && typeof cropBox === 'object') {
-                            bx = Math.max(0, Math.min(nw, cropBox.x * nw));
-                            by = Math.max(0, Math.min(nh, cropBox.y * nh));
-                            bw = Math.max(10, Math.min(nw - bx, cropBox.width * nw));
-                            bh = Math.max(10, Math.min(nh - by, cropBox.height * nh));
-                        }
-
-                        const isSwap = (rotation === 90 || rotation === 270);
-                        const outW = isSwap ? bh : bw;
-                        const outH = isSwap ? bw : bh;
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = Math.round(outW);
-                        canvas.height = Math.round(outH);
-                        const ctx = canvas.getContext('2d');
-
-                        ctx.translate(canvas.width / 2, canvas.height / 2);
-                        if (rotation) ctx.rotate((rotation * Math.PI) / 180);
-                        if (flip) ctx.scale(-1, 1);
-
-                        ctx.drawImage(img, bx, by, bw, bh, -bw / 2, -bh / 2, bw, bh);
-
-                        canvas.toBlob(function (blob) {
-                            if (!blob) { resolve(null); return; }
-                            const reader = new FileReader();
-                            reader.onloadend = function () {
-                                resolve({ dataUrl: reader.result, width: canvas.width, height: canvas.height });
-                            };
-                            reader.readAsDataURL(blob);
-                        }, 'image/png');
-                    };
-                    img.onerror = function () { resolve(null); };
-                    img.src = url;
-                } catch {
-                    resolve(null);
-                }
-            });
-        },
-
-        // ── Smart Background Removal & Subject Cutout ────────────────────────
-        removeBackground: async function (url, mode, color) {
-            return new Promise(function (resolve) {
-                try {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = function () {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.naturalWidth;
-                        canvas.height = img.naturalHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-
-                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        const data = imgData.data;
-
-                        const samples = [
-                            [0, 0], [canvas.width - 1, 0],
-                            [0, canvas.height - 1], [canvas.width - 1, canvas.height - 1],
-                            [Math.floor(canvas.width / 2), 0]
-                        ];
-                        let bgR = 0, bgG = 0, bgB = 0;
-                        for (const [sx, sy] of samples) {
-                            const idx = (sy * canvas.width + sx) * 4;
-                            bgR += data[idx]; bgG += data[idx + 1]; bgB += data[idx + 2];
-                        }
-                        bgR /= samples.length; bgG /= samples.length; bgB /= samples.length;
-
-                        const threshold = 48;
-                        for (let i = 0; i < data.length; i += 4) {
-                            const r = data[i], g = data[i + 1], b = data[i + 2];
-                            const dist = Math.sqrt(Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2));
-                            if (dist < threshold) {
-                                const alphaFactor = Math.max(0, (dist - (threshold - 16)) / 16);
-                                data[i + 3] = Math.round(data[i + 3] * alphaFactor);
-                            }
-                        }
-                        ctx.putImageData(imgData, 0, 0);
-
-                        if (mode === 'solid' && color) {
-                            const outCanvas = document.createElement('canvas');
-                            outCanvas.width = canvas.width;
-                            outCanvas.height = canvas.height;
-                            const outCtx = outCanvas.getContext('2d');
-                            outCtx.fillStyle = color;
-                            outCtx.fillRect(0, 0, outCanvas.width, outCanvas.height);
-                            outCtx.drawImage(canvas, 0, 0);
-                            outCanvas.toBlob(function (blob) {
-                                if (!blob) { resolve(null); return; }
-                                const reader = new FileReader();
-                                reader.onloadend = function () { resolve(reader.result); };
-                                reader.readAsDataURL(blob);
-                            }, 'image/png');
-                        } else {
-                            canvas.toBlob(function (blob) {
-                                if (!blob) { resolve(null); return; }
-                                const reader = new FileReader();
-                                reader.onloadend = function () { resolve(reader.result); };
-                                reader.readAsDataURL(blob);
-                            }, 'image/png');
-                        }
-                    };
-                    img.onerror = function () { resolve(null); };
-                    img.src = url;
-                } catch {
-                    resolve(null);
-                }
-            });
-        },
-
-        // ── Custom Meme Typography Stamping ──────────────────────────────────
-        renderCustomMeme: async function (url, topText, bottomText, font, color, outlineWidth) {
-            return new Promise(function (resolve) {
-                try {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = function () {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.naturalWidth;
-                        canvas.height = img.naturalHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-
-                        const fontSize = Math.max(28, Math.round(canvas.width * 0.08));
-                        ctx.font = `900 ${fontSize}px "${font || 'Impact'}", "Archivo Narrow", sans-serif`;
-                        ctx.textAlign = 'center';
-                        ctx.fillStyle = color || '#FFFFFF';
-                        ctx.strokeStyle = '#000000';
-                        ctx.lineWidth = outlineWidth !== undefined ? outlineWidth : Math.max(3, fontSize * 0.12);
-
-                        if (topText) {
-                            const lines = topText.toUpperCase().split('\n');
-                            let y = fontSize + 16;
-                            for (const line of lines) {
-                                ctx.strokeText(line, canvas.width / 2, y);
-                                ctx.fillText(line, canvas.width / 2, y);
-                                y += fontSize * 1.15;
-                            }
-                        }
-
-                        if (bottomText) {
-                            const lines = bottomText.toUpperCase().split('\n');
-                            let y = canvas.height - 24 - (lines.length - 1) * fontSize * 1.15;
-                            for (const line of lines) {
-                                ctx.strokeText(line, canvas.width / 2, y);
-                                ctx.fillText(line, canvas.width / 2, y);
-                                y += fontSize * 1.15;
-                            }
-                        }
-
-                        canvas.toBlob(function (blob) {
-                            if (!blob) { resolve(null); return; }
-                            const reader = new FileReader();
-                            reader.onloadend = function () { resolve(reader.result); };
-                            reader.readAsDataURL(blob);
-                        }, 'image/png');
-                    };
-                    img.onerror = function () { resolve(null); };
-                    img.src = url;
-                } catch {
-                    resolve(null);
-                }
-            });
-        }
     };
 
     // ── Internals ───────────────────────────────────────────────────────────
@@ -583,4 +312,52 @@ window.poUx = (function () {
 
         return new Blob(locals.concat(centrals, [end]), { type: 'application/zip' });
     }
+})();
+
+// ── Textarea autosize ───────────────────────────────────────────────────────
+// Any <textarea data-autosize> grows to fit its content, so it never shows its own
+// scrollbar nested inside a panel that already scrolls (the prompt drawer stacked ten of
+// them). Deliberately standalone rather than a poUx method invoked from C#: the drawer is
+// rendered by Blazor with no IJSRuntime of its own, so this listens to the DOM instead of
+// needing an interop call at exactly the right point in the render cycle.
+//
+// Browsers with CSS `field-sizing: content` already do this natively; the sizing below is
+// idempotent and simply agrees with them.
+(function () {
+    'use strict';
+
+    function fit(el) {
+        if (!el || el.tagName !== 'TEXTAREA') return;
+        // Reset first: without it the height only ever ratchets upward as text is deleted.
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+
+    function fitAll(root) {
+        (root || document).querySelectorAll('textarea[data-autosize]').forEach(fit);
+    }
+
+    // Typing. Capture phase so it still fires for elements added after this listener.
+    document.addEventListener('input', function (e) {
+        if (e.target && e.target.matches && e.target.matches('textarea[data-autosize]')) fit(e.target);
+    }, true);
+
+    // Blazor renders the drawer long after load, and sets `value` without firing `input`.
+    if (typeof MutationObserver === 'function') {
+        new MutationObserver(function (records) {
+            for (const r of records) {
+                for (const n of r.addedNodes) {
+                    if (n.nodeType !== 1) continue;
+                    if (n.matches && n.matches('textarea[data-autosize]')) fit(n);
+                    else fitAll(n);
+                }
+            }
+        }).observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    // A drawer can be re-shown without new nodes, and fonts land after first paint.
+    window.addEventListener('load', function () { fitAll(); });
+    document.addEventListener('transitionend', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('prompt-drawer')) fitAll(e.target);
+    });
 })();

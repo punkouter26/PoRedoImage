@@ -1,4 +1,4 @@
-name: CI/CD — Build, Test & Deploy
+name: CI/CD — Build & Deploy
 
 on:
   push:
@@ -19,8 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Test
+  build-and-publish:
+    name: Build & Publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -63,7 +63,7 @@ jobs:
   deploy:
     name: Deploy to Azure
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: build-and-publish
     timeout-minutes: 20
     environment:
       name: production
@@ -107,9 +107,10 @@ jobs:
         # deploy-restart finds the references resolvable and the app boots on the first try.
         #
         # 2026-06-29: CI SP lost Microsoft.Authorization/roleAssignments/write on the PoShared RG.
-        # The grant is still attempted (desired for production hygiene); on 403 we warn and
-        # continue. The literal App Settings rewrite below is the runtime safety net — the
-        # @Microsoft.KeyVault(...) refs fall back to those literal values so the site stays up.
+        # The grant is still attempted (desired for production hygiene); on 403 we warn and let the
+        # next step decide. That step used to paper over a failed grant by writing every secret to
+        # App Settings in plaintext; it now fails the deploy instead, so a missing grant is a loud
+        # stop with a remediation command rather than a silent leak.
         run: |
           PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
             --query identity.principalId -o tsv)
@@ -126,60 +127,59 @@ jobs:
           if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
             echo "::warning::CI SP could not verify the 'Key Vault Secrets User' assignment on kv-poshared."
             echo "::warning::This usually means the CI SP lost 'Microsoft.Authorization/roleAssignments/write' on the PoShared RG."
-            echo "::warning::Asking the PoShared RG Owner / User Access Administrator to re-grant it will restore the green bind. Until then, the deploy continues via the literal App Settings rewrite step below — site stays up."
+            echo "::warning::Ask the PoShared RG Owner / User Access Administrator to re-grant it. The next step will stop the deploy if the app identity still cannot read the vault."
           else
             echo "Bind verified — '$COUNT' assignment(s) for Key Vault Secrets User on kv-poshared."
           fi
-      - name: Rewrite App Service Key Vault references as literal App Settings
-        # Belt-and-suspenders against the App Service platform failing to resolve
-        # `@Microsoft.KeyVault(...)` App Settings at container start. Reproduced on
-        # deploy #54/2026-06-29: the @Microsoft.KeyVault(...) sentinels were returned to
-        # the .NET process unchanged, every check that reads configuration via the
-        # App Service layer saw the literal, and the StartupSecretValidator fail-fasted
-        # on an empty AzureAd:ClientId. The container kept restarting in a 503 loop
-        # for the full 230s cold-start budget.
+      - name: Verify Key Vault reference resolution
+        # REPLACES a step that read all ten secrets out of kv-poshared with the CI service principal
+        # and wrote them back as LITERAL App Settings on every deploy — AzureAd__ClientSecret,
+        # OpenAI__Key and Storage__ConnectionString among them. That defeated the entire Key Vault
+        # reference model this app is built on: the plaintext values became readable by anyone with
+        # Reader on the web app, visible in the portal, and resolved into the runner's memory on
+        # every run. It also made the @Microsoft.KeyVault(...) settings declared in
+        # infra/main.bicep dead config — overwritten seconds after the bicep deployment applied them.
         #
-        # This step reads each secret via the CI SP (which has `Key Vault Secrets User`
-        # on kv-poshared, set by the previous step) and writes the resolved value as a
-        # plain App Setting — overwriting the unresolved @Microsoft.KeyVault(...)
-        # sentinels for this deploy. The .NET process then sees real values, the
-        # StartupSecretValidator passes, and the app boots on the first try.
+        # The workaround was added for a single incident (deploy #54 / 2026-06-29) where the platform
+        # returned the unresolved sentinel because the managed identity had no vault access. The fix
+        # for that is the role assignment in the previous step, not shipping the secrets. This step
+        # now asserts the identity can actually resolve references and FAILS the deploy with the
+        # exact remediation command when it cannot — a loud failure instead of a silent secret leak.
+        # A failed deploy leaves the already-running site untouched.
         run: |
-          RESOLVED=()
-          MISSING=()
-          for pair in \
-            "ApplicationInsights__ConnectionString=PoRedoImage-ApplicationInsights-ConnectionString" \
-            "AzureAd__ClientId=PoRedoImage-AzureAd-ClientId" \
-            "AzureAd__ClientSecret=PoRedoImage-AzureAd-ClientSecret" \
-            "ComputerVision__ApiKey=PoRedoImage-ComputerVision-ApiKey" \
-            "ComputerVision__Endpoint=PoRedoImage-ComputerVision-Endpoint" \
-            "Google__ApiKey=PoRedoImage-Google-ApiKey" \
-            "Google__Imagen3Model=PoRedoImage-Google-Imagen3Model" \
-            "OpenAI__Endpoint=PoRedoImage-OpenAI-Endpoint" \
-            "OpenAI__Key=PoRedoImage-OpenAI-ApiKey" \
-            "Storage__ConnectionString=PoRedoImage-StorageConnectionString"; do
-            APP="${pair%=*}"
-            SECRET="${pair#*=}"
-            VAL=$(az keyvault secret show --vault-name kv-poshared --name "$SECRET" --query value -o tsv 2>/dev/null || true)
-            if [ -n "$VAL" ]; then
-              RESOLVED+=("$APP=$VAL")
-              echo "  ✓ $APP  (from $SECRET, ${#VAL} chars)"
-            else
-              MISSING+=("$SECRET")
-              echo "  ✗ $APP  ($SECRET not found in kv-poshared)"
-            fi
-          done
-          if [ "${#MISSING[@]}" -gt 0 ]; then
-            echo "::error::Missing secrets in kv-poshared: ${MISSING[*]}"
+          PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
+            --query identity.principalId -o tsv)
+          VAULT="/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared"
+          COUNT=$(az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
+            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv 2>/dev/null || echo "0")
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "::error::The app's managed identity ($PRINCIPAL) does not hold 'Key Vault Secrets User' on kv-poshared."
+            echo "::error::App Service cannot resolve the @Microsoft.KeyVault(...) App Settings without it."
+            echo "::error::Stopping rather than writing the secrets back as plaintext App Settings."
+            echo "::error::Remediate once, as a PoShared RG Owner / User Access Administrator:"
+            echo "::error::  az role assignment create --role 'Key Vault Secrets User' --assignee $PRINCIPAL --scope $VAULT"
             exit 1
           fi
-          echo "Applying ${#RESOLVED[@]} literal App Settings to ${{ env.AZURE_WEBAPP_NAME }}…"
-          az webapp config appsettings set \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --settings "${RESOLVED[@]}" --output none
+          echo "Managed identity holds Key Vault Secrets User on kv-poshared."
+
+          # Clear any literal secret App Settings left behind by the old rewrite step, so the
+          # bicep-declared Key Vault references become the live values again. Deleting a setting
+          # that is already a reference is a no-op, so this is safe to re-run.
+          LITERALS=$(az webapp config appsettings list \
+            -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
+            --query "[?!starts_with(value, '@Microsoft.KeyVault(')].name" -o tsv \
+            | grep -E '^(ApplicationInsights__ConnectionString|AzureAd__ClientId|AzureAd__ClientSecret|ComputerVision__ApiKey|ComputerVision__Endpoint|Google__ApiKey|Google__Imagen3Model|OpenAI__Endpoint|OpenAI__Key|Storage__ConnectionString)$' || true)
+          if [ -n "$LITERALS" ]; then
+            echo "Removing literal secret App Settings so Key Vault references take effect:"
+            echo "$LITERALS" | sed 's/^/  - /'
+            az webapp config appsettings delete \
+              -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
+              --setting-names $LITERALS --output none
+            echo "::warning::Literal secrets had been written to App Settings by the old pipeline step."
+            echo "::warning::They were readable in the portal and in earlier deploy logs — ROTATE them in kv-poshared."
+          fi
       - name: Wait for App Service configuration update
-        # Literal App Settings rewrite step already guarantees resolved secrets on container start.
+        # Key Vault references are verified resolvable by the previous step.
         # Short 10s wait allows the App Service platform to stabilize configuration before deployment.
         run: |
           echo "Waiting 10s for configuration stabilization…"

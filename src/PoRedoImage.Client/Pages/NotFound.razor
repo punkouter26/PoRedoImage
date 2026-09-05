@@ -10,6 +10,7 @@
 @page "/{*MissingRoute}"
 @attribute [AllowAnonymous]
 @layout MainLayout
+@inject NavigationManager NavigationManager
 
 <PageTitle>Page Not Found — PoRedoImage</PageTitle>
 
@@ -32,4 +33,17 @@
 @code {
     /// <summary>The path that did not match, echoed back so a mistyped link is obvious.</summary>
     [Parameter] public string? MissingRoute { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(MissingRoute) &&
+            (MissingRoute.StartsWith("challenge-microsoft", StringComparison.OrdinalIgnoreCase) ||
+             MissingRoute.StartsWith("dev-login", StringComparison.OrdinalIgnoreCase) ||
+             MissingRoute.StartsWith("auth/", StringComparison.OrdinalIgnoreCase) ||
+             MissingRoute.StartsWith("logout", StringComparison.OrdinalIgnoreCase) ||
+             MissingRoute.StartsWith("signin-oidc", StringComparison.OrdinalIgnoreCase)))
+        {
+            NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+        }
+    }
 }

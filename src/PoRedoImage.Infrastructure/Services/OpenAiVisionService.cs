@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
@@ -45,7 +45,7 @@ public sealed class OpenAiVisionService(
 
     private const string UserPrompt = "Analyze this image now.";
 
-    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs)>
+    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs, string? FallbackReason)>
         AnalyzeAsync(byte[] imageData, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(imageData);
@@ -80,7 +80,7 @@ public sealed class OpenAiVisionService(
         // Confidence is reported as 1.0 rather than fabricated from nothing: a chat model emits no
         // calibrated score, and inventing one would put a number in the UI that means nothing.
         // OllamaVisionService reports the same for the same reason.
-        return (description, tags, 1.0, elapsed);
+        return (description, tags, 1.0, elapsed, null);
     }
 
     private static (string Description, IReadOnlyList<string> Tags) Parse(string content)

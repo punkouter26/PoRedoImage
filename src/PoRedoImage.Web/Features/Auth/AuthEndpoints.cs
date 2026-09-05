@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
 using PoRedoImage.Shared.Configuration;
+using PoRedoImage.Web.Configuration;
 
 namespace PoRedoImage.Web.Features.Auth;
 
@@ -14,10 +15,17 @@ public static class AuthEndpoints
 {
     public static void MapAuthEndpoints(this WebApplication app)
     {
-        if (app.Environment.IsDevelopment())
+        // Dev/Test-only sign-in bypass, used by Login.razor's GUEST button and by both E2E suites.
+        // Registered for Dev OR Test so the route exists wherever DevLoginAsync is willing to serve
+        // it — the handler 404s on its own in any other environment, so this is belt-and-braces.
+        //
+        // A parallel set of "canonical" routes (/auth/login/fake, /auth/login/microsoft,
+        // /auth/logout, /auth/me) used to be registered alongside these, sharing the same handler
+        // bodies. Nothing ever called them: every caller in src/ and tests/ used the three routes
+        // below, and /auth/me had no consumer at all despite carrying an IL2026 suppression to
+        // exist. They were deleted rather than migrated to — these are the real entry points.
+        if (app.Environment.IsDevOrTest())
         {
-            // Legacy dev-only sign-in alias — kept because Login.razor still uses /dev-login.
-            // Canonical entry point is /auth/login/fake (registered below for both Dev and Test).
             app.MapGet("/dev-login", (HttpContext context, IWebHostEnvironment env, string? email, string? guestId, string? returnUrl) =>
                 DevLoginAsync(context, env, email, guestId, returnUrl))
             .AllowAnonymous();
@@ -32,58 +40,9 @@ public static class AuthEndpoints
         app.MapGet("/logout", (HttpContext context, IWebHostEnvironment env) =>
             SignOutAsync(context, env))
         .AllowAnonymous();
-
-        // ─── Canonical /auth/* routes (spec §2) ─────────────────────────────────
-        // These are the public, documented auth entry points. The legacy routes above
-        // (/challenge-microsoft, /dev-login, /logout) remain as back-compat aliases
-        // referenced by Login.razor and the existing E2E suites. Both forms share the
-        // same handler bodies so behavior is identical.
-
-        app.MapGet("/auth/login/microsoft", (HttpContext context, IWebHostEnvironment env, string? returnUrl) =>
-            ChallengeMicrosoftAsync(context, env, returnUrl))
-        .AllowAnonymous();
-
-        app.MapGet("/auth/login/fake", (HttpContext context, IWebHostEnvironment env, string? email, string? guestId, string? returnUrl) =>
-            DevLoginAsync(context, env, email, guestId, returnUrl))
-        .AllowAnonymous();
-
-        app.MapGet("/auth/logout", (HttpContext context, IWebHostEnvironment env) =>
-            SignOutAsync(context, env))
-        .AllowAnonymous();
-
-        // Server auth state + returnUrl validation. Returns 401 for unauthenticated callers
-        // (no redirect, no body leak) so API clients get a clean signal.
-        // IL2026: both responses are anonymous types, which System.Text.Json source generation
-        // cannot describe. Naming them would put the auth-probe shape in Shared and ship it to the
-        // browser as a DTO it never deserializes — the reflective writer is the lesser cost on a
-        // host assembly that is never trimmed. Scoped to this handler only.
-#pragma warning disable IL2026
-        app.MapGet("/auth/me", (HttpContext context, string? returnUrl) =>
-        {
-            var user = context.User;
-            if (user.Identity?.IsAuthenticated != true)
-                return Results.Json(new { authenticated = false }, statusCode: StatusCodes.Status401Unauthorized);
-
-            var safeReturn = !string.IsNullOrWhiteSpace(returnUrl)
-                && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)
-                && !returnUrl.StartsWith("//");
-
-            return Results.Json(new
-            {
-                authenticated = true,
-                name = user.Identity.Name,
-                email = user.FindFirst(ClaimTypes.Email)?.Value,
-                roles = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray(),
-                returnUrlValid = safeReturn
-            });
-        })
-        // Must be reachable anonymously: it is the client's auth-probe and returns its own 401
-        // body ({authenticated:false}) rather than triggering the FallbackPolicy login redirect.
-        .AllowAnonymous();
-#pragma warning restore IL2026
     }
 
-    // ─── Shared handlers (legacy + canonical routes) ──────────────────────────
+    // ─── Shared handlers ──────────────────────────────────────────────────────
 
     private static async Task ChallengeMicrosoftAsync(HttpContext context, IWebHostEnvironment env, string? returnUrl)
     {
@@ -96,8 +55,16 @@ public static class AuthEndpoints
         var clientId = context.RequestServices.GetRequiredService<IConfiguration>()[ConfigKeys.AzureAdClientId];
         var hasOidc = !string.IsNullOrWhiteSpace(clientId);
 
-        if (env.IsDevelopment() && !hasOidc)
+        if (!hasOidc)
         {
+            if (env.IsDevelopment() || env.IsEnvironment("Test"))
+            {
+                // In Dev/Test without Azure AD ClientId configured, simulate MS sign-in via dev-login
+                var devDestination = $"/dev-login?email=developer%40microsoft.local&returnUrl={Uri.EscapeDataString(destination)}";
+                context.Response.Redirect(devDestination);
+                return;
+            }
+
             context.Response.Redirect("/login");
             return;
         }

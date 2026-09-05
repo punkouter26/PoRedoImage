@@ -201,7 +201,7 @@ public class RapRoastTests
     {
         var vision = new Mock<IVisionService>();
         vision.Setup(v => v.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Description, Tags, 0.9, 5L));
+            .ReturnsAsync((Description, Tags, 0.9, 5L, (string?)null));
 
         var router = new Mock<IVisionServiceRouter>();
         router.Setup(r => r.Resolve(It.IsAny<string?>())).Returns(vision.Object);

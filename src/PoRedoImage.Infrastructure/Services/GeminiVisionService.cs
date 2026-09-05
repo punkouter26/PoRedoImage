@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -48,7 +48,7 @@ public sealed class GeminiVisionService : IVisionService
 
     [UnconditionalSuppressMessage("Trimming", "IL2026",
         Justification = "Anonymous types for Gemini REST payload; assembly is not trimmed.")]
-    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs)>
+    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs, string? FallbackReason)>
         AnalyzeAsync(byte[] imageData, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(imageData);
@@ -125,7 +125,7 @@ public sealed class GeminiVisionService : IVisionService
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
 
         _logger.LogInformation("Gemini vision analysis complete in {Elapsed}ms. Tags={Count}", elapsed, tags.Count);
-        return (description, tags, 1.0, elapsed);
+        return (description, tags, 1.0, elapsed, null);
     }
 
     private static (string Description, IReadOnlyList<string> Tags) ParseResponse(JsonElement root)

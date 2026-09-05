@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using NetArchTest.Rules;
 
 namespace PoRedoImage.Tests.Architecture;
@@ -28,7 +28,7 @@ public sealed record ArchitectureRule(
 /// </para>
 /// <para>
 /// It also gives the scorecard a real denominator: Architecture Pass Rate = passed / total, over
-/// exactly the list below. See <c>SCRIPTS/generate-scorecard.ps1</c>.
+/// exactly the list below.
 /// </para>
 /// </remarks>
 public static class ArchitectureRules

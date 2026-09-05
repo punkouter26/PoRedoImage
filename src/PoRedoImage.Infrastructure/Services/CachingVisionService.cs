@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
@@ -52,7 +52,7 @@ public sealed class CachingVisionService(
     /// </summary>
     internal static readonly TimeSpan Ttl = TimeSpan.FromHours(6);
 
-    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs)>
+    public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs, string? FallbackReason)>
         AnalyzeAsync(byte[] imageData, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(imageData);
@@ -66,18 +66,22 @@ public sealed class CachingVisionService(
             // ElapsedMs is reported as 0, not as the original call's duration: the metrics panel
             // shows what THIS request spent, and claiming 800ms for a dictionary lookup would make
             // the pipeline's own timings a lie.
-            return (hit.Description, hit.Tags, hit.Confidence, 0);
+            return (hit.Description, hit.Tags, hit.Confidence, 0, hit.FallbackReason);
         }
 
-        var (description, tags, confidence, elapsed) = await inner.AnalyzeAsync(imageData, ct);
+        var (description, tags, confidence, elapsed, fallbackReason) = await inner.AnalyzeAsync(imageData, ct);
 
-        cache.Set(key, new CachedVision(description, tags, confidence),
+        cache.Set(key, new CachedVision(description, tags, confidence, fallbackReason),
             new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = Ttl, Size = 1 });
 
-        return (description, tags, confidence, elapsed);
+        return (description, tags, confidence, elapsed, fallbackReason);
     }
 
-    private sealed record CachedVision(string Description, IReadOnlyList<string> Tags, double Confidence);
+    // FallbackReason is cached alongside the result on purpose: a cache hit that served the
+    // degraded tag-derived description without its explanation would reintroduce exactly the
+    // silent degradation this field exists to prevent.
+    private sealed record CachedVision(
+        string Description, IReadOnlyList<string> Tags, double Confidence, string? FallbackReason);
 }
 
 /// <summary>Content-addressed cache keys shared by the AI decorators.</summary>

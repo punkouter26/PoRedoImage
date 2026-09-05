@@ -3,7 +3,6 @@
 @using PoRedoImage.Client.Shared
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
-@inject ImageSessionService SessionService
 
 @* No tabindex, and no container-level Enter handler.
 
@@ -94,41 +93,6 @@
                    aria-label="Upload an image (JPG or PNG, up to 20 MB)" />
     </div>
 
-    @* ── Crop & Aspect Ratio Framer Toolbar ──────────────────────────── *@
-    @if (ImagePreviewUrl != null)
-    {
-        <div class="mt-2 p-2 bg-dark border border-secondary rounded">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => _showCropTools = !_showCropTools)"
-                        title="Crop, rotate, or adjust aspect ratio">
-                    <i class="bi bi-crop me-1 text-warning"></i>@(_showCropTools ? "Hide Crop & Frame" : "Crop & Frame")
-                </button>
-                @if (_showCropTools)
-                {
-                    <div class="d-flex gap-1 flex-wrap align-items-center">
-                        <button type="button" class="flap-btn flap-btn--sm @(_cropRatio == "free" ? "flap-btn--active" : "")"
-                                @onclick="@(() => _cropRatio = "free")">Free</button>
-                        <button type="button" class="flap-btn flap-btn--sm @(_cropRatio == "1:1" ? "flap-btn--active" : "")"
-                                @onclick="@(() => _cropRatio = "1:1")">1:1</button>
-                        <button type="button" class="flap-btn flap-btn--sm @(_cropRatio == "9:16" ? "flap-btn--active" : "")"
-                                @onclick="@(() => _cropRatio = "9:16")">9:16</button>
-                        <button type="button" class="flap-btn flap-btn--sm @(_cropRatio == "16:9" ? "flap-btn--active" : "")"
-                                @onclick="@(() => _cropRatio = "16:9")">16:9</button>
-                        <button type="button" class="flap-btn flap-btn--sm @(_cropRatio == "4:3" ? "flap-btn--active" : "")"
-                                @onclick="@(() => _cropRatio = "4:3")">4:3</button>
-
-                        <button type="button" class="flap-btn flap-btn--sm ms-1" @onclick="Rotate90" title="Rotate 90 degrees">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                        <button type="button" class="flap-btn flap-btn--primary flap-btn--sm ms-1" @onclick="ApplyCropAsync" disabled="@_cropping">
-                            <i class="bi bi-check2 me-1"></i>Apply
-                        </button>
-                    </div>
-                }
-            </div>
-        </div>
-    }
-
     @* ── Error ─────────────────────────────────────────────────────── *@
     @if (!string.IsNullOrEmpty(ErrorMessage))
     {
@@ -159,56 +123,7 @@
     [Parameter] public bool CanProcess { get; set; }
     [Parameter] public EventCallback<InputFileChangeEventArgs> OnFileChange { get; set; }
     [Parameter] public EventCallback OnProcessClicked { get; set; }
-    [Parameter] public EventCallback<string> ImagePreviewUrlChanged { get; set; }
-    [Parameter] public EventCallback<string> OnImageTransformed { get; set; }
     [Parameter] public EventCallback<int> OnDescriptionLengthChanged { get; set; }
-
-    private bool _showCropTools;
-    private string _cropRatio = "free";
-    private int _rotation;
-    private bool _cropping;
-
-    private void Rotate90()
-    {
-        _rotation = (_rotation + 90) % 360;
-    }
-
-    private async Task ApplyCropAsync()
-    {
-        if (string.IsNullOrEmpty(ImagePreviewUrl) || _cropping) return;
-        _cropping = true;
-        try
-        {
-            var res = await JSRuntime.InvokeAsync<CropResult?>("poUx.cropAndTransform", ImagePreviewUrl, _cropRatio, _rotation, false);
-            if (res != null && !string.IsNullOrEmpty(res.DataUrl))
-            {
-                ImagePreviewUrl = res.DataUrl;
-                _rotation = 0;
-                _showCropTools = false;
-                SessionService.SetImage(res.DataUrl, "image/png", SessionService.FileName ?? "transformed.png");
-                await ImagePreviewUrlChanged.InvokeAsync(res.DataUrl);
-                if (OnImageTransformed.HasDelegate)
-                {
-                    await OnImageTransformed.InvokeAsync(res.DataUrl);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error applying crop: {ex.Message}");
-        }
-        finally
-        {
-            _cropping = false;
-        }
-    }
-
-    public class CropResult
-    {
-        public string? DataUrl { get; set; }
-        public int Width { get; set; }
-        public int Height { get; set; }
-    }
 
     /// <summary>
     /// Raised when an image arrives by clipboard paste or a drop outside the drop zone.

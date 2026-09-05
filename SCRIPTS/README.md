@@ -6,13 +6,11 @@ This folder contains developer utility scripts for the PoRedoImage project.
 |--------|------|---------|
 | `setup.ps1` | PowerShell | One-command machine setup: Winget installs, Docker/Azurite init, package restore |
 | `run-e2e.ps1` | PowerShell | Launch the app with mock-AI env vars and run the E2E suites |
-| `audit-arg.ps1` | PowerShell | Azure Resource Graph audit (resource hygiene, naming, idle compute) |
 | `cleanup-testcontainers.ps1` | PowerShell | Remove orphaned Testcontainers containers (safe `-DryRun` mode) |
 
 ## Conventions
 
 - PowerShell scripts (`.ps1`) for Windows automation and Azure CLI tasks.
-- Python scripts (`.py`) for data processing or cross-platform utilities.
 - Each script must have a comment block at the top explaining its purpose, prerequisites, and usage.
 
 ## Quick Start (New Machine)

@@ -93,8 +93,11 @@
                 <div class="prompt-drawer__item" @key="@($"{_resetKey}-{idx}")">
                     <div class="prompt-drawer__row">
                         <span class="prompt-drawer__num">@(idx + 1)</span>
+                        @* data-autosize: grows to fit its text (see ux.js) so a long prompt does
+                           not get its own scrollbar inside the drawer's scrolling list. *@
                         <textarea class="prompt-drawer__textarea"
-                                  rows="3"
+                                  data-autosize
+                                  rows="2"
                                   value="@_localPrompts[idx]"
                                   @onfocus="@(() => _targetSlot = idx)"
                                   @onblur="@(() => History.RememberAsync(_localPrompts[idx]))"
