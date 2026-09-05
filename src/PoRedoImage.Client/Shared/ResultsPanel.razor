@@ -1,0 +1,433 @@
+@* ── Shared compare + actions base for both result panels ─────────────── *@
+@inject ImageSessionService SessionService
+@inject NavigationManager Nav
+@inject NotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@inject ILogger<ResultsPanel> Logger
+
+<div class="split-compare-wrapper mb-4">
+    <div class="compare-modes">
+        <button type="button" class="flap-btn flap-btn--sm @(_wipeMode ? "flap-btn--active" : "")"
+                @onclick="@(() => _wipeMode = true)" aria-pressed="@_wipeMode">
+            <i class="bi bi-arrow-left-right me-1"></i>Wipe
+        </button>
+        <button type="button" class="flap-btn flap-btn--sm @(!_wipeMode ? "flap-btn--active" : "")"
+                @onclick="@(() => _wipeMode = false)" aria-pressed="@(!_wipeMode)">
+            <i class="bi bi-layout-split me-1"></i>Side by side
+        </button>
+        <button type="button" class="flap-btn flap-btn--sm @(_loupeZoom ? "flap-btn--active" : "")"
+                @onclick="@(() => _loupeZoom = !_loupeZoom)" title="Toggle 2x inspection loupe">
+            <i class="bi bi-zoom-in me-1"></i>@(_loupeZoom ? "2x Loupe (On)" : "2x Loupe")
+        </button>
+    </div>
+
+    @if (_wipeMode)
+    {
+        @* Both images are stacked in one box; the top layer is clipped at --wipe. The range
+           input IS the control rather than a decoration over a pointer-drag handler, so the
+           comparison is keyboard-operable and works on touch with no interop at all. *@
+        <div class="compare @(_loupeZoom ? "split-compare--loupe" : "")" style="--wipe: @(_wipe.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%">
+            <div class="compare__layer">
+                <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
+                     onload="this.classList.add('loaded')" />
+                <span class="compare__tag compare__tag--left">Original</span>
+            </div>
+            <div class="compare__layer compare__layer--after">
+                @if (_activeCutoutUrl != null)
+                {
+                    <img src="@_activeCutoutUrl" class="split-compare__img" alt="Cutout"
+                         onload="this.classList.add('loaded')" />
+                }
+                else
+                {
+                    @RightSide
+                }
+                <span class="compare__tag compare__tag--right">@RightLabel</span>
+            </div>
+            <div class="compare__seam" aria-hidden="true">
+                <span class="compare__seam-pill"><i class="bi @DividerIcon"></i></span>
+            </div>
+            <input type="range" class="compare__range" min="0" max="100" step="0.5"
+                   value="@_wipe.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                   @oninput="OnWipeChanged"
+                   aria-label="@($"Reveal {RightLabel} — drag or use arrow keys")" />
+        </div>
+    }
+    else
+    {
+        <div class="split-compare @(_loupeZoom ? "split-compare--loupe" : "")">
+            <div class="split-compare__side overflow-hidden">
+                <span class="split-compare__label">Original</span>
+                <img src="@ImagePreviewUrl" class="split-compare__img" alt="Original"
+                     onload="this.classList.add('loaded')" />
+            </div>
+            <div class="split-compare__divider">
+                <div class="split-compare__divider-line"></div>
+                <div class="split-compare__divider-pill"><i class="bi @DividerIcon"></i></div>
+            </div>
+            <div class="split-compare__side overflow-hidden">
+                <span class="split-compare__label">
+                    @RightLabel
+                    @if (_activeCutoutUrl != null)
+                    {
+                        <span class="badge bg-warning text-dark ms-1">Cutout Active</span>
+                    }
+                </span>
+                @if (_activeCutoutUrl != null)
+                {
+                    <div class="w-100 h-100 d-flex align-items-center justify-content-center"
+                         style="background: repeating-conic-gradient(#2c2c2c 0% 25%, #1e1e1e 0% 50%) 50% / 20px 20px;">
+                        <img src="@_activeCutoutUrl" class="split-compare__img" alt="Cutout"
+                             onload="this.classList.add('loaded')" />
+                    </div>
+                }
+                else
+                {
+                    @RightSide
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@if (CaptionContent != null)
+{
+    @CaptionContent
+}
+
+<div class="results-actions mb-4 position-relative">
+    @PrimaryAction
+    @if (ResultImageUrl is not null)
+    {
+        <button class="flap-btn flap-btn--sm" @onclick="CopyClipboard" disabled="@_copying" title="Copy result image directly to clipboard">
+            <i class="bi @(_copying ? "bi-hourglass-split" : "bi-clipboard") me-1"></i>Copy
+        </button>
+        <div class="position-relative d-inline-block">
+            <button class="flap-btn flap-btn--sm" @onclick="@(() => _showExportMenu = !_showExportMenu)" title="Export in different formats">
+                <i class="bi bi-box-arrow-down me-1"></i>Export <i class="bi bi-chevron-down ms-1 small"></i>
+            </button>
+            @if (_showExportMenu)
+            {
+                <div class="export-menu-dropdown p-2 bg-dark border border-secondary rounded shadow position-absolute start-0 mt-1" style="z-index: 1050; min-width: 170px;">
+                    <div class="d-flex flex-column gap-1">
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => ExportFormatAsync("png"))">
+                            <i class="bi bi-file-earmark-image me-1 text-info"></i>PNG (Lossless)
+                        </button>
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => ExportFormatAsync("jpeg"))">
+                            <i class="bi bi-file-earmark me-1 text-warning"></i>JPEG (Photo)
+                        </button>
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => ExportFormatAsync("webp"))">
+                            <i class="bi bi-file-earmark-code me-1 text-success"></i>WebP (Web)
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+        <button class="flap-btn flap-btn--sm" @onclick="ShareResult" disabled="@_sharing" title="Share this result">
+            <i class="bi @(_sharing ? "bi-hourglass-split" : "bi-share") me-1"></i>Share
+        </button>
+        <div class="position-relative d-inline-block">
+            <button class="flap-btn flap-btn--sm" @onclick="@(() => _showBgMenu = !_showBgMenu)" disabled="@_removingBg" title="Remove background or create subject cutout">
+                <i class="bi @(_removingBg ? "bi-hourglass-split" : "bi-scissors") me-1 text-info"></i>Cutout / BG <i class="bi bi-chevron-down ms-1 small"></i>
+            </button>
+            @if (_showBgMenu)
+            {
+                <div class="export-menu-dropdown p-2 bg-dark border border-secondary rounded shadow position-absolute start-0 mt-1" style="z-index: 1050; min-width: 190px;">
+                    <div class="d-flex flex-column gap-1">
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => RemoveBgAsync("transparent", null))">
+                            <i class="bi bi-transparency me-1 text-primary"></i>Transparent PNG
+                        </button>
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => RemoveBgAsync("solid", "#FFFFFF"))">
+                            <i class="bi bi-square-fill me-1 text-white"></i>Studio White
+                        </button>
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => RemoveBgAsync("solid", "#121212"))">
+                            <i class="bi bi-square-fill me-1 text-dark"></i>Deep Black
+                        </button>
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => RemoveBgAsync("solid", "#0D6EFD"))">
+                            <i class="bi bi-square-fill me-1 text-primary"></i>Chroma Blue
+                        </button>
+                        <button class="flap-btn flap-btn--sm text-start" @onclick="@(() => RemoveBgAsync("solid", "#00FF66"))">
+                            <i class="bi bi-square-fill me-1 text-success"></i>Neon Green
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+        @if (_activeCutoutUrl != null)
+        {
+            <button class="flap-btn flap-btn--sm" @onclick="@(() => _activeCutoutUrl = null)" title="Restore original AI result">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Cutout
+            </button>
+        }
+    }
+    <button class="flap-btn flap-btn--sm" @onclick="OnStartOver">
+        <i class="bi bi-arrow-repeat me-1"></i>Try Again
+    </button>
+</div>
+
+@* ── Prompt Evolution & Iterative Remixing ───────────────────────── *@
+@if (ResultImageUrl is not null)
+{
+    <div class="card bg-dark border-secondary p-3 mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-warning fw-semibold">
+                <i class="bi bi-diagram-3 me-2"></i>Evolve &amp; Remix Prompt
+            </span>
+            <span class="small text-muted">Branch iteration into new generation</span>
+        </div>
+        <p class="small text-muted mb-2">Select visual modifiers to append to the generation prompt, or branch into a new variation:</p>
+        <div class="d-flex gap-2 flex-wrap">
+            @foreach (var mod in new[] { 
+                ("Cinematic", "cinematic volumetric lighting, 8k, photorealistic"), 
+                ("Cyberpunk", "cyberpunk neon glow, futuristic night city backdrop"), 
+                ("Oil Painting", "expressive oil on canvas, textured impasto brushwork"), 
+                ("35mm Film", "vintage 35mm film photography, grain, warm analog color grading"), 
+                ("Watercolor", "delicate watercolor splash, fluid washes, artistic"), 
+                ("Moody Dark", "moody chiaroscuro, dramatic rim light, deep contrast") 
+            })
+            {
+                <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => RemixWithModifier(mod.Item1, mod.Item2))">
+                    <i class="bi bi-plus me-1 text-warning"></i>@mod.Item1
+                </button>
+            }
+        </div>
+    </div>
+}
+
+@* ── Chaining: the generated image becomes the next feature's input ───── *@
+@if (ResultImageUrl is not null)
+{
+    <div class="send-to mb-4">
+        <span class="send-to__label">
+            <i class="bi bi-arrow-right-circle me-1"></i>Use this result as input for
+        </span>
+        <div class="send-to__row">
+            @foreach (var feature in FeatureCatalog.Except(_currentRoute))
+            {
+                var target = feature;
+                <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => SendResultTo(target))"
+                        title="@target.Description">
+                    <i class="bi @target.Icon me-1"></i>@target.Title
+                </button>
+            }
+        </div>
+    </div>
+}
+
+@* The "More options" disclosure was removed: it hid two ordinary buttons behind a click for
+   no protective reason, and the secondary actions are cheap enough to just show. *@
+<div class="results-more mb-4">
+    <div class="results-more__panel d-flex gap-2 flex-wrap">
+        <button class="flap-btn flap-btn--sm" @onclick="OnDownloadOriginal">
+            <i class="bi bi-download me-1"></i>Download Original
+        </button>
+        @if (AdditionalMoreOptions != null)
+        {
+            @AdditionalMoreOptions
+        }
+    </div>
+</div>
+
+@if (FooterContent != null)
+{
+    @FooterContent
+}
+
+@code {
+    [Parameter] public string? ImagePreviewUrl { get; set; }
+    [Parameter, EditorRequired] public string RightLabel { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string DividerIcon { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public RenderFragment RightSide { get; set; } = default!;
+
+    /// <summary>
+    /// The generated image as a <c>data:</c> URI. Drives Share and result-chaining — both are
+    /// hidden when it is null, which is also the "generation produced nothing" case.
+    /// </summary>
+    [Parameter] public string? ResultImageUrl { get; set; }
+
+    /// <summary>Suggested file name for the share sheet and the chained session image.</summary>
+    [Parameter] public string ResultFileName { get; set; } = "poredoimage-result.png";
+
+    [Parameter] public RenderFragment? CaptionContent { get; set; }
+    [Parameter, EditorRequired] public RenderFragment PrimaryAction { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback OnDownloadOriginal { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnStartOver { get; set; }
+    [Parameter] public RenderFragment? AdditionalMoreOptions { get; set; }
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+
+    private bool _wipeMode = false;
+    private double _wipe = 50;
+    private bool _sharing;
+    private bool _copying;
+    private bool _showExportMenu;
+    private bool _showBgMenu;
+    private bool _removingBg;
+    private bool _loupeZoom;
+    private string? _activeCutoutUrl;
+    private string _currentRoute = string.Empty;
+
+    private string? EffectiveResultImageUrl => _activeCutoutUrl ?? ResultImageUrl;
+
+    protected override void OnInitialized() => _currentRoute = new Uri(Nav.Uri).AbsolutePath;
+
+    private async Task RemoveBgAsync(string mode, string? color)
+    {
+        var targetUrl = EffectiveResultImageUrl;
+        if (targetUrl is null || _removingBg) return;
+        _showBgMenu = false;
+        _removingBg = true;
+        try
+        {
+            var res = await JSRuntime.InvokeAsync<string?>("poUx.removeBackground", targetUrl, mode, color);
+            if (!string.IsNullOrEmpty(res))
+            {
+                _activeCutoutUrl = res;
+                NotificationService.Notify(NotificationSeverity.Success, "Background Cutout", "Subject isolated successfully!", duration: 3000);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Cutout Failed", "Could not process background on this image.", duration: 3000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Background removal failed");
+        }
+        finally
+        {
+            _removingBg = false;
+        }
+    }
+
+    private void RemixWithModifier(string label, string clause)
+    {
+        var existing = SessionService.LastFinalPrompt ?? "";
+        var newPrompt = string.IsNullOrWhiteSpace(existing) 
+            ? clause 
+            : $"{existing}, {clause}";
+        SessionService.StagePrompt(newPrompt);
+        if (EffectiveResultImageUrl != null)
+        {
+            SessionService.SetImage(EffectiveResultImageUrl, ContentTypeOf(EffectiveResultImageUrl), ResultFileName);
+        }
+        NotificationService.Notify(NotificationSeverity.Info, $"Remix '{label}' Staged",
+            "Result image and evolved prompt set as session input. Opening Image Regeneration…", duration: 3000);
+        Nav.NavigateTo("/image-regeneration");
+    }
+
+    private async Task CopyClipboard()
+    {
+        if (EffectiveResultImageUrl is null || _copying) return;
+        _copying = true;
+        try
+        {
+            var outcome = await JSRuntime.InvokeAsync<string>("poUx.copyImageToClipboard", EffectiveResultImageUrl);
+            if (outcome == "copied")
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Copied!", "Image copied to clipboard — paste anywhere.", duration: 3000);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Copy unavailable", "Clipboard copy is not supported in this browser.", duration: 4000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Copy to clipboard failed");
+        }
+        finally
+        {
+            _copying = false;
+        }
+    }
+
+    private async Task ExportFormatAsync(string format)
+    {
+        if (EffectiveResultImageUrl is null) return;
+        _showExportMenu = false;
+        var success = await JSRuntime.InvokeAsync<bool>("poUx.exportFormatted", EffectiveResultImageUrl, format, 0.92, ResultFileName);
+        if (success)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Exported", $"Downloaded {format.ToUpperInvariant()} image.", duration: 3000);
+        }
+        else
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Export failed", "Could not export in the selected format.", duration: 4000);
+        }
+    }
+
+    private void OnWipeChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var v))
+            _wipe = Math.Clamp(v, 0, 100);
+    }
+
+    /// <summary>
+    /// Makes the generated image the session's active image and navigates to
+    /// <paramref name="feature"/>, so a transformation can be chained onto its own output.
+    /// </summary>
+    private void SendResultTo(FeatureLink feature)
+    {
+        if (EffectiveResultImageUrl is null) return;
+
+        // SetImage parses the bytes back out of the data URI itself, so only one copy is held.
+        SessionService.SetImage(EffectiveResultImageUrl, ContentTypeOf(EffectiveResultImageUrl), ResultFileName);
+        NotificationService.Notify(NotificationSeverity.Info, "Result carried over",
+            $"Opening {feature.Title} with this image as the input.", duration: 3000);
+        Nav.NavigateTo(feature.Route);
+    }
+
+    private async Task ShareResult()
+    {
+        if (EffectiveResultImageUrl is null || _sharing) return;
+        _sharing = true;
+        try
+        {
+            var outcome = await JSRuntime.InvokeAsync<string>(
+                "poUx.shareImage", EffectiveResultImageUrl, ResultFileName,
+                "Made with PoRedoImage", $"My {RightLabel.ToLowerInvariant()} from PoRedoImage");
+
+            switch (outcome)
+            {
+                // "shared" and "cancelled": the native sheet already gave the user feedback —
+                // a toast on top of it would be noise.
+                case "shared":
+                case "cancelled":
+                    break;
+                case "copied":
+                    NotificationService.Notify(NotificationSeverity.Success, "Copied",
+                        "Image copied to your clipboard — paste it anywhere.", duration: 3000);
+                    break;
+                case "unsupported":
+                    NotificationService.Notify(NotificationSeverity.Info, "Sharing unavailable",
+                        "This browser can't share images directly. Use Download instead.", duration: 5000);
+                    break;
+                default:
+                    NotificationService.Notify(NotificationSeverity.Warning, "Share failed",
+                        "The image could not be prepared for sharing. Try downloading it.", duration: 5000);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Share failed");
+            NotificationService.Notify(NotificationSeverity.Warning, "Share failed",
+                "The image could not be shared. Try downloading it.", duration: 5000);
+        }
+        finally
+        {
+            _sharing = false;
+        }
+    }
+
+    /// <summary>Reads the media type out of a <c>data:&lt;type&gt;;base64,…</c> URI.</summary>
+    private static string ContentTypeOf(string dataUri)
+    {
+        const string prefix = "data:";
+        if (!dataUri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return "image/png";
+        var semi = dataUri.IndexOf(';');
+        return semi > prefix.Length ? dataUri[prefix.Length..semi] : "image/png";
+    }
+}

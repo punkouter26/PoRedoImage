@@ -1074,6 +1074,16 @@ body.po-drop-active::after {
 
 .split-compare__img.loaded { opacity: 1; }
 
+.split-compare--loupe .split-compare__img {
+    transform: scale(2.2);
+    transform-origin: center center;
+    transition: transform 0.25s ease-in-out;
+    cursor: zoom-out;
+}
+.split-compare--loupe .split-compare__side {
+    cursor: crosshair;
+}
+
 .split-compare__label,
 .compare__tag {
     position: absolute;

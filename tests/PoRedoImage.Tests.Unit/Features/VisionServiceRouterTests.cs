@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Memory;
 using Moq;
@@ -16,13 +16,14 @@ namespace PoRedoImage.Tests.Unit.Features;
 public class VisionServiceRouterTests
 {
     private static VisionServiceRouter BuildRouter(
-        out AzureVisionService azure, out OllamaVisionService ollama, out OpenAiVisionService openAi)
+        out AzureVisionService azure, out OllamaVisionService ollama, out OpenAiVisionService openAi, out GeminiVisionService gemini)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ComputerVision:Endpoint"] = "https://test.cognitiveservices.azure.com/",
             ["ComputerVision:ApiKey"] = "test-key",
             ["Ollama:Endpoint"] = "http://localhost:11434",
+            ["Google:ApiKey"] = "test-gemini-key",
         }).Build();
 
         azure = new AzureVisionService(config, Mock.Of<ILogger<AzureVisionService>>());
@@ -35,26 +36,31 @@ public class VisionServiceRouterTests
         chat.SetupGet(c => c.IsConfigured).Returns(true);
         openAi = new OpenAiVisionService(chat.Object, Mock.Of<ILogger<OpenAiVisionService>>());
 
+        gemini = new GeminiVisionService(config, factory.Object, Mock.Of<ILogger<GeminiVisionService>>());
+
         return new VisionServiceRouter(
             azure, ollama, openAi,
             new MemoryCache(new MemoryCacheOptions()),
-            new LoggerFactory());
+            new LoggerFactory(),
+            gemini);
     }
 
     [Theory]
     [InlineData(AiProviderIds.OllamaVision, "ollama")]
     [InlineData(AiProviderIds.AzureOpenAiVision, "openai")]
+    [InlineData(AiProviderIds.GeminiVision, "gemini")]
     // Regression: "qwen..." previously matched the Ollama prefix rule.
     [InlineData(AiProviderIds.BrowserQwen25, "azure")]
     [InlineData(null, "azure")]
     [InlineData("gemma4", "azure")]
     public void Resolve_RoutesByNamespace_NotByModelNamePrefix(string? modelId, string expectedBackend)
     {
-        var router = BuildRouter(out var azure, out var ollama, out var openAi);
+        var router = BuildRouter(out var azure, out var ollama, out var openAi, out var gemini);
         IVisionService expected = expectedBackend switch
         {
             "ollama" => ollama,
             "openai" => openAi,
+            "gemini" => gemini,
             _ => azure,
         };
 

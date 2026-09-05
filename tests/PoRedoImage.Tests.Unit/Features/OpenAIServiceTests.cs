@@ -25,29 +25,14 @@ public class AzureOpenAiServiceTests
 
     // ─── Constructor tests ──────────────────────────────────────────
 
-    [Fact]
-    public void Constructor_MissingEndpoint_DoesNotThrow_SetsConfigError()
+    [Theory]
+    [InlineData("https://test.openai.azure.com/", "test-key")]
+    [InlineData(null, "test-key")]
+    [InlineData("https://test.openai.azure.com/", null)]
+    public void Constructor_ConfigurationPermutations_ConstructsSuccessfully(string? endpoint, string? key)
     {
-        // Service now degrades gracefully; errors are reported at call time, not construction
-        var config = BuildConfig(endpoint: null);
+        var config = BuildConfig(endpoint, key);
         var service = new AzureOpenAiService(config, _loggerMock.Object);
-        Assert.NotNull(service);
-    }
-
-    [Fact]
-    public void Constructor_MissingKey_UsesManagedIdentity_DoesNotThrow()
-    {
-        // When no API key is configured, the service falls back to DefaultAzureCredential
-        // (Managed Identity / Workload Identity on ACA). Construction must succeed.
-        var config = BuildConfig(key: null);
-        var service = new AzureOpenAiService(config, _loggerMock.Object);
-        Assert.NotNull(service);
-    }
-
-    [Fact]
-    public void Constructor_ValidConfig_DoesNotThrow()
-    {
-        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         Assert.NotNull(service);
     }
 
@@ -74,20 +59,15 @@ public class AzureOpenAiServiceTests
 
     // ─── EnhanceDescriptionAsync guard-clause tests ─────────────────
 
-    [Fact]
-    public async Task EnhanceDescriptionAsync_NullDescription_ThrowsArgumentNull()
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("desc", true)]
+    public async Task EnhanceDescriptionAsync_NullArguments_ThrowsArgumentNull(string? desc, bool nullTags)
     {
         var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
+        var tags = nullTags ? null! : new List<string> { "tag" };
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            service.EnhanceDescriptionAsync(null!, new List<string> { "tag" }, 200));
-    }
-
-    [Fact]
-    public async Task EnhanceDescriptionAsync_NullTags_ThrowsArgumentNull()
-    {
-        var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            service.EnhanceDescriptionAsync("desc", null!, 200));
+            service.EnhanceDescriptionAsync(desc!, tags, 200));
     }
 
     // Zero and negative are the same guard clause reached by two literals, so this is one theory

@@ -54,6 +54,11 @@ public sealed class MockChatCompletionService : IChatCompletionService, IMockabl
         => throw new InvalidOperationException(
             "MockChatCompletionService.CompleteAsync should never be called — IsConfigured is false so "
             + "callers must use their heuristic fallback. Reaching here indicates a missing IsConfigured guard.");
+
+    public IAsyncEnumerable<string> StreamCompleteAsync(
+        string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+        => throw new InvalidOperationException(
+            "MockChatCompletionService.StreamCompleteAsync should never be called — IsConfigured is false.");
 }
 
 /// <summary>Canned image generation — returns a tiny PNG and never calls Google Gemini/Imagen.</summary>

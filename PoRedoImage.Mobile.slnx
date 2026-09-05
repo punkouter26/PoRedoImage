@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PoRedoImage.Domain/PoRedoImage.Domain.csproj" />
+    <Project Path="src/PoRedoImage.Shared/PoRedoImage.Shared.csproj" />
+    <Project Path="src/PoRedoImage.Mobile/PoRedoImage.Mobile.csproj" />
+  </Folder>
+</Solution>

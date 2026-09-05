@@ -51,10 +51,16 @@ window.imageProcessing = (function () {
                         ctx.imageSmoothingQuality = 'high';
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                        const isJpeg = dataUrl.startsWith('data:image/jpeg');
-                        const out = isJpeg
-                            ? canvas.toDataURL('image/jpeg', 0.88)
-                            : canvas.toDataURL('image/png');
+                        let out;
+                        const webp = canvas.toDataURL('image/webp', 0.85);
+                        if (webp.startsWith('data:image/webp')) {
+                            out = webp;
+                        } else {
+                            const isJpeg = dataUrl.startsWith('data:image/jpeg');
+                            out = isJpeg
+                                ? canvas.toDataURL('image/jpeg', 0.88)
+                                : canvas.toDataURL('image/png');
+                        }
 
                         // A re-encode can occasionally come out LARGER than the source (already
                         // well-compressed PNGs do this). Keep whichever is smaller.

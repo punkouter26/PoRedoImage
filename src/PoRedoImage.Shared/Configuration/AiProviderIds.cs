@@ -1,4 +1,4 @@
-﻿namespace PoRedoImage.Shared.Configuration;
+namespace PoRedoImage.Shared.Configuration;
 
 /// <summary>
 /// The namespaced provider-id vocabulary shared by the client catalog and the server routers.
@@ -34,7 +34,9 @@ public static class AiProviderIds
     /// capability on the same resource, and the picker offers them separately.
     /// </summary>
     public const string AzureOpenAiVision = "remote:azure-openai-vision";
+    public const string GeminiVision = "remote:gemini-vision";
     public const string GeminiImagen3 = "remote:gemini-imagen3";
+    public const string GeminiImagen3Fast = "remote:gemini-imagen3-fast";
     public const string GoogleLyria = "remote:google-lyria";
 
     // Ollama (local service, dev only)

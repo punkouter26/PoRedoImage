@@ -11,10 +11,9 @@ namespace PoRedoImage.Application.Features.BulkGenerate;
 public sealed class BulkGenerationService : IBulkGenerationService
 {
     /// <summary>
-    /// Concurrent calls to the image model per batch. Three, matching the re-roll path — the
-    /// provider rate-limits above that and a 429 storm costs more wall clock than queueing does.
+    /// Concurrent calls to the image model per batch. Baseline 4 with adaptive backoff on rate limits.
     /// </summary>
-    internal const int BatchConcurrency = 3;
+    internal const int BatchConcurrency = 4;
 
     private readonly IImageGenerationRouter _router;
     private readonly ILogger<BulkGenerationService> _logger;
@@ -62,6 +61,15 @@ public sealed class BulkGenerationService : IBulkGenerationService
             prompts.Count, succeeded, sw.ElapsedMilliseconds);
     }
 
+    private static bool IsRateLimitException(Exception ex)
+    {
+        var msg = ex.Message;
+        return msg.Contains("429") ||
+               msg.Contains("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("quota", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task FanOutAsync(
         IImageGenerationService generator,
         IReadOnlyList<string> prompts,
@@ -77,26 +85,43 @@ public sealed class BulkGenerationService : IBulkGenerationService
                 await gate.WaitAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    var (data, contentType, _) = await generator
-                        .GenerateImageAsync(prompt, source, ct)
-                        .ConfigureAwait(false);
+                    const int maxRetries = 2;
+                    var delay = TimeSpan.FromMilliseconds(500);
 
-                    await writer
-                        .WriteAsync(new BulkBatchItem(index, Convert.ToBase64String(data), contentType, null), ct)
-                        .ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // One slot failing is a normal outcome the board already renders. Reporting it
-                    // as an item keeps the other nine running.
-                    _logger.LogWarning(ex, "Batch slot {Index} failed", index);
-                    await writer
-                        .WriteAsync(new BulkBatchItem(index, null, null, "Generation failed for this variation."), ct)
-                        .ConfigureAwait(false);
+                    for (var attempt = 0; attempt <= maxRetries; attempt++)
+                    {
+                        try
+                        {
+                            var (data, contentType, _) = await generator
+                                .GenerateImageAsync(prompt, source, ct)
+                                .ConfigureAwait(false);
+
+                            await writer
+                                .WriteAsync(new BulkBatchItem(index, Convert.ToBase64String(data), contentType, null), ct)
+                                .ConfigureAwait(false);
+                            return;
+                        }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex) when (attempt < maxRetries && IsRateLimitException(ex))
+                        {
+                            _logger.LogWarning(ex, "Batch slot {Index} rate limited (attempt {Attempt}); backing off {DelayMs}ms", index, attempt + 1, delay.TotalMilliseconds);
+                            await Task.Delay(delay, ct).ConfigureAwait(false);
+                            delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+                        }
+                        catch (Exception ex)
+                        {
+                            // One slot failing is a normal outcome the board already renders. Reporting it
+                            // as an item keeps the other nine running.
+                            _logger.LogWarning(ex, "Batch slot {Index} failed", index);
+                            await writer
+                                .WriteAsync(new BulkBatchItem(index, null, null, "Generation failed for this variation."), ct)
+                                .ConfigureAwait(false);
+                            return;
+                        }
+                    }
                 }
                 finally
                 {
@@ -130,22 +155,39 @@ public sealed class BulkGenerationService : IBulkGenerationService
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                // Seed = tick count mixed with the slot index — unique within the batch and
-                // reproducible if the user retries within the same tick.
-                var seed = (int)((Environment.TickCount ^ (i * 2654435761)) & 0x7FFFFFFF);
-                var (data, contentType, _) = await generator
-                    .GenerateImageAsync(seedPrompt, source, seed, ct)
-                    .ConfigureAwait(false);
+                const int maxRetries = 2;
+                var delay = TimeSpan.FromMilliseconds(500);
 
-                return new BulkRerollVariation(i, Convert.ToBase64String(data), contentType);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Re-roll slot {Index} failed", i);
+                for (var attempt = 0; attempt <= maxRetries; attempt++)
+                {
+                    try
+                    {
+                        // Seed = tick count mixed with the slot index — unique within the batch and
+                        // reproducible if the user retries within the same tick.
+                        var seed = (int)((Environment.TickCount ^ (i * 2654435761)) & 0x7FFFFFFF);
+                        var (data, contentType, _) = await generator
+                            .GenerateImageAsync(seedPrompt, source, seed, ct)
+                            .ConfigureAwait(false);
+
+                        return new BulkRerollVariation(i, Convert.ToBase64String(data), contentType);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex) when (attempt < maxRetries && IsRateLimitException(ex))
+                    {
+                        _logger.LogWarning(ex, "Re-roll slot {Index} rate limited (attempt {Attempt}); backing off {DelayMs}ms", i, attempt + 1, delay.TotalMilliseconds);
+                        await Task.Delay(delay, ct).ConfigureAwait(false);
+                        delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Re-roll slot {Index} failed", i);
+                        return null;
+                    }
+                }
+
                 return null;
             }
             finally

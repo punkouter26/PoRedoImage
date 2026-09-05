@@ -29,30 +29,23 @@ public class MemeTemplateServiceTests
         Assert.Contains(templates, t => t.Category == "experimental");
     }
 
-    [Fact]
-    public void GetById_ExistingId_ReturnsTemplate()
+    [Theory]
+    [InlineData("drake", true, "Drake Hotline Bling", 2)]
+    [InlineData("DRAKE", true, "Drake Hotline Bling", 2)]
+    [InlineData("nonexistent-template", false, null, 0)]
+    public void GetById_LookupTests(string id, bool shouldExist, string? expectedName, int expectedZones)
     {
-        var tpl = _svc.GetById("drake");
-
-        Assert.NotNull(tpl);
-        Assert.Equal("Drake Hotline Bling", tpl.Name);
-        Assert.Equal(2, tpl.RequiredZoneCount);
-    }
-
-    [Fact]
-    public void GetById_CaseInsensitive()
-    {
-        var tpl = _svc.GetById("DRAKE");
-
-        Assert.NotNull(tpl);
-    }
-
-    [Fact]
-    public void GetById_UnknownId_ReturnsNull()
-    {
-        var tpl = _svc.GetById("nonexistent-template");
-
-        Assert.Null(tpl);
+        var tpl = _svc.GetById(id);
+        if (shouldExist)
+        {
+            Assert.NotNull(tpl);
+            Assert.Equal(expectedName, tpl.Name);
+            Assert.Equal(expectedZones, tpl.RequiredZoneCount);
+        }
+        else
+        {
+            Assert.Null(tpl);
+        }
     }
 
     [Fact]
@@ -117,22 +110,14 @@ public class MemeTemplateServiceTests
             _svc.RenderAsync(image, tpl, ["only one"]));
     }
 
-    [Fact]
-    public async Task RenderAsync_NullImage_ThrowsArgumentNullException()
+    [Theory]
+    [InlineData(null, typeof(ArgumentNullException))]
+    [InlineData(new byte[0], typeof(ArgumentException))]
+    public async Task RenderAsync_InvalidImage_ThrowsExpectedException(byte[]? image, Type expectedException)
     {
         var tpl = _svc.GetById("drake")!;
-
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _svc.RenderAsync(null!, tpl, ["a", "b"]));
-    }
-
-    [Fact]
-    public async Task RenderAsync_EmptyImage_ThrowsArgumentException()
-    {
-        var tpl = _svc.GetById("drake")!;
-
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _svc.RenderAsync([], tpl, ["a", "b"]));
+        await Assert.ThrowsAsync(expectedException, () =>
+            _svc.RenderAsync(image!, tpl, ["a", "b"]));
     }
 
     private static byte[] CreateMinimalPng()

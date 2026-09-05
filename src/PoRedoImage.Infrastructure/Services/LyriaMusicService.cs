@@ -112,15 +112,16 @@ public sealed class LyriaMusicService : IMusicGenerationService
             throw new InvalidOperationException($"Lyria API returned {(int)response.StatusCode}: {errorBody}");
         }
 
-        var rawJson = await response.Content.ReadAsStringAsync(ct);
-        using var json = JsonDocument.Parse(rawJson);
+        using var responseStream = await response.Content.ReadAsStreamAsync(ct);
+        using var json = await JsonDocument.ParseAsync(responseStream, cancellationToken: ct);
 
         if (!TryExtractAudio(json.RootElement, out var audio, out var contentType))
         {
             // A 200 with no audio payload is how the endpoint reports a filtered generation in
             // some cases; treat it as a refusal rather than throwing, so the caller can retry.
             _logger.LogInformation("Lyria returned 200 with no audio payload — treating as a refusal.");
-            return MusicGenerationResult.FromRefusal(elapsed, ExtractMessage(rawJson));
+            var fallbackMsg = json.RootElement.TryGetProperty("error", out var err) ? err.ToString() : "Safety refusal";
+            return MusicGenerationResult.FromRefusal(elapsed, fallbackMsg);
         }
 
         _logger.LogInformation(

@@ -72,11 +72,12 @@ public static class InfrastructureServiceExtensions
         }
         else
         {
-            // Vision backends: Azure Computer Vision (default/cloud) + Ollama (local image-to-text).
+            // Vision backends: Azure Computer Vision (default/cloud) + Ollama (local image-to-text) + Gemini Vision.
             // The router picks per-request based on the selected model id.
             services.AddSingleton<AzureVisionService>();
             services.AddSingleton<OllamaVisionService>();
             services.AddSingleton<OpenAiVisionService>();
+            services.AddSingleton<GeminiVisionService>();
 
             // Vision is memoised by image content hash. The decorator wraps the DEFAULT service
             // only — the router hands out the concrete backends, so Ollama and the OpenAI vision
@@ -93,7 +94,8 @@ public static class InfrastructureServiceExtensions
                 sp.GetRequiredService<OllamaVisionService>(),
                 sp.GetRequiredService<OpenAiVisionService>(),
                 sp.GetRequiredService<IMemoryCache>(),
-                sp.GetRequiredService<ILoggerFactory>()));
+                sp.GetRequiredService<ILoggerFactory>(),
+                sp.GetRequiredService<GeminiVisionService>()));
 
             services.AddSingleton<AzureOpenAiService>();
             services.AddSingleton<IGenerativeAiService>(sp => new CachingGenerativeAiService(
@@ -101,19 +103,25 @@ public static class InfrastructureServiceExtensions
                 sp.GetRequiredService<IMemoryCache>(),
                 sp.GetRequiredService<ILogger<CachingGenerativeAiService>>()));
 
-            // Image generation: Google Gemini/Imagen, the only provider.
-            //
-            // HuggingFace was removed here in 2026-08. It had never worked end-to-end — every
-            // fal-ai/{flux,qwen-image-edit} POST returned HTTP 400 "Model not supported by provider"
-            // — and the account's inference credits were depleted, so the router returned 402. Both
-            // failures were swallowed by callers that substitute canned output, which meant an
-            // unusable provider degraded four features while the app still reported healthy.
+            // Image generation: Google Gemini/Imagen, with optional fast/budget tier.
             services.AddSingleton<GeminiImagen3Service>();
             services.AddSingleton<IImageGenerationService>(sp =>
                 sp.GetRequiredService<GeminiImagen3Service>());
 
-            services.AddSingleton<IImageGenerationRouter>(sp => new ImageGenerationRouter(
-                sp.GetRequiredService<GeminiImagen3Service>()));
+            services.AddSingleton<IImageGenerationRouter>(sp =>
+            {
+                var standard = sp.GetRequiredService<GeminiImagen3Service>();
+                var config = sp.GetRequiredService<IConfiguration>();
+                var fastModel = config[ConfigKeys.GoogleImagen3FastModel];
+                var fast = !string.IsNullOrWhiteSpace(fastModel)
+                    ? new GeminiImagen3Service(
+                        config,
+                        sp.GetRequiredService<IHttpClientFactory>(),
+                        sp.GetRequiredService<ILogger<GeminiImagen3Service>>(),
+                        fastModel)
+                    : null;
+                return new ImageGenerationRouter(standard, fast);
+            });
 
             // Chat + vision powering the Style Director agents, the Rap Roast scene describer, and
             // its lyric writer. Azure OpenAI is the only backend: one deployment serves both text

@@ -211,14 +211,28 @@
             <span class="roast-export__label">
                 <i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Take it with you
             </span>
+
+            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                <span class="small text-muted">Video Style:</span>
+                <button type="button" class="flap-btn flap-btn--sm @(_videoMode == "memeRoast" ? "flap-btn--active" : "")"
+                        @onclick="@(() => _videoMode = "memeRoast")" title="Dynamic punchline zooms, camera shakes, meme stickers and big typography">
+                    <i class="bi bi-fire me-1 text-danger"></i>Meme Video Roast (Funny Cut)
+                </button>
+                <button type="button" class="flap-btn flap-btn--sm @(_videoMode == "standard" ? "flap-btn--active" : "")"
+                        @onclick="@(() => _videoMode = "standard")" title="Clean typography and stage frame">
+                    <i class="bi bi-tv me-1"></i>Classic Stage
+                </button>
+            </div>
+
             <div class="roast-export__actions">
                 <button class="flap-btn flap-btn--sm" @onclick="SaveCardAsync" disabled="@_exporting">
                     <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-image") me-1" aria-hidden="true"></i>Save card
                 </button>
                 @if (_canRecord && !_result.AudioRefused)
                 {
-                    <button class="flap-btn flap-btn--sm" @onclick="ExportVideoAsync" disabled="@_exporting">
-                        <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-camera-video") me-1" aria-hidden="true"></i>Export video
+                    <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="ExportVideoAsync" disabled="@_exporting">
+                        <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-camera-video") me-1" aria-hidden="true"></i>
+                        @(_videoMode == "memeRoast" ? "Export Meme Video Roast" : "Export Video")
                     </button>
                 }
             </div>
@@ -227,7 +241,7 @@
                 <div class="roast-export__progress" role="status">
                     <div class="roast-export__bar" style="--export: @_exportProgress%"></div>
                     <span class="roast-export__pct">
-                        Recording @_exportProgress% — the track plays through in real time.
+                        Recording @_exportProgress% — rendering video with beats and kinetic punchline zooms in real time.
                     </span>
                 </div>
             }
@@ -342,6 +356,7 @@
     /// <summary>-1 when idle; 0–100 while a video is recording.</summary>
     private int _exportProgress = -1;
     private double _syncOffset;
+    private string _videoMode = "memeRoast";
 
     /// <summary>Guards against re-attaching on every render — one attach per result.</summary>
     private RapRoastResponse? _attachedTo;
@@ -541,7 +556,8 @@
         {
             // -1 asks the JS side for whichever bar is lit right now.
             var outcome = await SafeInvokeAsync<string>(
-                "poRoast.exportCard", _roastedImageUrl, _lines, -1, ExportMeta, "rap-roast-card.png");
+                "poRoast.exportCard", _roastedImageUrl, _lines, -1, ExportMeta,
+                _videoMode == "memeRoast" ? "meme-roast-card.png" : "rap-roast-card.png", _videoMode);
 
             if (outcome == "saved")
                 NotificationService.Notify(NotificationSeverity.Success, "Card saved",
@@ -567,7 +583,8 @@
         {
             _selfRef ??= DotNetObjectReference.Create(this);
             var outcome = await SafeInvokeAsync<string>(
-                "poRoast.exportVideo", _audioRef, _selfRef, _roastedImageUrl, _lines, ExportMeta, "rap-roast.webm");
+                "poRoast.exportVideo", _audioRef, _selfRef, _roastedImageUrl, _lines, ExportMeta,
+                _videoMode == "memeRoast" ? "meme-video-roast.webm" : "rap-roast.webm", _videoMode);
 
             var (severity, title, detail) = outcome switch
             {

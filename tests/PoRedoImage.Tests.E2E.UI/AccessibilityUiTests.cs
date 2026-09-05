@@ -1,4 +1,4 @@
-﻿using Deque.AxeCore.Commons;
+using Deque.AxeCore.Commons;
 using Deque.AxeCore.Playwright;
 using Microsoft.Playwright;
 
@@ -19,55 +19,18 @@ namespace PoRedoImage.Tests.E2E.UI;
 /// strict. Class name contains "Ui" so <c>TestCountCeilingTests</c> partitions it into the UI tier.
 /// </para>
 /// </remarks>
-public sealed class AccessibilityUiTests : IAsyncLifetime
+public sealed class AccessibilityUiTests : IClassFixture<PlaywrightBrowserFixture>
 {
     private static readonly string[] WcagAaTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-    private IPlaywright _playwright = default!;
-    private IBrowser _browser = default!;
+    private readonly PlaywrightBrowserFixture _fixture;
 
-    public async Task InitializeAsync()
+    public AccessibilityUiTests(PlaywrightBrowserFixture fixture)
     {
-        _playwright = await Playwright.CreateAsync();
-        _browser = await _playwright.Chromium.LaunchAsync(new() { Headless = true });
-
-        await WarmUpAsync();
+        _fixture = fixture;
     }
 
-    /// <summary>
-    /// Loads the app once and waits for the WASM runtime to boot before any test asserts.
-    /// </summary>
-    /// <remarks>
-    /// The first navigation after a rebuild pays for downloading and starting the WASM runtime,
-    /// which can outlast <c>NetworkIdle</c>. Tests that asserted immediately after it were
-    /// intermittently checking a page that had not finished hydrating — a flake that only appeared
-    /// on the first run after a build and vanished on re-run, which is the worst kind to chase.
-    /// Paying that cost once here makes every subsequent navigation hit a warm runtime.
-    /// </remarks>
-    private async Task WarmUpAsync()
-    {
-        await using var context = await _browser.NewContextAsync();
-        var page = await context.NewPageAsync();
-        try
-        {
-            await page.GotoAsync(LiveServerFactAttribute.BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
-            // The login form only renders once Blazor has hydrated, so its presence is the signal
-            // that the runtime is actually up rather than merely downloaded.
-            await page.WaitForSelectorAsync("a[href*='login'], .login-card, h1",
-                new() { Timeout = 30_000 });
-        }
-        catch (TimeoutException)
-        {
-            // Warm-up is an optimisation. If it times out the tests still run and report honestly.
-        }
-    }
-
-
-    public async Task DisposeAsync()
-    {
-        await _browser.DisposeAsync();
-        _playwright.Dispose();
-    }
+    private IBrowser _browser => _fixture.Browser;
 
     [LiveServerFact]
     public async Task Login_page_has_no_WCAG_AA_violations()

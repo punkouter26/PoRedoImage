@@ -1,6 +1,8 @@
 @namespace PoRedoImage.Client.Pages
 @using PoRedoImage.Client.Models
 @using Microsoft.AspNetCore.Components.Web.Virtualization
+@inject IJSRuntime JSRuntime
+@inject NotificationService NotificationService
 
 <div role="region" aria-label="Bulk generation gallery">
     @if (Results.Count == 0)
@@ -14,9 +16,25 @@
     else
     {
         <div class="mb-3">
-            <div class="bulk-progress-header">
-                <span id="bulk-progress-label">Generated @CompletedCount of @Results.Count images</span>
-                <span aria-hidden="true">@(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)%</span>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="bulk-progress-header mb-0">
+                    <span id="bulk-progress-label">Generated @CompletedCount of @Results.Count images</span>
+                    <span aria-hidden="true" class="ms-2 badge bg-secondary">@(Results.Count > 0 ? (int)(CompletedCount * 100.0 / Results.Count) : 0)%</span>
+                </div>
+                <div class="d-flex gap-2">
+                    @if (_pinnedIndices.Count >= 2)
+                    {
+                        <button type="button" class="flap-btn flap-btn--sm flap-btn--primary" @onclick="@(() => _showCompareMatrix = true)">
+                            <i class="bi bi-grid-fill me-1 text-warning"></i>2x2 Matrix (@_pinnedIndices.Count)
+                        </button>
+                    }
+                    @if (CompletedCount > 0)
+                    {
+                        <button type="button" class="flap-btn flap-btn--sm" @onclick="DownloadZipAsync" disabled="@_zipping" title="Download all completed images in a single ZIP">
+                            <i class="bi @(_zipping ? "bi-hourglass-split" : "bi-file-earmark-zip") me-1 text-warning"></i>@(_zipping ? "Zipping…" : "Download All (ZIP)")
+                        </button>
+                    }
+                </div>
             </div>
             <div class="bulk-progress-bar" role="progressbar"
                  aria-labelledby="bulk-progress-label"
@@ -77,6 +95,12 @@
                         @if (result.Status == BulkGenerateStatus.Complete && result.ImageUrl is not null)
                         {
                             <div class="bulk-slot__actions">
+                                <button class="btn-heart-slot @(_pinnedIndices.Contains(result.Index) ? "btn-heart-slot--active" : "")"
+                                        aria-label="Pin variation for 2x2 comparison"
+                                        @onclick="@(() => TogglePin(result.Index))"
+                                        title="@(_pinnedIndices.Contains(result.Index) ? "Unpin from 2x2 matrix" : "Pin to compare in 2x2 matrix")">
+                                    <i class="bi @(_pinnedIndices.Contains(result.Index) ? "bi-pin-angle-fill text-warning" : "bi-pin-angle")" aria-hidden="true"></i>
+                                </button>
                                 <button class="btn-heart-slot @(Favorites.Contains(result.Index) ? "btn-heart-slot--active" : "")"
                                         aria-pressed="@Favorites.Contains(result.Index)"
                                         aria-label="@(Favorites.Contains(result.Index) ? "Remove from favorites" : "Save to favorites")"
@@ -142,6 +166,59 @@
             </div>
         </div>
     }
+
+    @* ── Idea #10 — 2x2 Pin Comparison Matrix Modal ── *@
+    @if (_showCompareMatrix)
+    {
+        <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.85); z-index: 1060;">
+            <div class="modal-dialog modal-xl modal-dialog-centered">
+                <div class="modal-content bg-dark text-light border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-warning"><i class="bi bi-grid-fill me-2"></i>2x2 Comparison Matrix</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="@(() => _showCompareMatrix = false)"></button>
+                    </div>
+                    <div class="modal-body p-3">
+                        <div class="row g-3">
+                            @foreach (var idx in _pinnedIndices.Take(4))
+                            {
+                                var item = Results.FirstOrDefault(r => r.Index == idx);
+                                if (item != null && item.ImageUrl != null)
+                                {
+                                    <div class="col-6">
+                                        <div class="border border-secondary rounded p-2 h-100 d-flex flex-column bg-black">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="badge bg-secondary">Variation #@(item.Index + 1)</span>
+                                                <button class="btn btn-sm btn-link text-muted p-0" @onclick="@(() => TogglePin(item.Index))">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </div>
+                                            <div class="ratio ratio-1x1 mb-2 bg-dark rounded overflow-hidden">
+                                                <img src="@item.ImageUrl" class="object-fit-contain w-100 h-100" alt="Variation @(item.Index + 1)" />
+                                            </div>
+                                            <p class="small text-muted text-truncate mb-2" title="@item.Prompt">@item.Prompt</p>
+                                            <div class="mt-auto d-flex gap-2">
+                                                <button class="flap-btn flap-btn--sm flex-grow-1" @onclick="@(() => OnDownloadImage.InvokeAsync(item.Index))">
+                                                    <i class="bi bi-download me-1"></i>Save
+                                                </button>
+                                                <button class="flap-btn flap-btn--sm @(Favorites.Contains(item.Index) ? "flap-btn--active" : "")"
+                                                        @onclick="@(() => OnToggleFavorite.InvokeAsync(item.Index))">
+                                                    <i class="bi @(Favorites.Contains(item.Index) ? "bi-heart-fill text-danger" : "bi-heart")"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => _pinnedIndices.Clear())">Clear Pinned</button>
+                        <button type="button" class="flap-btn flap-btn--primary flap-btn--sm" @onclick="@(() => _showCompareMatrix = false)">Close Matrix</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -170,6 +247,55 @@
     private readonly HashSet<int> _rerollingIndices = [];
     private List<BulkRerollVariation> _rerollVariations = [];
     private int _rerollSourceIndex = -1;
+    private readonly HashSet<int> _pinnedIndices = [];
+    private bool _showCompareMatrix;
+    private bool _zipping;
+
+    private void TogglePin(int index)
+    {
+        if (_pinnedIndices.Contains(index))
+            _pinnedIndices.Remove(index);
+        else
+        {
+            if (_pinnedIndices.Count >= 4)
+            {
+                NotificationService.Notify(NotificationSeverity.Info, "Matrix full", "You can pin up to 4 variations in the 2x2 matrix.", duration: 2500);
+                return;
+            }
+            _pinnedIndices.Add(index);
+        }
+        StateHasChanged();
+    }
+
+    private async Task DownloadZipAsync()
+    {
+        if (_zipping) return;
+        _zipping = true;
+        try
+        {
+            var completed = Results.Where(r => r.Status == BulkGenerateStatus.Complete && !string.IsNullOrEmpty(r.ImageUrl))
+                .Select(r => new { url = r.ImageUrl, name = $"variation-{r.Index + 1}.png" })
+                .ToList();
+            if (completed.Count == 0) return;
+            var ok = await JSRuntime.InvokeAsync<bool>("poUx.downloadZip", completed, "bulk-variations.zip");
+            if (ok)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "ZIP Downloaded", $"Packaged {completed.Count} variations into bulk-variations.zip", duration: 3000);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Download issue", "Failed to build ZIP file.", duration: 3500);
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Download failed", ex.Message, duration: 4000);
+        }
+        finally
+        {
+            _zipping = false;
+        }
+    }
 
     private bool IsRerolling(int index) => _rerollingIndices.Contains(index);
 

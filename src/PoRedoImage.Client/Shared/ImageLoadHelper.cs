@@ -37,8 +37,8 @@ public static class ImageLoadHelper
         try
         {
             var fileType = Path.GetExtension(file.Name).ToLower();
-            if (fileType != ".jpg" && fileType != ".jpeg" && fileType != ".png")
-                return (null, "Only JPG and PNG files are supported.");
+            if (fileType != ".jpg" && fileType != ".jpeg" && fileType != ".png" && fileType != ".webp")
+                return (null, "Only JPG, PNG, and WebP files are supported.");
 
             if (file.Size > MaxFileSize)
                 return (null, $"File size exceeds the maximum allowed (20 MB). Current: {Math.Round(file.Size / 1024.0 / 1024.0, 2)} MB");
@@ -50,7 +50,7 @@ public static class ImageLoadHelper
 
             var contentType = file.ContentType;
             if (string.IsNullOrEmpty(contentType))
-                contentType = fileType is ".jpg" or ".jpeg" ? "image/jpeg" : "image/png";
+                contentType = fileType is ".jpg" or ".jpeg" ? "image/jpeg" : fileType == ".webp" ? "image/webp" : "image/png";
 
             var dataUrl = $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
             return (await ShrinkAsync(dataUrl, contentType, bytes, js), null);

@@ -43,7 +43,7 @@
        One family, two widths — the board's voice without a second type personality. *@
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@500;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap-icons/bootstrap-icons.min.css"]" />
     @* Bootstrap's CSS bundle is gone. The app used ~90 of its classes — a grid, a
        spacing scale and five components — and then spent 44 rules and 46 !important
        declarations disagreeing with the rest of it. foundation.css supplies exactly
@@ -69,8 +69,9 @@
     <Routes @rendermode="WasmMode" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+    <script src="js/audio.js"></script>
     <script src="js/imageProcessing.js"></script>
-    <script src="js/recents.js"></script>
+    <script src="js/sessionState.js"></script>
     <script src="js/guestStorage.js"></script>
     <script src="js/ux.js"></script>
     <script src="js/roastStage.js"></script>

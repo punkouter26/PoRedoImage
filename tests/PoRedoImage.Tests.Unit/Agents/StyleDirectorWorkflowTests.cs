@@ -19,6 +19,10 @@ public class StyleDirectorWorkflowTests
         public Task<ChatCompletionResult> CompleteAsync(
             string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
             => throw new NotSupportedException("Heuristic path should be used when IsConfigured is false.");
+
+        public IAsyncEnumerable<string> StreamCompleteAsync(
+            string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Heuristic path should be used when IsConfigured is false.");
     }
 
     /// <summary>Configured chat that replays a fixed JSON payload, to drive the AI path.</summary>
@@ -31,6 +35,13 @@ public class StyleDirectorWorkflowTests
                 $$"""{"subject":"A man","mood":"Wry","themes":["corporate"],"prompt":{{System.Text.Json.JsonSerializer.Serialize(prompt)}},"confidence":82}""",
                 TokensUsed: 100,
                 ElapsedMs: 5));
+
+        public async IAsyncEnumerable<string> StreamCompleteAsync(
+            string systemPrompt, string userPrompt, byte[]? image = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield return prompt;
+        }
     }
 
     private static readonly IChatCompletionService Chat = new NotConfiguredChat();

@@ -38,16 +38,6 @@ public static class MemeTemplateEndpoints
         .WithSummary("List the curated Meme Template Library (Idea #17)")
         .Produces<IReadOnlyList<MemeTemplateDto>>(StatusCodes.Status200OK);
 
-        group.MapGet("/{id}", (string id, IMemeTemplateService templates) =>
-        {
-            var tpl = templates.GetById(id);
-            return tpl is null ? Results.NotFound() : Results.Ok(tpl.ToDto());
-        })
-        .WithName("GetMemeTemplate")
-        .WithSummary("Look up a single meme template by id")
-        .Produces<MemeTemplateDto>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status404NotFound);
-
         // Render endpoint — runs locally, no AI cost, no auth required.
         group.MapPost("/render", async (
             MemeTemplateRenderRequest request,

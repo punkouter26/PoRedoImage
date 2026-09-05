@@ -14,12 +14,13 @@
     @if (!isProcessing && !isComplete)
     {
         <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
+        <StyleRecipeDrawer OnRecipeSelected="HandleRecipeSelected" CurrentRecipeId="@_activeRecipe?.Id" />
         <ImageUploadPanel
             ShowDescriptionLength="true"
             ButtonLabel="Process Image"
             ButtonIcon="bi-cpu"
             DescriptionLength="@descriptionLength"
-            ImagePreviewUrl="@imagePreviewUrl"
+            @bind-ImagePreviewUrl="@imagePreviewUrl"
             ErrorMessage="@errorMessage"
             CanProcess="@canProcessImage"
             OnFileChange="LoadFile"
@@ -110,6 +111,14 @@
     private int descriptionLength = 350;
     private ImageAnalysisResponse? analysisResult;
     private bool _descExpanded;
+    private PoRedoImage.Client.Models.StyleRecipe? _activeRecipe;
+
+    private void HandleRecipeSelected(PoRedoImage.Client.Models.StyleRecipe recipe)
+    {
+        _activeRecipe = recipe;
+        NotificationService.Notify(NotificationSeverity.Info, "Recipe Applied",
+            $"{recipe.Title}: {recipe.Description}", duration: 3500);
+    }
 
     protected override void OnGalleryImageSelected()
     {
@@ -160,12 +169,24 @@
             try
             {
                 request = await BuildAnalysisRequestAsync(
-            imageData: base64Data,
-            contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
-            fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
-            descriptionLength: descriptionLength,
-            mode: ProcessingMode.ImageRegeneration,
-            ct: localCts.Token);
+                    imageData: base64Data,
+                    contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                    fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
+                    descriptionLength: descriptionLength,
+                    mode: ProcessingMode.ImageRegeneration,
+                    ct: localCts.Token);
+
+                if (_activeRecipe != null || SessionService.StagedPrompt != null)
+                {
+                    var staged = SessionService.TakeStagedPrompt();
+                    var promptAddition = string.Join(", ", new[] { staged, _activeRecipe?.PromptSnippet }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                    if (!string.IsNullOrWhiteSpace(promptAddition))
+                    {
+                        request.PrecomputedDescription = string.IsNullOrWhiteSpace(request.PrecomputedDescription)
+                            ? promptAddition
+                            : $"{request.PrecomputedDescription}, {promptAddition}";
+                    }
+                }
             }
             catch (LocalInferenceException ex)
             {
@@ -234,17 +255,19 @@
                     // then deserialize explicitly.
             progressMessage = "Decoding result…";
             try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-            var rawJson = await httpResponse.Content.ReadAsStringAsync(cts.Token);
+            using var respStream = await httpResponse.Content.ReadAsStreamAsync(cts.Token);
             progressMessage = "Rendering result…";
             try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-            analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(
-                        rawJson,
-                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            analysisResult = await System.Text.Json.JsonSerializer.DeserializeAsync<ImageAnalysisResponse>(
+                        respStream,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                        cts.Token);
 
             if (analysisResult == null)
                         throw new InvalidOperationException("No response received from API.");
 
             imageDescription = analysisResult.Description;
+            SessionService.RecordFeatureVisit("/image-regeneration", analysisResult.Description);
             regeneratedImageUrl = !string.IsNullOrEmpty(analysisResult.RegeneratedImageData)
                         ? $"data:{analysisResult.RegeneratedImageContentType};base64,{analysisResult.RegeneratedImageData}"
                         : null;

@@ -15,37 +15,23 @@ public class KeyVaultSecretNameMappingTests
     // ─── Load tests — should accept known secrets ───────────────────
 
     [Theory]
-    [InlineData("PoRedoImage-ComputerVision-ApiKey")]
-    [InlineData("PoRedoImage-ComputerVision-Endpoint")]
-    [InlineData("PoRedoImage-OpenAI-ApiKey")]
-    [InlineData("PoRedoImage-OpenAI-Endpoint")]
-    [InlineData("PoRedoImage-ApplicationInsights-ConnectionString")]
-    [InlineData("PoRedoImage-StorageConnectionString")]
-    public void Load_KnownSecret_ReturnsTrue(string secretName)
+    [InlineData("PoRedoImage-ComputerVision-ApiKey", true)]
+    [InlineData("poredoimage-computervision-apikey", true)]
+    [InlineData("POREDOIMAGE-COMPUTERVISION-APIKEY", true)]
+    [InlineData("PoRedoImage-ComputerVision-Endpoint", true)]
+    [InlineData("PoRedoImage-OpenAI-ApiKey", true)]
+    [InlineData("PoRedoImage-OpenAI-Endpoint", true)]
+    [InlineData("PoRedoImage-ApplicationInsights-ConnectionString", true)]
+    [InlineData("PoRedoImage-StorageConnectionString", true)]
+    [InlineData("UnknownSecret", false)]
+    [InlineData("SomeOtherApp-ApiKey", false)]
+    [InlineData("ComputerVision-ApiKey", false)]
+    [InlineData("AzureOpenAI-ApiKey", false)]
+    [InlineData("", false)]
+    public void Load_EvaluatesSecretName(string secretName, bool expectedResult)
     {
         var properties = SecretModelFactory.SecretProperties(name: secretName);
-        Assert.True(_mapping.Load(properties));
-    }
-
-    [Theory]
-    [InlineData("UnknownSecret")]
-    [InlineData("SomeOtherApp-ApiKey")]
-    [InlineData("ComputerVision-ApiKey")]  // old unprefixed — should now be rejected
-    [InlineData("AzureOpenAI-ApiKey")]     // old unprefixed — should now be rejected
-    [InlineData("")]
-    public void Load_UnknownSecret_ReturnsFalse(string secretName)
-    {
-        var properties = SecretModelFactory.SecretProperties(name: secretName);
-        Assert.False(_mapping.Load(properties));
-    }
-
-    [Fact]
-    public void Load_IsCaseInsensitive()
-    {
-        var lower = SecretModelFactory.SecretProperties(name: "poredoimage-computervision-apikey");
-        var upper = SecretModelFactory.SecretProperties(name: "POREDOIMAGE-COMPUTERVISION-APIKEY");
-        Assert.True(_mapping.Load(lower));
-        Assert.True(_mapping.Load(upper));
+        Assert.Equal(expectedResult, _mapping.Load(properties));
     }
 
     // ─── GetKey tests — maps secret names to config keys ────────────
@@ -57,20 +43,12 @@ public class KeyVaultSecretNameMappingTests
     [InlineData("PoRedoImage-OpenAI-Endpoint", "OpenAI:Endpoint")]
     [InlineData("PoRedoImage-ApplicationInsights-ConnectionString", "ApplicationInsights:ConnectionString")]
     [InlineData("PoRedoImage-StorageConnectionString", "Storage:ConnectionString")]
-    public void GetKey_KnownSecret_ReturnsMappedConfigKey(string secretName, string expectedConfigKey)
+    [InlineData("Foo--Bar--Baz", "Foo:Bar:Baz")]
+    public void GetKey_SecretName_ReturnsMappedConfigKey(string secretName, string expectedConfigKey)
     {
         var secret = SecretModelFactory.KeyVaultSecret(
             SecretModelFactory.SecretProperties(name: secretName), "dummy-value");
         Assert.Equal(expectedConfigKey, _mapping.GetKey(secret));
-    }
-
-    [Fact]
-    public void GetKey_UnknownSecret_FallsBackToDoubleHyphenReplacement()
-    {
-        // For secrets not in the mapping, the fallback replaces "--" with ":"
-        var secret = SecretModelFactory.KeyVaultSecret(
-            SecretModelFactory.SecretProperties(name: "Foo--Bar--Baz"), "val");
-        Assert.Equal("Foo:Bar:Baz", _mapping.GetKey(secret));
     }
 
     [Fact]

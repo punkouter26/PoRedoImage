@@ -1,4 +1,4 @@
-﻿using PoRedoImage.Client.LocalAi;
+using PoRedoImage.Client.LocalAi;
 using PoRedoImage.Shared.Configuration;
 
 namespace PoRedoImage.Client.Models;
@@ -35,19 +35,16 @@ public static class AiServiceCatalog
         [AiCapability.AnalyzeImage] =
         [
             new(AiProviderIds.AzureComputerVision, "Azure Computer Vision", CategoryRemote, "Fastest, uses your API quota"),
-            // One call that returns a real caption AND tags. Azure CV's Caption feature is
-            // region-limited and unavailable on the configured resource, so that backend always
-            // falls back to joining its top tags — a keyword list, not a description. See
-            // OpenAiVisionService.
             new(AiProviderIds.AzureOpenAiVision, "Azure OpenAI vision", CategoryRemote, "Best descriptions, one call"),
+            new(AiProviderIds.GeminiVision, "Google Gemini Vision", CategoryRemote, "Multimodal flash, ~$0.0003"),
             BrowserOption(AiProviderIds.BrowserFlorence2, LocalCapability.Vision),
             new(AiProviderIds.OllamaVision, "Ollama", CategoryOllama, "Local service, dev only"),
         ],
 
         [AiCapability.GenerateImage] =
         [
-            // Google is the only image-generation provider; HuggingFace was removed in 2026-08.
-            new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image (only)"),
+            new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image"),
+            new(AiProviderIds.GeminiImagen3Fast, "Gemini Imagen 3 Fast", CategoryRemote, "Google fast tier, ~$0.020/image"),
         ],
 
         // Browser-local enhancement is implemented now: the client writes the image-generation

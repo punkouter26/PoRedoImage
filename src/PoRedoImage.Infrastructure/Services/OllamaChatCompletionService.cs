@@ -47,10 +47,13 @@ public sealed class OllamaChatCompletionService(
     /// </summary>
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Model);
 
+    private bool IsOpenAiFormat =>
+        string.Equals(configuration[ConfigKeys.OllamaApiFormat], "openai", StringComparison.OrdinalIgnoreCase)
+        || configuration[ConfigKeys.OllamaEndpoint]?.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) == true;
+
     [UnconditionalSuppressMessage("Trimming", "IL2026",
-        Justification = "The outbound body is an anonymous type shaped to Ollama's exact contract, "
-                      + "which System.Text.Json source generation cannot describe. Mirrors the "
-                      + "identical suppression in OllamaVisionService; this host is never trimmed.")]
+        Justification = "The outbound body is an anonymous type shaped to the local daemon's contract, "
+                      + "which System.Text.Json source generation cannot describe. Mirrors OllamaVisionService.")]
     public async Task<ChatCompletionResult> CompleteAsync(
         string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
     {
@@ -64,44 +67,191 @@ public sealed class OllamaChatCompletionService(
                 + "if the daemon is not on its default address).");
 
         var start = Stopwatch.GetTimestamp();
-
-        object userMessage = image is null
-            ? new { role = "user", content = userPrompt }
-            : new { role = "user", content = userPrompt, images = new[] { Convert.ToBase64String(image) } };
-
-        var payload = new
-        {
-            model,
-            stream = false,
-            messages = new object[]
-            {
-                new { role = "system", content = systemPrompt },
-                userMessage,
-            },
-        };
-
         var client = httpClientFactory.CreateClient("Ollama");
-        using var response = await client.PostAsJsonAsync("/api/chat", payload, ct);
-        response.EnsureSuccessStatusCode();
 
-        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        string content;
+        int tokens = 0;
 
-        var content = doc.RootElement.TryGetProperty("message", out var message)
-            && message.TryGetProperty("content", out var text)
-                ? text.GetString()?.Trim() ?? string.Empty
-                : string.Empty;
+        if (IsOpenAiFormat)
+        {
+            object userMessage = image is null
+                ? new { role = "user", content = userPrompt }
+                : new
+                {
+                    role = "user",
+                    content = new object[]
+                    {
+                        new { type = "text", text = userPrompt },
+                        new { type = "image_url", image_url = new { url = $"data:image/jpeg;base64,{Convert.ToBase64String(image)}" } }
+                    }
+                };
 
-        // Ollama reports prompt/completion counts separately and omits them on some builds.
-        var tokens =
-            (doc.RootElement.TryGetProperty("prompt_eval_count", out var p) ? p.GetInt32() : 0)
-            + (doc.RootElement.TryGetProperty("eval_count", out var e) ? e.GetInt32() : 0);
+            var payload = new
+            {
+                model,
+                stream = false,
+                messages = new object[]
+                {
+                    new { role = "system", content = systemPrompt },
+                    userMessage,
+                },
+            };
+
+            using var response = await client.PostAsJsonAsync("/v1/chat/completions", payload, ct);
+            response.EnsureSuccessStatusCode();
+
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            content = doc.RootElement.TryGetProperty("choices", out var choices)
+                && choices.GetArrayLength() > 0
+                && choices[0].TryGetProperty("message", out var msg)
+                && msg.TryGetProperty("content", out var text)
+                    ? text.GetString()?.Trim() ?? string.Empty
+                    : string.Empty;
+
+            if (doc.RootElement.TryGetProperty("usage", out var usage))
+            {
+                tokens = usage.TryGetProperty("total_tokens", out var t) ? t.GetInt32() : 0;
+            }
+        }
+        else
+        {
+            object userMessage = image is null
+                ? new { role = "user", content = userPrompt }
+                : new { role = "user", content = userPrompt, images = new[] { Convert.ToBase64String(image) } };
+
+            var payload = new
+            {
+                model,
+                stream = false,
+                messages = new object[]
+                {
+                    new { role = "system", content = systemPrompt },
+                    userMessage,
+                },
+            };
+
+            using var response = await client.PostAsJsonAsync("/api/chat", payload, ct);
+            response.EnsureSuccessStatusCode();
+
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+
+            content = doc.RootElement.TryGetProperty("message", out var message)
+                && message.TryGetProperty("content", out var text)
+                    ? text.GetString()?.Trim() ?? string.Empty
+                    : string.Empty;
+
+            tokens =
+                (doc.RootElement.TryGetProperty("prompt_eval_count", out var p) ? p.GetInt32() : 0)
+                + (doc.RootElement.TryGetProperty("eval_count", out var e) ? e.GetInt32() : 0);
+        }
 
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
 
         logger.LogInformation(
-            "Ollama chat completion finished in {Elapsed}ms. Model={Model}, Tokens={Tokens}, Image={HasImage}",
+            "Ollama/Local chat completion finished in {Elapsed}ms. Model={Model}, Tokens={Tokens}, Image={HasImage}",
             elapsed, model, tokens, image is not null);
 
         return new ChatCompletionResult(content, tokens, elapsed);
+    }
+
+    [UnconditionalSuppressMessage("Trimming", "IL2026",
+        Justification = "Anonymous types for local streaming API payload.")]
+    public async IAsyncEnumerable<string> StreamCompleteAsync(
+        string systemPrompt,
+        string userPrompt,
+        byte[]? image = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userPrompt);
+
+        var model = Model;
+        if (string.IsNullOrWhiteSpace(model))
+            throw new InvalidOperationException("Ollama chat completion is not configured.");
+
+        var client = httpClientFactory.CreateClient("Ollama");
+
+        if (IsOpenAiFormat)
+        {
+            var payload = new
+            {
+                model,
+                stream = true,
+                messages = new object[]
+                {
+                    new { role = "system", content = systemPrompt },
+                    new { role = "user", content = userPrompt }
+                }
+            };
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions")
+            {
+                Content = JsonContent.Create(payload)
+            };
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+
+            using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+
+            while (await reader.ReadLineAsync(ct).ConfigureAwait(false) is { } line)
+            {
+                if (ct.IsCancellationRequested) break;
+                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: ", StringComparison.Ordinal)) continue;
+                var json = line[6..].Trim();
+                if (json == "[DONE]") break;
+
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                {
+                    var delta = choices[0].GetProperty("delta");
+                    if (delta.TryGetProperty("content", out var c) && c.GetString() is { Length: > 0 } str)
+                    {
+                        yield return str;
+                    }
+                }
+            }
+        }
+        else
+        {
+            object userMessage = image is null
+                ? new { role = "user", content = userPrompt }
+                : new { role = "user", content = userPrompt, images = new[] { Convert.ToBase64String(image) } };
+
+            var payload = new
+            {
+                model,
+                stream = true,
+                messages = new object[]
+                {
+                    new { role = "system", content = systemPrompt },
+                    userMessage,
+                },
+            };
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
+            {
+                Content = JsonContent.Create(payload)
+            };
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+
+            while (await reader.ReadLineAsync(ct).ConfigureAwait(false) is { } line)
+            {
+                if (ct.IsCancellationRequested) break;
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                using var doc = JsonDocument.Parse(line);
+                if (doc.RootElement.TryGetProperty("message", out var msg)
+                    && msg.TryGetProperty("content", out var c)
+                    && c.GetString() is { Length: > 0 } str)
+                {
+                    yield return str;
+                }
+            }
+        }
     }
 }

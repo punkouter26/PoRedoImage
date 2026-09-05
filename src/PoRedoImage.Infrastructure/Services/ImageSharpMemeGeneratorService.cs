@@ -39,7 +39,7 @@ public sealed class ImageSharpMemeGeneratorService : IMemeGeneratorService
                     DrawMemeText(ctx, bottomText.ToUpperInvariant(), image.Width, image.Height, isTop: false);
             });
             using var outputStream = new MemoryStream();
-            image.Save(outputStream, new PngEncoder());
+            image.Save(outputStream, new PngEncoder { CompressionLevel = PngCompressionLevel.BestSpeed });
             return outputStream.ToArray();
         }, ct);
 

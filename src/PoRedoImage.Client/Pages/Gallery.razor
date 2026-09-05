@@ -1,0 +1,467 @@
+@page "/gallery"
+@attribute [Authorize]
+@using PoRedoImage.Domain.Entities
+@using PoRedoImage.Shared.DTOs
+@using PoRedoImage.Client.Shared
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ImageSessionService SessionService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<Gallery> Logger
+
+<PageTitle>Gallery & Asset Manager — PoRedoImage</PageTitle>
+
+<div class="gallery-page p-3 p-md-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1 text-light"><i class="bi bi-images me-2 text-warning"></i>Gallery & Asset Manager</h1>
+            <p class="text-muted small mb-0">Browse, organize, chain, and batch-export your studio creations.</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <button class="flap-btn flap-btn--sm" @onclick="LoadGalleryAsync" disabled="@_loading" title="Refresh gallery">
+                <i class="bi bi-arrow-clockwise me-1 @(_loading ? "spin" : "")"></i>Refresh
+            </button>
+            <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="@(() => Nav.NavigateTo("/"))">
+                <i class="bi bi-plus-lg me-1"></i>New Creation
+            </button>
+        </div>
+    </div>
+
+    @* ── Filter & Search Toolbar ────────────────────────────────────── *@
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-secondary border-secondary text-light"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control bg-dark border-secondary text-light"
+                               placeholder="Search by file name or AI tag..."
+                               @bind="_searchQuery" @bind:event="oninput" />
+                        @if (!string.IsNullOrWhiteSpace(_searchQuery))
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="@(() => _searchQuery = string.Empty)">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+                    <div class="d-flex gap-1 flex-wrap justify-content-md-end">
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == null ? "flap-btn--active" : "")"
+                                @onclick="@(() => _selectedKind = null)">
+                            All (@_images.Count)
+                        </button>
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Original ? "flap-btn--active" : "")"
+                                @onclick="@(() => _selectedKind = UserImageKind.Original)">
+                            <i class="bi bi-camera me-1"></i>Originals (@CountFor(UserImageKind.Original))
+                        </button>
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Regeneration ? "flap-btn--active" : "")"
+                                @onclick="@(() => _selectedKind = UserImageKind.Regeneration)">
+                            <i class="bi bi-palette2 me-1"></i>Regen (@CountFor(UserImageKind.Regeneration))
+                        </button>
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Meme ? "flap-btn--active" : "")"
+                                @onclick="@(() => _selectedKind = UserImageKind.Meme)">
+                            <i class="bi bi-chat-square-text me-1"></i>Memes (@CountFor(UserImageKind.Meme))
+                        </button>
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.BulkVariation ? "flap-btn--active" : "")"
+                                @onclick="@(() => _selectedKind = UserImageKind.BulkVariation)">
+                            <i class="bi bi-grid-3x3 me-1"></i>Bulk (@CountFor(UserImageKind.BulkVariation))
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            @* Batch action bar *@
+            @if (_selectedIds.Count > 0)
+            {
+                <div class="d-flex align-items-center justify-content-between mt-3 pt-2 border-top border-secondary flex-wrap gap-2">
+                    <div class="small text-warning">
+                        <i class="bi bi-check-square me-1"></i><strong>@_selectedIds.Count</strong> image(s) selected
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="flap-btn flap-btn--sm" @onclick="DownloadSelectedZipAsync" disabled="@_batchWorking">
+                            <i class="bi bi-file-earmark-zip me-1"></i>Download ZIP (@_selectedIds.Count)
+                        </button>
+                        <button class="flap-btn flap-btn--sm text-danger" @onclick="DeleteSelectedAsync" disabled="@_batchWorking">
+                            <i class="bi bi-trash me-1"></i>Delete Selected
+                        </button>
+                        <button class="flap-btn flap-btn--sm" @onclick="@(() => _selectedIds.Clear())">
+                            Clear Selection
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── Content Grid ─────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        <div class="row g-3">
+            @for (int i = 0; i < 6; i++)
+            {
+                <div class="col-6 col-md-4 col-lg-3">
+                    <div class="card bg-dark border-secondary h-100 p-2 text-center" style="min-height: 240px;">
+                        <div class="spinner-border text-warning m-auto" role="status"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-danger d-flex align-items-center" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+            <div>
+                <strong>Error loading gallery:</strong> @_loadError
+                <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadGalleryAsync">Retry</button>
+            </div>
+        </div>
+    }
+    else if (FilteredImages.Count == 0)
+    {
+        <div class="text-center py-5 border border-dashed border-secondary rounded p-4">
+            <i class="bi bi-images text-muted fs-1 mb-2 d-block"></i>
+            <h4 class="text-light">No images found</h4>
+            <p class="text-muted small">
+                @if (!string.IsNullOrWhiteSpace(_searchQuery) || _selectedKind != null)
+                {
+                    <span>No items match your active search or filter. Try clearing them.</span>
+                }
+                else
+                {
+                    <span>Your studio gallery is empty. Upload and transform a photo to get started!</span>
+                }
+            </p>
+            <button class="flap-btn flap-btn--primary mt-2" @onclick="@(() => Nav.NavigateTo("/"))">
+                Go to Studio
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+            <div class="small text-muted">Showing <strong>@FilteredImages.Count</strong> item(s)</div>
+            <button class="btn btn-link btn-sm text-secondary text-decoration-none p-0" @onclick="ToggleSelectAll">
+                <i class="bi @(_selectedIds.Count == FilteredImages.Count ? "bi-check-square-fill" : "bi-square") me-1"></i>
+                @(_selectedIds.Count == FilteredImages.Count ? "Deselect All" : "Select All")
+            </button>
+        </div>
+
+        <div class="row g-3">
+            @foreach (var img in FilteredImages)
+            {
+                var isSelected = _selectedIds.Contains(img.Id);
+                <div class="col-6 col-md-4 col-lg-3">
+                    <div class="card bg-dark border-secondary h-100 gallery-card @(isSelected ? "border-warning" : "")">
+                        <div class="position-relative gallery-card__thumb-wrapper">
+                            <img src="@img.ImageUrl" alt="@img.FileName" class="card-img-top gallery-card__img" loading="lazy" />
+                            <span class="badge position-absolute top-0 start-0 m-2 @KindBadgeClass(img.Kind)">
+                                <i class="bi @KindIcon(img.Kind) me-1"></i>@img.Kind
+                            </span>
+                            <div class="form-check position-absolute top-0 end-0 m-2">
+                                <input class="form-check-input" type="checkbox" checked="@isSelected"
+                                       @onchange="@(() => ToggleSelect(img.Id))" />
+                            </div>
+                        </div>
+
+                        <div class="card-body p-2 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="small text-light text-truncate fw-semibold" title="@img.FileName">
+                                    @img.FileName
+                                </div>
+                                <div class="text-muted extra-small d-flex justify-content-between mt-1">
+                                    <span>@img.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</span>
+                                    <span>@FormatSize(img.SizeBytes)</span>
+                                </div>
+
+                                @if (img.Tags?.Count > 0)
+                                {
+                                    <div class="mt-2 d-flex flex-wrap gap-1" style="max-height: 48px; overflow: hidden;">
+                                        @foreach (var tag in img.Tags.Take(4))
+                                        {
+                                            <span class="badge bg-secondary extra-small cursor-pointer"
+                                                  @onclick="@(() => _searchQuery = tag)" title="Filter by tag: @tag">
+                                                #@tag
+                                            </span>
+                                        }
+                                        @if (img.Tags.Count > 4)
+                                        {
+                                            <span class="badge bg-dark border border-secondary extra-small">+@(img.Tags.Count - 4)</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="gallery-card__actions mt-3 pt-2 border-top border-secondary d-flex justify-content-between align-items-center">
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-secondary btn-sm" title="View full size"
+                                            @onclick="@(() => OpenLightboxAsync(img))">
+                                        <i class="bi bi-arrows-fullscreen"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" title="Use as session input"
+                                            @onclick="@(() => UseAsInput(img))">
+                                        <i class="bi bi-arrow-right-circle text-warning"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" title="Copy to clipboard"
+                                            @onclick="@(() => CopyToClipboardAsync(img.ImageUrl))">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
+                                <button class="btn btn-outline-danger btn-sm" title="Delete image"
+                                        disabled="@(_deletingId == img.Id)"
+                                        @onclick="@(() => DeleteSingleAsync(img))">
+                                    <i class="bi @(_deletingId == img.Id ? "bi-hourglass-split" : "bi-trash")"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .extra-small { font-size: 0.72rem; }
+    .gallery-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+    .gallery-card:hover { transform: translateY(-2px); }
+    .gallery-card__thumb-wrapper { height: 180px; overflow: hidden; background: #111; display: flex; align-items: center; justify-content: center; }
+    .gallery-card__img { width: 100%; height: 100%; object-fit: cover; }
+    .cursor-pointer { cursor: pointer; }
+    .spin { animation: spin 1s linear infinite; }
+    @@keyframes spin { 100% { transform: rotate(360deg); } }
+</style>
+
+@code {
+    private bool _loading = true;
+    private string? _loadError;
+    private List<UserImageDto> _images = new();
+    private string _searchQuery = string.Empty;
+    private UserImageKind? _selectedKind;
+    private HashSet<string> _selectedIds = new();
+    private string? _deletingId;
+    private bool _batchWorking;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGalleryAsync();
+    }
+
+    private async Task LoadGalleryAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<List<UserImageDto>>("/api/user-images");
+            _images = res?.OrderByDescending(x => x.CreatedAt).ToList() ?? new List<UserImageDto>();
+            _selectedIds.Clear();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load gallery");
+            _loadError = "Could not connect to the storage service. Ensure backend services are running.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private List<UserImageDto> FilteredImages
+    {
+        get
+        {
+            var q = _images.AsEnumerable();
+            if (_selectedKind.HasValue)
+            {
+                q = q.Where(x => x.Kind == _selectedKind.Value);
+            }
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                var query = _searchQuery.Trim().ToLowerInvariant();
+                q = q.Where(x =>
+                    (x.FileName?.ToLowerInvariant().Contains(query) ?? false) ||
+                    (x.Tags != null && x.Tags.Any(t => t.ToLowerInvariant().Contains(query))));
+            }
+            return q.ToList();
+        }
+    }
+
+    private int CountFor(UserImageKind kind) => _images.Count(x => x.Kind == kind);
+
+    private void ToggleSelect(string id)
+    {
+        if (!_selectedIds.Add(id))
+            _selectedIds.Remove(id);
+    }
+
+    private void ToggleSelectAll()
+    {
+        var currentFiltered = FilteredImages;
+        if (_selectedIds.Count == currentFiltered.Count)
+        {
+            _selectedIds.Clear();
+        }
+        else
+        {
+            _selectedIds = new HashSet<string>(currentFiltered.Select(x => x.Id));
+        }
+    }
+
+    private async Task OpenLightboxAsync(UserImageDto item)
+    {
+        var galleryItem = new MyImagesGallery.GalleryItem(
+            item.Id,
+            item.FileName,
+            item.ContentType,
+            item.Kind,
+            item.CreatedAt,
+            item.SizeBytes,
+            item.ImageUrl,
+            item.Tags ?? Array.Empty<string>());
+
+        var choice = await DialogService.OpenAsync<GalleryLightbox>(
+            item.FileName,
+            new Dictionary<string, object>
+            {
+                ["Item"] = galleryItem,
+                ["IconClass"] = KindIcon(item.Kind)
+            },
+            new DialogOptions
+            {
+                CloseDialogOnOverlayClick = true,
+                ShowClose = true,
+                CssClass = "gallery-lightbox"
+            });
+
+        if (choice is GalleryLightbox.LightboxResult.Use)
+        {
+            UseAsInput(item);
+        }
+        else if (choice is GalleryLightbox.LightboxResult.Download)
+        {
+            await JS.InvokeAsync<bool>("downloadImage", item.ImageUrl, item.FileName);
+        }
+    }
+
+    private void UseAsInput(UserImageDto item)
+    {
+        SessionService.SetImage(item.ImageUrl, item.ContentType, item.FileName);
+        NotificationService.Notify(NotificationSeverity.Info, "Session Image Set",
+            $"Loaded {item.FileName} as active session image.", duration: 3000);
+        Nav.NavigateTo("/");
+    }
+
+    private async Task CopyToClipboardAsync(string url)
+    {
+        var outcome = await JS.InvokeAsync<string>("poUx.copyImageToClipboard", url);
+        if (outcome == "copied")
+            NotificationService.Notify(NotificationSeverity.Success, "Copied", "Image copied to clipboard.", duration: 2500);
+        else
+            NotificationService.Notify(NotificationSeverity.Warning, "Unavailable", "Clipboard copy failed or unsupported in this browser.", duration: 3000);
+    }
+
+    private async Task DeleteSingleAsync(UserImageDto item)
+    {
+        _deletingId = item.Id;
+        try
+        {
+            var res = await Http.DeleteAsync($"/api/user-images/{item.Id}");
+            if (res.IsSuccessStatusCode)
+            {
+                _images.RemoveAll(x => x.Id == item.Id);
+                _selectedIds.Remove(item.Id);
+                NotificationService.Notify(NotificationSeverity.Success, "Deleted", $"Removed {item.FileName}", duration: 2500);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Delete failed", "Could not delete image from gallery.", duration: 3500);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete image {Id}", item.Id);
+        }
+        finally
+        {
+            _deletingId = null;
+        }
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (_selectedIds.Count == 0 || _batchWorking) return;
+        _batchWorking = true;
+        int deleted = 0;
+        var toDelete = _selectedIds.ToList();
+        foreach (var id in toDelete)
+        {
+            try
+            {
+                var res = await Http.DeleteAsync($"/api/user-images/{id}");
+                if (res.IsSuccessStatusCode)
+                {
+                    _images.RemoveAll(x => x.Id == id);
+                    _selectedIds.Remove(id);
+                    deleted++;
+                }
+            }
+            catch { /* proceed with batch */ }
+        }
+        _batchWorking = false;
+        NotificationService.Notify(NotificationSeverity.Info, "Batch Delete", $"Deleted {deleted} image(s).", duration: 3000);
+    }
+
+    private async Task DownloadSelectedZipAsync()
+    {
+        if (_selectedIds.Count == 0 || _batchWorking) return;
+        _batchWorking = true;
+        try
+        {
+            var selectedItems = _images.Where(x => _selectedIds.Contains(x.Id)).ToList();
+            var files = selectedItems.Select(x => new { name = x.FileName, url = x.ImageUrl }).ToArray();
+            var count = await JS.InvokeAsync<int>("poUx.downloadZip", files, $"poredoimage-gallery-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
+            NotificationService.Notify(NotificationSeverity.Success, "ZIP Ready", $"Archived {count} image(s). Check downloads.", duration: 3500);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to build ZIP");
+            NotificationService.Notify(NotificationSeverity.Error, "ZIP Failed", "Could not package images into ZIP.", duration: 3500);
+        }
+        finally
+        {
+            _batchWorking = false;
+        }
+    }
+
+    private static string KindIcon(UserImageKind kind) => kind switch
+    {
+        UserImageKind.Original => "bi-camera",
+        UserImageKind.Regeneration => "bi-palette2",
+        UserImageKind.Meme => "bi-chat-square-text",
+        UserImageKind.BulkVariation => "bi-grid-3x3",
+        _ => "bi-image"
+    };
+
+    private static string KindBadgeClass(UserImageKind kind) => kind switch
+    {
+        UserImageKind.Original => "bg-primary",
+        UserImageKind.Regeneration => "bg-success",
+        UserImageKind.Meme => "bg-info text-dark",
+        UserImageKind.BulkVariation => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{(bytes / 1024.0):F1} KB";
+        return $"{(bytes / (1024.0 * 1024.0)):F1} MB";
+    }
+}

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
@@ -109,20 +109,19 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         var clauseBudget = Math.Clamp(targetLength / 4, 40, 120);
 
         var prompt = $"""
+            Clause budget: at most {clauseBudget} words.
             Subject: "{description}"
             Detected elements: {string.Join(", ", tags)}
-
-            Write an image-generation prompt for this subject in at most {clauseBudget} words.
-            Comma-separated visual clauses only — subject, composition, lighting, colour, texture,
-            lens or medium. No sentences, no narration, no preamble, no "the image shows".
-            Front-load the most important visual facts.
             """;
 
         var messages = new List<ChatMessage>
         {
             new SystemChatMessage(
                 "You write prompts for image-generation models. You reply with the prompt itself and "
-                + "nothing else — no preamble, no explanation, no markdown."),
+                + "nothing else — no preamble, no explanation, no markdown. "
+                + "Comma-separated visual clauses only — subject, composition, lighting, colour, texture, "
+                + "lens or medium. No sentences, no narration, no preamble, no \"the image shows\". "
+                + "Front-load the most important visual facts."),
             new UserChatMessage(prompt)
         };
 
@@ -174,18 +173,22 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         _logger.MemeCaptionStarting(tags.Count);
         var start = Stopwatch.GetTimestamp();
 
-        var prompt = $$"""
-            Create a funny meme caption for an image with these elements: {{string.Join(", ", tags)}}
+        var systemInstruction =
+            "You are a meme caption generator. "
+            + "Respond in JSON format: {\"topText\": \"TOP CAPTION\", \"bottomText\": \"BOTTOM CAPTION\"}. "
+            + "Keep captions short (3-7 words each). Make it humorous and relatable."
+            + MemeGuardrail;
 
-            Respond in JSON format:
-            {"topText": "TOP CAPTION", "bottomText": "BOTTOM CAPTION"}
+        var userPrompt = $"Create a funny meme caption for an image with these elements: {string.Join(", ", tags)}";
 
-            Keep captions short (3-7 words each). Make it humorous and relatable.
-            {{MemeGuardrail}}
-            """;
+        var options = new ChatCompletionOptions
+        {
+            ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat()
+        };
 
         var response = await _chatClient.CompleteChatAsync(
-            [new SystemChatMessage("You are a meme caption generator." + MemeGuardrail), new UserChatMessage(prompt)],
+            [new SystemChatMessage(systemInstruction), new UserChatMessage(userPrompt)],
+            options,
             cancellationToken: ct);
 
         if (response.Value.Content.Count == 0)

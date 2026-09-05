@@ -212,6 +212,142 @@ window.poRoast = (function () {
         ctx.textAlign = 'left';
     }
 
+    function drawMemeRoastFrame(ctx, img, lines, idx, progress, meta, t) {
+        ctx.save();
+        t = t || 0;
+
+        // Beat pulse (~120 BPM)
+        const beat = Math.sin(t * 7.5);
+        const isPunchline = idx >= 0 && (idx % 2 === 1 || idx === lines.length - 1);
+
+        // Shake effect on punchlines
+        let shakeX = 0, shakeY = 0;
+        if (isPunchline && Math.abs(beat) > 0.3) {
+            shakeX = (Math.random() - 0.5) * 14;
+            shakeY = (Math.random() - 0.5) * 14;
+        }
+
+        // Background: energetic dark gradient with warm underglow
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, CARD);
+        bgGrad.addColorStop(0, '#0a0000');
+        bgGrad.addColorStop(0.6, '#150606');
+        bgGrad.addColorStop(1, isPunchline ? '#350a00' : '#1a0505');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, CARD, CARD);
+
+        // Dynamic Photo Cell
+        const cellW = CARD - PAD * 2;
+        const photoH = 550;
+        const photoCenterX = PAD + cellW / 2;
+        const photoCenterY = PAD + photoH / 2;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(PAD + shakeX, PAD + shakeY, cellW, photoH);
+        ctx.clip();
+
+        ctx.fillStyle = '#111';
+        ctx.fillRect(PAD + shakeX, PAD + shakeY, cellW, photoH);
+
+        if (img && img.naturalWidth) {
+            // Punch zoom: on punchlines, zoom in directly on the face
+            let zoom = 1.05 + 0.05 * Math.max(0, beat);
+            if (isPunchline) {
+                zoom = 1.35 + 0.08 * Math.sin(t * 10);
+            }
+
+            const baseScale = Math.max(cellW / img.naturalWidth, photoH / img.naturalHeight);
+            const w = img.naturalWidth * baseScale * zoom;
+            const h = img.naturalHeight * baseScale * zoom;
+
+            ctx.drawImage(img, photoCenterX + shakeX - w / 2, photoCenterY + shakeY - h / 2, w, h);
+        }
+
+        // Red vignette flash on punchlines
+        if (isPunchline) {
+            const radGrad = ctx.createRadialGradient(photoCenterX, photoCenterY, photoH * 0.25, photoCenterX, photoCenterY, photoH * 0.75);
+            radGrad.addColorStop(0, 'rgba(255, 0, 0, 0)');
+            radGrad.addColorStop(1, 'rgba(255, 20, 0, 0.4)');
+            ctx.fillStyle = radGrad;
+            ctx.fillRect(PAD, PAD, cellW, photoH);
+        }
+
+        // "ROASTED!" stamp on punchlines
+        if (isPunchline) {
+            ctx.save();
+            ctx.translate(PAD + 150 + shakeX, PAD + 130 + shakeY);
+            ctx.rotate(-14 * Math.PI / 180);
+            ctx.strokeStyle = '#FF2200';
+            ctx.lineWidth = 6;
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+            ctx.fillRect(-110, -36, 220, 72);
+            ctx.strokeRect(-110, -36, 220, 72);
+            ctx.font = '900 40px "Impact", "Archivo Narrow", sans-serif';
+            ctx.fillStyle = '#FF3300';
+            ctx.textAlign = 'center';
+            ctx.fillText('🔥 ROASTED!', 0, 14);
+            ctx.restore();
+        }
+
+        // Reaction badge
+        ctx.save();
+        ctx.font = '36px sans-serif';
+        ctx.fillText(isPunchline ? '💀 🤡' : '🎯', PAD + cellW - 90, PAD + 50);
+        ctx.restore();
+
+        ctx.restore(); // end photo clip
+
+        // Gold/Fire Border around photo
+        ctx.strokeStyle = isPunchline ? '#FF3300' : '#FFB400';
+        ctx.lineWidth = isPunchline ? 4 : 2;
+        ctx.strokeRect(PAD + shakeX, PAD + shakeY, cellW, photoH);
+
+        // ── Lower Third: Viral Meme Typography ──
+        const sung = lines.filter(function (l) { return !l.isSection; });
+        const activeLine = idx >= 0 && lines[idx] ? lines[idx] : (sung[0] || null);
+
+        const textY = PAD + photoH + 68;
+        ctx.textAlign = 'center';
+        const textCenterX = CARD / 2;
+
+        ctx.font = '700 22px "Archivo Narrow", sans-serif';
+        ctx.fillStyle = '#FFB400';
+        ctx.fillText('RAP ROAST · MEME CUT 🎤', textCenterX, textY);
+
+        if (activeLine) {
+            const textLines = wrap(ctx, activeLine.text, cellW - 32, 2);
+            let currY = textY + 54;
+            for (const lineStr of textLines) {
+                ctx.font = '900 44px "Impact", "Archivo Narrow", sans-serif';
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 8;
+                ctx.strokeText(lineStr, textCenterX, currY);
+                ctx.fillStyle = isPunchline ? '#FFF000' : '#FFFFFF';
+                ctx.fillText(lineStr, textCenterX, currY);
+                currY += 52;
+            }
+        }
+
+        // Footer progress & metadata
+        ctx.font = '600 22px "Archivo Narrow", sans-serif';
+        ctx.fillStyle = '#868C95';
+        ctx.textAlign = 'left';
+        ctx.fillText('PoRedoImage Video Roast', PAD, CARD - PAD - 20);
+        ctx.textAlign = 'right';
+        ctx.fillText(meta || '', CARD - PAD, CARD - PAD - 20);
+
+        // Fire progress bar
+        ctx.fillStyle = '#1B1B1E';
+        ctx.fillRect(PAD, CARD - PAD, cellW, 6);
+        const fireGrad = ctx.createLinearGradient(PAD, 0, PAD + cellW, 0);
+        fireGrad.addColorStop(0, '#FFB400');
+        fireGrad.addColorStop(1, '#FF3300');
+        ctx.fillStyle = fireGrad;
+        ctx.fillRect(PAD, CARD - PAD, cellW * Math.min(1, Math.max(0, progress)), 6);
+
+        ctx.restore();
+    }
+
     async function buildCanvas() {
         // Canvas text falls back to a system face if the webfont has not landed yet, which would
         // silently produce a card in the wrong typeface.
@@ -334,7 +470,7 @@ window.poRoast = (function () {
          * Always available: it needs nothing beyond a 2D canvas, which is why it is the fallback
          * wherever recording is not supported.
          */
-        exportCard: async function (imageUrl, lines, activeIndex, meta, fileName) {
+        exportCard: async function (imageUrl, lines, activeIndex, meta, fileName, mode) {
             try {
                 // -1 means "whatever bar is lit right now". The karaoke session owns that number —
                 // asking .NET for it would need a second interop hop to learn something this side
@@ -343,7 +479,11 @@ window.poRoast = (function () {
                 const canvas = await buildCanvas();
                 const ctx = canvas.getContext('2d');
                 const img = await loadImage(imageUrl);
-                drawFrame(ctx, img, lines || [], activeIndex, 0, meta);
+                if (mode === 'memeRoast') {
+                    drawMemeRoastFrame(ctx, img, lines || [], activeIndex, 0, meta, 2.0);
+                } else {
+                    drawFrame(ctx, img, lines || [], activeIndex, 0, meta);
+                }
                 const blob = await new Promise(function (r) { canvas.toBlob(r, 'image/png'); });
                 if (!blob) return 'failed';
                 downloadBlob(blob, fileName || 'rap-roast-card.png');
@@ -355,10 +495,9 @@ window.poRoast = (function () {
 
         /**
          * Records the animated card with the track's own audio, in real time, and saves the file.
-         * Real time is not a shortcut — MediaRecorder captures a live stream, so a 30-second clip
-         * takes 30 seconds. Progress is reported to .NET so the page can say so honestly.
+         * Supports 'standard' (classic stage) and 'memeRoast' (funny animated video roast mocking the photo).
          */
-        exportVideo: async function (audio, dotNetRef, imageUrl, lines, meta, fileName) {
+        exportVideo: async function (audio, dotNetRef, imageUrl, lines, meta, fileName, mode) {
             if (!this.canRecord()) return 'unsupported';
             if (!audio || !isUsableDuration(audio.duration)) return 'failed';
 
@@ -409,7 +548,11 @@ window.poRoast = (function () {
                         if (t >= l.start && t < l.end) { idx = i; break; }
                         if (t >= l.end) idx = i;
                     }
-                    drawFrame(ctx, img, timed, idx, t / duration, meta);
+                    if (mode === 'memeRoast') {
+                        drawMemeRoastFrame(ctx, img, timed, idx, t / duration, meta, t);
+                    } else {
+                        drawFrame(ctx, img, timed, idx, t / duration, meta);
+                    }
                     if (dotNetRef) {
                         dotNetRef.invokeMethodAsync('OnExportProgress', Math.round((t / duration) * 100))
                             .catch(function () { /* component disposed mid-record — keep recording */ });

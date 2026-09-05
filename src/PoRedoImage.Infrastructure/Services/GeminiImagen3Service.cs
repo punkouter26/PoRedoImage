@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -22,12 +22,18 @@ public sealed class GeminiImagen3Service : IImageGenerationService
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration[ConfigKeys.GoogleApiKey]);
 
-    public GeminiImagen3Service(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<GeminiImagen3Service> logger)
+    public GeminiImagen3Service(
+        IConfiguration configuration,
+        IHttpClientFactory httpClientFactory,
+        ILogger<GeminiImagen3Service> logger,
+        string? modelOverride = null)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
-        _model = configuration[ConfigKeys.GoogleImagen3Model] ?? "gemini-2.0-flash-exp-image-generation";
+        _model = modelOverride
+            ?? configuration[ConfigKeys.GoogleImagen3Model]
+            ?? "gemini-2.0-flash-exp-image-generation";
 
         // Defense-in-depth budget guardrail. The MockAiDelegatingHandler sits on the GeminiApi
         // named HttpClient and would also block this path, but failing here at construction
@@ -193,10 +199,8 @@ public sealed class GeminiImagen3Service : IImageGenerationService
             throw new InvalidOperationException($"Gemini API returned {(int)response.StatusCode}: {errorBody}");
         }
 
-        var rawJson = await response.Content.ReadAsStringAsync(ct);
-        _logger.GeminiRawResponse(rawJson);
-
-        using var json = JsonDocument.Parse(rawJson);
+        using var responseStream = await response.Content.ReadAsStreamAsync(ct);
+        using var json = await JsonDocument.ParseAsync(responseStream, cancellationToken: ct);
 
         // Surface API-level errors (e.g., INVALID_ARGUMENT, permission) before walking candidates.
         if (json.RootElement.TryGetProperty("error", out var apiError))

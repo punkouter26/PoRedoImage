@@ -1,0 +1,105 @@
+@using PoRedoImage.Client.Models
+
+<div class="style-recipe-drawer card bg-dark border-secondary mb-3">
+    <div class="card-header bg-dark border-secondary py-2 px-3 d-flex justify-content-between align-items-center cursor-pointer"
+         @onclick="@(() => _expanded = !_expanded)">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-magic text-warning fs-5"></i>
+            <span class="fw-semibold text-light">Curated Style Recipes</span>
+            <span class="badge bg-secondary extra-small">@(StyleRecipeCatalog.All.Count) styles</span>
+            @if (_selectedRecipe != null)
+            {
+                <span class="badge bg-warning text-dark extra-small ms-2">
+                    <i class="bi @(_selectedRecipe.Icon) me-1"></i>Active: @_selectedRecipe.Title
+                </span>
+            }
+        </div>
+        <div class="text-muted small">
+            <span>@(_expanded ? "Hide Recipes" : "Browse Recipes")</span>
+            <i class="bi @(_expanded ? "bi-chevron-up" : "bi-chevron-down") ms-1"></i>
+        </div>
+    </div>
+
+    @if (_expanded)
+    {
+        <div class="card-body p-3">
+            @* Category Pills *@
+            <div class="d-flex gap-1 flex-wrap mb-3">
+                @foreach (var cat in StyleRecipeCatalog.Categories)
+                {
+                    <button type="button" class="flap-btn flap-btn--sm @(_activeCategory == cat ? "flap-btn--active" : "")"
+                            @onclick="@(() => _activeCategory = cat)">
+                        @cat
+                    </button>
+                }
+            </div>
+
+            @* Recipe Grid *@
+            <div class="row g-2" style="max-height: 380px; overflow-y: auto;">
+                @foreach (var recipe in FilteredRecipes)
+                {
+                    var isCurrent = _selectedRecipe?.Id == recipe.Id;
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card bg-dark h-100 p-2 recipe-card @(isCurrent ? "border-warning bg-black" : "border-secondary")"
+                             @onclick="@(() => SelectRecipe(recipe))">
+                            <div class="d-flex align-items-start gap-2">
+                                <span class="recipe-icon p-2 rounded bg-secondary text-warning">
+                                    <i class="bi @recipe.Icon fs-5"></i>
+                                </span>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="fw-semibold text-light text-truncate small">@recipe.Title</div>
+                                    <div class="text-muted extra-small text-truncate">@recipe.Category</div>
+                                    <p class="text-muted extra-small mb-1 mt-1 recipe-desc">@recipe.Description</p>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-1 flex-wrap mt-auto pt-1">
+                                @foreach (var tag in recipe.Tags.Take(3))
+                                {
+                                    <span class="badge bg-dark border border-secondary text-muted extra-small">@tag</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .style-recipe-drawer { transition: border-color 0.2s; }
+    .recipe-card { cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+    .recipe-card:hover { transform: translateY(-2px); border-color: var(--bs-warning) !important; }
+    .recipe-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
+    .recipe-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+    .cursor-pointer { cursor: pointer; }
+    .extra-small { font-size: 0.72rem; }
+</style>
+
+@code {
+    [Parameter] public EventCallback<StyleRecipe> OnRecipeSelected { get; set; }
+    [Parameter] public string? CurrentRecipeId { get; set; }
+
+    private bool _expanded = false;
+    private string _activeCategory = "All";
+    private StyleRecipe? _selectedRecipe;
+
+    protected override void OnParametersSet()
+    {
+        if (CurrentRecipeId != null && _selectedRecipe?.Id != CurrentRecipeId)
+        {
+            _selectedRecipe = StyleRecipeCatalog.All.FirstOrDefault(r => r.Id == CurrentRecipeId);
+        }
+    }
+
+    private IEnumerable<StyleRecipe> FilteredRecipes =>
+        _activeCategory == "All"
+            ? StyleRecipeCatalog.All
+            : StyleRecipeCatalog.All.Where(r => r.Category == _activeCategory);
+
+    private async Task SelectRecipe(StyleRecipe recipe)
+    {
+        _selectedRecipe = recipe;
+        await OnRecipeSelected.InvokeAsync(recipe);
+    }
+}

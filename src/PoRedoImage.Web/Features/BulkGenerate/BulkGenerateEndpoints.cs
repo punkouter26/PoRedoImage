@@ -97,30 +97,6 @@ public static class BulkGenerateEndpoints
         .WithName("DescribePerson")
         .WithSummary("Describe the primary person in an image for use in art-style prompts");
 
-        // Generate a single art-style variation. Still routed through IImageGenerationRouter even
-        // though Google is the only provider: the router is where a second one would slot back in,
-        // and it already resolves the default when no modelId is supplied.
-        aiGroup.MapPost("/variation", async (BulkVariationRequest request, IImageGenerationRouter router) =>
-        {
-            if (string.IsNullOrWhiteSpace(request.ImageData))
-                return Results.BadRequest("ImageData is required.");
-            if (string.IsNullOrWhiteSpace(request.Prompt))
-                return Results.BadRequest("Prompt is required.");
-
-            ImageBytes imageBytes;
-            try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
-            catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
-
-            var imagen3 = router.Resolve(request.ImageGenModelId);
-            if (!imagen3.IsConfigured)
-                return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
-
-            var (imgData, imgCt, _) = await imagen3.GenerateImageAsync(request.Prompt, imageBytes.Bytes.ToArray());
-            return Results.Ok(new BulkVariationResponse(Convert.ToBase64String(imgData), imgCt));
-        })
-        .WithName("GenerateBulkVariation")
-        .WithSummary("Generate a single art-style variation image");
-
         // Generate every slot in one request, streaming each result the moment it lands.
         //
         // The client used to drive this with a `for` loop of one-at-a-time POSTs — ten sequential

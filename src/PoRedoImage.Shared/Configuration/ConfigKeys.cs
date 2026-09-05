@@ -1,4 +1,4 @@
-﻿namespace PoRedoImage.Shared.Configuration;
+namespace PoRedoImage.Shared.Configuration;
 
 /// <summary>
 /// Every configuration key the solution reads, in one place (§1 "Zero magic strings").
@@ -63,6 +63,8 @@ public static class ConfigKeys
     // ── Google (Gemini / Imagen) ────────────────────────────────────────
     public const string GoogleApiKey = "Google:ApiKey";
     public const string GoogleImagen3Model = "Google:Imagen3Model";
+    public const string GoogleImagen3FastModel = "Google:Imagen3FastModel";
+    public const string GoogleVisionModel = "Google:VisionModel";
 
     /// <summary>
     /// Lyria music model id. Lyria performs supplied lyrics, unlike instrumental text-to-audio
@@ -73,6 +75,7 @@ public static class ConfigKeys
     // ── Ollama (local, dev only) ────────────────────────────────────────
     public const string OllamaEndpoint = "Ollama:Endpoint";
     public const string OllamaVisionModel = "Ollama:VisionModel";
+    public const string OllamaApiFormat = "Ollama:ApiFormat";
 
     /// <summary>
     /// Names a local model for free-form reasoning. Setting it switches <c>IChatCompletionService</c>

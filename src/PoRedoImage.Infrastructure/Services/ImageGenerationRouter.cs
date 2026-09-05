@@ -12,10 +12,26 @@ namespace PoRedoImage.Infrastructure.Services;
 /// per-request model id and the indirection is where a second provider would slot back in. It had
 /// a HuggingFace branch until 2026-08; see <c>InfrastructureServiceExtensions</c> for why that went.
 /// </remarks>
-public sealed class ImageGenerationRouter(
-    IImageGenerationService gemini) : IImageGenerationRouter
+public sealed class ImageGenerationRouter : IImageGenerationRouter
 {
-    public IImageGenerationService Resolve(string? modelId) => gemini;
+    private readonly IImageGenerationService _gemini;
+    private readonly IImageGenerationService? _fastGemini;
+
+    public ImageGenerationRouter(
+        IImageGenerationService gemini,
+        IImageGenerationService? fastGemini = null)
+    {
+        _gemini = gemini;
+        _fastGemini = fastGemini;
+    }
+
+    public IImageGenerationService Resolve(string? modelId)
+    {
+        if (string.Equals(modelId, AiProviderIds.GeminiImagen3Fast, StringComparison.Ordinal) && _fastGemini is not null)
+            return _fastGemini;
+
+        return _gemini;
+    }
 }
 
 /// <summary>

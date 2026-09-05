@@ -178,17 +178,13 @@ jobs:
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --name ${{ env.AZURE_WEBAPP_NAME }} \
             --settings "${RESOLVED[@]}" --output none
-      - name: Wait for Key Vault RBAC propagation
-        # `az role assignment create` returns as soon as the CONTROL-plane assignment exists, but
-        # the Key Vault DATA-plane honours it only after Azure RBAC propagation — typically
-        # 30–90s, occasionally several minutes. If the container starts before propagation
-        # completes, the platform cannot resolve the `@Microsoft.KeyVault(...)` App Settings and
-        # the app crash-loops with 503 "Application Error" (deploy #54). This wait gives
-        # propagation a head start before the deploy-restart.
+      - name: Wait for App Service configuration update
+        # Literal App Settings rewrite step already guarantees resolved secrets on container start.
+        # Short 10s wait allows the App Service platform to stabilize configuration before deployment.
         run: |
-          echo "Waiting 75s for Key Vault RBAC data-plane propagation (role granted above)…"
-          sleep 75
-          echo "Propagation wait complete — proceeding to deploy."
+          echo "Waiting 10s for configuration stabilization…"
+          sleep 10
+          echo "Configuration wait complete — proceeding to deploy."
       - name: Ensure App Service is running
         # OneDeploy (azure/webapps-deploy@v3) returns 403 "Site Disabled" when the
         # App Service is in the Stopped state. Explicitly start it before deploy.

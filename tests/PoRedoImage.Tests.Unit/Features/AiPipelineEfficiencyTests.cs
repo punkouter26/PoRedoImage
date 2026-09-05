@@ -2,6 +2,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using PoRedoImage.Application.Features.BulkGenerate;
 using PoRedoImage.Application.Features.RapRoast;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services;
@@ -95,5 +96,61 @@ public class AiPipelineEfficiencyTests
         asCombined.Verify(c => c.AnalyzeAllAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
         vision.Verify(v => v.AnalyzeAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
         combined.Verify(c => c.GetDetailsAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Bulk_generation_retries_on_rate_limit_and_succeeds()
+    {
+        var generator = new Mock<IImageGenerationService>();
+        var attempts = 0;
+        generator.Setup(g => g.GenerateImageAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                attempts++;
+                if (attempts == 1)
+                {
+                    throw new HttpRequestException("429 Too Many Requests (RESOURCE_EXHAUSTED)");
+                }
+                return Task.FromResult((Png, "image/png", 100L));
+            });
+
+        var router = new Mock<IImageGenerationRouter>();
+        router.Setup(r => r.Resolve(It.IsAny<string?>())).Returns(generator.Object);
+
+        var sut = new BulkGenerationService(router.Object, NullLogger<BulkGenerationService>.Instance);
+        var results = new List<BulkBatchItem>();
+        await foreach (var item in sut.GenerateBatchAsync(["test prompt"], Png, null))
+        {
+            results.Add(item);
+        }
+
+        Assert.Single(results);
+        Assert.NotNull(results[0].ImageData);
+        Assert.Null(results[0].Error);
+        Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task Chat_completion_streaming_yields_expected_tokens()
+    {
+        var chat = new Mock<IChatCompletionService>();
+        static async IAsyncEnumerable<string> ProduceTokens()
+        {
+            await Task.Yield();
+            yield return "Hello";
+            yield return " ";
+            yield return "world";
+        }
+
+        chat.Setup(c => c.StreamCompleteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
+            .Returns(ProduceTokens());
+
+        var tokens = new List<string>();
+        await foreach (var token in chat.Object.StreamCompleteAsync("sys", "user"))
+        {
+            tokens.Add(token);
+        }
+
+        Assert.Equal(["Hello", " ", "world"], tokens);
     }
 }

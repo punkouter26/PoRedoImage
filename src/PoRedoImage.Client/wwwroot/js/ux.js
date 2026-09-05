@@ -214,6 +214,266 @@ window.poUx = (function () {
         },
         savePromptHistory: function (json) {
             try { localStorage.setItem('poRedoImage_promptHistory', json); } catch { /* quota — non-fatal */ }
+        },
+
+        // ── Direct Clipboard Copy ────────────────────────────────────────────
+        copyImageToClipboard: async function (url) {
+            try {
+                let blob;
+                if (url.startsWith('data:')) {
+                    const res = await fetch(url);
+                    blob = await res.blob();
+                } else {
+                    const res = await fetch(url);
+                    if (!res.ok) return 'failed';
+                    blob = await res.blob();
+                }
+                if (navigator.clipboard && window.ClipboardItem) {
+                    const png = blob.type === 'image/png' ? blob : await toPng(blob);
+                    if (png) {
+                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+                        return 'copied';
+                    }
+                }
+                return 'unsupported';
+            } catch {
+                return 'failed';
+            }
+        },
+
+        // ── Multi-format Export (PNG, JPEG, WebP) ────────────────────────────
+        exportFormatted: async function (url, format, quality, fileName) {
+            return new Promise(async function (resolve) {
+                try {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function () {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        const ctx = canvas.getContext('2d');
+                        if (format === 'jpeg') {
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        }
+                        ctx.drawImage(img, 0, 0);
+                        const mime = format === 'jpeg' ? 'image/jpeg' : (format === 'webp' ? 'image/webp' : 'image/png');
+                        canvas.toBlob(function (blob) {
+                            if (!blob) { resolve(false); return; }
+                            const ext = format === 'jpeg' ? '.jpg' : (format === 'webp' ? '.webp' : '.png');
+                            const baseName = (fileName || 'image').replace(/\.[^/.]+$/, '');
+                            const cleanName = baseName + ext;
+                            const blobUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.download = cleanName;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 4000);
+                            resolve(true);
+                        }, mime, quality || 0.92);
+                    };
+                    img.onerror = function () { resolve(false); };
+                    img.src = url;
+                } catch {
+                    resolve(false);
+                }
+            });
+        },
+
+        // ── Interactive Crop & Transform ─────────────────────────────────────
+        cropAndTransform: async function (url, cropBox, rotation, flip) {
+            return new Promise(function (resolve) {
+                try {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function () {
+                        const nw = img.naturalWidth;
+                        const nh = img.naturalHeight;
+                        let bx = 0, by = 0, bw = nw, bh = nh;
+                        if (typeof cropBox === 'string' && cropBox !== 'free') {
+                            let targetRatio = null;
+                            if (cropBox === '1:1') targetRatio = 1.0;
+                            else if (cropBox === '16:9') targetRatio = 16 / 9;
+                            else if (cropBox === '9:16') targetRatio = 9 / 16;
+                            else if (cropBox === '4:3') targetRatio = 4 / 3;
+                            if (targetRatio) {
+                                const currentRatio = nw / nh;
+                                if (currentRatio > targetRatio) {
+                                    bw = nh * targetRatio;
+                                    bh = nh;
+                                    bx = (nw - bw) / 2;
+                                    by = 0;
+                                } else {
+                                    bw = nw;
+                                    bh = nw / targetRatio;
+                                    bx = 0;
+                                    by = (nh - bh) / 2;
+                                }
+                            }
+                        } else if (cropBox && typeof cropBox === 'object') {
+                            bx = Math.max(0, Math.min(nw, cropBox.x * nw));
+                            by = Math.max(0, Math.min(nh, cropBox.y * nh));
+                            bw = Math.max(10, Math.min(nw - bx, cropBox.width * nw));
+                            bh = Math.max(10, Math.min(nh - by, cropBox.height * nh));
+                        }
+
+                        const isSwap = (rotation === 90 || rotation === 270);
+                        const outW = isSwap ? bh : bw;
+                        const outH = isSwap ? bw : bh;
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(outW);
+                        canvas.height = Math.round(outH);
+                        const ctx = canvas.getContext('2d');
+
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        if (rotation) ctx.rotate((rotation * Math.PI) / 180);
+                        if (flip) ctx.scale(-1, 1);
+
+                        ctx.drawImage(img, bx, by, bw, bh, -bw / 2, -bh / 2, bw, bh);
+
+                        canvas.toBlob(function (blob) {
+                            if (!blob) { resolve(null); return; }
+                            const reader = new FileReader();
+                            reader.onloadend = function () {
+                                resolve({ dataUrl: reader.result, width: canvas.width, height: canvas.height });
+                            };
+                            reader.readAsDataURL(blob);
+                        }, 'image/png');
+                    };
+                    img.onerror = function () { resolve(null); };
+                    img.src = url;
+                } catch {
+                    resolve(null);
+                }
+            });
+        },
+
+        // ── Smart Background Removal & Subject Cutout ────────────────────────
+        removeBackground: async function (url, mode, color) {
+            return new Promise(function (resolve) {
+                try {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function () {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imgData.data;
+
+                        const samples = [
+                            [0, 0], [canvas.width - 1, 0],
+                            [0, canvas.height - 1], [canvas.width - 1, canvas.height - 1],
+                            [Math.floor(canvas.width / 2), 0]
+                        ];
+                        let bgR = 0, bgG = 0, bgB = 0;
+                        for (const [sx, sy] of samples) {
+                            const idx = (sy * canvas.width + sx) * 4;
+                            bgR += data[idx]; bgG += data[idx + 1]; bgB += data[idx + 2];
+                        }
+                        bgR /= samples.length; bgG /= samples.length; bgB /= samples.length;
+
+                        const threshold = 48;
+                        for (let i = 0; i < data.length; i += 4) {
+                            const r = data[i], g = data[i + 1], b = data[i + 2];
+                            const dist = Math.sqrt(Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2));
+                            if (dist < threshold) {
+                                const alphaFactor = Math.max(0, (dist - (threshold - 16)) / 16);
+                                data[i + 3] = Math.round(data[i + 3] * alphaFactor);
+                            }
+                        }
+                        ctx.putImageData(imgData, 0, 0);
+
+                        if (mode === 'solid' && color) {
+                            const outCanvas = document.createElement('canvas');
+                            outCanvas.width = canvas.width;
+                            outCanvas.height = canvas.height;
+                            const outCtx = outCanvas.getContext('2d');
+                            outCtx.fillStyle = color;
+                            outCtx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+                            outCtx.drawImage(canvas, 0, 0);
+                            outCanvas.toBlob(function (blob) {
+                                if (!blob) { resolve(null); return; }
+                                const reader = new FileReader();
+                                reader.onloadend = function () { resolve(reader.result); };
+                                reader.readAsDataURL(blob);
+                            }, 'image/png');
+                        } else {
+                            canvas.toBlob(function (blob) {
+                                if (!blob) { resolve(null); return; }
+                                const reader = new FileReader();
+                                reader.onloadend = function () { resolve(reader.result); };
+                                reader.readAsDataURL(blob);
+                            }, 'image/png');
+                        }
+                    };
+                    img.onerror = function () { resolve(null); };
+                    img.src = url;
+                } catch {
+                    resolve(null);
+                }
+            });
+        },
+
+        // ── Custom Meme Typography Stamping ──────────────────────────────────
+        renderCustomMeme: async function (url, topText, bottomText, font, color, outlineWidth) {
+            return new Promise(function (resolve) {
+                try {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function () {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        const fontSize = Math.max(28, Math.round(canvas.width * 0.08));
+                        ctx.font = `900 ${fontSize}px "${font || 'Impact'}", "Archivo Narrow", sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.fillStyle = color || '#FFFFFF';
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = outlineWidth !== undefined ? outlineWidth : Math.max(3, fontSize * 0.12);
+
+                        if (topText) {
+                            const lines = topText.toUpperCase().split('\n');
+                            let y = fontSize + 16;
+                            for (const line of lines) {
+                                ctx.strokeText(line, canvas.width / 2, y);
+                                ctx.fillText(line, canvas.width / 2, y);
+                                y += fontSize * 1.15;
+                            }
+                        }
+
+                        if (bottomText) {
+                            const lines = bottomText.toUpperCase().split('\n');
+                            let y = canvas.height - 24 - (lines.length - 1) * fontSize * 1.15;
+                            for (const line of lines) {
+                                ctx.strokeText(line, canvas.width / 2, y);
+                                ctx.fillText(line, canvas.width / 2, y);
+                                y += fontSize * 1.15;
+                            }
+                        }
+
+                        canvas.toBlob(function (blob) {
+                            if (!blob) { resolve(null); return; }
+                            const reader = new FileReader();
+                            reader.onloadend = function () { resolve(reader.result); };
+                            reader.readAsDataURL(blob);
+                        }, 'image/png');
+                    };
+                    img.onerror = function () { resolve(null); };
+                    img.src = url;
+                } catch {
+                    resolve(null);
+                }
+            });
         }
     };
 

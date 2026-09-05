@@ -28,4 +28,14 @@ public class ImageGenerationRouterTests
     {
         Assert.Same(Gemini, Build().Resolve(modelId));
     }
+
+    [Fact]
+    public void Resolve_FastTierReturnsFastGeminiWhenProvided()
+    {
+        var fast = Mock.Of<IImageGenerationService>();
+        var router = new ImageGenerationRouter(Gemini, fast);
+
+        Assert.Same(fast, router.Resolve(AiProviderIds.GeminiImagen3Fast));
+        Assert.Same(Gemini, router.Resolve(AiProviderIds.GeminiImagen3));
+    }
 }

@@ -148,6 +148,44 @@ public sealed class AzureOpenAiChatCompletionService : IChatCompletionService
         return new ChatCompletionResult(content, tokens, elapsed);
     }
 
+    public async IAsyncEnumerable<string> StreamCompleteAsync(
+        string systemPrompt,
+        string userPrompt,
+        byte[]? image = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (_chatClient is null)
+            throw new InvalidOperationException(
+                "Azure OpenAI chat completion is not configured. Set OpenAI:Endpoint (and OpenAI:Key, "
+                + "unless managed identity is in use) via Key Vault.");
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userPrompt);
+
+        var currentKey = _configuration[ConfigKeys.OpenAiKey];
+        if (!string.IsNullOrWhiteSpace(currentKey)) _keyCredential?.Update(currentKey);
+
+        var userMessage = image is null
+            ? new UserChatMessage(userPrompt)
+            : new UserChatMessage(
+                ChatMessageContentPart.CreateImagePart(new Uri(ToDataUrl(image))),
+                ChatMessageContentPart.CreateTextPart(userPrompt));
+
+        var messages = new List<ChatMessage> { new SystemChatMessage(systemPrompt), userMessage };
+
+        var updates = _chatClient.CompleteChatStreamingAsync(messages, cancellationToken: ct);
+        await foreach (var update in updates.WithCancellation(ct))
+        {
+            foreach (var part in update.ContentUpdate)
+            {
+                if (!string.IsNullOrEmpty(part.Text))
+                {
+                    yield return part.Text;
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// Sniffs the JPEG magic bytes the same way <see cref="AzureOpenAiService.DescribePersonAsync"/>
     /// does; everything else is declared PNG, which the service accepts for the formats this app

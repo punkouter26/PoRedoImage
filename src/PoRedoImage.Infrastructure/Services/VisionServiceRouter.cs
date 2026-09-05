@@ -28,24 +28,29 @@ public sealed class VisionServiceRouter : IVisionServiceRouter
     private readonly IVisionService _azure;
     private readonly IVisionService _ollama;
     private readonly IVisionService _openAi;
+    private readonly IVisionService? _gemini;
 
     public VisionServiceRouter(
         AzureVisionService azure,
         OllamaVisionService ollama,
         OpenAiVisionService openAi,
         IMemoryCache cache,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        GeminiVisionService? gemini = null)
     {
         var log = loggerFactory.CreateLogger<CachingVisionService>();
         _azure = new CachingVisionService(azure, cache, log, "vision:azure-cv");
         _ollama = new CachingVisionService(ollama, cache, log, "vision:ollama");
         _openAi = new CachingVisionService(openAi, cache, log, "vision:openai");
+        if (gemini is not null)
+            _gemini = new CachingVisionService(gemini, cache, log, "vision:gemini");
     }
 
     public IVisionService Resolve(string? modelId)
     {
         if (AiProviderIds.IsOllama(modelId)) return _ollama;
         if (string.Equals(modelId, AiProviderIds.AzureOpenAiVision, StringComparison.Ordinal)) return _openAi;
+        if (string.Equals(modelId, AiProviderIds.GeminiVision, StringComparison.Ordinal) && _gemini is not null) return _gemini;
         return _azure;
     }
 }
