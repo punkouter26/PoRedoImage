@@ -1,0 +1,1063 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoRedoImage User Workflows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* ── Tokens ─────────────────────────────────────────────────────────────────
+   Selenium-toned neutrals (cool grey paper, ferrotype ink) with a single
+   safelight-oxide accent reserved for one job: marking a degraded path.
+   Chart series come from the validated categorical set; the accent never
+   appears as a series colour, so a fallback rail can never read as data. */
+:root {
+  color-scheme: light;
+
+  --paper:      #edeff0;
+  --surface:    #fafbfb;
+  --surface-2:  #f2f5f6;
+  --ink:        #10161a;
+  --ink-2:      #4c5a61;
+  --ink-3:      #7c8a91;
+  --rule:       #d8dee0;
+  --hair:       rgba(16, 22, 26, 0.10);
+  --shadow:     rgba(16, 22, 26, 0.07);
+
+  --safelight:  #a33a1e;
+  --safelight-wash: #f7e9e3;
+
+  --s1: #2a78d6;  --s2: #eb6834;  --s3: #1baf7a;  --s4: #eda100;  --s5: #e87ba4;
+  --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+  --grid: #e2e6e8; --axis: #c3cbce;
+
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  --measure: 68ch;
+  --gap: 22px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:      #0b0e10;
+    --surface:    #14191c;
+    --surface-2:  #1b2226;
+    --ink:        #e8eef0;
+    --ink-2:      #a0b0b7;
+    --ink-3:      #71828a;
+    --rule:       #242d32;
+    --hair:       rgba(232, 238, 240, 0.12);
+    --shadow:     rgba(0, 0, 0, 0.5);
+    --safelight:  #e27246;
+    --safelight-wash: #2a1912;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --grid: #232b2f; --axis: #39444a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:      #0b0e10;
+  --surface:    #14191c;
+  --surface-2:  #1b2226;
+  --ink:        #e8eef0;
+  --ink-2:      #a0b0b7;
+  --ink-3:      #71828a;
+  --rule:       #242d32;
+  --hair:       rgba(232, 238, 240, 0.12);
+  --shadow:     rgba(0, 0, 0, 0.5);
+  --safelight:  #e27246;
+  --safelight-wash: #2a1912;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --grid: #232b2f; --axis: #39444a;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16.5px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--f-display);
+  font-weight: 650;
+  letter-spacing: -0.017em;
+  line-height: 1.14;
+  text-wrap: balance;
+  margin: 0;
+}
+
+h1 { font-size: clamp(28px, 4.2vw, 44px); }
+h2 { font-size: clamp(22px, 2.7vw, 30px); }
+h3 { font-size: 19px; letter-spacing: -0.01em; }
+h4 { font-size: 15px; }
+
+p { margin: 0 0 1em; max-width: var(--measure); }
+p:last-child { margin-bottom: 0; }
+
+a { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--safelight); }
+a:hover { color: var(--safelight); }
+:focus-visible { outline: 2px solid var(--safelight); outline-offset: 3px; border-radius: 2px; }
+
+code, kbd, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+code {
+  background: var(--surface-2);
+  border: 1px solid var(--hair);
+  padding: 0.08em 0.36em;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+strong { font-weight: 600; }
+
+/* ── Header + Detail Switcher ───────────────────────────────────────────── */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.hdr-in {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 13px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+
+.brand-mark {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--safelight);
+  white-space: nowrap;
+}
+
+.brand-title {
+  font-family: var(--f-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switch {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.switch button {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  padding: 7px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s, color 0.14s;
+}
+
+.switch button:first-child { border-left: 0; }
+.switch button:hover { background: var(--surface-2); color: var(--ink); }
+
+.switch button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.switch button .n { opacity: 0.55; margin-right: 6px; }
+.switch button[aria-pressed="true"] .n { opacity: 0.7; }
+
+/* Cumulative disclosure: level 1 = tier 1 only, 2 = tiers 1+2, 3 = everything. */
+:root[data-level="1"] [data-tier="2"],
+:root[data-level="1"] [data-tier="3"],
+:root[data-level="2"] [data-tier="3"] { display: none !important; }
+
+/* ── Page frame ─────────────────────────────────────────────────────────── */
+.wrap { max-width: 1220px; margin: 0 auto; padding: 0 26px 96px; }
+
+.lede { padding: 44px 0 30px; border-bottom: 1px solid var(--rule); }
+.lede h1 { margin-bottom: 14px; }
+.lede .sub { font-size: 18px; color: var(--ink-2); max-width: 62ch; }
+
+.eyebrow {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 12px;
+}
+
+section { padding: 40px 0 4px; border-top: 1px solid var(--rule); }
+section:first-of-type { border-top: 0; }
+
+.sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+
+.tier {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex: none;
+}
+
+.sec-note { color: var(--ink-2); font-size: 16px; margin: 6px 0 22px; max-width: var(--measure); }
+
+.stack { display: flex; flex-direction: column; gap: var(--gap); }
+
+/* ── Cards & grids ──────────────────────────────────────────────────────── */
+.grid { display: grid; gap: var(--gap); }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(204px, 1fr)); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 20px 22px;
+}
+
+.card h3 { margin-bottom: 8px; }
+.card p { font-size: 15.5px; color: var(--ink-2); }
+
+.card-k {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+
+/* Navigation matrix cards read as destinations, not content blocks. */
+a.nav-card {
+  display: block;
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 22px;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+a.nav-card:hover {
+  border-color: var(--safelight);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px var(--shadow);
+  color: var(--ink);
+}
+
+a.nav-card h3 { margin-bottom: 7px; }
+a.nav-card p { font-size: 15px; color: var(--ink-2); margin-bottom: 14px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 7px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+.chip.on { border-color: color-mix(in srgb, var(--good) 45%, var(--rule)); color: var(--ink); }
+.chip.hot { border-color: color-mix(in srgb, var(--safelight) 55%, var(--rule)); color: var(--safelight); }
+
+/* Status is never colour alone: every dot ships with its label. */
+.st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 11.5px; white-space: nowrap; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ink-3); }
+.st.good::before { background: var(--good); }
+.st.warn::before { background: var(--warn); }
+.st.serious::before { background: var(--serious); }
+.st.crit::before { background: var(--crit); }
+
+/* ── Stat tiles — used only where the figure is the point ───────────────── */
+.stat { background: var(--surface); border: 1px solid var(--hair); border-radius: 5px; padding: 18px 20px; }
+.stat .v { font-family: var(--f-display); font-size: 32px; font-weight: 650; letter-spacing: -0.028em; line-height: 1; }
+.stat .l { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin-top: 9px; }
+.stat .d { font-size: 14px; color: var(--ink-2); margin-top: 7px; line-height: 1.45; }
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.scroll { overflow-x: auto; border: 1px solid var(--hair); border-radius: 5px; background: var(--surface); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+
+thead th {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: left;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+  background: var(--surface-2);
+}
+
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--hair); vertical-align: top; color: var(--ink-2); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody td:first-child { color: var(--ink); font-weight: 500; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-mono); }
+td .mono, th .mono { font-size: 12.5px; }
+td code { font-size: 12.5px; }
+.nw { white-space: nowrap; }
+
+/* ── Code blocks ────────────────────────────────────────────────────────── */
+pre.code {
+  margin: 0;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 16px 18px;
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  tab-size: 2;
+}
+
+pre.code b { color: var(--ink); font-weight: 600; }
+pre.code i { color: var(--ink-3); font-style: normal; }
+pre.code em { color: var(--safelight); font-style: normal; }
+
+.cap { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-3); margin-top: 9px; }
+
+/* ── The degradation rail — the one place the accent is spent ───────────── */
+.degrade {
+  background: var(--safelight-wash);
+  border: 1px solid color-mix(in srgb, var(--safelight) 26%, transparent);
+  border-left: 3px solid var(--safelight);
+  border-radius: 0 5px 5px 0;
+  padding: 16px 20px;
+}
+
+.degrade .card-k { color: var(--safelight); }
+.degrade p { font-size: 15px; color: var(--ink-2); }
+.degrade p:last-child { margin-bottom: 0; }
+
+/* ── Diagrams ───────────────────────────────────────────────────────────── */
+.diagram {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 20px 18px;
+  overflow-x: auto;
+}
+
+.diagram pre.mermaid { margin: 0; background: none; border: 0; padding: 0; text-align: center; }
+.diagram svg { max-width: 100%; height: auto; }
+
+/* ── Charts ─────────────────────────────────────────────────────────────── */
+/* Capped to its own content so the card does not trail dead space to the right
+   of a fixed-width plot; the scroll container handles anything narrower. */
+.chart { background: var(--surface); border: 1px solid var(--hair); border-radius: 5px;
+  padding: 20px 22px 16px; max-width: 860px; }
+.chart h4 { margin-bottom: 3px; }
+.chart .sub { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+.chart-body { overflow-x: auto; }
+.chart svg { display: block; }
+.chart svg text { font-family: var(--f-mono); fill: var(--ink-2); }
+.chart svg text.lab { fill: var(--ink); font-size: 12px; }
+.chart svg text.val { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.chart svg text.tick { fill: var(--ink-3); font-size: 10.5px; }
+.chart svg .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart svg .baseline { stroke: var(--axis); stroke-width: 1; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--hair); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-2); }
+.legend i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.foot { margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--rule); font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+
+@media (max-width: 640px) {
+  .wrap, .hdr-in { padding-left: 17px; padding-right: 17px; }
+  body { font-size: 16px; }
+  .switch button { padding: 7px 9px; font-size: 11px; }
+  .switch button .n { margin-right: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+  a.nav-card:hover { transform: none; }
+}
+</style>
+<script>
+/* Detail Switcher — cumulative disclosure.
+   1 Simple      = tier 1
+   2 Standard    = tier 1 + 2
+   3 All details = tier 1 + 2 + 3
+   Level lands on <html data-level> before first paint so nothing flashes, and
+   the choice rides along in localStorage so it survives a hop between reports. */
+(function () {
+  var KEY = "poredoimage-detail-level";
+  var root = document.documentElement;
+
+  function read() {
+    try {
+      var v = localStorage.getItem(KEY);
+      if (v === "1" || v === "2" || v === "3") return v;
+    } catch (e) { /* private window, blocked storage — fall through */ }
+    return "3";
+  }
+
+  function apply(level) {
+    root.setAttribute("data-level", level);
+    var btns = document.querySelectorAll(".switch button[data-level]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].setAttribute("aria-pressed", btns[i].getAttribute("data-level") === level ? "true" : "false");
+    }
+  }
+
+  apply(read());
+
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest ? ev.target.closest(".switch button[data-level]") : null;
+    if (!btn) return;
+    var level = btn.getAttribute("data-level");
+    apply(level);
+    try { localStorage.setItem(KEY, level); } catch (e) { /* nothing to persist to */ }
+  });
+
+  document.addEventListener("DOMContentLoaded", function () { apply(root.getAttribute("data-level") || "3"); });
+})();
+</script>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="brand">
+      <span class="brand-mark"><a href="index.html" style="color:inherit;text-decoration:none">&larr; Portal</a></span>
+      <span class="brand-title">User Workflows</span>
+    </div>
+    <div class="switch" role="group" aria-label="Level of detail">
+      <button type="button" data-level="1" aria-pressed="false"><span class="n">1</span>Simple</button>
+      <button type="button" data-level="2" aria-pressed="false"><span class="n">2</span>Standard</button>
+      <button type="button" data-level="3" aria-pressed="true"><span class="n">3</span>All details</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="lede">
+    <div class="eyebrow">Report 03 &middot; What the user does and what the system does back</div>
+    <h1>User Workflows</h1>
+    <p class="sub">Six transformations, three response shapes &mdash; a plain JSON round trip, a streamed
+    NDJSON batch, and a start-then-poll job &mdash; traced from the upload control to the blob.</p>
+  </div>
+
+  <!-- ═══ TIER 1 ═══ -->
+  <section data-tier="1">
+    <div class="sec-head"><h2>Everything starts with one photo</h2><span class="tier">TIER 1</span></div>
+    <p class="sec-note">A single image is picked once and held in <code>ImageSessionService</code> for the
+    browser session, so moving between features does not mean re-uploading. Every feature page inherits
+    the same intake rules from <code>FeaturePageBase</code>.</p>
+
+    <div class="grid g3">
+      <div class="card">
+        <div class="card-k">Accepted</div>
+        <h3>JPG, PNG, WebP</h3>
+        <p>Checked twice: by extension in the browser, and again on the server by magic bytes, which
+        additionally recognise GIF and BMP and return a specific hint for HEIC. The declared content
+        type is a hint, never the decision.</p>
+      </div>
+      <div class="card">
+        <div class="card-k">Bounded</div>
+        <h3>20&nbsp;MB, 1568&nbsp;px</h3>
+        <p>The same 20&nbsp;MB ceiling on both sides, with the Kestrel request body capped at 25&nbsp;MB
+        to leave room for the JSON envelope. Images are downscaled to a 1568&nbsp;px longest edge before
+        upload &mdash; past that point nothing downstream resolves more detail.</p>
+      </div>
+      <div class="card">
+        <div class="card-k">Reused</div>
+        <h3>Result chaining</h3>
+        <p>Each results panel offers a &ldquo;send result to&hellip;&rdquo; row built from the same
+        feature catalogue the Studio renders. The output of one feature becomes the active image of the
+        next, and the vision cache means re-reading it costs nothing.</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-tier="1">
+    <div class="sec-head"><h2>The six workflows</h2><span class="tier">TIER 1</span></div>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Feature</th><th>Page</th><th>Intent</th><th>Extra input rules</th><th>What changes</th><th>Budget</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Regeneration</td><td><span class="mono">/image-regeneration</span></td>
+            <td>Repaint my photo as a new artistic image.</td>
+            <td><span class="mono">DescriptionLength</span> 200&ndash;500, rejected twice &mdash; by the validation filter and again in the handler.</td>
+            <td>Nothing persists unless the user saves. A save writes one blob and one table row of kind <span class="mono">Regeneration</span>.</td>
+            <td class="nw">~2 provider calls</td>
+          </tr>
+          <tr>
+            <td>Meme</td><td><span class="mono">/meme-generation</span></td>
+            <td>Write me a caption and burn it into the image &mdash; or lay my own text into a template.</td>
+            <td>Template render needs a known <span class="mono">TemplateId</span> and at least one zone string; short zone lists are padded.</td>
+            <td>Optional save of kind <span class="mono">Meme</span>. The template catalogue itself is immutable.</td>
+            <td class="nw">1 AI call, or none</td>
+          </tr>
+          <tr>
+            <td>Bulk Generate</td><td><span class="mono">/bulk-generate</span></td>
+            <td>Give me ten art-style variations of this photo at once.</td>
+            <td>Exactly 10 prompts to save; 1&ndash;10 to run; each non-empty and &le;&nbsp;2000 characters.</td>
+            <td>Prompts persist per user in Table Storage. Results are mirrored to <span class="mono">localStorage</span> so a dropped connection does not lose the board.</td>
+            <td class="nw">45&nbsp;s p95 target</td>
+          </tr>
+          <tr>
+            <td>Rap Roast</td><td><span class="mono">/rap-roast</span></td>
+            <td>Roast this photo in bars and perform it over a beat.</td>
+            <td>Style &mdash; boom-bap, trap, old-school. Intensity &mdash; gentle, roast, scorched. Both default when omitted, so an older client keeps its behaviour exactly.</td>
+            <td>Nothing persists. Audio is returned inline as base64.</td>
+            <td class="nw">up to 2 music attempts</td>
+          </tr>
+          <tr>
+            <td>Style Director</td><td><span class="mono">/style-director</span></td>
+            <td>Tell me what art direction this photo wants, and why.</td>
+            <td>Image plus the tags and confidence a previous analysis produced.</td>
+            <td>Nothing persists. Returns a prompt, a critique, and a four-step reasoning trace.</td>
+            <td class="nw">1 chat call</td>
+          </tr>
+          <tr>
+            <td>Video</td><td><span class="mono">/video</span></td>
+            <td>Animate this still into an eight-second clip.</td>
+            <td>Prompt 3&ndash;1200 characters. No duration field &mdash; every clip is 8&nbsp;s, which is also the longest Veo produces.</td>
+            <td>Nothing persists. The operation handle lives only in the browser between poll calls.</td>
+            <td class="nw">300&nbsp;s ceiling</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-tier="1">
+    <div class="sec-head"><h2>Three response shapes</h2><span class="tier">TIER 1</span></div>
+    <p class="sec-note">Which one a feature uses is decided by how long the work takes and whether partial
+    results are useful before the whole is done.</p>
+
+    <div class="grid g3">
+      <div class="card">
+        <div class="card-k">Shape 1 &mdash; request / response</div>
+        <h3>One POST, one JSON body</h3>
+        <p>Regeneration, Meme, Rap Roast, Style Director, template render. The client shows a staged
+        progress message and reads the body as a string first, because a multi-megabyte payload takes a
+        noticeable moment to deserialise on the WASM side.</p>
+      </div>
+      <div class="card">
+        <div class="card-k">Shape 2 &mdash; streamed</div>
+        <h3>NDJSON, a line per slot</h3>
+        <p>The bulk board. The image travels once, the server fans out under a concurrency cap, and each
+        slot is flushed the instant it lands. Slots complete out of order; a failed slot carries an
+        <code>error</code> and never fails the batch.</p>
+      </div>
+      <div class="card">
+        <div class="card-k">Shape 3 &mdash; start and poll</div>
+        <h3>Operation handle</h3>
+        <p>Video. <code>POST /generate</code> returns the provider's job handle immediately; the client
+        passes it back to <code>GET /status</code> until <code>done</code>. A render outlives any
+        reasonable HTTP response.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ TIER 2 ═══ -->
+  <section data-tier="2">
+    <div class="sec-head"><h2>Shape 1 &mdash; analyze and regenerate</h2><span class="tier">TIER 2</span></div>
+    <p class="sec-note">The full path for the app's primary flow, including the two places a
+    browser-local model can remove a metered call entirely.</p>
+
+    <div class="diagram">
+<pre class="mermaid">sequenceDiagram
+  autonumber
+  participant P as ImageRegeneration page
+  participant HC as HttpClient handler chain
+  participant EP as POST /api/images/analyze
+  participant OR as ImageAnalysisOrchestrator
+  participant V as Vision backend (+ 6 h cache)
+  participant G as Azure OpenAI
+  participant IM as Gemini Imagen 3
+  P->>HC: ImageAnalysisRequest
+  HC->>HC: CorrelationHeaderHandler → AntiforgeryTokenHandler → fetch
+  HC->>EP: POST, cookie + X-Correlation-ID + X-Session-ID
+  EP->>EP: ValidationFilter — DataAnnotations on the DTO
+  EP->>EP: ImageBytes.FromBase64 — magic bytes, 20 MB cap
+  EP->>OR: ProcessAsync(request)
+  alt PrecomputedDescription supplied by a browser model
+    OR->>OR: skip vision, confidence forced to 1.0
+  else
+    OR->>V: AnalyzeAsync(bytes)
+    V-->>OR: description, tags, confidence, fallback reason
+  end
+  alt PrecomputedEnhancedPrompt supplied
+    OR->>OR: skip the enhancement call
+  else
+    OR->>G: EnhanceDescriptionAsync(description, tags, length)
+    G-->>OR: prompt + token count
+  end
+  OR->>IM: GenerateAsync(prompt)
+  IM-->>OR: PNG bytes + elapsed
+  OR-->>EP: ImageAnalysisResponse + ProcessingMetricsDto
+  EP-->>P: 200 · or 422 declined · 503 unauthorised · 400 invalid image</pre>
+    </div>
+
+    <div style="height:22px"></div>
+
+    <div class="degrade">
+      <div class="card-k">Why the two skips exist</div>
+      <p>A user who selected an on-device model has already said they want that trade. Re-running vision
+      or the prompt rewrite server-side would bill a metered API for work already done for free &mdash;
+      and if the local run <em>fails</em>, nothing falls back to a paid provider, because silently
+      billing someone who chose a free model is a surprise charge.</p>
+    </div>
+  </section>
+
+  <section data-tier="2">
+    <div class="sec-head"><h2>Shape 2 &mdash; the bulk board</h2><span class="tier">TIER 2</span></div>
+    <p class="sec-note">This replaced ten sequential POSTs driven by a <code>for</code> loop in the
+    browser. That shape re-uploaded the source image with every request, turning a 4&nbsp;MB photo into
+    roughly 53&nbsp;MB of base64 upload for one batch, and took about 40&nbsp;s of wall clock against a
+    45&nbsp;s p95 target it was only just meeting.</p>
+
+    <div class="diagram">
+<pre class="mermaid">sequenceDiagram
+  autonumber
+  participant B as BulkGenerate page
+  participant D as POST /describe
+  participant BA as POST /batch
+  participant S as BulkGenerationService
+  participant IM as Gemini Imagen 3
+  B->>D: image once — who is in this photo?
+  alt described
+    D-->>B: person description
+  else description call failed
+    D-->>B: empty string — img2img still runs on the raw &lt;PERSON&gt; token
+  end
+  B->>B: substitute &lt;PERSON&gt; into all 10 prompts
+  B->>BA: BulkBatchRequest — image once, 10 prompts
+  BA->>BA: 1–10 prompts, each ≤ 2000 chars, provider configured
+  BA->>S: GenerateBatchAsync — SemaphoreSlim(4)
+  loop each slot, up to 4 in flight
+    S->>IM: GenerateAsync(prompt)
+    IM-->>S: image · or failure → 2 retries, 500 ms doubling
+    S-->>BA: BulkBatchItem
+    BA-->>B: one NDJSON line, flushed immediately
+    B->>B: paint that tile, mirror the board to localStorage
+  end
+  Note over B: any slot the server never reported is marked failed, — rather than left spinning forever</pre>
+    </div>
+  </section>
+
+  <section data-tier="2">
+    <div class="sec-head"><h2>Shape 3 &mdash; video, and a save to the gallery</h2><span class="tier">TIER 2</span></div>
+
+    <div class="grid g2">
+      <div class="diagram">
+<pre class="mermaid">sequenceDiagram
+  autonumber
+  participant V as Video page
+  participant A as POST /api/video/generate
+  participant P as GET /api/video/status
+  participant VEO as Google Veo
+  V->>A: image + prompt (3–1200 chars)
+  A->>VEO: StartAsync
+  VEO-->>A: operations/…
+  A-->>V: 200 { operationName }
+  loop until done
+    V->>P: ?op=operations/…
+    P->>P: reject "..", leading "/", or no "operations/"
+    P->>VEO: PollAsync
+    VEO-->>P: done? bytes?
+    P-->>V: { done:false } … then bytes or an errorMessage
+  end</pre>
+      </div>
+      <div class="diagram">
+<pre class="mermaid">sequenceDiagram
+  autonumber
+  participant U as Result panel
+  participant S as UserImageSaveService
+  participant E as POST /api/user-images/result
+  participant BL as Blob user-images
+  participant TB as Table UserImages
+  U->>S: save this result
+  S->>E: bytes + kind + tags, Idempotency-Key
+  E->>E: antiforgery, then idempotency replay check
+  E->>BL: {userId}/{imageId}, tags as blob metadata
+  E->>TB: PK = userId, RK = imageId
+  E-->>S: { id, imageUrl }
+  Note over S: 503 on a storage outage raises a retry toast, — never a lost result</pre>
+      </div>
+    </div>
+
+    <div style="height:22px"></div>
+
+    <div class="degrade">
+      <div class="card-k">The operation handle is untrusted input</div>
+      <p>It comes from the client and reaches the provider URL as a path segment, so
+      <code>GET /api/video/status</code> requires it to contain <code>operations/</code> and rejects
+      <code>..</code> or a leading slash &mdash; a crafted value must not be able to walk the path onto a
+      different endpoint.</p>
+    </div>
+  </section>
+
+  <!-- ═══ TIER 3 ═══ -->
+  <section data-tier="3">
+    <div class="sec-head"><h2>Request contracts</h2><span class="tier">TIER 3</span></div>
+    <p class="sec-note">All shared DTOs live in <code>PoRedoImage.Shared</code>, which must stay
+    trim-safe: both the WASM client's call sites and the minimal APIs serialise through one resolver
+    chain built by <code>SharedJsonOptions.CreateResolver()</code>.</p>
+
+    <div class="grid g2">
+      <div class="stack">
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">POST /api/images/analyze</span></h4>
+<pre class="code">class <b>ImageAnalysisRequest</b>
+{
+  [Required]              string  ImageData;
+  [Required]              string  ContentType;
+                          string  FileName;
+  [Range(200, 500)]       int     DescriptionLength = 200;
+                          ProcessingMode Mode;   <i>// Regeneration | Meme</i>
+                          string? ModelId;            <i>// vision provider id</i>
+                          string? ImageGenModelId;
+
+  <em>// on-device shortcuts — each removes a metered call</em>
+  [StringLength(4000)]    string? PrecomputedDescription;
+  [MaxCount(20)]
+  [MaxItemLength(100)]    IReadOnlyList&lt;string&gt;? PrecomputedTags;
+                          string? PrecomputedEnhancedPrompt;
+}</pre>
+          <div class="cap">The caps on the precomputed fields are not arbitrary: this is client-supplied
+          free text that flows verbatim into a metered model as prompt tokens. The endpoint is
+          rate-limited, but a field that becomes billable tokens still carries a bound.</div>
+        </div>
+
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">POST /api/rap-roast</span></h4>
+<pre class="code">class <b>RapRoastRequest</b>
+{
+  [Required] string  ImageData;
+  [Required] string  ContentType;
+             string? ModelId;
+             RapStyle        Style     = BoomBap;  <i>// | Trap | OldSchool</i>
+             RoastIntensity  Intensity = Roast;    <i>// Gentle | Roast | Scorched</i>
+}</pre>
+          <div class="cap">Both enums keep their initialiser when the JSON omits them, so a client that
+          predates <span class="mono">Intensity</span> behaves exactly as it always did. Every level sits
+          inside the same content guardrail &mdash; the dial changes how hard a jab lands, never what it
+          may land on.</div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">POST /api/bulk-generate/batch</span></h4>
+<pre class="code">record <b>BulkBatchRequest</b>(
+  string   ImageData,        <i>// travels once for the whole board</i>
+  string   ContentType,
+  string[] Prompts,          <i>// already &lt;PERSON&gt;-substituted</i>
+  string?  ImageGenModelId = null);
+
+record <b>BulkBatchItem</b>(
+  int     Index,             <i>// slots complete out of order</i>
+  string? ImageData,
+  string? ContentType,
+  string? Error);            <i>// one failure never fails the batch</i></pre>
+        </div>
+
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">POST /api/video/generate</span></h4>
+<pre class="code">record <b>VideoGenerateRequest</b>(
+  [Required] string ImageData,
+  [Required] string ContentType,
+  [Required, StringLength(1200, MinimumLength = 3)]
+             string Prompt);
+
+record <b>VideoGenerateStartResponse</b>(string OperationName);
+
+record <b>VideoGenerateStatusResponse</b>(
+  bool    Done,
+  string? VideoData        = null,
+  string? VideoContentType = null,
+  string? ErrorMessage     = null);</pre>
+          <div class="cap"><span class="mono">ErrorMessage</span> is always populated on failure rather
+          than left null: a video that silently fails to appear reads to the user as the app being
+          broken.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-tier="3">
+    <div class="sec-head"><h2>Response contracts</h2><span class="tier">TIER 3</span></div>
+    <p class="sec-note">Note how much of each response exists to explain itself. These fields are not
+    telemetry &mdash; they are what the UI shows when the answer is worse than the happy path.</p>
+
+    <div class="grid g2">
+      <div class="stack">
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">ImageAnalysisResponse</span></h4>
+<pre class="code">string  Description;
+List&lt;string&gt; Tags;
+double  ConfidenceScore;
+string? RegeneratedImageData;      <i>// base64</i>
+string  RegeneratedImageContentType = "image/png";
+string? MemeImageData;
+string? MemeCaption;               <i>// "top / bottom"</i>
+<em>string? DescriptionFallbackReason;</em>
+ProcessingMetricsDto Metrics;
+  ├ ImageAnalysisTimeMs        <i>// 0 when a browser model supplied it</i>
+  ├ DescriptionGenerationTimeMs
+  ├ ImageRegenerationTimeMs
+  ├ DescriptionTokensUsed
+  ├ ErrorInfo
+  └ TotalProcessingTimeMs      <i>// computed, the sum of the three</i></pre>
+        </div>
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">StyleDirectorResultDto</span></h4>
+<pre class="code">bool    Succeeded;   string? ErrorMessage;
+string? FinalPrompt; string? Critique;  int? Confidence;
+string? Subject;     string? Mood;      IReadOnlyList&lt;string&gt;? Themes;
+IReadOnlyList&lt;StyleDirectionDto&gt;? Directions;
+  <i>// name · palette · technique · referenceEra</i>
+string? StrategyRationale;  string? WhyThisPrompt;
+IReadOnlyList&lt;string&gt;? Suggestions;
+long    ElapsedMs;
+IReadOnlyList&lt;StyleDirectorReasoningEntryDto&gt; Reasoning;
+  <i>// vision-analyst · style-strategist · prompt-refiner · critic</i>
+  <i>// each with elapsed, tokens, timestamp and…</i>
+  <em>└ string? FallbackReason  // "why this step ran without the model"</em></pre>
+          <div class="cap">Without that last field the AI and rule-based paths are indistinguishable on
+          screen &mdash; the trace would read as reasoning either way.</div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">RapRoastResponse</span></h4>
+<pre class="code">string Lyrics;              <i>// always populated, with [Verse]/[Chorus] tags</i>
+string AudioData;           <i>// empty when AudioRefused</i>
+string AudioContentType;
+<em>bool   AudioRefused;        // the safety filter declined, twice</em>
+<em>string? RefusalReason;</em>
+<em>bool   LyricsSoftened;      // these are the second, gentler attempt</em>
+string ImageDescription;    <i>// "what the AI saw"</i>
+<em>bool   DescriptionIsDetailed;</em>
+<em>string? DescriptionFallbackReason;</em>
+SceneSnapshotDto? Scene;
+  <i>// outfit · pose · expression · setting · props</i>
+  <i>// textInImage — read by OCR, exact, not inferred</i>
+  <i>// mostIncongruousDetail</i>
+long   TotalMs;</pre>
+        </div>
+        <div>
+          <h4 style="margin-bottom:8px"><span class="mono">UserImageDto</span> &amp; save</h4>
+<pre class="code">record <b>UserImageDto</b>(
+  string Id, string FileName, string ContentType,
+  UserImageKind Kind,      <i>// Original | Regeneration | Meme | BulkVariation</i>
+  DateTimeOffset CreatedAt, long SizeBytes,
+  string ImageUrl, IReadOnlyList&lt;string&gt; Tags);
+
+record SaveResultRequest(string ImageData, string ContentType,
+                         UserImageKind Kind,
+                         IReadOnlyList&lt;string&gt;? Tags = null);
+record SaveImageResponse(string Id, string ImageUrl);</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-tier="3">
+    <div class="sec-head"><h2>Validation, in the order it runs</h2><span class="tier">TIER 3</span></div>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Stage</th><th>Where</th><th>Rejects with</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>1 &mdash; file picker</td><td><span class="mono">ImageLoadHelper.LoadAsync</span> (browser)</td><td>Inline message</td><td>Extension must be <span class="mono">.jpg/.jpeg/.png/.webp</span>; size &le; 20&nbsp;MB; then downscale to a 1568&nbsp;px longest edge when a JS runtime is available.</td></tr>
+          <tr><td>2 &mdash; request body</td><td>Kestrel + <span class="mono">FormOptions</span></td><td>413</td><td>25&nbsp;MB ceiling &mdash; the 20&nbsp;MB image cap plus JSON envelope overhead. Prevents a 50&nbsp;MB base64 payload from exhausting the worker.</td></tr>
+          <tr><td>3 &mdash; DataAnnotations</td><td><span class="mono">ValidationFilter&lt;T&gt;</span></td><td>400 problem+json</td><td>Minimal APIs do not run <span class="mono">[Required]</span>/<span class="mono">[Range]</span> automatically; this filter bridges that. All failing messages are joined into one <span class="mono">detail</span>.</td></tr>
+          <tr><td>4 &mdash; handler guards</td><td>Each slice endpoint</td><td>400</td><td>Deliberately redundant with stage 3 on the analyze path &mdash; the range check is repeated in the handler so the contract holds even if the filter is ever detached.</td></tr>
+          <tr><td>5 &mdash; image identity</td><td><span class="mono">ImageBytes.FromBase64</span></td><td>400 &ldquo;Invalid Image&rdquo;</td><td>Strips an optional data-URI prefix, decodes into an exact-size buffer, then resolves the real type from magic bytes. Replaced seven copies of the same <span class="mono">try/Convert.FromBase64String</span> pair.</td></tr>
+          <tr><td>6 &mdash; provider readiness</td><td><span class="mono">IsConfigured</span></td><td>503</td><td>Checked before any work begins, so an unconfigured key is a clear 503 rather than a 500 from deep inside a client.</td></tr>
+          <tr><td>7 &mdash; upstream refusal</td><td>Endpoint <span class="mono">catch</span> clauses</td><td>422</td><td>Content-filter refusals are matched on message text under <em>both</em> vendor spellings &mdash; Azure's <span class="mono">content_filter</span> and OpenAI.com's <span class="mono">content_policy_violation</span>. Matching only the latter left every Azure refusal falling through to an opaque 500.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-tier="3">
+    <div class="sec-head"><h2>The client's handler chain</h2><span class="tier">TIER 3</span></div>
+    <p class="sec-note">Order matters: a replayed request must keep its correlation headers and pick up a
+    <em>fresh</em> CSRF token, so the antiforgery handler sits inside the correlation handler.</p>
+
+<pre class="code">new HttpClient(
+  new <b>CorrelationHeaderHandler</b>(clientRequestContext)   <i>// X-Correlation-ID, X-Session-ID</i>
+  {
+    InnerHandler = new <b>AntiforgeryTokenHandler</b>(          <i>// X-CSRF-TOKEN, one retry on 400</i>
+      () =&gt; new HttpClient { BaseAddress = base, Timeout = 30 s })  <i>// bare client for the token GET —</i>
+    {                                                        <i>// reusing this pipeline would re-enter</i>
+      InnerHandler = new HttpClientHandler()                  <i>// the handler that is mid-fetch</i>
+    }
+  })
+{
+  BaseAddress = <b>builder.HostEnvironment.BaseAddress</b>,      <i>// same origin → the cookie flows</i>
+  Timeout     = TimeSpan.FromMinutes(4),
+}</pre>
+    <div class="cap">Same origin is what makes the BFF model work: the client never sets an
+    <span class="mono">Authorization</span> header because it has nothing to put in one.</div>
+  </section>
+
+  <div class="foot">
+    <span>Report 03 &mdash; User Workflows</span>
+    <span><a href="index.html">Back to the portal</a></span>
+    <span>Six features &middot; three response shapes</span>
+  </div>
+</div>
+<script type="module">
+/* Mermaid, themed from the page's own tokens and re-rendered when the viewer's
+   theme flips — a diagram initialised once against the light palette is
+   unreadable on the dark ground, which is the whole reason this re-runs. */
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+const sources = new Map();
+document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+  el.id = el.id || "mmd-" + i;
+  sources.set(el.id, el.textContent);
+});
+
+function tok(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+async function draw() {
+  const ink = tok("--ink"), ink2 = tok("--ink-2"), rule = tok("--rule");
+  const surface = tok("--surface"), surface2 = tok("--surface-2"), accent = tok("--safelight");
+
+  mermaid.initialize({
+    startOnLoad: false,
+    // "strict" disables HTML labels, which silently drops every <br/> in a node
+    // label and runs the lines together. The diagram sources here are authored in
+    // this file, not user input, so loose + htmlLabels is the correct trade.
+    securityLevel: "loose",
+    flowchart: { htmlLabels: true, useMaxWidth: true, curve: "basis", padding: 12 },
+    sequence: { useMaxWidth: true, wrap: true, width: 160 },
+    er: { useMaxWidth: true },
+    // A system monospace stack, deliberately NOT the page's webfont: mermaid sizes
+    // every label box by measuring text at render time, and a webfont that lands
+    // afterwards is wider than the fallback it measured — which clips node labels
+    // and subgraph titles with no error.
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+    theme: "base",
+    themeVariables: {
+      background: surface,
+      primaryColor: surface2,
+      primaryTextColor: ink,
+      primaryBorderColor: rule,
+      secondaryColor: surface,
+      tertiaryColor: surface,
+      lineColor: ink2,
+      textColor: ink,
+      mainBkg: surface2,
+      nodeBorder: rule,
+      clusterBkg: "transparent",
+      clusterBorder: rule,
+      titleColor: ink,
+      edgeLabelBackground: surface,
+      actorBkg: surface2,
+      actorBorder: rule,
+      actorTextColor: ink,
+      actorLineColor: ink2,
+      signalColor: ink2,
+      signalTextColor: ink2,
+      labelBoxBkgColor: surface2,
+      labelBoxBorderColor: accent,
+      labelTextColor: ink,
+      loopTextColor: ink2,
+      noteBkgColor: surface2,
+      noteBorderColor: accent,
+      noteTextColor: ink2,
+      sequenceNumberColor: surface,
+      activationBkgColor: surface2,
+      activationBorderColor: ink2,
+      altBackground: surface2
+    }
+  });
+
+  for (const [id, src] of sources) {
+    const host = document.getElementById(id);
+    if (!host) continue;
+    try {
+      const { svg } = await mermaid.render(id + "-svg-" + Date.now(), src);
+      host.innerHTML = svg;
+      host.removeAttribute("data-processed");
+    } catch (err) {
+      host.textContent = src;
+    }
+  }
+}
+
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(draw);
+
+const mq = window.matchMedia("(prefers-color-scheme: dark)");
+mq.addEventListener("change", draw);
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>

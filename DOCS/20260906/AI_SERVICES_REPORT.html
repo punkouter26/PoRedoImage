@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoRedoImage AI Services</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* ── Tokens ─────────────────────────────────────────────────────────────────
+   Selenium-toned neutrals (cool grey paper, ferrotype ink) with a single
+   safelight-oxide accent reserved for one job: marking a degraded path.
+   Chart series come from the validated categorical set; the accent never
+   appears as a series colour, so a fallback rail can never read as data. */
+:root {
+  color-scheme: light;
+
+  --paper:      #edeff0;
+  --surface:    #fafbfb;
+  --surface-2:  #f2f5f6;
+  --ink:        #10161a;
+  --ink-2:      #4c5a61;
+  --ink-3:      #7c8a91;
+  --rule:       #d8dee0;
+  --hair:       rgba(16, 22, 26, 0.10);
+  --shadow:     rgba(16, 22, 26, 0.07);
+
+  --safelight:  #a33a1e;
+  --safelight-wash: #f7e9e3;
+
+  --s1: #2a78d6;  --s2: #eb6834;  --s3: #1baf7a;  --s4: #eda100;  --s5: #e87ba4;
+  --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+  --grid: #e2e6e8; --axis: #c3cbce;
+
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  --measure: 68ch;
+  --gap: 22px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:      #0b0e10;
+    --surface:    #14191c;
+    --surface-2:  #1b2226;
+    --ink:        #e8eef0;
+    --ink-2:      #a0b0b7;
+    --ink-3:      #71828a;
+    --rule:       #242d32;
+    --hair:       rgba(232, 238, 240, 0.12);
+    --shadow:     rgba(0, 0, 0, 0.5);
+    --safelight:  #e27246;
+    --safelight-wash: #2a1912;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --grid: #232b2f; --axis: #39444a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:      #0b0e10;
+  --surface:    #14191c;
+  --surface-2:  #1b2226;
+  --ink:        #e8eef0;
+  --ink-2:      #a0b0b7;
+  --ink-3:      #71828a;
+  --rule:       #242d32;
+  --hair:       rgba(232, 238, 240, 0.12);
+  --shadow:     rgba(0, 0, 0, 0.5);
+  --safelight:  #e27246;
+  --safelight-wash: #2a1912;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --grid: #232b2f; --axis: #39444a;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16.5px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--f-display);
+  font-weight: 650;
+  letter-spacing: -0.017em;
+  line-height: 1.14;
+  text-wrap: balance;
+  margin: 0;
+}
+
+h1 { font-size: clamp(28px, 4.2vw, 44px); }
+h2 { font-size: clamp(22px, 2.7vw, 30px); }
+h3 { font-size: 19px; letter-spacing: -0.01em; }
+h4 { font-size: 15px; }
+
+p { margin: 0 0 1em; max-width: var(--measure); }
+p:last-child { margin-bottom: 0; }
+
+a { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--safelight); }
+a:hover { color: var(--safelight); }
+:focus-visible { outline: 2px solid var(--safelight); outline-offset: 3px; border-radius: 2px; }
+
+code, kbd, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+code {
+  background: var(--surface-2);
+  border: 1px solid var(--hair);
+  padding: 0.08em 0.36em;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+strong { font-weight: 600; }
+
+/* ── Header + Detail Switcher ───────────────────────────────────────────── */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.hdr-in {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 13px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+
+.brand-mark {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--safelight);
+  white-space: nowrap;
+}
+
+.brand-title {
+  font-family: var(--f-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switch {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.switch button {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  padding: 7px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s, color 0.14s;
+}
+
+.switch button:first-child { border-left: 0; }
+.switch button:hover { background: var(--surface-2); color: var(--ink); }
+
+.switch button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.switch button .n { opacity: 0.55; margin-right: 6px; }
+.switch button[aria-pressed="true"] .n { opacity: 0.7; }
+
+/* Cumulative disclosure: level 1 = tier 1 only, 2 = tiers 1+2, 3 = everything. */
+:root[data-level="1"] [data-tier="2"],
+:root[data-level="1"] [data-tier="3"],
+:root[data-level="2"] [data-tier="3"] { display: none !important; }
+
+/* ── Page frame ─────────────────────────────────────────────────────────── */
+.wrap { max-width: 1220px; margin: 0 auto; padding: 0 26px 96px; }
+
+.lede { padding: 44px 0 30px; border-bottom: 1px solid var(--rule); }
+.lede h1 { margin-bottom: 14px; }
+.lede .sub { font-size: 18px; color: var(--ink-2); max-width: 62ch; }
+
+.eyebrow {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 12px;
+}
+
+section { padding: 40px 0 4px; border-top: 1px solid var(--rule); }
+section:first-of-type { border-top: 0; }
+
+.sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+
+.tier {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex: none;
+}
+
+.sec-note { color: var(--ink-2); font-size: 16px; margin: 6px 0 22px; max-width: var(--measure); }
+
+.stack { display: flex; flex-direction: column; gap: var(--gap); }
+
+/* ── Cards & grids ──────────────────────────────────────────────────────── */
+.grid { display: grid; gap: var(--gap); }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(204px, 1fr)); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 20px 22px;
+}
+
+.card h3 { margin-bottom: 8px; }
+.card p { font-size: 15.5px; color: var(--ink-2); }
+
+.card-k {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+
+/* Navigation matrix cards read as destinations, not content blocks. */
+a.nav-card {
+  display: block;
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 22px;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+a.nav-card:hover {
+  border-color: var(--safelight);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px var(--shadow);
+  color: var(--ink);
+}
+
+a.nav-card h3 { margin-bottom: 7px; }
+a.nav-card p { font-size: 15px; color: var(--ink-2); margin-bottom: 14px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 7px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+.chip.on { border-color: color-mix(in srgb, var(--good) 45%, var(--rule)); color: var(--ink); }
+.chip.hot { border-color: color-mix(in srgb, var(--safelight) 55%, var(--rule)); color: var(--safelight); }
+
+/* Status is never colour alone: every dot ships with its label. */
+.st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 11.5px; white-space: nowrap; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ink-3); }
+.st.good::before { background: var(--good); }
+.st.warn::before { background: var(--warn); }
+.st.serious::before { background: var(--serious); }
+.st.crit::before { background: var(--crit); }
+
+/* ── Stat tiles — used only where the figure is the point ───────────────── */
+.stat { background: var(--surface); border: 1px solid var(--hair); border-radius: 5px; padding: 18px 20px; }
+.stat .v { font-family: var(--f-display); font-size: 32px; font-weight: 650; letter-spacing: -0.028em; line-height: 1; }
+.stat .l { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin-top: 9px; }
+.stat .d { font-size: 14px; color: var(--ink-2); margin-top: 7px; line-height: 1.45; }
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.scroll { overflow-x: auto; border: 1px solid var(--hair); border-radius: 5px; background: var(--surface); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+
+thead th {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: left;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+  background: var(--surface-2);
+}
+
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--hair); vertical-align: top; color: var(--ink-2); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody td:first-child { color: var(--ink); font-weight: 500; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-mono); }
+td .mono, th .mono { font-size: 12.5px; }
+td code { font-size: 12.5px; }
+.nw { white-space: nowrap; }
+
+/* ── Code blocks ────────────────────────────────────────────────────────── */
+pre.code {
+  margin: 0;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 16px 18px;
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  tab-size: 2;
+}
+
+pre.code b { color: var(--ink); font-weight: 600; }
+pre.code i { color: var(--ink-3); font-style: normal; }
+pre.code em { color: var(--safelight); font-style: normal; }
+
+.cap { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-3); margin-top: 9px; }
+
+/* ── The degradation rail — the one place the accent is spent ───────────── */
+.degrade {
+  background: var(--safelight-wash);
+  border: 1px solid color-mix(in srgb, var(--safelight) 26%, transparent);
+  border-left: 3px solid var(--safelight);
+  border-radius: 0 5px 5px 0;
+  padding: 16px 20px;
+}
+
+.degrade .card-k { color: var(--safelight); }
+.degrade p { font-size: 15px; color: var(--ink-2); }
+.degrade p:last-child { margin-bottom: 0; }
+
+/* ── Diagrams ───────────────────────────────────────────────────────────── */
+.diagram {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 20px 18px;
+  overflow-x: auto;
+}
+
+.diagram pre.mermaid { margin: 0; background: none; border: 0; padding: 0; text-align: center; }
+.diagram svg { max-width: 100%; height: auto; }
+
+/* ── Charts ─────────────────────────────────────────────────────────────── */
+/* Capped to its own content so the card does not trail dead space to the right
+   of a fixed-width plot; the scroll container handles anything narrower. */
+.chart { background: var(--surface); border: 1px solid var(--hair); border-radius: 5px;
+  padding: 20px 22px 16px; max-width: 860px; }
+.chart h4 { margin-bottom: 3px; }
+.chart .sub { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+.chart-body { overflow-x: auto; }
+.chart svg { display: block; }
+.chart svg text { font-family: var(--f-mono); fill: var(--ink-2); }
+.chart svg text.lab { fill: var(--ink); font-size: 12px; }
+.chart svg text.val { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.chart svg text.tick { fill: var(--ink-3); font-size: 10.5px; }
+.chart svg .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart svg .baseline { stroke: var(--axis); stroke-width: 1; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--hair); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-2); }
+.legend i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.foot { margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--rule); font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+
+@media (max-width: 640px) {
+  .wrap, .hdr-in { padding-left: 17px; padding-right: 17px; }
+  body { font-size: 16px; }
+  .switch button { padding: 7px 9px; font-size: 11px; }
+  .switch button .n { margin-right: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+  a.nav-card:hover { transform: none; }
+}
+</style>
+<script>
+/* Detail Switcher — cumulative disclosure.
+   1 Simple      = tier 1
+   2 Standard    = tier 1 + 2
+   3 All details = tier 1 + 2 + 3
+   Level lands on <html data-level> before first paint so nothing flashes, and
+   the choice rides along in localStorage so it survives a hop between reports. */
+(function () {
+  var KEY = "poredoimage-detail-level";
+  var root = document.documentElement;
+
+  function read() {
+    try {
+      var v = localStorage.getItem(KEY);
+      if (v === "1" || v === "2" || v === "3") return v;
+    } catch (e) { /* private window, blocked storage — fall through */ }
+    return "3";
+  }
+
+  function apply(level) {
+    root.setAttribute("data-level", level);
+    var btns = document.querySelectorAll(".switch button[data-level]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].setAttribute("aria-pressed", btns[i].getAttribute("data-level") === level ? "true" : "false");
+    }
+  }
+
+  apply(read());
+
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest ? ev.target.closest(".switch button[data-level]") : null;
+    if (!btn) return;
+    var level = btn.getAttribute("data-level");
+    apply(level);
+    try { localStorage.setItem(KEY, level); } catch (e) { /* nothing to persist to */ }
+  });
+
+  document.addEventListener("DOMContentLoaded", function () { apply(root.getAttribute("data-level") || "3"); });
+})();
+</script>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="brand">
+      <span class="brand-mark"><a href="index.html" style="color:inherit;text-decoration:none">&larr; Portal</a></span>
+      <span class="brand-title">AI Services</span>
+    </div>
+    <div class="switch" role="group" aria-label="Level of detail">
+      <button type="button" data-level="1" aria-pressed="false"><span class="n">1</span>Simple</button>
+      <button type="button" data-level="2" aria-pressed="false"><span class="n">2</span>Standard</button>
+      <button type="button" data-level="3" aria-pressed="true"><span class="n">3</span>All details</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="lede">
+    <div class="eyebrow">Report 01 &middot; AI services, cost and failure</div>
+    <h1>AI Services</h1>
+    <p class="sub">Nine provider ids across four execution locations, what each call costs, how long it
+    may take, and &mdash; the part this system cares most about &mdash; what the user is told when one
+    of them fails.</p>
+  </div>
+
+  <!-- ═══ TIER 1 ═══ -->
+  <section data-tier="1">
+    <div class="sec-head"><h2>Who serves which capability</h2><span class="tier">TIER 1</span></div>
+    <p class="sec-note">Model selection is per capability, never one global choice. The client picker
+    renders straight from this catalogue; the server routes on the id's <em>namespace</em>, so
+    <code>browser:qwen2.5-0.5b-instruct</code> and <code>device:qwen2.5-0.5b-instruct</code> &mdash;
+    the same weights under two different runtimes &mdash; can never be mistaken for one another.</p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Capability</th><th>Provider id</th><th>Runs on</th><th>Backing service</th><th class="num">Indicative</th></tr>
+        </thead>
+        <tbody>
+          <tr><td rowspan="5">Analyze image</td><td><span class="mono">remote:azure-cv</span></td><td>Azure</td><td><span class="mono">AzureVisionService</span> &mdash; tags, caption where the region serves it</td><td class="num">$0.001</td></tr>
+          <tr><td><span class="mono">remote:azure-openai-vision</span></td><td>Azure</td><td><span class="mono">OpenAiVisionService</span> &mdash; caption + tags in one chat call</td><td class="num">$0.0015</td></tr>
+          <tr><td><span class="mono">remote:gemini-vision</span></td><td>Google</td><td><span class="mono">GeminiVisionService</span>, registered optionally</td><td class="num">~$0.0003</td></tr>
+          <tr><td><span class="mono">browser:florence2-base</span></td><td>Browser (WebGPU)</td><td>Florence-2 base &mdash; ~230&nbsp;MB first run</td><td class="num">$0.000</td></tr>
+          <tr><td><span class="mono">ollama:vision</span></td><td>Local daemon</td><td><span class="mono">OllamaVisionService</span> &mdash; dev only</td><td class="num">$0.000</td></tr>
+
+          <tr><td rowspan="2">Generate image</td><td><span class="mono">remote:gemini-imagen3</span></td><td>Google</td><td><span class="mono">GeminiImagen3Service</span> &mdash; <span class="mono">gemini-2.5-flash-image</span></td><td class="num">$0.039</td></tr>
+          <tr><td><span class="mono">remote:gemini-imagen3-fast</span></td><td>Google</td><td>Same service, second instance on <span class="mono">Google:Imagen3FastModel</span></td><td class="num">~$0.020</td></tr>
+
+          <tr><td rowspan="2">Enhance description</td><td><span class="mono">remote:azure-openai</span></td><td>Azure</td><td><span class="mono">AzureOpenAiService</span>, memoised by <span class="mono">CachingGenerativeAiService</span></td><td class="num">$0.0015</td></tr>
+          <tr><td><span class="mono">browser:qwen2.5-0.5b-instruct</span></td><td>Browser (WebGPU)</td><td>Qwen2.5 0.5B &mdash; ~350&nbsp;MB, writes the prompt on-device</td><td class="num">$0.000</td></tr>
+
+          <tr><td>Style Director</td><td><span class="mono">remote:azure-openai</span></td><td>Azure</td><td><span class="mono">IChatCompletionService</span> &mdash; one deployment serves text and image parts</td><td class="num">$0.0015</td></tr>
+          <tr><td>Scene detail (OCR)</td><td><span class="mono">remote:azure-cv</span></td><td>Azure</td><td><span class="mono">AzureSceneDetailService</span> &mdash; Read, DenseCaptions, Objects, People</td><td class="num">$0.001</td></tr>
+          <tr><td>Create audio</td><td><span class="mono">remote:google-lyria</span></td><td>Google</td><td><span class="mono">LyriaMusicService</span> &mdash; performs supplied lyrics</td><td class="num">$0.040</td></tr>
+          <tr><td>Create video</td><td><span class="mono">Google:VeoModel</span></td><td>Google</td><td><span class="mono">VeoVideoGenerationService</span> &mdash; <span class="mono">veo-3.1-lite</span>, 8&nbsp;s at 720p</td><td class="num">$0.400</td></tr>
+          <tr><td>Meme caption (phone)</td><td><span class="mono">device:qwen2.5-0.5b-instruct</span></td><td>Android (ONNX GenAI)</td><td>int4 weights side-loaded to external storage, never bundled</td><td class="num">$0.000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-tier="1">
+    <div class="sec-head"><h2>What a call costs</h2><span class="tier">TIER 1</span></div>
+    <p class="sec-note">Indicative list prices from the <code>AiPricing</code> configuration section,
+    surfaced to the browser by <code>GET /api/pricing</code> and tallied per session by
+    <code>SessionCostService</code>. These are estimates shown in the UI, not billed amounts.</p>
+
+    <div class="chart">
+      <h4>Unit price per AI action</h4>
+      <div class="sub">USD, indicative. One eight-second clip costs what ten regenerated images cost, and
+      what four hundred vision calls cost &mdash; which is why Veo runs on the Lite tier and is mocked in
+      every non-production run.</div>
+      <div class="chart-body">
+        <svg viewBox="0 0 760 252" width="760" role="img" aria-label="Unit price per AI action, in US dollars. Video clip 0.400, music track 0.040, Imagen 3 image 0.039, Imagen 3 Fast image 0.020, text reasoning 0.0015, vision analysis 0.001, browser or on-device 0.000.">
+          <g>
+            <line class="gridline" x1="200" y1="22" x2="200" y2="228"></line>
+            <line class="gridline" x1="310" y1="22" x2="310" y2="228"></line>
+            <line class="gridline" x1="420" y1="22" x2="420" y2="228"></line>
+            <line class="gridline" x1="530" y1="22" x2="530" y2="228"></line>
+            <line class="gridline" x1="640" y1="22" x2="640" y2="228"></line>
+            <text class="tick" x="200" y="14" text-anchor="middle">$0</text>
+            <text class="tick" x="310" y="14" text-anchor="middle">$0.10</text>
+            <text class="tick" x="420" y="14" text-anchor="middle">$0.20</text>
+            <text class="tick" x="530" y="14" text-anchor="middle">$0.30</text>
+            <text class="tick" x="640" y="14" text-anchor="middle">$0.40</text>
+            <line class="baseline" x1="200" y1="228" x2="200" y2="22"></line>
+          </g>
+          <g>
+            <text class="lab" x="182" y="50" text-anchor="end">Video clip, 8&#8201;s</text>
+            <rect x="200" y="40" width="440" height="12" rx="3" fill="var(--s1)"></rect>
+            <text class="val" x="648" y="50">$0.400</text>
+
+            <text class="lab" x="182" y="78" text-anchor="end">Music track</text>
+            <rect x="200" y="68" width="44" height="12" rx="3" fill="var(--s1)"></rect>
+            <text class="val" x="252" y="78">$0.040</text>
+
+            <text class="lab" x="182" y="106" text-anchor="end">Image &mdash; Imagen&#8201;3</text>
+            <rect x="200" y="96" width="43" height="12" rx="3" fill="var(--s1)"></rect>
+            <text class="val" x="251" y="106">$0.039</text>
+
+            <text class="lab" x="182" y="134" text-anchor="end">Image &mdash; Fast tier</text>
+            <rect x="200" y="124" width="22" height="12" rx="3" fill="var(--s1)"></rect>
+            <text class="val" x="230" y="134">$0.020</text>
+
+            <text class="lab" x="182" y="162" text-anchor="end">Text reasoning</text>
+            <rect x="200" y="152" width="3" height="12" rx="1.5" fill="var(--s1)"></rect>
+            <text class="val" x="211" y="162">$0.0015</text>
+
+            <text class="lab" x="182" y="190" text-anchor="end">Vision analysis</text>
+            <rect x="200" y="180" width="3" height="12" rx="1.5" fill="var(--s1)"></rect>
+            <text class="val" x="211" y="190">$0.0010</text>
+
+            <text class="lab" x="182" y="218" text-anchor="end">Browser / on-device</text>
+            <rect x="200" y="208" width="1.5" height="12" fill="var(--axis)"></rect>
+            <text class="val" x="211" y="218">$0.0000</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div style="height:22px"></div>
+
+    <div class="chart">
+      <h4>Timeout budget per HTTP client</h4>
+      <div class="sub">Seconds. The per-attempt value is the one that matters: the standard resilience
+      handler defaults it to <strong>ten seconds</strong>, and raising only the total request timeout
+      changed nothing &mdash; every attempt still died at ten while real generative calls ran 30&ndash;90&nbsp;s.</div>
+      <div class="chart-body">
+        <svg viewBox="0 0 760 240" width="760" role="img" aria-label="Timeout budget in seconds per HTTP client. Gemini API client: 120 seconds per attempt, 300 seconds total. BFF self-client: 120 per attempt, 240 total. Ollama client: 300 per attempt, 300 total. Observed generative call duration is 30 to 90 seconds.">
+          <g>
+            <rect x="244" y="22" width="88" height="178" fill="var(--s2)" opacity="0.15"></rect>
+            <line class="gridline" x1="244" y1="22" x2="244" y2="200" stroke-dasharray="3 3"></line>
+            <line class="gridline" x1="332" y1="22" x2="332" y2="200" stroke-dasharray="3 3"></line>
+            <text class="tick" x="288" y="218" text-anchor="middle">observed generative call &mdash; 30&ndash;90&#8201;s</text>
+          </g>
+          <g>
+            <line class="gridline" x1="288" y1="22" x2="288" y2="200"></line>
+            <line class="gridline" x1="376" y1="22" x2="376" y2="200"></line>
+            <line class="gridline" x1="464" y1="22" x2="464" y2="200"></line>
+            <line class="gridline" x1="552" y1="22" x2="552" y2="200"></line>
+            <line class="gridline" x1="640" y1="22" x2="640" y2="200"></line>
+            <text class="tick" x="200" y="14" text-anchor="middle">0</text>
+            <text class="tick" x="288" y="14" text-anchor="middle">60&#8201;s</text>
+            <text class="tick" x="376" y="14" text-anchor="middle">120&#8201;s</text>
+            <text class="tick" x="464" y="14" text-anchor="middle">180&#8201;s</text>
+            <text class="tick" x="552" y="14" text-anchor="middle">240&#8201;s</text>
+            <text class="tick" x="640" y="14" text-anchor="middle">300&#8201;s</text>
+            <line class="baseline" x1="200" y1="200" x2="200" y2="22"></line>
+          </g>
+          <g>
+            <text class="lab" x="182" y="62" text-anchor="end">Gemini &middot; Lyria &middot; Veo</text>
+            <rect x="200" y="40" width="176" height="14" rx="3" fill="var(--s1)"></rect>
+            <text class="val" x="384" y="51">120&#8201;s</text>
+            <rect x="200" y="58" width="440" height="14" rx="3" fill="var(--s2)"></rect>
+            <text class="val" x="648" y="69">300&#8201;s</text>
+
+            <text class="lab" x="182" y="118" text-anchor="end">BFF self-client</text>
+            <rect x="200" y="96" width="176" height="14" rx="3" fill="var(--s1)"></rect>
+            <text class="val" x="384" y="107">120&#8201;s</text>
+            <rect x="200" y="114" width="352" height="14" rx="3" fill="var(--s2)"></rect>
+            <text class="val" x="560" y="125">240&#8201;s</text>
+
+            <text class="lab" x="182" y="174" text-anchor="end">Ollama, local</text>
+            <rect x="200" y="152" width="440" height="14" rx="3" fill="var(--s1)"></rect>
+            <text class="val" x="648" y="163">300&#8201;s</text>
+            <rect x="200" y="170" width="440" height="14" rx="3" fill="var(--s2)"></rect>
+            <text class="val" x="648" y="181">300&#8201;s</text>
+          </g>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--s1)"></i>Per attempt</span>
+        <span><i style="background:var(--s2)"></i>Total request, all retries</span>
+      </div>
+    </div>
+  </section>
+
+  <section data-tier="1">
+    <div class="sec-head"><h2>Cost projection</h2><span class="tier">TIER 1</span></div>
+    <p class="sec-note">Arithmetic on the indicative prices above &mdash; what one run of each feature
+    costs, and what a hundred of them cost. Nothing here is metered billing; it is the same estimate the
+    session meter shows the user.</p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Feature run</th><th>Composition</th><th class="num">Per run</th><th class="num">&times;100</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Meme</td><td>vision + caption; the overlay is rendered locally by ImageSharp at no AI cost</td><td class="num">$0.0025</td><td class="num">$0.25</td></tr>
+          <tr><td>Style Director</td><td>one chat completion returning subject, mood, directions and a prompt</td><td class="num">$0.0015</td><td class="num">$0.15</td></tr>
+          <tr><td>Meme template render</td><td>no AI call at all &mdash; template geometry plus text layout</td><td class="num">$0.0000</td><td class="num">$0.00</td></tr>
+          <tr><td>Regeneration</td><td>vision + prompt enhancement + one Imagen&#8201;3 image</td><td class="num">$0.0415</td><td class="num">$4.15</td></tr>
+          <tr><td>Rap Roast</td><td>vision + lyric writing + one Lyria track</td><td class="num">$0.0425</td><td class="num">$4.25</td></tr>
+          <tr><td>Bulk board, 10 slots</td><td>one person description + ten images</td><td class="num">$0.3915</td><td class="num">$39.15</td></tr>
+          <tr><td>Video clip</td><td>a single Veo render, 8&nbsp;s at 720p</td><td class="num">$0.4000</td><td class="num">$40.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="height:22px"></div>
+
+    <div class="grid g3">
+      <div class="stat">
+        <div class="v">6&nbsp;h</div>
+        <div class="l">Vision cache TTL</div>
+        <div class="d">Keyed on the SHA-256 of the image bytes, scoped per backend. &ldquo;Try again&rdquo;,
+        result chaining and a bulk batch all re-ask the same question &mdash; each was a fresh metered
+        call before the decorator existed.</div>
+      </div>
+      <div class="stat">
+        <div class="v">10/min</div>
+        <div class="l">AI rate limit, per user</div>
+        <div class="d">Sliding window, six segments, queue of two. Partitioned by
+        <span class="mono">NameIdentifier</span> so one user's bulk batch cannot starve another on the
+        same IP.</div>
+      </div>
+      <div class="stat">
+        <div class="v">4</div>
+        <div class="l">Bulk fan-out concurrency</div>
+        <div class="d">Ten slots, four in flight, two retries each with 500&nbsp;ms doubling backoff. A
+        slot that fails is marked failed; the batch continues.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ TIER 2 ═══ -->
+  <section data-tier="2">
+    <div class="sec-head"><h2>Reading a photo &mdash; routing and the two-call fallback</h2><span class="tier">TIER 2</span></div>
+    <p class="sec-note">The Rap Roast path exercises the whole vision surface: an id resolves a backend,
+    Azure Computer Vision can answer four visual features in one request, and when it cannot the two
+    calls run concurrently instead of in sequence.</p>
+
+    <div class="diagram">
+<pre class="mermaid">sequenceDiagram
+  autonumber
+  participant O as RapRoastOrchestrator
+  participant R as IVisionServiceRouter
+  participant CV as AzureVisionService (+cache)
+  participant SD as AzureSceneDetailService
+  participant CH as IChatCompletionService
+  O->>R: Resolve(modelId)
+  R-->>O: CachingVisionService, scoped per backend
+  alt backend supports combined analysis
+    O->>SD: AnalyzeAllAsync — Caption+Tags+Read+DenseCaptions
+    SD-->>O: description, tags, details — one call, one charge
+  else Ollama chosen, or the combined call threw
+    par concurrent, neither reads the other
+      O->>CV: AnalyzeAsync(bytes)
+      O->>SD: GetDetailsAsync(bytes)
+    end
+    Note over O,SD: detail failure degrades the bars, never fails the request
+  end
+  O->>CH: SceneDescriber — turn tags into a real scene read
+  alt chat configured and it answered
+    CH-->>O: structured snapshot, Detailed = true
+  else not configured, rate-limited, or refused
+    CH-->>O: tag-derived text +  — DescriptionFallbackReason
+  end</pre>
+    </div>
+
+    <div style="height:22px"></div>
+
+    <div class="degrade">
+      <div class="card-k">Fallback that had to be named</div>
+      <p>The UI once hardcoded a single explanation for every one of these paths &mdash; &ldquo;no vision
+      model was available &mdash; configure HuggingFace:ApiKey&rdquo;. A rate-limited call, a
+      content-filter refusal and an unconfigured backend are three different problems with three
+      different recoveries, and naming the wrong one sent people to change settings that were already
+      fine. <code>DescriptionFallbackReason</code> now carries the actual reason to the browser.</p>
+    </div>
+  </section>
+
+  <section data-tier="2">
+    <div class="sec-head"><h2>Retry, circuit breaker, and where the fallback lands</h2><span class="tier">TIER 2</span></div>
+    <p class="sec-note">The three resilience values are interdependent and validated at startup:
+    <code>TotalRequestTimeout &ge; AttemptTimeout</code>, and
+    <code>CircuitBreaker.SamplingDuration &ge; 2 &times; AttemptTimeout</code>. Change one without the
+    others and the host throws on boot.</p>
+
+    <div class="diagram">
+<pre class="mermaid">sequenceDiagram
+  autonumber
+  participant E as Slice endpoint
+  participant H as GeminiApi named client
+  participant P as Standard resilience pipeline
+  participant G as Google API
+  E->>H: GenerateAsync(prompt)
+  H->>P: attempt 1 — 120 s budget
+  P->>G: POST :generateContent
+  G--xP: 503 / timeout
+  P->>G: attempt 2, after backoff
+  G--xP: 503 / timeout
+  P->>G: attempt 3 — last of MaxRetryAttempts = 2
+  G--xP: 503 / timeout
+  Note over P: failures inside a 240 s sampling window — trip the breaker; total request cut at 300 s
+  P-->>H: TimeoutRejectedException / BrokenCircuitException
+  H-->>E: throws
+  alt endpoint maps the failure
+    E-->>E: 422 declined · 503 unauthorised · 502 upstream
+  else caller substitutes canned output
+    E-->>E: degraded answer + a named reason
+  end</pre>
+    </div>
+
+    <div style="height:22px"></div>
+
+    <div class="grid g2">
+      <div class="card">
+        <div class="card-k">The failure mode to understand</div>
+        <p>Callers of the chat, vision and image services catch failures and substitute canned output. A
+        broken provider therefore degrades several features at once while <code>/health</code> still
+        reports green &mdash; which is exactly how a dead image provider went unnoticed until its
+        account ran out of credit.</p>
+      </div>
+      <div class="card">
+        <div class="card-k">Where mock services are allowed</div>
+        <p><code>Mocks:UseMockAi</code> is gated to the Test environment by <code>MockAiGate</code>. Each
+        mock implements <code>IMockable</code>, and the client probes
+        <code>/api/diag/mock-status</code> at start-up to render a &ldquo;USING MOCK DATA&rdquo; banner
+        listing every reason. A delegating handler blocks any outbound AI call while mocks are on, so a
+        future regression fails loudly rather than spending a live token.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ TIER 3 ═══ -->
+  <section data-tier="3">
+    <div class="sec-head"><h2>Configuration schema</h2><span class="tier">TIER 3</span></div>
+    <p class="sec-note">Every key is a constant on <code>ConfigKeys</code> &mdash; these were once 74
+    string literals spread across two projects, where a typo produced a silent null rather than a compile
+    error. Secrets resolve from Key Vault <code>kv-poshared</code> under a name mapping; local runs use
+    the same vault through <code>DefaultAzureCredential</code>.</p>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Key</th><th>Default</th><th>Effect of changing it</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">Google:ApiKey</span></td><td>Key Vault</td><td>Gates image generation, Lyria and Veo simultaneously &mdash; <span class="mono">IsConfigured</span> goes false on all three.</td></tr>
+          <tr><td><span class="mono">Google:Imagen3Model</span></td><td><span class="mono">gemini-2.5-flash-image</span></td><td>The single largest per-request charge in the app. Cheaper capable alternatives exist; the free-tier model has quota limits unsuitable for production.</td></tr>
+          <tr><td><span class="mono">Google:Imagen3FastModel</span></td><td>unset</td><td>When set, a second <span class="mono">GeminiImagen3Service</span> is constructed and the router honours <span class="mono">remote:gemini-imagen3-fast</span>. Unset, that id falls through to standard.</td></tr>
+          <tr><td><span class="mono">Google:VeoModel</span></td><td><span class="mono">veo-3.1-lite-generate-preview</span></td><td>Changes what a render costs &mdash; Lite 720p is $0.05/s against $0.40 for Standard. Update <span class="mono">AiPricing</span> in the same change.</td></tr>
+          <tr><td><span class="mono">OpenAI:ChatCompletionsDeployment</span></td><td><span class="mono">gpt-5.4-nano</span></td><td>Deliberately <strong>not</strong> a Key Vault secret: a stale vault copy once shadowed the live value and produced <span class="mono">404 DeploymentNotFound</span>. Production overrides it with a literal app setting.</td></tr>
+          <tr><td><span class="mono">ComputerVision:MinTagConfidence</span></td><td><span class="mono">0.6</span></td><td>Tags below the threshold are dropped before they reach a description, a prompt or blob metadata.</td></tr>
+          <tr><td><span class="mono">Ollama:VisionModel</span></td><td><span class="mono">gemma4</span></td><td>Routes <span class="mono">ollama:*</span> analysis to the local daemon.</td></tr>
+          <tr><td><span class="mono">Ollama:ChatModel</span></td><td>empty</td><td>Setting it moves <em>all</em> free-form reasoning off Azure OpenAI for the whole process. Resolved once at startup &mdash; a deployment decision, not a per-request one.</td></tr>
+          <tr><td><span class="mono">Vision:SecondOpinion</span></td><td><span class="mono">false</span></td><td>Consults a second vision model and merges its answer. Off by default: roughly doubles the vision cost for a marginal gain once OCR supplies facts.</td></tr>
+          <tr><td><span class="mono">ImageGen:Provider</span></td><td><span class="mono">google</span></td><td><strong>Vestigial.</strong> Nothing reads it for routing; it survives only so a pre-existing App Service setting cannot fail configuration binding, and so the pricing endpoint resolves a known label.</td></tr>
+          <tr><td><span class="mono">Mocks:UseMockAi</span></td><td><span class="mono">false</span></td><td>Swaps in mock vision, generative, image-gen, chat, music and video services. Honoured only in the Test environment.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-tier="3">
+    <div class="sec-head"><h2>Service registration bindings</h2><span class="tier">TIER 3</span></div>
+    <p class="sec-note">All wiring lives in <code>AddPoRedoImageInfrastructure</code>. Note the decorator
+    placement: each vision backend gets its <em>own</em> cache wrapper, because the cache key is the
+    image content hash and one shared wrapper would serve an Ollama answer to a caller who asked for
+    Azure.</p>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Abstraction</th><th>Implementation</th><th>Lifetime</th><th>Decorator / note</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">IVisionService</span></td><td><span class="mono">AzureVisionService</span></td><td>Singleton</td><td><span class="mono">CachingVisionService("vision:azure-cv")</span></td></tr>
+          <tr><td><span class="mono">IVisionServiceRouter</span></td><td><span class="mono">VisionServiceRouter</span></td><td>Singleton</td><td>Builds four scoped cache wrappers in its constructor; Gemini is a nullable ctor argument</td></tr>
+          <tr><td><span class="mono">IGenerativeAiService</span></td><td><span class="mono">AzureOpenAiService</span></td><td>Singleton</td><td><span class="mono">CachingGenerativeAiService</span></td></tr>
+          <tr><td><span class="mono">IImageGenerationService</span></td><td><span class="mono">GeminiImagen3Service</span></td><td>Singleton</td><td>The only real implementation</td></tr>
+          <tr><td><span class="mono">IImageGenerationRouter</span></td><td><span class="mono">ImageGenerationRouter</span></td><td>Singleton</td><td>Standard + optional fast instance; every unrecognised id maps to standard</td></tr>
+          <tr><td><span class="mono">IChatCompletionService</span></td><td><span class="mono">Ollama</span> or <span class="mono">AzureOpenAi</span></td><td>Singleton</td><td>Chosen <strong>once at startup</strong> on <span class="mono">Ollama:ChatModel</span></td></tr>
+          <tr><td><span class="mono">IMusicGenerationService</span></td><td><span class="mono">LyriaMusicService</span></td><td>Singleton</td><td>Performs supplied lyrics rather than an instrumental bed</td></tr>
+          <tr><td><span class="mono">IVideoGenerationService</span></td><td><span class="mono">VeoVideoGenerationService</span></td><td>Singleton</td><td>Start + poll; the client holds the operation handle</td></tr>
+          <tr><td><span class="mono">ISceneDetailProvider</span></td><td><span class="mono">AzureSceneDetailService</span></td><td>Singleton</td><td>Also implements <span class="mono">ICombinedVisionAnalyzer</span>; <span class="mono">NullSceneDetailProvider</span> under mocks</td></tr>
+          <tr><td><span class="mono">IMemeGeneratorService</span></td><td><span class="mono">ImageSharpMemeGeneratorService</span></td><td>Scoped</td><td>Local render, no network</td></tr>
+          <tr><td><span class="mono">IMemeTemplateService</span></td><td><span class="mono">MemeTemplateService</span></td><td>Singleton</td><td>Immutable catalogue; the DTO projection is held in <span class="mono">HybridCache</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-tier="3">
+    <div class="sec-head"><h2>Routing rules, exactly</h2><span class="tier">TIER 3</span></div>
+
+    <div class="grid g2">
+      <div>
+        <h4 style="margin-bottom:10px">Vision &mdash; per request, on the namespace</h4>
+<pre class="code"><b>IVisionService Resolve(string? modelId)</b>
+  <em>ollama:*</em>                        &rarr; OllamaVisionService
+  <em>remote:azure-openai-vision</em>      &rarr; OpenAiVisionService
+  <em>remote:gemini-vision</em>            &rarr; GeminiVisionService <i>(if registered)</i>
+  <i>everything else, incl. browser:*</i>  &rarr; AzureVisionService</pre>
+        <div class="cap">A <span class="mono">browser:</span> id should never have reached the server at
+        all &mdash; falling through to the default is the safe reading of an id this router should not
+        have seen.</div>
+      </div>
+
+      <div>
+        <h4 style="margin-bottom:10px">Image generation &mdash; one provider deep</h4>
+<pre class="code"><b>IImageGenerationService Resolve(string? modelId)</b>
+  <em>remote:gemini-imagen3-fast</em>  &rarr; fast instance <i>(if configured)</i>
+  <i>anything else, incl. null</i>     &rarr; GeminiImagen3Service</pre>
+        <div class="cap">The indirection is kept, not collapsed into a direct dependency: it is the slot
+        where a second provider returns. It carried a HuggingFace branch until August 2026.</div>
+      </div>
+    </div>
+  </section>
+
+  <section data-tier="3">
+    <div class="sec-head"><h2>Fallback catalogue</h2><span class="tier">TIER 3</span></div>
+    <p class="sec-note">Every degraded path in the AI layer, the field that carries it to the browser, and
+    the recovery it points at. A new fallback without an entry here will fail review.</p>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Trigger</th><th>Behaviour</th><th>Field on the wire</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Computer Vision region does not serve <span class="mono">Caption</span></td>
+            <td>One 400 teaches the service permanently (<span class="mono">_captionUnsupported</span>), then every call is Tags-only and the description is synthesised from the top eight tags.</td>
+            <td><span class="mono">DescriptionFallbackReason</span></td>
+          </tr>
+          <tr>
+            <td>200 response carrying no caption</td>
+            <td>Same tag-derived text, but the flag is <em>not</em> set &mdash; a missing caption is not a region failure and must not poison later calls.</td>
+            <td><span class="mono">DescriptionFallbackReason</span></td>
+          </tr>
+          <tr>
+            <td>Combined vision analysis throws</td>
+            <td>Falls back to two concurrent calls. The combined call is an optimisation, so its failure must cost what it saved and nothing more.</td>
+            <td>&mdash; <span class="st warn">logged, not user-facing</span></td>
+          </tr>
+          <tr>
+            <td>Scene detail (OCR) throws</td>
+            <td>Returns <span class="mono">SceneDetails.Empty</span>. Losing OCR degrades the bars; it must never fail the request.</td>
+            <td>&mdash; <span class="st warn">logged, not user-facing</span></td>
+          </tr>
+          <tr>
+            <td>Chat service unconfigured or failing</td>
+            <td>Style Director drops to a deterministic rule-based path, and each reasoning step in the trace says so.</td>
+            <td><span class="mono">StyleDirectorReasoningEntryDto.FallbackReason</span></td>
+          </tr>
+          <tr>
+            <td>Music provider refuses the lyrics</td>
+            <td>Exactly one softened rewrite, then lyrics-only. Capped at two attempts &mdash; without a cap a stubborn safety filter would bill on a loop.</td>
+            <td><span class="mono">AudioRefused</span>, <span class="mono">RefusalReason</span>, <span class="mono">LyricsSoftened</span></td>
+          </tr>
+          <tr>
+            <td>Music provider not configured</td>
+            <td>Returns the bars alone rather than failing &mdash; a normal local-dev state.</td>
+            <td><span class="mono">RefusalReason</span></td>
+          </tr>
+          <tr>
+            <td>Person description fails on a bulk batch</td>
+            <td>Returns an empty description so image-to-image still runs against the raw <span class="mono">&lt;PERSON&gt;</span> token.</td>
+            <td>Empty <span class="mono">BulkDescribeResponse</span></td>
+          </tr>
+          <tr>
+            <td>Browser-local inference fails</td>
+            <td><strong>No fallback.</strong> <span class="mono">LocalInferenceException</span> surfaces verbatim &mdash; silently billing a user who picked a free on-device model is a surprise charge.</td>
+            <td>Exception text</td>
+          </tr>
+          <tr>
+            <td>On-device caption fails (Android)</td>
+            <td><strong>No fallback</strong>, for the same reason. <span class="mono">OnDeviceCaptionException</span> surfaces verbatim.</td>
+            <td>Exception text</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>Report 01 &mdash; AI Services</span>
+    <span><a href="index.html">Back to the portal</a></span>
+    <span>Prices indicative, from AiPricing</span>
+  </div>
+</div>
+<script type="module">
+/* Mermaid, themed from the page's own tokens and re-rendered when the viewer's
+   theme flips — a diagram initialised once against the light palette is
+   unreadable on the dark ground, which is the whole reason this re-runs. */
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+const sources = new Map();
+document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+  el.id = el.id || "mmd-" + i;
+  sources.set(el.id, el.textContent);
+});
+
+function tok(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+async function draw() {
+  const ink = tok("--ink"), ink2 = tok("--ink-2"), rule = tok("--rule");
+  const surface = tok("--surface"), surface2 = tok("--surface-2"), accent = tok("--safelight");
+
+  mermaid.initialize({
+    startOnLoad: false,
+    // "strict" disables HTML labels, which silently drops every <br/> in a node
+    // label and runs the lines together. The diagram sources here are authored in
+    // this file, not user input, so loose + htmlLabels is the correct trade.
+    securityLevel: "loose",
+    flowchart: { htmlLabels: true, useMaxWidth: true, curve: "basis", padding: 12 },
+    sequence: { useMaxWidth: true, wrap: true, width: 160 },
+    er: { useMaxWidth: true },
+    // A system monospace stack, deliberately NOT the page's webfont: mermaid sizes
+    // every label box by measuring text at render time, and a webfont that lands
+    // afterwards is wider than the fallback it measured — which clips node labels
+    // and subgraph titles with no error.
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+    theme: "base",
+    themeVariables: {
+      background: surface,
+      primaryColor: surface2,
+      primaryTextColor: ink,
+      primaryBorderColor: rule,
+      secondaryColor: surface,
+      tertiaryColor: surface,
+      lineColor: ink2,
+      textColor: ink,
+      mainBkg: surface2,
+      nodeBorder: rule,
+      clusterBkg: "transparent",
+      clusterBorder: rule,
+      titleColor: ink,
+      edgeLabelBackground: surface,
+      actorBkg: surface2,
+      actorBorder: rule,
+      actorTextColor: ink,
+      actorLineColor: ink2,
+      signalColor: ink2,
+      signalTextColor: ink2,
+      labelBoxBkgColor: surface2,
+      labelBoxBorderColor: accent,
+      labelTextColor: ink,
+      loopTextColor: ink2,
+      noteBkgColor: surface2,
+      noteBorderColor: accent,
+      noteTextColor: ink2,
+      sequenceNumberColor: surface,
+      activationBkgColor: surface2,
+      activationBorderColor: ink2,
+      altBackground: surface2
+    }
+  });
+
+  for (const [id, src] of sources) {
+    const host = document.getElementById(id);
+    if (!host) continue;
+    try {
+      const { svg } = await mermaid.render(id + "-svg-" + Date.now(), src);
+      host.innerHTML = svg;
+      host.removeAttribute("data-processed");
+    } catch (err) {
+      host.textContent = src;
+    }
+  }
+}
+
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(draw);
+
+const mq = window.matchMedia("(prefers-color-scheme: dark)");
+mq.addEventListener("change", draw);
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>
