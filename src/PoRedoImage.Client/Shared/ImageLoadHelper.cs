@@ -36,7 +36,8 @@ public static class ImageLoadHelper
     {
         try
         {
-            var fileType = Path.GetExtension(file.Name).ToLower();
+            // ToLowerInvariant — current-culture ToLower() risks Turkish-I casing and is more expensive.
+            var fileType = Path.GetExtension(file.Name).ToLowerInvariant();
             if (fileType != ".jpg" && fileType != ".jpeg" && fileType != ".png" && fileType != ".webp")
                 return (null, "Only JPG, PNG, and WebP files are supported.");
 

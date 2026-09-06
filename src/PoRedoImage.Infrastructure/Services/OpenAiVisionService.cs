@@ -103,17 +103,24 @@ public sealed class OpenAiVisionService(
 
             var description = root.TryGetProperty("description", out var d) ? d.GetString() ?? "" : "";
 
-            var tags = new List<string>();
+            var tags = new List<string>(16);
             if (root.TryGetProperty("tags", out var t) && t.ValueKind == JsonValueKind.Array)
             {
+                // Hand-rolled dedup with a capacity-hinted HashSet — avoids the double pass
+                // (.Distinct() re-walks the list) and stops the moment we hit the 16-tag cap.
+                var seen = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var item in t.EnumerateArray())
                 {
                     var tag = item.GetString()?.Trim().ToLowerInvariant();
-                    if (!string.IsNullOrEmpty(tag)) tags.Add(tag);
+                    if (!string.IsNullOrEmpty(tag) && seen.Add(tag))
+                    {
+                        tags.Add(tag);
+                        if (tags.Count == 16) break;
+                    }
                 }
             }
 
-            return (description.Trim(), tags.Distinct().Take(16).ToList());
+            return (description.Trim(), tags);
         }
         catch (JsonException)
         {

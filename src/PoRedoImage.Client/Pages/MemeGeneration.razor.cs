@@ -35,6 +35,14 @@ public partial class MemeGeneration : FeaturePageBase
     private string? _selectedTemplateId;
     private List<string> _zoneTexts = [];
 
+    // Hoisted: the analyze response can carry a 700+ KB base64 meme, and rebuilding the
+    // JsonSerializerOptions graph on every call would force fresh metadata caches.
+    private static readonly System.Text.Json.JsonSerializerOptions AnalyzeJsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        MaxDepth = 64,
+    };
+
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
@@ -148,11 +156,6 @@ public partial class MemeGeneration : FeaturePageBase
                     // The response can carry a 700+ KB base64 meme + an optional regenerated image,
                     // which approaches Blazor WASM's default deserialization budget. Bump the limit and
                     // explicitly use System.Text.Json to keep behaviour deterministic across hosts.
-                    var jsonOpts = new System.Text.Json.JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true,
-                        MaxDepth = 64,
-                    };
                     // ReadAsStringAsync first so we can show progress and avoid a stuck-progress state
                     // when deserialization of a multi-MB payload takes a noticeable moment on the WASM side.
                     progressMessage = "Decoding meme…";
@@ -160,7 +163,7 @@ public partial class MemeGeneration : FeaturePageBase
                     var rawJson = await httpResponse.Content.ReadAsStringAsync(cts.Token);
                     progressMessage = "Rendering result…";
                     try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-                    analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(rawJson, jsonOpts);
+                    analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(rawJson, AnalyzeJsonOpts);
                     if (analysisResult == null)
                         throw new InvalidOperationException("No response received from API.");
 

@@ -146,16 +146,23 @@ public sealed class GeminiVisionService : IVisionService
         {
             using var json = JsonDocument.Parse(text);
             var desc = json.RootElement.TryGetProperty("description", out var d) ? d.GetString() ?? "" : "";
-            var tagList = new List<string>();
+            var tags = new List<string>(16);
             if (json.RootElement.TryGetProperty("tags", out var tg) && tg.ValueKind == JsonValueKind.Array)
             {
+                // Hand-rolled dedup with a capacity-hinted HashSet — avoids the double pass
+                // (.Distinct() re-walks the list) and stops the moment we hit the 16-tag cap.
+                var seen = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var el in tg.EnumerateArray())
                 {
                     var val = el.GetString()?.Trim().ToLowerInvariant();
-                    if (!string.IsNullOrEmpty(val)) tagList.Add(val);
+                    if (!string.IsNullOrEmpty(val) && seen.Add(val))
+                    {
+                        tags.Add(val);
+                        if (tags.Count == 16) break;
+                    }
                 }
             }
-            return (string.IsNullOrWhiteSpace(desc) ? "No description available." : desc, tagList.Distinct().Take(16).ToList());
+            return (string.IsNullOrWhiteSpace(desc) ? "No description available." : desc, tags);
         }
         catch
         {

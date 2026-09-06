@@ -48,6 +48,13 @@ public partial class BulkGenerate
 
     private sealed record BulkSavedState(BulkGenerateImageResult[] Results);
 
+    // Hoisted out of OnAfterRenderAsync so the JsonSerializerOptions graph (with its metadata
+    // caches) is built once instead of per circuit-restore attempt.
+    private static readonly System.Text.Json.JsonSerializerOptions RestoreJsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
@@ -105,9 +112,7 @@ public partial class BulkGenerate
                 var savedJson = await JSRuntime.InvokeAsync<string?>("bulkStateManager.load");
                 if (!string.IsNullOrEmpty(savedJson))
                 {
-                    var state = System.Text.Json.JsonSerializer.Deserialize<BulkSavedState>(
-                        savedJson,
-                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    var state = System.Text.Json.JsonSerializer.Deserialize<BulkSavedState>(savedJson, RestoreJsonOpts);
                     if (state?.Results?.Length > 0)
                     {
                         _results = [.. state.Results];
@@ -300,9 +305,8 @@ public partial class BulkGenerate
                 StateHasChanged();
                 // Persist results to localStorage so they survive circuit disconnection
                 _ = JSRuntime.InvokeVoidAsync("bulkStateManager.save",
-                    System.Text.Json.JsonSerializer.Serialize(new { Results = _results })).AsTask();
+                    System.Text.Json.JsonSerializer.Serialize(new BulkSavedState(_results.ToArray()), RestoreJsonOpts)).AsTask();
             }
-
             // Any slot the server never reported is a slot that did not land — mark it rather than
             // leaving it spinning forever.
             foreach (var slot in _results.Where(r => r.Status == BulkGenerateStatus.Processing))
