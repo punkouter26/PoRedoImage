@@ -6,6 +6,7 @@ using PoRedoImage.Client.LocalAi;
 using PoRedoImage.Client.Models;
 using PoRedoImage.Client.Services;
 using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Shared.Json;
 using PoRedoImage.Client.Shared;
 using Microsoft.JSInterop;
 using Radzen;
@@ -263,6 +264,86 @@ public abstract class FeaturePageBase : ComponentBase
 
         await AddLocalEnhancementAsync(request, descriptionLength, ct);
         return request;
+    }
+
+    /// <summary>
+    /// <see cref="BuildAnalysisRequestAsync"/> wrapped in the two failure cases every caller has to
+    /// handle, returning <c>null</c> when the request could not be built.
+    /// </summary>
+    /// <remarks>
+    /// Both catch blocks were previously copy-pasted verbatim into ImageRegeneration and
+    /// MemeGeneration. The <see cref="OperationCanceledException"/> one especially must not be
+    /// dropped: <c>LocalInferenceSession</c> deliberately rethrows it unwrapped rather than as a
+    /// <see cref="LocalInferenceException"/>, so a page that only catches the latter lets it fall
+    /// through to its outer generic handler, skipping the <c>isProcessing</c> reset and leaving the
+    /// progress bar frozen. On a <c>null</c> return the caller must simply return — this has already
+    /// set <c>errorMessage</c> and cleared <c>isProcessing</c>.
+    /// </remarks>
+    protected async Task<ImageAnalysisRequest?> TryBuildAnalysisRequestAsync(
+        string imageData,
+        string contentType,
+        string fileName,
+        int descriptionLength,
+        ProcessingMode mode,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            return await BuildAnalysisRequestAsync(
+                imageData, contentType, fileName, descriptionLength, mode, ct);
+        }
+        catch (LocalInferenceException ex)
+        {
+            errorMessage = LocalAiErrorClassifier.Describe(ex.Failure);
+            isProcessing = false;
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            errorMessage = "On-device model setup took too long, likely the first-run model "
+                + "download. Try again on a faster connection, or pick a remote provider in AI services.";
+            isProcessing = false;
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Turns a non-success response from <c>api/images/analyze</c> into a user-facing message.
+    /// Returns <c>true</c> when the page should stop because a redirect is already under way.
+    /// </summary>
+    /// <remarks>
+    /// The 401 branch is the reason this is shared rather than inlined. A missing or expired BFF
+    /// session cookie (idle tab, server restart with rotated DataProtection keys, cleared cookies)
+    /// produces an empty body, so reading it as ProblemDetails throws and the user is told to
+    /// "check that Azure services are configured" — which sends them debugging infrastructure when
+    /// their tab only needed to re-authenticate. <c>forceLoad</c> bypasses the SPA router so the
+    /// cookie and serialized auth state are re-established on the next load.
+    /// </remarks>
+    protected async Task<bool> HandleAnalyzeErrorAsync(HttpResponseMessage response)
+    {
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "Your session has expired. Please sign in again.";
+            NotificationService.Notify(
+                NotificationSeverity.Warning,
+                "Session expired",
+                "Please sign in again to continue.",
+                duration: 4000);
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return true;
+        }
+
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsDto>(SharedJsonOptions.Default);
+            errorMessage = problem?.Detail ?? $"Request failed ({(int)response.StatusCode})";
+        }
+        catch
+        {
+            errorMessage = $"Request failed ({(int)response.StatusCode}). Check that Azure services are configured.";
+        }
+
+        return false;
     }
 
     /// <summary>

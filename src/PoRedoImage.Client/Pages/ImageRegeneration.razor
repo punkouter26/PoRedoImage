@@ -164,45 +164,28 @@
             // connection. The 3-minute HTTP CTS below is created only once the request is built, so
             // it covers just the round trip it was originally scoped to.
             using var localCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-            ImageAnalysisRequest request;
-            try
-            {
-                request = await BuildAnalysisRequestAsync(
-                    imageData: base64Data,
-                    contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
-                    fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
-                    descriptionLength: descriptionLength,
-                    mode: ProcessingMode.ImageRegeneration,
-                    ct: localCts.Token);
+            var request = await TryBuildAnalysisRequestAsync(
+                imageData: base64Data,
+                contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
+                descriptionLength: descriptionLength,
+                mode: ProcessingMode.ImageRegeneration,
+                ct: localCts.Token);
+            if (request is null) return;
 
-                if (_activeRecipe != null || SessionService.StagedPrompt != null)
+            // Fold the Style Director recipe and any prompt staged by another page into the
+            // description the server will regenerate from. Unique to this page, so it stays here
+            // rather than in TryBuildAnalysisRequestAsync.
+            if (_activeRecipe != null || SessionService.StagedPrompt != null)
+            {
+                var staged = SessionService.TakeStagedPrompt();
+                var promptAddition = string.Join(", ", new[] { staged, _activeRecipe?.PromptSnippet }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                if (!string.IsNullOrWhiteSpace(promptAddition))
                 {
-                    var staged = SessionService.TakeStagedPrompt();
-                    var promptAddition = string.Join(", ", new[] { staged, _activeRecipe?.PromptSnippet }.Where(s => !string.IsNullOrWhiteSpace(s)));
-                    if (!string.IsNullOrWhiteSpace(promptAddition))
-                    {
-                        request.PrecomputedDescription = string.IsNullOrWhiteSpace(request.PrecomputedDescription)
-                            ? promptAddition
-                            : $"{request.PrecomputedDescription}, {promptAddition}";
-                    }
+                    request.PrecomputedDescription = string.IsNullOrWhiteSpace(request.PrecomputedDescription)
+                        ? promptAddition
+                        : $"{request.PrecomputedDescription}, {promptAddition}";
                 }
-            }
-            catch (LocalInferenceException ex)
-            {
-                errorMessage = LocalAiErrorClassifier.Describe(ex.Failure);
-                isProcessing = false;
-                return;
-            }
-            catch (OperationCanceledException)
-            {
-                // LocalInferenceSession deliberately rethrows OperationCanceledException unwrapped
-                // (it is not a LocalInferenceException), so it must be caught here explicitly rather
-                // than falling through to the generic catch below — which would skip this reset and
-                // leave the progress bar frozen.
-                errorMessage = "On-device model setup took too long, likely the first-run model "
-                    + "download. Try again on a faster connection, or pick a remote provider in AI services.";
-                isProcessing = false;
-                return;
             }
 
             progressMessage = "Analyzing image...";
@@ -215,34 +198,7 @@
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
-                    // 401 means the BFF session cookie is missing/expired (idle tab, server
-                    // restart with rotated DataProtection keys, browser cleared the cookie, …).
-                    // The server returns an empty body in this case, so ReadFromJsonAsync would
-                    // fall into the catch and the user would see the misleading "Check that Azure
-                    // services are configured" message. Send them back to /login instead.
-            if (httpResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                    {
-                        errorMessage = "Your session has expired. Please sign in again.";
-                        NotificationService.Notify(
-                            NotificationSeverity.Warning,
-                            "Session expired",
-                            "Please sign in again to continue.",
-                            duration: 4000);
-                        // forceLoad bypasses the SPA router so the cookie + auth state are
-                        // re-established on the next page load.
-                        NavigationManager.NavigateTo("/login", forceLoad: true);
-                        return;
-                    }
-
-            try
-                    {
-                        var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>(SharedJsonOptions.Default);
-                        errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
-                    }
-            catch
-                    {
-                        errorMessage = $"Request failed ({(int)httpResponse.StatusCode}). Check that Azure services are configured.";
-                    }
+                    if (await HandleAnalyzeErrorAsync(httpResponse)) return;
                 }
                 else
                 {

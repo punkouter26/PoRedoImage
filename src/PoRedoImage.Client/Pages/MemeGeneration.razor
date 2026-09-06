@@ -278,34 +278,14 @@
             // connection. The 3-minute HTTP CTS below is created only once the request is built, so
             // it covers just the round trip it was originally scoped to.
             using var localCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-            ImageAnalysisRequest request;
-            try
-            {
-                request = await BuildAnalysisRequestAsync(
-                    imageData: base64Data,
-                    contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
-                    fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
-                    descriptionLength: 350,
-                    mode: ProcessingMode.MemeGeneration,
-                    ct: localCts.Token);
-            }
-            catch (LocalInferenceException ex)
-            {
-                errorMessage = LocalAiErrorClassifier.Describe(ex.Failure);
-                isProcessing = false;
-                return;
-            }
-            catch (OperationCanceledException)
-            {
-                // LocalInferenceSession deliberately rethrows OperationCanceledException unwrapped
-                // (it is not a LocalInferenceException), so it must be caught here explicitly rather
-                // than falling through to the generic catch below — which would skip this reset and
-                // leave the progress bar frozen.
-                errorMessage = "On-device model setup took too long, likely the first-run model "
-                    + "download. Try again on a faster connection, or pick a remote provider in AI services.";
-                isProcessing = false;
-                return;
-            }
+            var request = await TryBuildAnalysisRequestAsync(
+                imageData: base64Data,
+                contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
+                descriptionLength: 350,
+                mode: ProcessingMode.MemeGeneration,
+                ct: localCts.Token);
+            if (request is null) return;
 
             progressMessage = "Analyzing image...";
             StateHasChanged();
@@ -317,32 +297,7 @@
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
-                    // 401 = BFF session cookie missing/expired. Send to /login instead of the
-                    // misleading "Azure services" fallback (the server returns an empty body
-                    // in this case, so ReadFromJsonAsync would throw and the user would think
-                    // their Azure config is broken when actually their tab just needs to
-                    // re-authenticate). See ImageRegeneration.razor for the matching fix.
-                    if (httpResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                    {
-                        errorMessage = "Your session has expired. Please sign in again.";
-                        NotificationService.Notify(
-                            NotificationSeverity.Warning,
-                            "Session expired",
-                            "Please sign in again to continue.",
-                            duration: 4000);
-                        NavigationManager.NavigateTo("/login", forceLoad: true);
-                        return;
-                    }
-
-                    try
-                    {
-                        var problem = await httpResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>(SharedJsonOptions.Default);
-                        errorMessage = problem?.Detail ?? $"Request failed ({(int)httpResponse.StatusCode})";
-                    }
-                    catch
-                    {
-                        errorMessage = $"Request failed ({(int)httpResponse.StatusCode}). Check that Azure services are configured.";
-                    }
+                    if (await HandleAnalyzeErrorAsync(httpResponse)) return;
                 }
                 else
                 {

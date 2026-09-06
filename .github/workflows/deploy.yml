@@ -31,28 +31,30 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          # Keyed on the projects this pipeline actually restores, NOT '**/*.csproj'. The glob
-          # matched src/PoRedoImage.Mobile and the four test projects, so editing a MAUI head or
-          # a test csproj busted the NuGet cache for a build that never touches either.
-          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'src/PoRedoImage.Web/*.csproj', 'src/PoRedoImage.Client/*.csproj', 'src/PoRedoImage.Infrastructure/*.csproj', 'src/PoRedoImage.Application/*.csproj', 'src/PoRedoImage.Domain/*.csproj', 'src/PoRedoImage.Shared/*.csproj') }}
+          # '**/*.csproj' is correct again now that the solution is what gets restored. It
+          # deliberately does NOT match src/PoRedoImage.Mobile, which lives in its own
+          # PoRedoImage.Mobile.slnx and is never restored by this pipeline.
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'PoRedoImage.slnx', 'src/**/*.csproj', 'tests/**/*.csproj') }}
           restore-keys: nuget-${{ runner.os }}-
-      # Build the DEPLOYED project graph, not the whole solution. PoRedoImage.slnx also
-      # contains PoRedoImage.Mobile, a net10.0-android MAUI head that nothing references and
-      # that this pipeline never publishes. Restoring the solution drags it in and fails on
-      # ubuntu-latest with NETSDK1147 ("the following workloads must be installed:
-      # maui-android"). Installing the workload here would add minutes to every deploy to
-      # produce an APK no step consumes; building the API project instead covers exactly what
-      # ships — Web → Client + Shared + Infrastructure → Application → Domain.
-      # Consequence to know about: the test projects are no longer COMPILED here. This
-      # pipeline never ran them anyway (see below), so a test-only compile break now surfaces
-      # on the next local `dotnet test` rather than on a deploy that would not have run it.
-      - run: dotnet restore ${{ env.API_PROJECT_PATH }}
-      - run: dotnet build ${{ env.API_PROJECT_PATH }} --no-restore -c Release
-      # No test execution in this pipeline, by explicit policy: it stays focused on build +
-      # deploy orchestration. Integration + E2E suites need Docker (Testcontainers) and
-      # Playwright browsers; unit tests run in <1s and belong next to code reviews. Run them
-      # locally with `dotnet test` / `SCRIPTS/run-e2e.ps1` — this is the only workflow in the
-      # repo, so nothing else catches a broken test.
+      # Build the SOLUTION, so the five test projects are compiled here too.
+      #
+      # This used to build only $API_PROJECT_PATH because PoRedoImage.slnx once contained
+      # PoRedoImage.Mobile, a net10.0-android MAUI head that fails restore on ubuntu-latest
+      # with NETSDK1147 ("the following workloads must be installed: maui-android"). That is
+      # no longer true: the MAUI head was split out into PoRedoImage.Mobile.slnx, and the
+      # main solution is pure net10.0. Nothing here needs the workload.
+      #
+      # Compiling the tests costs seconds and closes a real gap — a test-only compile break
+      # used to reach master and only surface on someone's next local `dotnet test`.
+      - run: dotnet restore PoRedoImage.slnx
+      - run: dotnet build PoRedoImage.slnx --no-restore -c Release
+      # Only the tiers that need no external services run here. Unit is pure logic and
+      # Architecture is reflection over the built assemblies; together they are ~2s on the
+      # runner. Integration (Testcontainers/Docker) and the two E2E tiers (a live app on
+      # :4000, plus Playwright browsers) stay local — run them with `dotnet test` and
+      # `SCRIPTS/run-e2e.ps1`.
+      - run: dotnet test tests/PoRedoImage.Tests.Unit --no-build -c Release
+      - run: dotnet test tests/PoRedoImage.Tests.Architecture --no-build -c Release
       - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
       - uses: actions/upload-artifact@v7
         with:
@@ -132,20 +134,17 @@ jobs:
             echo "Bind verified — '$COUNT' assignment(s) for Key Vault Secrets User on kv-poshared."
           fi
       - name: Verify Key Vault reference resolution
-        # REPLACES a step that read all ten secrets out of kv-poshared with the CI service principal
-        # and wrote them back as LITERAL App Settings on every deploy — AzureAd__ClientSecret,
-        # OpenAI__Key and Storage__ConnectionString among them. That defeated the entire Key Vault
-        # reference model this app is built on: the plaintext values became readable by anyone with
-        # Reader on the web app, visible in the portal, and resolved into the runner's memory on
-        # every run. It also made the @Microsoft.KeyVault(...) settings declared in
-        # infra/main.bicep dead config — overwritten seconds after the bicep deployment applied them.
+        # The app resolves its secrets through the @Microsoft.KeyVault(...) App Settings declared
+        # in infra/main.bicep, using its own managed identity. That only works while the identity
+        # holds 'Key Vault Secrets User' on kv-poshared, so assert it here and fail the deploy
+        # loudly — with the exact remediation command — when it does not. A failed deploy leaves
+        # the already-running site untouched.
         #
-        # The workaround was added for a single incident (deploy #54 / 2026-06-29) where the platform
-        # returned the unresolved sentinel because the managed identity had no vault access. The fix
-        # for that is the role assignment in the previous step, not shipping the secrets. This step
-        # now asserts the identity can actually resolve references and FAILS the deploy with the
-        # exact remediation command when it cannot — a loud failure instead of a silent secret leak.
-        # A failed deploy leaves the already-running site untouched.
+        # Do NOT "fix" a resolution failure by reading the secrets in CI and writing them back as
+        # literal App Settings. A previous version of this pipeline did exactly that and leaked
+        # AzureAd__ClientSecret, OpenAI__Key and Storage__ConnectionString into the portal in
+        # plaintext, readable by anyone with Reader on the web app. The fix is the role
+        # assignment in the previous step.
         run: |
           PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
             --query identity.principalId -o tsv)
@@ -161,23 +160,6 @@ jobs:
             exit 1
           fi
           echo "Managed identity holds Key Vault Secrets User on kv-poshared."
-
-          # Clear any literal secret App Settings left behind by the old rewrite step, so the
-          # bicep-declared Key Vault references become the live values again. Deleting a setting
-          # that is already a reference is a no-op, so this is safe to re-run.
-          LITERALS=$(az webapp config appsettings list \
-            -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
-            --query "[?!starts_with(value, '@Microsoft.KeyVault(')].name" -o tsv \
-            | grep -E '^(ApplicationInsights__ConnectionString|AzureAd__ClientId|AzureAd__ClientSecret|ComputerVision__ApiKey|ComputerVision__Endpoint|Google__ApiKey|Google__Imagen3Model|OpenAI__Endpoint|OpenAI__Key|Storage__ConnectionString)$' || true)
-          if [ -n "$LITERALS" ]; then
-            echo "Removing literal secret App Settings so Key Vault references take effect:"
-            echo "$LITERALS" | sed 's/^/  - /'
-            az webapp config appsettings delete \
-              -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
-              --setting-names $LITERALS --output none
-            echo "::warning::Literal secrets had been written to App Settings by the old pipeline step."
-            echo "::warning::They were readable in the portal and in earlier deploy logs — ROTATE them in kv-poshared."
-          fi
       - name: Wait for App Service configuration update
         # Key Vault references are verified resolvable by the previous step.
         # Short 10s wait allows the App Service platform to stabilize configuration before deployment.
