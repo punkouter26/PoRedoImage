@@ -5,8 +5,9 @@ This folder contains developer utility scripts for the PoRedoImage project.
 | Script | Type | Purpose |
 |--------|------|---------|
 | `setup.ps1` | PowerShell | One-command machine setup: Winget installs, Docker/Azurite init, package restore |
-| `run-e2e.ps1` | PowerShell | Launch the app with mock-AI env vars and run the E2E suites |
+| `run-e2e.ps1` | PowerShell | Launch the app under `ASPNETCORE_ENVIRONMENT=Test` with mock AI and run the E2E suites |
 | `cleanup-testcontainers.ps1` | PowerShell | Remove orphaned Testcontainers containers (safe `-DryRun` mode) |
+| `push-mobile-model.ps1` | PowerShell | Download and `adb push` the Qwen2.5 on-device caption model |
 
 ## Conventions
 
@@ -39,7 +40,7 @@ docker compose -f ../docker-compose.yml up -d
 ### Running Tests
 
 ```powershell
-# Unit + Integration tests with coverage
+# Unit + Integration tests with coverage (Integration needs Docker for Testcontainers)
 dotnet test ../PoRedoImage.slnx --collect:"XPlat Code Coverage" --results-directory ../TestResults
 
 # E2E API smoke (pure HTTP — runs on any agent, no browser install required)

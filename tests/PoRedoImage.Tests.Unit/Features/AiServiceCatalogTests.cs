@@ -12,18 +12,15 @@ namespace PoRedoImage.Tests.Unit.Features;
 public class AiServiceCatalogTests
 {
     [Fact]
-    public void AnalyzeImage_OffersRemoteOllamaAndBrowser()
+    public void Catalog_offers_the_expected_options_per_capability()
     {
-        var ids = AiServiceCatalog.OptionsFor(AiCapability.AnalyzeImage).Select(o => o.Id).ToList();
+        // AnalyzeImage is the one capability with a real choice across all three execution
+        // locations, so it is the one that would notice a provider being dropped from the catalog.
+        var analyze = AiServiceCatalog.OptionsFor(AiCapability.AnalyzeImage).Select(o => o.Id).ToList();
+        Assert.Contains(AiProviderIds.AzureComputerVision, analyze);
+        Assert.Contains(AiProviderIds.OllamaVision, analyze);
+        Assert.Contains(AiProviderIds.BrowserFlorence2, analyze);
 
-        Assert.Contains(AiProviderIds.AzureComputerVision, ids);
-        Assert.Contains(AiProviderIds.OllamaVision, ids);
-        Assert.Contains(AiProviderIds.BrowserFlorence2, ids);
-    }
-
-    [Fact]
-    public void SingleProviderCapabilities_HaveExactlyOneOption()
-    {
         // These three genuinely have one implementation each. EnhanceDescription used to be here
         // too, on the grounds that "browser-local text enhancement is unimplemented" — it is
         // implemented now (ImageAnalysisRequest.PrecomputedEnhancedPrompt), so it moved out.
@@ -59,11 +56,10 @@ public class AiServiceCatalogTests
             Assert.Single(browserOptions);
             Assert.NotNull(LocalModelRegistry.DefaultFor(localCapability));
         }
-    }
 
-    [Fact]
-    public void BrowserOption_MirrorsTheLocalModelRegistry()
-    {
+        // …and the option it offers must be DERIVED from the registry entry, not restated beside
+        // it. A hand-written display name or download size drifts silently the moment the model is
+        // swapped, and the size is what the user reads before agreeing to the download.
         var florence = LocalModelRegistry.DefaultFor(LocalCapability.Vision);
         Assert.NotNull(florence);
 
