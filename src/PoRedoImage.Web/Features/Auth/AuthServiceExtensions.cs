@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using PoRedoImage.Application.Configuration;
 using PoRedoImage.Shared.Configuration;
+using PoRedoImage.Web.Configuration;
 
 namespace PoRedoImage.Web.Features.Auth;
 
@@ -181,14 +182,22 @@ public static class AuthServiceExtensions
     /// <summary>
     /// §4.2 BFF cookie hardening: the session cookie is HttpOnly (never readable by WASM/JS),
     /// SameSite=Strict (not sent on cross-site navigations — the OIDC nonce/correlation cookies keep
-    /// their own SameSite=None Secure defaults so the handshake still works), and Secure in every
-    /// non-Development environment (SameAsRequest locally so the http://localhost:4000 F5 loop works).
+    /// their own SameSite=None Secure defaults so the handshake still works), and Secure everywhere
+    /// except the two local tiers that run over plain HTTP.
     /// </summary>
+    /// <remarks>
+    /// <c>IsDevOrTest()</c>, not <c>IsDevelopment()</c> — matching the antiforgery cookie in
+    /// <c>Program.cs</c>. Test runs the E2E suites over http://localhost:4000, so
+    /// <see cref="CookieSecurePolicy.Always"/> makes the browser silently DISCARD the auth cookie:
+    /// /dev-login still answers 302 with a Set-Cookie, the request looks fine in the log, and every
+    /// UI test then lands on /login instead of the page it asked for. The two cookies must agree —
+    /// gating only one of them is what produced that failure.
+    /// </remarks>
     private static void HardenCookie(CookieAuthenticationOptions options, IWebHostEnvironment environment)
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Strict;
-        options.Cookie.SecurePolicy = environment.IsDevelopment()
+        options.Cookie.SecurePolicy = environment.IsDevOrTest()
             ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
     }

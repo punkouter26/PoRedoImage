@@ -39,6 +39,18 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // The host wires the static web assets manifest ONLY when the environment is Development, so
+    // running from build output under any other name leaves MapStaticAssets() with endpoints it
+    // cannot resolve to files: every asset answers 200 with Content-Length 0 and no Content-Type,
+    // /_framework/* falls through to the SPA fallback, and the WASM app never boots. That is
+    // invisible in Production (publish lays the files into wwwroot next to the DLL) but it makes
+    // the Test environment — which the E2E tiers run under, see SCRIPTS/run-e2e.ps1 — unusable.
+    // Opt Test in explicitly. Development already does this for itself; Production must not.
+    if (builder.Environment.IsEnvironment(PoEnvironments.Test))
+    {
+        builder.WebHost.UseStaticWebAssets();
+    }
+
     // ─── BOMB-2: Bound request body size (Po2Logic mitigation) ──────────────────
     // Default Kestrel limit is 30 MB. We allow 25 MB for image uploads (matches the
     // 20 MB client-side cap + JSON envelope overhead). Prevents 50 MB base64 payloads
@@ -240,10 +252,13 @@ try
         ctx => !ctx.Request.Path.StartsWithSegments("/api"),
         branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
 
-    // HTTPS redirect is skipped in Development so the E2E suite (default base URL
+    // HTTPS redirect is skipped in Development and Test so the E2E suite (default base URL
     // http://localhost:4000) gets real status codes instead of a 307 to https — the dev cert
     // already secures :4001 for interactive use. Production/Staging keep the redirect + HSTS.
-    if (!app.Environment.IsDevelopment())
+    // Test is listed for the same reason as the cookie SecurePolicy checks: SCRIPTS/run-e2e.ps1
+    // serves that tier over plain HTTP only, so the middleware has no https port to redirect to
+    // and logs "Failed to determine the https port for redirect" on every request.
+    if (!app.Environment.IsDevOrTest())
     {
         app.UseHttpsRedirection();
     }

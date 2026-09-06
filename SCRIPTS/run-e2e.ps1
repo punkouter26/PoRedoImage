@@ -3,9 +3,9 @@
     Run the E2E tier (E2EAPI + E2EUI) against a freshly-launched local server.
 
 .DESCRIPTION
-    Starts the Web app on http://localhost:4000 (Development → no HTTPS redirect, so the default
-    E2E_BASE_URL works), waits for /alive, runs the E2E test project, then stops the server.
-    Playwright Chromium must be installed (SCRIPTS/setup.ps1 does this).
+    Starts the Web app on http://localhost:4000 under ASPNETCORE_ENVIRONMENT=Test (no HTTPS
+    redirect, so the default E2E_BASE_URL works), waits for /alive, runs the E2E test project,
+    then stops the server. Playwright Chromium must be installed (SCRIPTS/setup.ps1 does this).
 
 .USAGE
     pwsh ./SCRIPTS/run-e2e.ps1
@@ -21,16 +21,26 @@ $BaseUrl = 'http://localhost:4000'
 Write-Host "==> Building solution" -ForegroundColor Cyan
 dotnet build "$Root/PoRedoImage.slnx" -c Release --nologo | Out-Null
 
-Write-Host "==> Launching Web app (Development) on $BaseUrl" -ForegroundColor Cyan
+Write-Host "==> Launching Web app (Test) on $BaseUrl" -ForegroundColor Cyan
 # Budget guardrail: force the app into mock-AI mode so the E2E suite can NEVER spend a live token,
 # and flag the test run to HARD-FAIL if the target isn't actually mocked (asserted by the
 # Ai_services_are_mocked_when_mock_mode_is_required E2E test via /api/diag/mock-status).
 # Start-Process inherits these from the current process, so the launched app picks them up.
+#
+# ASPNETCORE_ENVIRONMENT=Test is REQUIRED, not cosmetic: MockAiGate honours Mocks:UseMockAi only in
+# the Test environment, so without it the flag is ignored, the app boots with real providers, and
+# this suite either burns live tokens or (thanks to E2E_REQUIRE_MOCK) just fails. Test is also what
+# swaps in FakeAuthHandler and relaxes the antiforgery cookie-security check for plain HTTP.
+#
+# --no-launch-profile matters for the same reason: launchSettings.json pins
+# ASPNETCORE_ENVIRONMENT=Development on both profiles, and a profile's environmentVariables beat the
+# inherited process environment — so a launch profile would silently undo the line above.
+$env:ASPNETCORE_ENVIRONMENT = 'Test'
 $env:Mocks__UseMockAi = 'true'
 $env:E2E_REQUIRE_MOCK = 'true'
 $server = Start-Process -FilePath 'dotnet' `
     -ArgumentList @('run', '--project', "$Root/src/PoRedoImage.Web/PoRedoImage.Web.csproj",
-                    '--launch-profile', 'https', '--no-build', '-c', 'Release') `
+                    '--no-launch-profile', '--urls', $BaseUrl, '--no-build', '-c', 'Release') `
     -PassThru -WindowStyle Hidden
 
 try {

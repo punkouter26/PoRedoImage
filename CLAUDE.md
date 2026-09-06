@@ -53,22 +53,25 @@ pwsh ./SCRIPTS/setup.ps1       # one-time machine setup (SDK, Docker, Playwright
 pwsh ./SCRIPTS/cleanup-testcontainers.ps1   # reap leaked Azurite containers after an aborted run
 ```
 
-README.md's `dotnet test tests/PoRedoImage.Tests.E2E` and its `Tests.E2EAPI`/`Tests.E2EUI` names are
-stale — the real projects are `Tests.E2E.ApiSmoke` and `Tests.E2E.UI`. Its `docs/` links are dead
-too; no documentation directory exists.
+README.md's test commands now name the real projects (`Tests.E2E.ApiSmoke` / `Tests.E2E.UI`); its
+`docs/` references were removed along with the directory they pointed at.
 
 Playwright browsers install once after a build:
 `pwsh tests/PoRedoImage.Tests.E2E.UI/bin/Release/net10.0/playwright.ps1 install`
 
-**CI does not run tests.** [deploy.yml](.github/workflows/deploy.yml) is build + publish + deploy
-only, by explicit policy, and it is the only workflow. Nothing catches a broken test but a local run.
+**CI runs Unit and Architecture only.** [deploy.yml](.github/workflows/deploy.yml) builds
+`PoRedoImage.slnx`, runs those two tiers, then publishes and deploys. It is the only workflow.
 
-It also builds `src/PoRedoImage.Web` rather than `PoRedoImage.slnx`, and must keep doing so: the
-solution contains the MAUI head, whose `net10.0-android` TFM fails restore on `ubuntu-latest` with
-`NETSDK1147` (no `maui-android` workload). Pointing CI back at the solution reintroduces that break;
-adding the workload instead costs minutes per deploy to produce an APK nothing consumes. The
-consequence to keep in mind is that the test projects are not compiled in CI either — a test-only
-compile break only shows up locally.
+Integration and the two E2E tiers deliberately stay local: Integration needs Docker for
+Testcontainers, and E2E needs a live app on :4000 plus Playwright browsers. Nothing but a local run
+catches a break in those three — run them before you push anything that touches storage, auth, or a
+page's render path.
+
+CI builds the whole solution, so a test-only compile break is caught. Do not "optimise" this back
+down to `src/PoRedoImage.Web`: it was scoped that way when `PoRedoImage.slnx` still contained the
+MAUI head and restore died on `ubuntu-latest` with `NETSDK1147` (no `maui-android` workload). The
+MAUI head now lives in its own [PoRedoImage.Mobile.slnx](PoRedoImage.Mobile.slnx) and the main
+solution is pure net10.0, so the workload is not needed and the test projects compile for free.
 
 ## Running without Azure
 
@@ -165,10 +168,11 @@ deployment serves both reasoning and image-to-text.
 
 `IVisionServiceRouter` *is* per-request, and matches on the id **namespace**, never a model-name
 prefix: `ollama:*` → `OllamaVisionService`, `remote:azure-openai-vision` → `OpenAiVisionService`,
-everything else (including `browser:*`, which should never have reached the server) →
-`AzureVisionService`. Each backend gets its **own** `CachingVisionService` wrapper — the cache key is
-the image content hash, so one shared wrapper would serve an Ollama answer to a caller who asked for
-Azure.
+`AiProviderIds.GeminiVision` → `GeminiVisionService` (registered optionally — the router takes it as
+a nullable ctor arg and falls through to the default when it is not configured), everything else
+(including `browser:*`, which should never have reached the server) → `AzureVisionService`. Each
+backend gets its **own** `CachingVisionService` wrapper — the cache key is the image content hash, so
+one shared wrapper would serve an Ollama answer to a caller who asked for Azure.
 
 **The failure mode to understand:** callers of chat/vision/image services catch failures and
 substitute canned output. A broken provider therefore degrades several features while `/health` still

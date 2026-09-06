@@ -102,7 +102,9 @@ flowchart LR
 
 ### Architecture
 
-Live Mermaid diagrams live alongside their source in [`docs/`](docs/). See [docs/README.md](docs/README.md) for the full index of architecture, journey, state, data, and UI diagrams.
+[CLAUDE.md](CLAUDE.md) is the architecture reference and the agent-facing guide — the two-project
+web tier and why prerendering is off, the BFF auth invariant, the vertical-slice layout, how the AI
+providers fail, and the build/test gates. There is no `docs/` directory; this README is the PRD.
 
 ---
 
@@ -191,9 +193,10 @@ tests/
   PoRedoImage.Tests.Integration/     # xUnit + WebApplicationFactory + Testcontainers
   PoRedoImage.Tests.E2E.ApiSmoke/    # pure HTTP API E2E (xUnit, self-skip if no live instance)
   PoRedoImage.Tests.E2E.UI/          # C# Playwright UI E2E (self-skip if no live instance)
+  PoRedoImage.Tests.Architecture/    # xUnit rule registry over the built assemblies
 infra/
   main.bicep          # App Service + Storage provisioning
-docs/                 # All .mmd diagrams + screenshots
+  storage-lifecycle.json
 ```
 
 ---
