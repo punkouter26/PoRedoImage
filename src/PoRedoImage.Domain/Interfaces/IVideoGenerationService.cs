@@ -37,6 +37,24 @@ public interface IVideoGenerationService
     bool IsConfigured { get; }
 }
 
+/// <summary>
+/// The provider refused or could not accept a <see cref="IVideoGenerationService.StartAsync"/> call,
+/// carrying a message fit to show the user.
+/// </summary>
+/// <remarks>
+/// A rejection at submit time used to surface as a bare "Could not start video generation." while
+/// the actual reason — an invalid request shape, a filtered photo, an exhausted quota — sat in the
+/// server log where the person who could act on it never sees it. Same rule as every other fallback
+/// in this codebase: the failure has to name itself. <see cref="Message"/> is the provider's own
+/// explanation, already trimmed of the raw JSON envelope.
+/// </remarks>
+public sealed class VideoGenerationException(int status, string message)
+    : Exception(message)
+{
+    /// <summary>Upstream HTTP status, for the caller to map onto its own response.</summary>
+    public int Status { get; } = status;
+}
+
 /// <summary>State of a single video-generation job.</summary>
 /// <param name="Done">False while the provider is still rendering.</param>
 /// <param name="Video">Encoded video bytes; null until <paramref name="Done"/> and successful.</param>

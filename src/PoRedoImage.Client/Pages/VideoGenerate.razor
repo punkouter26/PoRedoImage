@@ -70,14 +70,25 @@
                     <span class="split-compare__label">Source photo</span>
                     @if (imagePreviewUrl is not null)
                     {
-                        <img src="@imagePreviewUrl" class="split-compare__img" alt="Source photo" />
+                        @* .split-compare__img starts at opacity:0 and fades in via the
+                           .loaded class — the page-level handler mirrors the same hook the
+                           other pages use so the source photo lands at opacity 1. *@
+                        <img src="@imagePreviewUrl" class="split-compare__img" alt="Source photo"
+                             onload="this.classList.add('loaded')"
+                             onerror="this.onerror=null; this.classList.add('loaded');" />
                     }
                 </div>
                 <div class="split-compare__side">
                     <span class="split-compare__label">Video</span>
                     @if (_videoUrl is not null)
                     {
-                        <video class="split-compare__img" src="@_videoUrl" controls autoplay loop playsinline></video>
+                        @* <video> has no onload — onloadeddata fires when the first frame has
+                           decoded, which is the right hook for fading the player in. On error,
+                           still drop the .loaded class so the (broken) element is visible rather
+                           than stuck at opacity 0 — there is no .error rule in app.css. *@
+                        <video class="split-compare__img" src="@_videoUrl" controls autoplay loop playsinline
+                               onloadeddata="this.classList.add('loaded')"
+                               onerror="this.onerror=null; this.classList.add('loaded');"></video>
                     }
                     else
                     {

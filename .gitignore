@@ -551,3 +551,6 @@ webapp-logs*.zip
 # outputs that matter to the project — ARE committed. Drop this rule if you want the design
 # detector hook to travel with the repo for every contributor.
 .claude/
+
+# Mock sample assets (large media files used only by mock AI services in dev/test)
+src/PoRedoImage.Infrastructure/MockSamples/

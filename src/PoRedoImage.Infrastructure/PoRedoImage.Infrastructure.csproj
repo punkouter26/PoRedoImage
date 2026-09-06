@@ -19,6 +19,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Mock sample assets: dev-only video used by MockVeoVideoGenerationService when Mocks:UseMockAi
+         is true. Gitignored (see .gitignore entry under "Mock sample assets"); a missing file falls
+         back to the embedded TinyMp4 stub so the build never breaks for a missing artefact. -->
+    <None Include="MockSamples\mock-video.mp4" CopyToOutputDirectory="PreserveNewest" Link="MockSamples\mock-video.mp4" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Azure SDKs used by infrastructure implementations -->
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Azure.AI.Vision.ImageAnalysis" />

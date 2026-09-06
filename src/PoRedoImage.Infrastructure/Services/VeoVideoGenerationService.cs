@@ -93,13 +93,17 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
                 new
                 {
                     prompt,
+                    // :predictLongRunning is a PREDICT endpoint, so the image is a predict
+                    // instance — bytesBase64Encoded + mimeType — not the generateContent
+                    // { inlineData: { data, mimeType } } envelope. Sending inlineData here made
+                    // this model answer 400 INVALID_ARGUMENT on every single request:
+                    //   "`inlineData` isn't supported by this model."
+                    // The two shapes are easy to conflate because the same API hosts both, and the
+                    // published Veo curl example uses the generateContent form.
                     image = new
                     {
-                        inlineData = new
-                        {
-                            mimeType = contentType,
-                            data = Convert.ToBase64String(image),
-                        },
+                        bytesBase64Encoded = Convert.ToBase64String(image),
+                        mimeType = contentType,
                     },
                 },
             },
@@ -127,7 +131,7 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
         {
             var errorBody = await response.Content.ReadAsStringAsync(ct);
             _logger.LogError("Veo start error {Status}: {Body}", (int)response.StatusCode, errorBody);
-            throw new InvalidOperationException($"Veo API returned {(int)response.StatusCode}: {errorBody}");
+            throw new VideoGenerationException((int)response.StatusCode, ExtractErrorMessage(errorBody));
         }
 
         using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -139,6 +143,34 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
         _logger.LogInformation(
             "Veo job started. Operation={Operation}, Duration={Duration}s", operationName, ClipSeconds);
         return operationName;
+    }
+
+    /// <summary>
+    /// Pulls <c>error.message</c> out of a Google API error envelope, falling back to the raw body.
+    /// </summary>
+    /// <remarks>
+    /// The whole body is already in the log; what travels to the browser should be the one sentence
+    /// that explains the refusal, not the JSON around it. Mirrors how <see cref="PollAsync"/>
+    /// already reads a finished-with-error operation.
+    /// </remarks>
+    private static string ExtractErrorMessage(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var err)
+                && err.TryGetProperty("message", out var msg)
+                && msg.GetString() is { Length: > 0 } text)
+            {
+                return text;
+            }
+        }
+        catch (JsonException)
+        {
+            // Not a JSON envelope (an HTML gateway page, say) — fall through to the raw text.
+        }
+
+        return string.IsNullOrWhiteSpace(body) ? "The video service rejected the request." : body.Trim();
     }
 
     public async Task<VideoGenerationStatus> PollAsync(string operationName, CancellationToken ct = default)

@@ -60,6 +60,20 @@ public static class VideoGenerateEndpoints
 
                 return Results.Ok(new VideoGenerateStartResponse(operationName));
             }
+            // The provider said no and told us why. Pass that through: a bare "could not start"
+            // leaves the user with nothing to act on, and the difference between a filtered photo,
+            // an exhausted quota and a malformed request is the whole of what they need to know.
+            catch (VideoGenerationException ex)
+            {
+                logger.LogWarning(ex, "Video service rejected the request with {Status}", ex.Status);
+
+                // 4xx is the request or its content; anything else is the provider being unwell.
+                var status = ex.Status is >= 400 and < 500
+                    ? StatusCodes.Status422UnprocessableEntity
+                    : StatusCodes.Status502BadGateway;
+
+                return Results.Problem(ex.Message, statusCode: status, title: "Video Generation Declined");
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to start video generation");

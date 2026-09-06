@@ -149,15 +149,47 @@ public sealed class MockVeoVideoGenerationService : IVideoGenerationService, IMo
 
     /// <summary>
     /// Smallest well-formed MP4 container: an ftyp box (isom) followed by an empty moov box.
-    /// Enough for a &lt;video&gt; element to accept the source and for a download to produce a real file.
+    /// Browsers accept the source and a download produces a real file, but it has zero decoded
+    /// frames so the &lt;video&gt; element renders a black rectangle. Used as the fallback when the
+    /// dev sample asset is missing.
     /// </summary>
     private static readonly byte[] TinyMp4 = Convert.FromBase64String(
         "AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhtb292");
+
+    private readonly byte[] _payload;
+
+    public MockVeoVideoGenerationService()
+    {
+        // Try the dev sample first — a real, ~10s playable MP4 lives at MockSamples/mock-video.mp4
+        // and is copied to output via the .csproj. Falls back to the header-only stub when the
+        // asset is missing (e.g. a fresh checkout without restoring the dev artefact) so the
+        // service still satisfies the contract and tests can assert against the wire format.
+        _payload = LoadSampleOrFallback();
+    }
+
+    private static byte[] LoadSampleOrFallback()
+    {
+        try
+        {
+            var samplePath = Path.Combine(AppContext.BaseDirectory, "MockSamples", "mock-video.mp4");
+            if (File.Exists(samplePath))
+            {
+                var bytes = File.ReadAllBytes(samplePath);
+                if (bytes.Length > 0) return bytes;
+            }
+        }
+        catch
+        {
+            // Any IO failure falls through to the embedded stub — never throw from a mock ctor.
+        }
+
+        return TinyMp4;
+    }
 
     public Task<string> StartAsync(
         byte[] image, string contentType, string prompt, CancellationToken ct = default)
         => Task.FromResult("models/veo-mock/operations/mock-video-operation");
 
     public Task<VideoGenerationStatus> PollAsync(string operationName, CancellationToken ct = default)
-        => Task.FromResult(new VideoGenerationStatus(Done: true, Video: TinyMp4, ContentType: "video/mp4"));
+        => Task.FromResult(new VideoGenerationStatus(Done: true, Video: _payload, ContentType: "video/mp4"));
 }
