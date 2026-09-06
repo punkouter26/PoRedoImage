@@ -131,3 +131,33 @@ public sealed class AlwaysRefusingMusicService : IMusicGenerationService, IMocka
         return Task.FromResult(MusicGenerationResult.FromRefusal(1L, "Blocked by safety filters."));
     }
 }
+
+/// <summary>
+/// Video generator that returns a tiny valid MP4 without any upstream call.
+/// </summary>
+/// <remarks>
+/// The budget guardrail matters most here: Veo is metered per second of output, so a single
+/// accidental live call in a test run costs more than every other mocked service combined. The
+/// job completes on the first poll — the real service takes 1–5 minutes, and making the E2E suite
+/// wait that long to assert a UI transition would buy nothing.
+/// </remarks>
+public sealed class MockVeoVideoGenerationService : IVideoGenerationService, IMockable
+{
+    public string MockReason => "Veo video-gen (mock)";
+
+    public bool IsConfigured => true;
+
+    /// <summary>
+    /// Smallest well-formed MP4 container: an ftyp box (isom) followed by an empty moov box.
+    /// Enough for a &lt;video&gt; element to accept the source and for a download to produce a real file.
+    /// </summary>
+    private static readonly byte[] TinyMp4 = Convert.FromBase64String(
+        "AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhtb292");
+
+    public Task<string> StartAsync(
+        byte[] image, string contentType, string prompt, CancellationToken ct = default)
+        => Task.FromResult("models/veo-mock/operations/mock-video-operation");
+
+    public Task<VideoGenerationStatus> PollAsync(string operationName, CancellationToken ct = default)
+        => Task.FromResult(new VideoGenerationStatus(Done: true, Video: TinyMp4, ContentType: "video/mp4"));
+}

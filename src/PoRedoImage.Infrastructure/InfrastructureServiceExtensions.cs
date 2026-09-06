@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -75,6 +75,10 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<MockLyriaMusicService>();
             services.AddSingleton<IMusicGenerationService>(sp => sp.GetRequiredService<MockLyriaMusicService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockLyriaMusicService>());
+
+            services.AddSingleton<MockVeoVideoGenerationService>();
+            services.AddSingleton<IVideoGenerationService>(sp => sp.GetRequiredService<MockVeoVideoGenerationService>());
+            services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockVeoVideoGenerationService>());
         }
         else
         {
@@ -153,6 +157,11 @@ public static class InfrastructureServiceExtensions
             // Music generation for the Rap Roast slice: Google Lyria, which performs supplied
             // lyrics rather than producing an instrumental bed.
             services.AddSingleton<IMusicGenerationService, LyriaMusicService>();
+
+            // Image-to-video for the Video slice: Google Veo 3.1 Lite at 720p. The most expensive
+            // call in the app per invocation ($0.40 per 8-second clip), which is why the Lite tier
+            // is the default and the mock above is wired for every non-production run.
+            services.AddSingleton<IVideoGenerationService, VeoVideoGenerationService>();
 
             // OCR (Read), region captions (DenseCaptions), objects and people — the grounded facts
             // the scene describer hands to the vision model so it does not have to guess them.

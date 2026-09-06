@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Json;
 
@@ -27,15 +27,19 @@ public sealed class SessionCostService(HttpClient http, ILogger<SessionCostServi
     /// <summary>Lyria music generation tracks this session (Google Lyria 3).</summary>
     public int MusicCount { get; private set; }
 
+    /// <summary>Veo video clips generated this session (Google Veo 3.1 Lite, 8s each).</summary>
+    public int VideoCount { get; private set; }
+
     /// <summary>Total count of distinct AI operations used in this session.</summary>
-    public int TotalOperations => ImageCount + VisionCount + TextReasoningCount + MusicCount;
+    public int TotalOperations => ImageCount + VisionCount + TextReasoningCount + MusicCount + VideoCount;
 
     /// <summary>Estimated spend this session across all AI services, in <see cref="AiPricingDto.Currency"/>.</summary>
     public decimal EstimatedTotal =>
         (ImageCount * (Pricing?.ImageToImageUsd ?? 0.039m)) +
         (VisionCount * (Pricing?.VisionAnalysisUsd ?? 0.001m)) +
         (TextReasoningCount * (Pricing?.TextReasoningUsd ?? 0.0015m)) +
-        (MusicCount * (Pricing?.MusicGenerationUsd ?? 0.040m));
+        (MusicCount * (Pricing?.MusicGenerationUsd ?? 0.040m)) +
+        (VideoCount * (Pricing?.VideoGenerationUsd ?? 0.40m));
 
     public event Action? OnChange;
 
@@ -91,12 +95,21 @@ public sealed class SessionCostService(HttpClient http, ILogger<SessionCostServi
         OnChange?.Invoke();
     }
 
+    /// <summary>Records <paramref name="count"/> Veo video clip(s) — the priciest action here.</summary>
+    public void RecordVideo(int count = 1)
+    {
+        if (count <= 0) return;
+        VideoCount += count;
+        OnChange?.Invoke();
+    }
+
     public void Reset()
     {
         ImageCount = 0;
         VisionCount = 0;
         TextReasoningCount = 0;
         MusicCount = 0;
+        VideoCount = 0;
         OnChange?.Invoke();
     }
 
@@ -128,6 +141,12 @@ public sealed class SessionCostService(HttpClient http, ILogger<SessionCostServi
         {
             var unit = p?.MusicGenerationUsd ?? 0.040m;
             list.Add(new("Lyria Music", "bi-music-note-beamed", MusicCount, unit, MusicCount * unit));
+        }
+
+        if (VideoCount > 0)
+        {
+            var unit = p?.VideoGenerationUsd ?? 0.40m;
+            list.Add(new("Veo Video", "bi-film", VideoCount, unit, VideoCount * unit));
         }
 
         return list;

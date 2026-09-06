@@ -23,6 +23,7 @@ using PoRedoImage.Web.Features.RapRoast;
 using PoRedoImage.Web.Features.Shared;
 using PoRedoImage.Web.Features.StyleDirector;
 using PoRedoImage.Web.Features.UserImages;
+using PoRedoImage.Web.Features.VideoGenerate;
 using Radzen;
 using Serilog;
 using Serilog.Events;
@@ -396,6 +397,7 @@ try
     app.MapMemeTemplateEndpoints();
     app.MapStyleDirectorEndpoints();
     app.MapRapRoastEndpoints();
+    app.MapVideoGenerateEndpoints();
     app.MapPricingEndpoints();
 
     // Redirect /favicon.ico → /favicon.png so browsers don't get a 404.

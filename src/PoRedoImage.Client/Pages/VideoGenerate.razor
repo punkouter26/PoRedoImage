@@ -1,0 +1,106 @@
+@page "/video"
+@attribute [Authorize]
+@inherits FeaturePageBase
+@implements IDisposable
+
+<PageTitle>Video — PoRedoImage</PageTitle>
+
+<FeatureShell IconClass="bi-film"
+              Title="Video"
+              Description="Upload a photo, describe what should happen, and Veo animates it into an 8-second clip with sound."
+              ModelBadge="Veo 3.1 Lite">
+    <ChildContent>
+
+    @if (!isProcessing && !isComplete)
+    {
+        <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
+
+        <div class="video-prompt-card mt-3 p-3">
+            <label class="form-label small fw-semibold" for="video-prompt">
+                <i class="bi bi-chat-left-text me-1"></i>What should happen in the clip?
+            </label>
+            <textarea id="video-prompt"
+                      class="form-control"
+                      rows="3"
+                      maxlength="1200"
+                      placeholder="e.g. slow push-in on the subject, hair moving in the breeze, warm afternoon light"
+                      value="@_prompt"
+                      @onchange="@(e => _prompt = e.Value?.ToString() ?? string.Empty)"></textarea>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <span class="extra-small text-muted">
+                    <i class="bi bi-clock me-1"></i>Every clip is 8 seconds — Veo's maximum.
+                </span>
+                <span class="extra-small text-muted">@_prompt.Length / 1200</span>
+            </div>
+        </div>
+
+        <ImageUploadPanel
+            ShowDescriptionLength="false"
+            ButtonLabel="Create Video"
+            ButtonIcon="bi-film"
+            DescriptionLength="0"
+            @bind-ImagePreviewUrl="@imagePreviewUrl"
+            ErrorMessage="@errorMessage"
+            CanProcess="@CanCreateVideo"
+            OnFileChange="LoadFile"
+            OnImageIntake="HandleImageIntake"
+            OnProcessClicked="CreateVideo" />
+
+        @if (canProcessImage && string.IsNullOrWhiteSpace(_prompt))
+        {
+            <p class="small text-muted mt-2" role="status">
+                <i class="bi bi-info-circle me-1"></i>Add a prompt above to enable Create Video.
+            </p>
+        }
+    }
+
+    @if (isProcessing)
+    {
+        <ProcessingProgressBar Message="@progressMessage" />
+        <p class="small text-muted text-center mt-2">
+            Veo renders take one to five minutes. You can leave this tab open — it keeps checking.
+        </p>
+    }
+
+    @if (isComplete)
+    {
+        <div class="video-result mt-3">
+            <div class="split-compare">
+                <div class="split-compare__side">
+                    <span class="split-compare__label">Source photo</span>
+                    @if (imagePreviewUrl is not null)
+                    {
+                        <img src="@imagePreviewUrl" class="split-compare__img" alt="Source photo" />
+                    }
+                </div>
+                <div class="split-compare__side">
+                    <span class="split-compare__label">Video</span>
+                    @if (_videoUrl is not null)
+                    {
+                        <video class="split-compare__img" src="@_videoUrl" controls autoplay loop playsinline></video>
+                    }
+                    else
+                    {
+                        <div class="split-compare__unavailable">Video not available</div>
+                    }
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                @if (_videoUrl is not null)
+                {
+                    @* download attribute rather than a JS saver: the clip is already a blob/data URL
+                       in this document, so the browser can write it without another round trip. *@
+                    <a class="flap-btn flap-btn--primary flap-btn--sm" href="@_videoUrl" download="poredoimage-video.mp4">
+                        <i class="bi bi-download me-2"></i>Download Video
+                    </a>
+                }
+                <button class="flap-btn flap-btn--sm" @onclick="StartOver">
+                    <i class="bi bi-arrow-repeat me-1"></i>Make another
+                </button>
+            </div>
+        </div>
+    }
+
+    </ChildContent>
+</FeatureShell>

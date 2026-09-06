@@ -33,6 +33,8 @@ public static class FeatureCatalog
             "AI writes a roast verse about your photo, then performs it over a beat."),
         new("/style-director", "Style Director", "bi-sliders",
             "AI synthesizes the optimal art-style direction and refined prompt, then Gemini paints it."),
+        new("/video", "Video", "bi-film",
+            "Describe what should happen and Veo animates your photo into an 8-second clip with sound."),
     ];
 
     /// <summary>Every feature except the one at <paramref name="route"/> (case-insensitive).</summary>

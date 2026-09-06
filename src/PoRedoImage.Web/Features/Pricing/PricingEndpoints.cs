@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Web.Configuration;
 using PoRedoImage.Shared.Configuration;
@@ -31,7 +31,8 @@ public static class PricingEndpoints
                 Currency: pricing.Value.Currency,
                 VisionAnalysisUsd: pricing.Value.VisionAnalysisUsd,
                 TextReasoningUsd: pricing.Value.TextReasoningUsd,
-                MusicGenerationUsd: pricing.Value.MusicGenerationUsd));
+                MusicGenerationUsd: pricing.Value.MusicGenerationUsd,
+                VideoGenerationUsd: pricing.Value.VideoGenerationUsd));
         })
         .WithName("GetAiPricing")
         .WithTags("Pricing")

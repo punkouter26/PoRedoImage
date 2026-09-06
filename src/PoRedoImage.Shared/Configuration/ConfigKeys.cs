@@ -1,4 +1,4 @@
-namespace PoRedoImage.Shared.Configuration;
+﻿namespace PoRedoImage.Shared.Configuration;
 
 /// <summary>
 /// Every configuration key the solution reads, in one place (§1 "Zero magic strings").
@@ -71,6 +71,13 @@ public static class ConfigKeys
     /// models. Defaults to the 30-second clip model.
     /// </summary>
     public const string GoogleLyriaModel = "Google:LyriaModel";
+
+    /// <summary>
+    /// Veo video model id. Defaults to the Lite tier at 720p — the cheapest Veo variant
+    /// ($0.05/sec vs $0.40 for Standard). Changing this changes what a render costs, so update
+    /// AiPricingOptions in the same change.
+    /// </summary>
+    public const string GoogleVeoModel = "Google:VeoModel";
 
     // ── Ollama (local, dev only) ────────────────────────────────────────
     public const string OllamaEndpoint = "Ollama:Endpoint";
