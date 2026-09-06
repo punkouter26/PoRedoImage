@@ -54,13 +54,14 @@ public sealed class OpenAiOptionsValidator : IValidateOptions<OpenAiOptions>
 
     public ValidateOptionsResult Validate(string? name, OpenAiOptions options)
     {
-        // If real services aren't wired (mock mode forced), the bound options are never consumed.
-        // Skipping the check here keeps the offline / CI path bootable while still producing loud,
-        // actionable failures when someone WANTS real AI but forgot the keys.
-        if (ConfigValue.Bool(_configuration, ConfigKeys.MocksUseMockAi))
+        // If real services aren't wired (mock mode forced, Test env only), the bound options are
+        // never consumed. Skipping the check keeps the offline / CI path bootable while still
+        // producing loud, actionable failures when someone WANTS real AI but forgot the keys.
+        if (MockAiGate.IsEnabled(_configuration, _env))
         {
             _logger.LogInformation(
-                "Mocks:UseMockAi=true — OpenAI key validation skipped. Real Azure OpenAI is not wired.");
+                "Mocks:UseMockAi=true in {Env} — OpenAI key validation skipped. Real Azure OpenAI is not wired.",
+                _env.EnvironmentName);
             return ValidateOptionsResult.Success;
         }
 

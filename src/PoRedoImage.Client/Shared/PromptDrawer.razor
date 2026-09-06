@@ -76,9 +76,11 @@
                                     @onclick="@(() => History.TogglePinAsync(e.Text))">
                                 <i class="bi @(e.Pinned ? "bi-star-fill" : "bi-star")"></i>
                             </button>
-                            <button type="button" class="prompt-history__drop" title="Forget this prompt"
+                            <button type="button" class="prompt-history__drop"
+                                    aria-label="Forget this prompt"
+                                    title="Forget this prompt"
                                     @onclick="@(() => History.RemoveAsync(e.Text))">
-                                <i class="bi bi-x"></i>
+                                <i class="bi bi-x" aria-hidden="true"></i>
                             </button>
                         </div>
                     }
@@ -107,8 +109,11 @@
                             && !string.IsNullOrWhiteSpace(_localPrompts[idx])
                             && _localPrompts[idx] != DefaultPrompts.All[idx])
                         {
-                            <button type="button" class="prompt-drawer__reset" @onclick="@(() => ResetRow(idx))" title="Reset to default">
-                                <i class="bi bi-arrow-counterclockwise"></i>
+                            <button type="button" class="prompt-drawer__reset"
+                                    aria-label="Reset to default"
+                                    title="Reset to default"
+                                    @onclick="@(() => ResetRow(idx))">
+                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                             </button>
                         }
                         @if (ImageBytes is not null && !string.IsNullOrWhiteSpace(_localPrompts[idx]))
@@ -117,8 +122,9 @@
                             <button type="button"
                                     class="prompt-drawer__improve @(busy ? "prompt-drawer__improve--busy" : "")"
                                     disabled="@busy"
-                                    @onclick="@(() => ImproveRowAsync(idx))"
-                                    title="Let the 4-agent Style Director rewrite this prompt for your image">
+                                    aria-label="Improve this prompt with Style Director"
+                                    title="Let the 4-agent Style Director rewrite this prompt for your image"
+                                    @onclick="@(() => ImproveRowAsync(idx))">
                                 @if (busy)
                                 {
                                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>

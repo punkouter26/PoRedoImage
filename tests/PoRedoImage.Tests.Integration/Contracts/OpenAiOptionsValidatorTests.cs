@@ -8,8 +8,13 @@ using PoRedoImage.Web.Configuration;
 namespace PoRedoImage.Tests.Integration.Contracts;
 
 /// <summary>
-/// Contract tests for <see cref="OpenAiOptionsValidator"/>. Asserts the dev-policy contract:
-///   - <c>Mocks:UseMockAi=true</c>: validator is short-circuited (real services aren't wired).
+/// Contract tests for <see cref="OpenAiOptionsValidator"/>. Asserts the policy contract:
+///   - <c>Mocks:UseMockAi=true</c> in the Test env: validator is short-circuited (real services
+///     aren't wired; mocks take their place). The Test env is the ONLY one where the flag is
+///     honoured — see MockAiGate.
+///   - <c>Mocks:UseMockAi=true</c> in Development or Production: the gate ignores the flag, so
+///     real services are wired AND the validator runs as if the flag were off. Setting the flag
+///     in Dev no longer silently degrades to canned output.
 ///   - <c>Mocks:UseMockAi=false</c> + missing fields: Fail in EVERY environment (Production AND
 ///     Development). The old warn-and-continue-in-Development behavior masked missing-key setups
 ///     and only surfaced as a 401 on the first AI call.
@@ -21,15 +26,10 @@ namespace PoRedoImage.Tests.Integration.Contracts;
 public class OpenAiOptionsValidatorTests
 {
     private static OpenAiOptionsValidator MakeValidator(
-        bool isProduction,
+        string envName,
         bool useMockAi = false)
     {
-        var env = new HostingEnvironment
-        {
-            EnvironmentName = isProduction
-                ? Microsoft.Extensions.Hosting.Environments.Production
-                : Microsoft.Extensions.Hosting.Environments.Development
-        };
+        var env = new HostingEnvironment { EnvironmentName = envName };
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -39,10 +39,19 @@ public class OpenAiOptionsValidatorTests
         return new OpenAiOptionsValidator(env, config, NullLogger<OpenAiOptionsValidator>.Instance);
     }
 
+    private static OpenAiOptionsValidator MakeProductionValidator() =>
+        MakeValidator(Microsoft.Extensions.Hosting.Environments.Production);
+
+    private static OpenAiOptionsValidator MakeDevelopmentValidator(bool useMockAi = false) =>
+        MakeValidator(Microsoft.Extensions.Hosting.Environments.Development, useMockAi);
+
+    private static OpenAiOptionsValidator MakeTestValidator(bool useMockAi = false) =>
+        MakeValidator(PoRedoImage.Web.Configuration.PoEnvironments.Test, useMockAi);
+
     [Fact]
     public void AllFieldsPresent_Production_Succeeds()
     {
-        var v = MakeValidator(isProduction: true);
+        var v = MakeProductionValidator();
         var result = v.Validate(null, new OpenAiOptions { Endpoint = "https://x.openai.azure.com/", Key = "k", ChatCompletionsDeployment = "gpt-4o" });
         Assert.True(result.Succeeded);
     }
@@ -53,7 +62,7 @@ public class OpenAiOptionsValidatorTests
     [InlineData("deployment", "ChatCompletionsDeployment")]
     public void MissingField_Production_Fails(string blankedField, string expectedFailureFragment)
     {
-        var v = MakeValidator(isProduction: true);
+        var v = MakeProductionValidator();
         var options = new OpenAiOptions
         {
             Endpoint = blankedField == "endpoint" ? "" : "https://x.openai.azure.com/",
@@ -67,7 +76,7 @@ public class OpenAiOptionsValidatorTests
         Assert.Contains(result.Failures, f => f.Contains(expectedFailureFragment));
     }
 
-    // ── New dev-policy contract: real AI in dev means real keys; no silent degradation. ──
+    // ── Dev-policy contract: real AI in dev means real keys; no silent degradation. ──
 
     [Fact]
     public void MissingFields_Development_MocksOff_Fails()
@@ -75,7 +84,7 @@ public class OpenAiOptionsValidatorTests
         // Dev previously passed with warnings; the new contract is that Dev also fails fast
         // when real services are wired (Mocks:UseMockAi=false). Otherwise the first AI call
         // returns 401 and the user has no clear signal that the keys are missing.
-        var v = MakeValidator(isProduction: false, useMockAi: false);
+        var v = MakeDevelopmentValidator(useMockAi: false);
         var result = v.Validate(null, new OpenAiOptions());
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, f => f.Contains("OpenAI:Endpoint"));
@@ -85,7 +94,7 @@ public class OpenAiOptionsValidatorTests
     [Fact]
     public void MissingKey_Development_MocksOff_Fails()
     {
-        var v = MakeValidator(isProduction: false, useMockAi: false);
+        var v = MakeDevelopmentValidator(useMockAi: false);
         var result = v.Validate(null, new OpenAiOptions
         {
             Endpoint = "https://x.openai.azure.com/",
@@ -97,19 +106,43 @@ public class OpenAiOptionsValidatorTests
     }
 
     [Fact]
-    public void MissingFields_Development_MocksOn_Succeeds()
+    public void MissingFields_Development_MocksOn_StillFails_BecauseGateIgnoresFlag()
     {
-        // Explicit offline-mode opt-out: real services aren't wired, so the bound options are
-        // never consumed and the validator must NOT block startup.
-        var v = MakeValidator(isProduction: false, useMockAi: true);
+        // Mock mode is Test-only. Setting Mocks:UseMockAi=true in Development must NOT
+        // short-circuit the validator — the gate ignores the flag, real services are wired,
+        // and the missing keys must therefore be reported. This is what stops "I set the flag
+        // once to debug something and forgot, and now my dev loop is silently mocked".
+        var v = MakeDevelopmentValidator(useMockAi: true);
+        var result = v.Validate(null, new OpenAiOptions());
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Endpoint"));
+    }
+
+    [Fact]
+    public void MissingFields_Test_MocksOn_Succeeds()
+    {
+        // The Test environment IS where the mock flag is honored: real services aren't wired,
+        // the bound options are never consumed, and the validator must NOT block startup.
+        var v = MakeTestValidator(useMockAi: true);
         var result = v.Validate(null, new OpenAiOptions());
         Assert.True(result.Succeeded);
     }
 
     [Fact]
+    public void MissingFields_Test_MocksOff_Fails()
+    {
+        // Even in Test, if the flag is off the validator runs normally. The Test env doesn't
+        // get a free pass on missing fields when the operator said "use real services".
+        var v = MakeTestValidator(useMockAi: false);
+        var result = v.Validate(null, new OpenAiOptions());
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Endpoint"));
+    }
+
+    [Fact]
     public void AllFieldsPresent_Development_MocksOff_Succeeds()
     {
-        var v = MakeValidator(isProduction: false, useMockAi: false);
+        var v = MakeDevelopmentValidator(useMockAi: false);
         var result = v.Validate(null, new OpenAiOptions
         {
             Endpoint = "https://x.openai.azure.com/",

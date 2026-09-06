@@ -11,16 +11,27 @@
     justify-content: center;
 }
 
-/* Below md the five labels cannot share the rail with the wordmark. They become a
-   scrollable strip rather than wrapping the header to two rows or disappearing —
-   a hidden nav is the bug this component was written to fix. */
+/* Below md the five labels cannot share the rail with the wordmark. They wrap to a
+   second row when the wordmark and account controls leave room, and only scroll inline
+   when even two rows cannot fit — a hidden nav is the bug this component was written
+   to fix. The horizontal scrollbar is left visible (thin) so the overflow is
+   discoverable on touch, with an edge fade so it does not look broken. */
 @media (max-width: 991.98px) {
     .app-nav__links {
-        justify-content: flex-start;
+        justify-content: flex-end;
+        flex-wrap: wrap;
         overflow-x: auto;
-        scrollbar-width: none;
+        scrollbar-width: thin;
         -webkit-overflow-scrolling: touch;
+        mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
     }
 
-    .app-nav__links::-webkit-scrollbar { display: none; }
+    /* On really narrow viewports, fall back to a single scrollable row to keep the
+       rail height constant and the wordmark from reflowing into two lines. */
+    @media (max-width: 479.98px) {
+        .app-nav__links {
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+        }
+    }
 }

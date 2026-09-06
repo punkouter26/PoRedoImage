@@ -26,15 +26,21 @@ namespace PoRedoImage.Infrastructure;
 public static class InfrastructureServiceExtensions
 {
     /// <param name="configuration">
-    /// Optional. When <c>Mocks:UseMockAi</c> is <c>true</c>, the three high-cost AI services
-    /// (Vision, OpenAI text, Imagen3) are replaced with zero-network mock implementations that
-    /// also implement <see cref="IMockable"/> — driving the client "USING MOCK DATA" banner and
-    /// guaranteeing zero live token spend. Passing <c>null</c> always wires the real services.
+    /// Optional. The Infrastructure layer reads <c>Mocks:UseMockAi</c> from this for the
+    /// defence-in-depth checks inside individual AI service classes (which throw if a real
+    /// service is constructed while mocks are enabled — see <c>MockAiDelegatingHandler</c>).
+    /// </param>
+    /// <param name="useMockAi">
+    /// Whether to register the mock AI services instead of the real ones. This MUST be
+    /// resolved by the host using <c>MockAiGate.IsEnabled(...)</c> so the Test-only policy
+    /// is enforced in exactly one place. Passing <c>false</c> wires the real services and
+    /// is the safe default for Dev and Prod.
     /// </param>
     public static IServiceCollection AddPoRedoImageInfrastructure(
-        this IServiceCollection services, IConfiguration? configuration = null)
+        this IServiceCollection services,
+        IConfiguration? configuration = null,
+        bool useMockAi = false)
     {
-        var useMockAi = ConfigValue.Bool(configuration, ConfigKeys.MocksUseMockAi);
 
         // Domain service implementations (Singleton: clients own long-lived HTTP/SDK resources)
         if (useMockAi)

@@ -2,10 +2,11 @@
 
 namespace PoRedoImage.Infrastructure.Services.Mocks;
 
-// Mock AI service implementations used when Mocks:UseMockAi is enabled (Development demos and the
-// automated-test tier). Each implements IMockable so the Blazor client renders the "USING MOCK DATA"
-// banner, and — critically — none of them make a network call, guaranteeing zero live token spend
-// against Azure OpenAI / Computer Vision / Google Gemini. See InfrastructureServiceExtensions.
+// Mock AI service implementations wired when MockAiGate.IsEnabled(...) returns true — gated to the
+// Test environment only (integration + E2E). Development and Production MUST use real services;
+// mocks are a test fixture, not a dev shortcut. Each implementation also implements IMockable so the
+// Blazor client renders the "USING MOCK DATA" banner, and — critically — none make a network call,
+// guaranteeing zero live token spend against Azure OpenAI / Computer Vision / Google Gemini.
 
 /// <summary>Canned vision analysis — never calls Azure Computer Vision.</summary>
 public sealed class MockVisionService : IVisionService, IMockable

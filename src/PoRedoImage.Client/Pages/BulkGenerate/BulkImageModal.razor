@@ -1,41 +1,39 @@
 @namespace PoRedoImage.Client.Pages
 @using PoRedoImage.Client.Models
+@inject DialogService Dialog
 
-@if (IsVisible && Result is not null)
-{
-    <div class="bulk-modal-backdrop" @onclick="() => OnClose.InvokeAsync()">
-        <div class="bulk-modal-panel" @onclick:stopPropagation>
-            <div class="bulk-modal-header">
-                <span class="bulk-modal-num">Variation #@(Result.Index + 1)</span>
-                <button class="bulk-modal-close" @onclick="() => OnClose.InvokeAsync()" aria-label="Close">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
-            <div class="bulk-modal-img-wrap">
-                <img src="@Result.ImageUrl" alt="Variation @(Result.Index + 1)" />
-            </div>
-            <div class="bulk-modal-footer">
-                <p class="bulk-modal-prompt">@Result.Prompt</p>
-                <div class="bulk-modal-actions">
-                    <button class="flap-btn flap-btn--icon @(IsFavorite ? "flap-btn--active" : "")"
-                            @onclick="() => OnToggleFavorite.InvokeAsync(Result.Index)">
-                        <i class="bi @(IsFavorite ? "bi-heart-fill" : "bi-heart")"></i>
-                        <span class="ms-1">@(IsFavorite ? "Saved" : "Save")</span>
-                    </button>
-                    <button class="flap-btn flap-btn--sm" @onclick="() => OnDownload.InvokeAsync(Result.Index)">
-                        <i class="bi bi-download me-1"></i>Download
-                    </button>
-                </div>
-            </div>
+@*
+    Bulk variation lightbox panel. Hosted by Radzen's DialogService from BulkGallery.
+    Radzen brings the focus trap, Escape handler, inert backdrop and focus restore —
+    see GalleryLightbox.razor for the rationale behind choosing it here too.
+    This file only paints the panel surface.
+*@
+<div class="bulk-modal-panel">
+    <div class="bulk-modal-img-wrap">
+        <img src="@Result.ImageUrl" alt="Variation @(Result.Index + 1)" />
+    </div>
+    <div class="bulk-modal-footer">
+        <p class="bulk-modal-prompt">@Result.Prompt</p>
+        <div class="bulk-modal-actions">
+            <button type="button"
+                    class="flap-btn flap-btn--icon @(IsFavorite ? "flap-btn--active" : null)"
+                    aria-pressed="@IsFavorite.ToString().ToLowerInvariant()"
+                    @onclick="() => OnToggleFavorite.InvokeAsync(Result.Index)">
+                <i class="bi @(IsFavorite ? "bi-heart-fill" : "bi-heart")" aria-hidden="true"></i>
+                <span class="ms-1">@(IsFavorite ? "Saved" : "Save")</span>
+            </button>
+            <button type="button"
+                    class="flap-btn flap-btn--sm"
+                    @onclick="() => OnDownload.InvokeAsync(Result.Index)">
+                <i class="bi bi-download me-1" aria-hidden="true"></i>Download
+            </button>
         </div>
     </div>
-}
+</div>
 
 @code {
-    [Parameter] public bool IsVisible { get; set; }
-    [Parameter] public BulkGenerateImageResult? Result { get; set; }
+    [Parameter, EditorRequired] public BulkGenerateImageResult Result { get; set; } = default!;
     [Parameter] public bool IsFavorite { get; set; }
-    [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback<int> OnToggleFavorite { get; set; }
     [Parameter] public EventCallback<int> OnDownload { get; set; }
 }

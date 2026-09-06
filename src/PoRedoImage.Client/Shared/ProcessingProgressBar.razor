@@ -27,15 +27,28 @@
                bar omits aria-valuenow, which is exactly how ARIA says to express "running,
                length unknown" — and is what the four feature pages that used to publish
                invented milestones (15 → 45 → 85) should have been saying all along. *@
-            <div class="shimmer-progress shimmer-progress--@(Percentage is null ? "indeterminate" : "determinate") mt-2"
-                 role="progressbar"
-                 aria-valuenow="@(Percentage?.ToString())" aria-valuemin="0" aria-valuemax="100"
-                 aria-label="@(string.IsNullOrEmpty(Message) ? "Progress" : Message)">
-                <div class="shimmer-progress__bar"
-                     style="--progress: @(((Percentage ?? 0) / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));"></div>
-            </div>
+            @{ var pct = Percentage ?? 0; }
+            @if (Percentage is not null)
+            {
+                <div class="shimmer-progress shimmer-progress--determinate mt-2"
+                     role="progressbar"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="@pct"
+                     aria-label="@(string.IsNullOrEmpty(Message) ? "Progress" : Message)">
+                    <div class="shimmer-progress__bar"
+                         style="--progress: @((pct / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));"></div>
+                </div>
+            }
+            else
+            {
+                <div class="shimmer-progress shimmer-progress--indeterminate mt-2"
+                     role="progressbar"
+                     aria-label="@(string.IsNullOrEmpty(Message) ? "Progress" : Message)">
+                    <div class="shimmer-progress__bar"></div>
+                </div>
+            }
         </div>
-        @if (Percentage is { } pct)
+        @if (Percentage is not null)
         {
             <span class="shimmer-pct">@pct%</span>
         }

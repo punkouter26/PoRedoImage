@@ -48,10 +48,11 @@ public static class HostBootstrapExtensions
                 "Skipping KV load; secrets must come from another provider or Mocks:UseMockAi must be true.");
             return builder;
         }
-        if (ConfigValue.Bool(builder.Configuration, ConfigKeys.MocksUseMockAi))
+        if (MockAiGate.IsEnabled(builder.Configuration, builder.Environment))
         {
             Log.Information(
-                "Mocks:UseMockAi=true — skipping Key Vault load (real AI services are not wired).");
+                "Mocks:UseMockAi=true in {Env} — skipping Key Vault load (real AI services are not wired).",
+                builder.Environment.EnvironmentName);
             return builder;
         }
 

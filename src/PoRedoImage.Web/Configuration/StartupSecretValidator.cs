@@ -31,12 +31,12 @@ public sealed class StartupSecretValidator : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         // Mock-mode opt-out: real services aren't wired, so AI key validation is unnecessary.
-        // Keeps the offline / CI path bootable while still producing loud, actionable failures
-        // when someone WANTS real AI but forgot the keys.
-        if (ConfigValue.Bool(_configuration, ConfigKeys.MocksUseMockAi))
+        // Gated to the Test environment — see MockAiGate for the policy.
+        if (MockAiGate.IsEnabled(_configuration, _env))
         {
             _logger.LogInformation(
-                "Mocks:UseMockAi=true — AI secret validation skipped. Mock services wired; no live keys required.");
+                "Mocks:UseMockAi=true in {Env} — AI secret validation skipped. Mock services wired; no live keys required.",
+                _env.EnvironmentName);
             return Task.CompletedTask;
         }
 

@@ -34,13 +34,6 @@ public sealed class ImageSessionService
     public bool HasImage => Bytes is not null;
 
     /// <summary>
-    /// Route of the most recent feature page the user worked on
-    /// (e.g. <c>/studio</c>, <c>/bulk-generate</c>, <c>/meme-generation</c>).
-    /// Used to deep-link back into the originating flow.
-    /// </summary>
-    public string? LastVisitedFeatureRoute { get; private set; }
-
-    /// <summary>
     /// Final prompt (style description, meme caption, bulk directive) most recently
     /// submitted. Persisted so the user can return and re-roll without re-typing.
     /// </summary>
@@ -81,12 +74,12 @@ public sealed class ImageSessionService
     }
 
     /// <summary>
-    /// Records the route and final prompt of the most recently visited feature page.
-    /// Safe to call multiple times — the latest values win.
+    /// Records the final prompt of the most recently visited feature page.
+    /// Safe to call multiple times — the latest values win. The route is no
+    /// longer tracked because no consumer reads it (see commit history).
     /// </summary>
     public void RecordFeatureVisit(string route, string? finalPrompt = null)
     {
-        LastVisitedFeatureRoute = route;
         if (finalPrompt is not null) LastFinalPrompt = finalPrompt;
         OnChange?.Invoke();
     }
@@ -119,7 +112,6 @@ public sealed class ImageSessionService
         Bytes = null;
         ContentType = null;
         FileName = null;
-        LastVisitedFeatureRoute = null;
         LastFinalPrompt = null;
         StagedPrompt = null;
         _cachedPreviewUrl = null;

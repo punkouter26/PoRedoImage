@@ -117,8 +117,12 @@
         <div class="processing-pill">
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
             <span>Generating @_completedCount / @(_results.Count)</span>
-            <button class="processing-pill__cancel" @onclick="CancelGeneration" title="Cancel">
-                <i class="bi bi-x"></i>
+            <button class="processing-pill__cancel"
+                    type="button"
+                    aria-label="Cancel generation"
+                    title="Cancel"
+                    @onclick="CancelGeneration">
+                <i class="bi bi-x" aria-hidden="true"></i>
             </button>
         </div>
     }

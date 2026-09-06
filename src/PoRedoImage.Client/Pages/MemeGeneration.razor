@@ -51,13 +51,16 @@
                 }
                 else
                 {
-                    <div class="meme-template-grid">
+                    <div class="meme-template-grid" role="radiogroup" aria-label="Meme template">
                         @foreach (var t in _templates)
                         {
                             var isSelected = _selectedTemplateId == t.Id;
-                            <button class="flap-choice flap-choice--tile @(isSelected ? "flap-choice--active" : "")"
-                                    @onclick="@(() => SelectTemplate(t.Id))"
-                                    title="@t.Description">
+                            <button type="button"
+                                    class="flap-choice flap-choice--tile @(isSelected ? "flap-choice--active" : null)"
+                                    role="radio"
+                                    aria-checked="@isSelected.ToString().ToLowerInvariant()"
+                                    aria-label="@($"{t.Name} — {t.Description}")"
+                                    @onclick="@(() => SelectTemplate(t.Id))">
                                 <span class="flap-choice__name">@t.Name</span>
                                 <span class="flap-choice__meta">@t.Category · @t.RequiredZoneCount zone@(t.RequiredZoneCount == 1 ? "" : "s")</span>
                             </button>
@@ -73,9 +76,11 @@
                             @for (var i = 0; i < _selectedTemplate.RequiredZoneCount; i++)
                             {
                                 var zone = _selectedTemplate.Zones[i];
+                                var zoneId = $"meme-zone-{i}";
                                 <div class="mb-2">
-                                    <label class="form-label small fw-semibold">@zone.Label</label>
-                                    <input class="form-control form-control-sm"
+                                    <label class="form-label small fw-semibold" for="@zoneId">@zone.Label</label>
+                                    <input id="@zoneId"
+                                           class="form-control form-control-sm"
                                            placeholder="Type the text for this zone…"
                                            maxlength="120"
                                            value="@(_zoneTexts.Count > i ? _zoneTexts[i] : string.Empty)"

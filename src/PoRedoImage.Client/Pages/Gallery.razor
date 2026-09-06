@@ -35,41 +35,60 @@
         <div class="card-body p-3">
             <div class="row g-2 align-items-center">
                 <div class="col-md-5">
+                    <label class="visually-hidden" for="gallery-search">Search images</label>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-secondary border-secondary text-light"><i class="bi bi-search"></i></span>
-                        <input type="text" class="form-control bg-dark border-secondary text-light"
+                        <input id="gallery-search" type="text" class="form-control bg-dark border-secondary text-light"
                                placeholder="Search by file name or AI tag..."
+                               aria-label="Search images"
                                @bind="_searchQuery" @bind:event="oninput" />
                         @if (!string.IsNullOrWhiteSpace(_searchQuery))
                         {
-                            <button class="btn btn-outline-secondary" type="button" @onclick="@(() => _searchQuery = string.Empty)">
-                                <i class="bi bi-x"></i>
+                            <button class="btn btn-outline-secondary" type="button"
+                                    aria-label="Clear search"
+                                    @onclick="@(() => _searchQuery = string.Empty)">
+                                <i class="bi bi-x" aria-hidden="true"></i>
                             </button>
                         }
                     </div>
                 </div>
 
                 <div class="col-md-7">
-                    <div class="d-flex gap-1 flex-wrap justify-content-md-end">
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == null ? "flap-btn--active" : "")"
+                    <div class="d-flex gap-1 flex-wrap justify-content-md-end" role="radiogroup" aria-label="Filter by image kind">
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == null ? "flap-btn--active" : null)"
+                                type="button"
+                                role="radio"
+                                aria-checked="@((_selectedKind == null).ToString().ToLowerInvariant())"
                                 @onclick="@(() => _selectedKind = null)">
                             All (@_images.Count)
                         </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Original ? "flap-btn--active" : "")"
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Original ? "flap-btn--active" : null)"
+                                type="button"
+                                role="radio"
+                                aria-checked="@((_selectedKind == UserImageKind.Original).ToString().ToLowerInvariant())"
                                 @onclick="@(() => _selectedKind = UserImageKind.Original)">
-                            <i class="bi bi-camera me-1"></i>Originals (@CountFor(UserImageKind.Original))
+                            <i class="bi bi-camera me-1" aria-hidden="true"></i>Originals (@CountFor(UserImageKind.Original))
                         </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Regeneration ? "flap-btn--active" : "")"
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Regeneration ? "flap-btn--active" : null)"
+                                type="button"
+                                role="radio"
+                                aria-checked="@((_selectedKind == UserImageKind.Regeneration).ToString().ToLowerInvariant())"
                                 @onclick="@(() => _selectedKind = UserImageKind.Regeneration)">
-                            <i class="bi bi-palette2 me-1"></i>Regen (@CountFor(UserImageKind.Regeneration))
+                            <i class="bi bi-palette2 me-1" aria-hidden="true"></i>Regen (@CountFor(UserImageKind.Regeneration))
                         </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Meme ? "flap-btn--active" : "")"
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Meme ? "flap-btn--active" : null)"
+                                type="button"
+                                role="radio"
+                                aria-checked="@((_selectedKind == UserImageKind.Meme).ToString().ToLowerInvariant())"
                                 @onclick="@(() => _selectedKind = UserImageKind.Meme)">
-                            <i class="bi bi-chat-square-text me-1"></i>Memes (@CountFor(UserImageKind.Meme))
+                            <i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Memes (@CountFor(UserImageKind.Meme))
                         </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.BulkVariation ? "flap-btn--active" : "")"
+                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.BulkVariation ? "flap-btn--active" : null)"
+                                type="button"
+                                role="radio"
+                                aria-checked="@((_selectedKind == UserImageKind.BulkVariation).ToString().ToLowerInvariant())"
                                 @onclick="@(() => _selectedKind = UserImageKind.BulkVariation)">
-                            <i class="bi bi-grid-3x3 me-1"></i>Bulk (@CountFor(UserImageKind.BulkVariation))
+                            <i class="bi bi-grid-3x3 me-1" aria-hidden="true"></i>Bulk (@CountFor(UserImageKind.BulkVariation))
                         </button>
                     </div>
                 </div>
@@ -101,13 +120,14 @@
     @* ── Content Grid ─────────────────────────────────────────────── *@
     @if (_loading)
     {
-        <div class="row g-3">
+        @* Skeletons match the loaded grid: six thumbs, same column count, the same
+           shimmer-anim the bulk slots use, so the loading frame matches the loaded one. *@
+        <div class="row g-3" aria-busy="true" aria-live="polite">
             @for (int i = 0; i < 6; i++)
             {
                 <div class="col-6 col-md-4 col-lg-3">
-                    <div class="card bg-dark border-secondary h-100 p-2 text-center" style="min-height: 240px;">
-                        <div class="spinner-border text-warning m-auto" role="status"></div>
-                    </div>
+                    <div class="card bg-dark border-secondary h-100 gallery-thumb gallery-thumb--skeleton shimmer-anim"
+                         aria-label="Loading image"></div>
                 </div>
             }
         </div>

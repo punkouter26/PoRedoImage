@@ -2115,6 +2115,11 @@ input.form-control:focus {
 .session-cost-popover { right: auto; left: 0; max-width: calc(100vw - 2rem); }
 }
 
+/* Small caption and chip text used inside the cost popover. Lives in the global
+   sheet because SessionCostChip does not own a scoped .razor.css. */
+.session-cost-caption { font-size: 0.65rem; }
+.session-cost-chip-text { font-size: 0.7rem; }
+
 /* ═══ Mobile sticky action rail ══════════════════════════════════════════ */
 @media (max-width: 767.98px) {
 .mobile-sticky-cta {

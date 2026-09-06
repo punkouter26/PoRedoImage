@@ -200,8 +200,11 @@ try
         sp.GetRequiredService<IHttpClientFactory>().CreateClient("BffApi"));
 
     // ─── Feature services (Onion Architecture — Infrastructure layer wires all services) ──
-    // DI registration follows Dependency Inversion Principle (SOLID-D)
-    builder.Services.AddPoRedoImageInfrastructure(builder.Configuration);
+    // DI registration follows Dependency Inversion Principle (SOLID-D). The mock-mode decision
+    // is resolved here (Test env only — see MockAiGate) and passed in, because the
+    // Infrastructure assembly deliberately has no ASP.NET types in scope.
+    var useMockAi = MockAiGate.IsEnabled(builder.Configuration, builder.Environment);
+    builder.Services.AddPoRedoImageInfrastructure(builder.Configuration, useMockAi);
 
     // ─── Correlation on the outbound leg (§3) ──────────────────────────
     // RequestContextMiddleware handles browser → BFF. This closes the chain for BFF → downstream

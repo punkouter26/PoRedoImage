@@ -1,8 +1,8 @@
 @namespace PoRedoImage.Client.Pages
 @using PoRedoImage.Client.Models
-@using Microsoft.AspNetCore.Components.Web.Virtualization
 @inject IJSRuntime JSRuntime
 @inject NotificationService NotificationService
+@inject DialogService DialogService
 
 <div role="region" aria-label="Bulk generation gallery">
     @if (Results.Count == 0)
@@ -47,7 +47,11 @@
         </div>
 
         <div class="bulk-gallery" aria-live="polite" aria-busy="@(CompletedCount < Results.Count)">
-            <Virtualize Items="Results.AsReadOnly()" Context="result" ItemSize="280" OverscanCount="3">
+            @* NOT <Virtualize>: the container is a multi-column responsive grid, so the
+               block-axis ItemSize spacer that Virtualize sizes would lie about the rendered
+               height. The catalog is hard-capped at 10, so a plain foreach is the right call. *@
+            @foreach (var result in Results)
+            {
                 <div class="bulk-slot bulk-slot--@result.Status.ToString().ToLower()">
                     <div class="bulk-slot__header">
                         @* The bay number belongs in real flap cells: this is the board's position
@@ -78,7 +82,7 @@
                                      tabindex="0"
                                      role="button"
                                      aria-label="View variation @(result.Index + 1) at full size"
-                                     @onclick="@(() => _modalResult = result)"
+                                     @onclick="@(() => OpenVariationModalAsync(result))"
                                      @onkeydown="@(e => HandleSlotKey(e, result))" />
                                 break;
                             case BulkGenerateStatus.Failed:
@@ -132,17 +136,14 @@
                         }
                     </div>
                 </div>
-            </Virtualize>
+            }
         </div>
     }
 
-    <BulkImageModal
-        IsVisible="_modalResult is not null"
-        Result="_modalResult"
-        IsFavorite="@(_modalResult is not null && Favorites.Contains(_modalResult.Index))"
-        OnClose="@(() => _modalResult = null)"
-        OnToggleFavorite="@(idx => OnToggleFavorite.InvokeAsync(idx))"
-        OnDownload="@(async idx => { await OnDownloadImage.InvokeAsync(idx); _modalResult = null; })" />
+    @* Variation modal is opened via DialogService.OpenAsync from OpenVariationModalAsync —
+       Radzen provides the focus trap, Escape-to-close, and inert backdrop. The dialog's
+       content lives in BulkImageModal.razor, which only paints the panel surface.
+       See GalleryLightbox.razor for the rationale. *@
 
     @* Idea #11 — One-Tap Re-roll panel. Shows the 3 fresh variations from the last re-roll. *@
     @if (_rerollVariations.Count > 0)
@@ -243,13 +244,38 @@
     [Parameter] public EventCallback<int> OnReroll { get; set; }
     [Parameter] public EventCallback<(int SourceIndex, BulkRerollVariation Variation)> OnAcceptReroll { get; set; }
 
-    private BulkGenerateImageResult? _modalResult;
     private readonly HashSet<int> _rerollingIndices = [];
     private List<BulkRerollVariation> _rerollVariations = [];
     private int _rerollSourceIndex = -1;
     private readonly HashSet<int> _pinnedIndices = [];
     private bool _showCompareMatrix;
     private bool _zipping;
+
+    /// <summary>Opens the variation lightbox via Radzen's DialogService. The dialog's Escape
+    /// handler, focus trap, inert backdrop and focus restore come from Radzen — see the
+    /// why-Radzen comment at the top of GalleryLightbox.razor for the rationale.</summary>
+    private async Task OpenVariationModalAsync(BulkGenerateImageResult result)
+    {
+        var parameters = new Dictionary<string, object>
+        {
+            ["Result"] = result,
+            ["IsFavorite"] = Favorites.Contains(result.Index),
+            ["OnToggleFavorite"] = EventCallback.Factory.Create<int>(this, idx => OnToggleFavorite.InvokeAsync(idx)),
+            ["OnDownload"] = EventCallback.Factory.Create<int>(this, idx => OnDownloadImage.InvokeAsync(idx)),
+        };
+        await DialogService.OpenAsync<BulkImageModal>(
+            title: $"Variation #{result.Index + 1}",
+            parameters: parameters,
+            options: new DialogOptions
+            {
+                Width = "min(720px, 92vw)",
+                CloseDialogOnOverlayClick = true,
+                CloseDialogOnEsc = true,
+                ShowClose = true,
+                Draggable = false,
+                Resizable = false,
+            });
+    }
 
     private void TogglePin(int index)
     {
@@ -300,13 +326,12 @@
     private bool IsRerolling(int index) => _rerollingIndices.Contains(index);
 
     /// <summary>Keyboard handler so the clickable image tile is keyboard-activatable (WCAG 2.1.1).</summary>
-    private void HandleSlotKey(KeyboardEventArgs e, BulkGenerateImageResult result)
+    private async Task HandleSlotKey(KeyboardEventArgs e, BulkGenerateImageResult result)
     {
         if (e is null) return;
         if (e.Key is "Enter" or " " or "Spacebar")
         {
-            _modalResult = result;
-            StateHasChanged();
+            await OpenVariationModalAsync(result);
         }
     }
 
