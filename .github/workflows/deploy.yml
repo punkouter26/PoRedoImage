@@ -261,22 +261,44 @@ jobs:
         # AzureAd__ClientSecret, OpenAI__Key and Storage__ConnectionString into the portal in
         # plaintext, readable by anyone with Reader on the web app. The fix is the access policy
         # in the previous step.
+        #
+        # The vault read is deliberately NOT silenced. It used to be `2>/dev/null || echo ""`,
+        # which collapsed two different failures into one message: "the app has no policy" and
+        # "this pipeline cannot read the vault to find out" both produced an empty PERMS and the
+        # same remediation text. When the CI SP lacks read on PoShared - which is the state that
+        # broke this step while the policy was present and correct the whole time - that advice
+        # sends the operator to grant something that is already granted.
         run: |
-          PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
-            --query identity.principalId -o tsv)
-          PERMS=$(az keyvault show -n kv-poshared -g PoShared \
-            --query "properties.accessPolicies[?objectId=='$PRINCIPAL'].permissions.secrets[]" -o tsv 2>/dev/null || echo "")
-          echo "secrets permissions for $PRINCIPAL: ${PERMS:-<none>}"
-          if ! echo "$PERMS" | grep -qx "get"; then
-            echo "::error::The app's managed identity ($PRINCIPAL) cannot 'get' secrets from kv-poshared."
-            echo "::error::App Service cannot resolve the @Microsoft.KeyVault(...) App Settings without it."
-            echo "::error::Stopping rather than writing the secrets back as plaintext App Settings."
-            echo "::error::NOTE: kv-poshared uses ACCESS POLICIES (enableRbacAuthorization=false)."
-            echo "::error::A 'Key Vault Secrets User' role assignment on it grants nothing — use:"
-            echo "::error::  az keyvault set-policy -n kv-poshared --object-id $PRINCIPAL --secret-permissions get list"
+          PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query identity.principalId -o tsv)
+          echo "App managed identity: $PRINCIPAL"
+
+          # Two different failures, told apart: can this pipeline read the vault at all?
+          if ! VAULT_JSON=$(az keyvault show -n kv-poshared -g PoShared -o json 2>&1); then
+            echo "::error::This pipeline cannot READ kv-poshared, so it cannot verify the app's access."
+            echo "::error::That is a CI service-principal permission gap, NOT a missing app policy."
+            echo "::error::az reported:"
+            echo "$VAULT_JSON" | head -5
+            echo "::error::Grant the CI SP 'Reader' on the PoShared resource group:"
+            echo "::error::  az role assignment create --role Reader --assignee <CI_SP_APP_ID> --scope /subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared"
             exit 1
           fi
-          echo "Managed identity holds a get/list secrets access policy on kv-poshared."
+
+          PERMS=$(printf '%s' "$VAULT_JSON" | python3 -c "import sys,json;p='$PRINCIPAL'.lower();d=json.load(sys.stdin);print(' '.join(sorted({x for a in d['properties']['accessPolicies'] if a['objectId'].lower()==p for x in (a['permissions'].get('secrets') or [])})))")
+          echo "secrets permissions for $PRINCIPAL: ${PERMS:-<none>}"
+
+          case " $PERMS " in
+            *" get "*) ;;
+            *)
+              echo "::error::The app's managed identity ($PRINCIPAL) cannot 'get' secrets from kv-poshared."
+              echo "::error::App Service cannot resolve the @Microsoft.KeyVault(...) App Settings without it."
+              echo "::error::Stopping rather than writing the secrets back as plaintext App Settings."
+              echo "::error::NOTE: kv-poshared uses ACCESS POLICIES (enableRbacAuthorization=false)."
+              echo "::error::A 'Key Vault Secrets User' role assignment on it grants NOTHING - use:"
+              echo "::error::  az keyvault set-policy -n kv-poshared --object-id $PRINCIPAL --secret-permissions get list"
+              exit 1
+              ;;
+          esac
+          echo "Managed identity holds a 'get' secrets access policy on kv-poshared."
       - name: Wait for App Service configuration update
         # Key Vault references are verified resolvable by the previous step.
         # Short 10s wait allows the App Service platform to stabilize configuration before deployment.
