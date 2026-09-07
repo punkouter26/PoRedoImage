@@ -20,9 +20,14 @@
 
   <ItemGroup>
     <!-- Mock sample assets: dev-only video used by MockVeoVideoGenerationService when Mocks:UseMockAi
-         is true. Gitignored (see .gitignore entry under "Mock sample assets"); a missing file falls
-         back to the embedded TinyMp4 stub so the build never breaks for a missing artefact. -->
-    <None Include="MockSamples\mock-video.mp4" CopyToOutputDirectory="PreserveNewest" Link="MockSamples\mock-video.mp4" />
+         is true. Gitignored (see .gitignore entry under "Mock sample assets"), so it is present on a
+         dev box and ABSENT on a CI runner and in a fresh clone.
+         This MUST stay a wildcard. A literal Include="MockSamples\mock-video.mp4" fails the build with
+         MSB3030 ("Could not copy ... because it was not found") wherever the file is absent — which is
+         every CI run. A glob matching nothing is silently dropped by MSBuild, so the build works both
+         ways and MockVeoVideoGenerationService falls back to its embedded TinyMp4 stub at runtime
+         (see MockAiServices.GetMockVideoBytes). -->
+    <None Include="MockSamples\*.mp4" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
