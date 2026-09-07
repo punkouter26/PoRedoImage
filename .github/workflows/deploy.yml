@@ -200,25 +200,33 @@ jobs:
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --template-file infra/main.bicep \
             --name "ci-${{ github.run_id }}"
-      - name: Bind Key Vault Secrets User role
+      - name: Bind Key Vault secrets access policy
         # Grants the app's system-assigned managed identity read access to the shared Key Vault.
         # The App Service platform resolves the `@Microsoft.KeyVault(...)` App Settings (bound in
-        # infra/main.bicep) AT CONTAINER START using this identity. If the identity does not yet
-        # hold `Key Vault Secrets User` on kv-poshared — or that grant has not propagated to the
-        # data plane — the platform CANNOT resolve the references and the container fails to start,
+        # infra/main.bicep) AT CONTAINER START using this identity. If the identity cannot read the
+        # vault, the platform CANNOT resolve the references and the container fails to start,
         # surfacing as a 503 "Application Error" crash loop (deploy #54 root cause; see ADR-026).
+        #
+        # ACCESS POLICY, NOT RBAC. kv-poshared has enableRbacAuthorization=false, so its data plane
+        # is governed by access policies and `Key Vault Secrets User` role assignments on it are
+        # INERT. This step and the verify below used to create and then check for exactly that role.
+        # The check could therefore never pass, and the failure it printed told the operator to run
+        # `az role assignment create` — a command that reports success and grants nothing, so
+        # following the instructions left the deploy just as broken. infra/main.bicep has always
+        # described the real mechanism ("holds a get/list access policy"); the pipeline was the only
+        # thing asserting RBAC. Do not "fix" a future failure here by switching the vault to RBAC:
+        # 75 other identities hold access policies on it and would lose access at once.
         #
         # ORDERING: this step runs BEFORE the code deploy/restart, not after. The previous order
         # (grant AFTER deploy) left a window where the container started with no vault access and
-        # crash-looped; the post-deploy smoke test then raced the RBAC data-plane propagation
-        # (1–5+ min) and lost. Granting first + waiting for propagation (next step) means the
-        # deploy-restart finds the references resolvable and the app boots on the first try.
+        # crash-looped; the post-deploy smoke test then raced data-plane propagation and lost.
+        # Granting first + waiting for propagation (next step) means the deploy-restart finds the
+        # references resolvable and the app boots on the first try.
         #
-        # 2026-06-29: CI SP lost Microsoft.Authorization/roleAssignments/write on the PoShared RG.
-        # The grant is still attempted (desired for production hygiene); on 403 we warn and let the
-        # next step decide. That step used to paper over a failed grant by writing every secret to
-        # App Settings in plaintext; it now fails the deploy instead, so a missing grant is a loud
-        # stop with a remediation command rather than a silent leak.
+        # The grant is attempted every run for convergence; if the CI SP lacks vault-management
+        # rights the set-policy call fails and we warn, leaving the next step to decide. That step
+        # used to paper over a failed grant by writing every secret to App Settings in plaintext;
+        # it now fails the deploy instead, so a missing grant is a loud stop, not a silent leak.
         run: |
           PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
             --query identity.principalId -o tsv)
@@ -226,46 +234,49 @@ jobs:
             echo "::error::App has no system-assigned identity; re-check infra/main.bicep."
             exit 1
           fi
-          VAULT="/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared"
-          az role assignment create --role "Key Vault Secrets User" \
-            --assignee "$PRINCIPAL" --scope "$VAULT" 2>&1 \
-            | grep -v "AlreadyExists" || true
-          COUNT=$(az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
-            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv 2>/dev/null || echo "0")
+          # get + list only. The app reads secrets; it never writes, deletes or purges them.
+          az keyvault set-policy -n kv-poshared --object-id "$PRINCIPAL" \
+            --secret-permissions get list -o none 2>&1 || true
+          COUNT=$(az keyvault show -n kv-poshared -g PoShared \
+            --query "length(properties.accessPolicies[?objectId=='$PRINCIPAL'])" -o tsv 2>/dev/null || echo "0")
           if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
-            echo "::warning::CI SP could not verify the 'Key Vault Secrets User' assignment on kv-poshared."
-            echo "::warning::This usually means the CI SP lost 'Microsoft.Authorization/roleAssignments/write' on the PoShared RG."
-            echo "::warning::Ask the PoShared RG Owner / User Access Administrator to re-grant it. The next step will stop the deploy if the app identity still cannot read the vault."
+            echo "::warning::CI SP could not set or verify the secrets access policy on kv-poshared."
+            echo "::warning::This usually means the CI SP lacks Microsoft.KeyVault/vaults/accessPolicies/write on the vault."
+            echo "::warning::Ask a PoShared RG Owner to grant it. The next step will stop the deploy if the app identity still cannot read the vault."
           else
-            echo "Bind verified — '$COUNT' assignment(s) for Key Vault Secrets User on kv-poshared."
+            echo "Bind verified — access policy present for $PRINCIPAL on kv-poshared."
           fi
       - name: Verify Key Vault reference resolution
         # The app resolves its secrets through the @Microsoft.KeyVault(...) App Settings declared
         # in infra/main.bicep, using its own managed identity. That only works while the identity
-        # holds 'Key Vault Secrets User' on kv-poshared, so assert it here and fail the deploy
+        # holds a secrets access policy on kv-poshared, so assert it here and fail the deploy
         # loudly — with the exact remediation command — when it does not. A failed deploy leaves
         # the already-running site untouched.
+        #
+        # The permissions are checked, not just the policy's presence: an entry granting only
+        # 'set' would satisfy a presence check while the platform still could not read a secret.
         #
         # Do NOT "fix" a resolution failure by reading the secrets in CI and writing them back as
         # literal App Settings. A previous version of this pipeline did exactly that and leaked
         # AzureAd__ClientSecret, OpenAI__Key and Storage__ConnectionString into the portal in
-        # plaintext, readable by anyone with Reader on the web app. The fix is the role
-        # assignment in the previous step.
+        # plaintext, readable by anyone with Reader on the web app. The fix is the access policy
+        # in the previous step.
         run: |
           PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} \
             --query identity.principalId -o tsv)
-          VAULT="/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared/providers/Microsoft.KeyVault/vaults/kv-poshared"
-          COUNT=$(az role assignment list --assignee "$PRINCIPAL" --scope "$VAULT" \
-            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv 2>/dev/null || echo "0")
-          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
-            echo "::error::The app's managed identity ($PRINCIPAL) does not hold 'Key Vault Secrets User' on kv-poshared."
+          PERMS=$(az keyvault show -n kv-poshared -g PoShared \
+            --query "properties.accessPolicies[?objectId=='$PRINCIPAL'].permissions.secrets[]" -o tsv 2>/dev/null || echo "")
+          echo "secrets permissions for $PRINCIPAL: ${PERMS:-<none>}"
+          if ! echo "$PERMS" | grep -qx "get"; then
+            echo "::error::The app's managed identity ($PRINCIPAL) cannot 'get' secrets from kv-poshared."
             echo "::error::App Service cannot resolve the @Microsoft.KeyVault(...) App Settings without it."
             echo "::error::Stopping rather than writing the secrets back as plaintext App Settings."
-            echo "::error::Remediate once, as a PoShared RG Owner / User Access Administrator:"
-            echo "::error::  az role assignment create --role 'Key Vault Secrets User' --assignee $PRINCIPAL --scope $VAULT"
+            echo "::error::NOTE: kv-poshared uses ACCESS POLICIES (enableRbacAuthorization=false)."
+            echo "::error::A 'Key Vault Secrets User' role assignment on it grants nothing — use:"
+            echo "::error::  az keyvault set-policy -n kv-poshared --object-id $PRINCIPAL --secret-permissions get list"
             exit 1
           fi
-          echo "Managed identity holds Key Vault Secrets User on kv-poshared."
+          echo "Managed identity holds a get/list secrets access policy on kv-poshared."
       - name: Wait for App Service configuration update
         # Key Vault references are verified resolvable by the previous step.
         # Short 10s wait allows the App Service platform to stabilize configuration before deployment.
