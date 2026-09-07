@@ -52,8 +52,7 @@
                 </div>
                 <div class="card-body p-0">
                     <RadzenDataGrid Data="@_healthRows" TItem="HealthRow" AllowSorting="true" AllowFiltering="true"
-                                    AllowPaging="false" PageSize="20" Density="Density.Compact"
-                                    class="diag-config-table">
+                                    AllowPaging="false" PageSize="20" Density="Density.Compact">
                         <Columns>
                             <RadzenDataGridColumn TItem="HealthRow" Property="Key" Title="Check" Width="40%" />
                             <RadzenDataGridColumn TItem="HealthRow" Property="StatusBadge" Title="Status" Width="14%" />
@@ -73,8 +72,7 @@
                 </div>
                 <div class="card-body p-0">
                     <RadzenDataGrid Data="@_configRows" TItem="ConfigRow" AllowSorting="true" AllowFiltering="true"
-                                    AllowPaging="false" PageSize="20" Density="Density.Compact"
-                                    class="diag-config-table">
+                                    AllowPaging="false" PageSize="20" Density="Density.Compact">
                         <Columns>
                             <RadzenDataGridColumn TItem="ConfigRow" Property="Key" Title="Key" Width="40%" />
                             <RadzenDataGridColumn TItem="ConfigRow" Property="Value" Title="Value" />

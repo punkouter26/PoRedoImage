@@ -48,11 +48,9 @@ jobs:
       # used to reach master and only surface on someone's next local `dotnet test`.
       - run: dotnet restore PoRedoImage.slnx
       - run: dotnet build PoRedoImage.slnx --no-restore -c Release
-      # Only the tiers that need no external services run here. Unit is pure logic and
-      # Architecture is reflection over the built assemblies; together they are ~2s on the
-      # runner. Integration (Testcontainers/Docker) and the two E2E tiers (a live app on
-      # :4000, plus Playwright browsers) stay local — run them with `dotnet test` and
-      # `SCRIPTS/run-e2e.ps1`.
+      # The two tiers that need nothing but the built assemblies. Unit is pure logic and
+      # Architecture is reflection; together ~2s. The other three (Integration, and the two
+      # E2E tiers) run in the `full-test` job below, which has Docker and a live app.
       - run: dotnet test tests/PoRedoImage.Tests.Unit --no-build -c Release
       - run: dotnet test tests/PoRedoImage.Tests.Architecture --no-build -c Release
       - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
@@ -62,10 +60,118 @@ jobs:
           path: publish
           retention-days: 1
 
+  full-test:
+    # Integration + both E2E tiers. These used to be local-only, and the cost of that was real:
+    # two E2E assertions rotted for weeks after 066dac7 renamed a fieldset and grew a radio
+    # group, because nothing on this runner ever executed them. ubuntu-latest ships Docker (for
+    # the Testcontainers Azurite the Integration tier spins up) and can host the app itself, so
+    # the only thing that was ever actually missing is this job.
+    name: Integration + E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Azurite for the E2E APP only. The Integration tier ignores this and spins up its own
+    # ephemeral Azurite through Testcontainers, exactly as it does locally — the two paths stay
+    # separate so neither can leak state into the other (same reason docker-compose's Azurite is
+    # dev-loop only). Without a real blob/table endpoint the app degrades silently: POST
+    # /api/user-images/original still answers 200 with an id while persisting nothing, and the
+    # gallery then reads back empty. That is what an unconfigured Storage:ConnectionString buys.
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        ports: ['10000:10000', '10001:10001', '10002:10002']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'PoRedoImage.slnx', 'src/**/*.csproj', 'tests/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: dotnet restore PoRedoImage.slnx
+      - run: dotnet build PoRedoImage.slnx --no-restore -c Release
+
+      # Testcontainers starts its own throwaway Azurite; the docker-compose Azurite is the F5
+      # dev loop only and must never be what tests talk to.
+      - name: Integration tier (Testcontainers/Docker)
+        run: dotnet test tests/PoRedoImage.Tests.Integration --no-build -c Release
+
+      - name: Install Playwright browsers
+        run: pwsh tests/PoRedoImage.Tests.E2E.UI/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      # Mirrors SCRIPTS/run-e2e.ps1. Every variable here is load-bearing:
+      #   ASPNETCORE_ENVIRONMENT=Test  — MockAiGate honours Mocks:UseMockAi ONLY in Test, and Test
+      #                                  is also what swaps in FakeAuthHandler and relaxes the
+      #                                  antiforgery cookie-security check for plain HTTP.
+      #   Mocks__UseMockAi=true        — budget guardrail: CI must never be able to spend a live
+      #                                  token against Gemini/Azure/Veo.
+      #   E2E_REQUIRE_MOCK=true        — makes the suite HARD-FAIL if the target turns out not to
+      #                                  be mocked, so a misconfigured run is loud, not expensive.
+      #   --no-launch-profile          — launchSettings.json pins Development on both profiles and
+      #                                  a profile's env beats the inherited process env, which
+      #                                  would silently undo the line above.
+      - name: Start app for E2E
+        env:
+          ASPNETCORE_ENVIRONMENT: Test
+          Mocks__UseMockAi: 'true'
+          # The well-known Azurite development account. Not a secret — it is a fixed, publicly
+          # documented emulator credential and grants nothing outside this job's container.
+          Storage__ConnectionString: >-
+            DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;
+        run: |
+          nohup dotnet run --project src/PoRedoImage.Web --no-build --no-launch-profile             -c Release --urls http://localhost:4000 > /tmp/e2e-app.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:4000/alive --max-time 3 > /dev/null; then
+              echo "App is up after ${i} attempt(s)."; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::App never became healthy at /alive. Last 100 log lines:"
+          tail -100 /tmp/e2e-app.log
+          exit 1
+
+      # Asserts the guardrail actually took, before spending the suite on a wrong target.
+      - name: Assert the app is mocked
+        run: |
+          MOCKS=$(curl -s http://localhost:4000/api/diag/mock-status --max-time 10)
+          echo "mock-status: $MOCKS"
+          if [ "$MOCKS" = "[]" ] || [ -z "$MOCKS" ]; then
+            echo "::error::App is NOT in mock mode — refusing to run E2E against live providers."
+            exit 1
+          fi
+
+      # Both tiers run even if the first fails: a red API smoke and a red UI suite are
+      # independently useful signals.
+      - name: E2E ApiSmoke
+        id: apismoke
+        continue-on-error: true
+        env: { E2E_BASE_URL: 'http://localhost:4000', E2E_REQUIRE_MOCK: 'true' }
+        run: dotnet test tests/PoRedoImage.Tests.E2E.ApiSmoke --no-build -c Release
+
+      - name: E2E UI (Playwright)
+        id: uitests
+        continue-on-error: true
+        env: { E2E_BASE_URL: 'http://localhost:4000', E2E_REQUIRE_MOCK: 'true' }
+        run: dotnet test tests/PoRedoImage.Tests.E2E.UI --no-build -c Release
+
+      - name: App log on failure
+        if: steps.apismoke.outcome == 'failure' || steps.uitests.outcome == 'failure'
+        run: tail -200 /tmp/e2e-app.log
+
+      - name: Fail if either E2E tier failed
+        if: steps.apismoke.outcome == 'failure' || steps.uitests.outcome == 'failure'
+        run: |
+          echo "::error::ApiSmoke=${{ steps.apismoke.outcome }} UI=${{ steps.uitests.outcome }}"
+          exit 1
+
   deploy:
     name: Deploy to Azure
     runs-on: ubuntu-latest
-    needs: build-and-publish
+    # Gated on full-test as well, so a broken Integration or E2E tier stops the deploy instead of
+    # being discovered later on someone's laptop. It runs in PARALLEL with build-and-publish, so
+    # this costs wall-clock only when it is slower than the build.
+    needs: [build-and-publish, full-test]
     timeout-minutes: 20
     environment:
       name: production

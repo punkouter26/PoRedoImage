@@ -1,15 +1,15 @@
 @using PoRedoImage.Client.Models
 
-<div class="style-recipe-drawer card bg-dark border-secondary mb-3">
-    <div class="card-header bg-dark border-secondary py-2 px-3 d-flex justify-content-between align-items-center cursor-pointer"
+<div class="style-recipe-drawer card mb-3">
+    <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center cursor-pointer"
          @onclick="@(() => _expanded = !_expanded)">
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-magic text-warning fs-5"></i>
-            <span class="fw-semibold text-light">Curated Style Recipes</span>
+            <span class="fw-semibold text-white">Curated Style Recipes</span>
             <span class="badge bg-secondary extra-small">@(StyleRecipeCatalog.All.Count) styles</span>
             @if (_selectedRecipe != null)
             {
-                <span class="badge bg-warning text-dark extra-small ms-2">
+                <span class="badge bg-warning extra-small ms-2">
                     <i class="bi @(_selectedRecipe.Icon) me-1"></i>Active: @_selectedRecipe.Title
                 </span>
             }
@@ -41,7 +41,7 @@
                     var isCurrent = _selectedRecipe?.Id == recipe.Id;
                     <div class="col-sm-6 col-lg-4">
                         <button type="button"
-                                class="card bg-dark h-100 p-2 recipe-card border-secondary @(isCurrent ? "border-warning bg-black" : null)"
+                                class="card h-100 p-2 recipe-card @(isCurrent ? "border-warning bg-black" : null)"
                                 aria-pressed="@isCurrent"
                                 @onclick="@(() => SelectRecipe(recipe))">
                             <div class="d-flex align-items-start gap-2">
@@ -49,7 +49,7 @@
                                     <i class="bi @recipe.Icon fs-5"></i>
                                 </span>
                                 <div class="flex-grow-1 overflow-hidden">
-                                    <div class="fw-semibold text-light text-truncate small">@recipe.Title</div>
+                                    <div class="fw-semibold text-white text-truncate small">@recipe.Title</div>
                                     <div class="text-muted extra-small text-truncate">@recipe.Category</div>
                                     <p class="text-muted extra-small mb-1 mt-1 recipe-desc">@recipe.Description</p>
                                 </div>
@@ -57,7 +57,7 @@
                             <div class="d-flex gap-1 flex-wrap mt-auto pt-1">
                                 @foreach (var tag in recipe.Tags.Take(3))
                                 {
-                                    <span class="badge bg-dark border border-secondary text-muted extra-small">@tag</span>
+                                    <span class="badge border text-muted extra-small">@tag</span>
                                 }
                             </div>
                         </button>

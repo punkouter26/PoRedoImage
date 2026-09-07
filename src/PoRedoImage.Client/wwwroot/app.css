@@ -2802,3 +2802,84 @@ code { color: var(--amber); }
     .upload-panel__camera-btn { transition: none; }
 }
 
+/* ═══ Classes the markup asked for and never got ═══════════════════════════
+   Each of these was referenced from a class attribute with no rule anywhere in the
+   app. Some were leaning on Bootstrap utilities that stopped existing with the bundle
+   (.gallery-page's padding, the cost table's table-dark/table-sm), the rest were simply
+   never written. Marker-only modifiers are NOT listed here: .shimmer-progress--determinate,
+   .gallery-bar--loading/--empty and friends sit on bases that already carry their styling,
+   so they render correctly with no rule of their own. */
+
+/* Gallery page gutter. Was `p-3 p-md-4`; p-md-4 never existed, so the wider desktop
+   gutter silently never applied. */
+.gallery-page { padding: var(--space-3); }
+
+@media (min-width: 768px) {
+    .gallery-page { padding: var(--space-4); }
+}
+
+/* Dashed empty-state frame — the one place the board uses a dashed rule, to say
+   "nothing here yet" rather than "a thing with an edge". */
+.border-dashed { border-style: dashed !important; }
+
+/* Utilities the markup used that the Bootstrap bundle used to supply. */
+.fst-italic { font-style: italic; }
+.text-amber { color: var(--amber); }
+
+/* ── Video feature ──────────────────────────────────────────────────────── */
+.video-prompt-help {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin-top: var(--space-2);
+    color: var(--steel);
+    font-size: var(--text-2xs);
+    line-height: var(--lh-tight);
+}
+
+.video-prompt-help i { color: var(--amber); flex-shrink: 0; }
+
+/* Without a width cap a 720p clip pushes the results column wider than the page. */
+.video-result__player {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    display: block;
+    background: var(--flap-black);
+    border: 1px solid var(--rule);
+    box-shadow: var(--inset-cell);
+}
+
+/* ── Session cost breakdown ─────────────────────────────────────────────────
+   The popover's figures were in a `table table-sm table-dark table-borderless`, none of
+   which exists any more — so the breakdown rendered as a bare browser table on a dark
+   panel: serif-ish default type, default cell padding, no alignment. */
+.session-cost-popover__body { padding: var(--space-2) var(--space-3) var(--space-3); }
+
+.session-cost-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-2xs);
+    margin-bottom: var(--space-2);
+}
+
+.session-cost-table td {
+    padding: 0.25rem 0.35rem;
+    border: none;
+    vertical-align: middle;
+}
+
+/* Figures right-aligned and tabular, so the column of prices reads as a column. */
+.session-cost-table td:not(:first-child) {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.session-cost-table tfoot td {
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 0.4rem;
+    font-weight: 700;
+}
+

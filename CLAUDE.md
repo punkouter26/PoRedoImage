@@ -59,13 +59,25 @@ README.md's test commands now name the real projects (`Tests.E2E.ApiSmoke` / `Te
 Playwright browsers install once after a build:
 `pwsh tests/PoRedoImage.Tests.E2E.UI/bin/Release/net10.0/playwright.ps1 install`
 
-**CI runs Unit and Architecture only.** [deploy.yml](.github/workflows/deploy.yml) builds
-`PoRedoImage.slnx`, runs those two tiers, then publishes and deploys. It is the only workflow.
+**CI runs all five tiers.** [deploy.yml](.github/workflows/deploy.yml) is the only workflow. It
+has two test jobs, run in parallel, and the deploy is gated on both:
 
-Integration and the two E2E tiers deliberately stay local: Integration needs Docker for
-Testcontainers, and E2E needs a live app on :4000 plus Playwright browsers. Nothing but a local run
-catches a break in those three — run them before you push anything that touches storage, auth, or a
-page's render path.
+- `build-and-publish` — builds `PoRedoImage.slnx`, runs **Unit** and **Architecture** (~2s, nothing
+  but the built assemblies needed), then publishes.
+- `full-test` — runs **Integration** and both **E2E** tiers. `ubuntu-latest` ships Docker, so the
+  Integration tier spins up its own Testcontainers Azurite exactly as it does locally; the E2E app
+  gets a separate Azurite **service container** and Playwright Chromium is installed for the UI tier.
+
+This used to be Unit + Architecture only, on the grounds that the other three "need external
+services". The cost of that was real: two E2E assertions rotted for weeks after `066dac7` renamed a
+fieldset and grew a radio group, and nothing noticed until someone ran the suite by hand. If you are
+tempted to trim `full-test` back, that is the regression you are re-introducing.
+
+The E2E app in CI runs under `ASPNETCORE_ENVIRONMENT=Test` with `Mocks__UseMockAi=true` and a
+mock-status assertion gating the suite, so CI can never spend a live AI token. It needs the Azurite
+service: with an unconfigured `Storage:ConnectionString` the app degrades **silently** — `POST
+/api/user-images/original` still answers 200 with an id while persisting nothing, and the gallery
+then reads back empty.
 
 CI builds the whole solution, so a test-only compile break is caught. Do not "optimise" this back
 down to `src/PoRedoImage.Web`: it was scoped that way when `PoRedoImage.slnx` still contained the

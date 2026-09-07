@@ -3,7 +3,9 @@
 @implements IDisposable
 @inject PoRedoImage.Client.Services.PromptHistoryService History
 
-<div class="prompt-drawer-wrapper">
+@* No wrapper class: .prompt-drawer__fab is position:fixed and the drawer positions
+   itself, so .prompt-drawer-wrapper never needed — or had — a rule. *@
+<div>
     @* Floating toggle (FAB). Bootstrap icons — consistent with the rest of the app. *@
     <button type="button"
             class="prompt-drawer__fab @(_isExpanded ? "prompt-drawer__fab--active" : "")"

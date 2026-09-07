@@ -30,25 +30,32 @@
                their own aria-checked and active class from an overlapping range test. The
                ranges stay in DetailPresetFor so a value arriving from a saved session still
                lands on the right segment; the Template keeps the two-line stacked face. *@
+            @* role/aria-checked are explicit for the same reason as the Gallery filter:
+               RadzenSelectBar emits bare divs with no role or checked state, so the group would
+               otherwise be invisible to assistive tech. Radzen splats them onto the item. *@
             <RadzenSelectBar TValue="int"
                              Value="@DetailPresetFor(DescriptionLength)"
                              ValueChanged="@(v => OnDescriptionLengthChanged.InvokeAsync(v))"
                              Size="ButtonSize.Small"
+                             role="radiogroup"
                              aria-label="Prompt detail">
                 <Items>
-                    <RadzenSelectBarItem Value="200">
+                    <RadzenSelectBarItem Value="200" role="radio"
+                                         aria-checked="@((DetailPresetFor(DescriptionLength) == 200).ToString().ToLowerInvariant())">
                         <Template>
                             <span class="detail-preset__name">Quick</span>
                             <span class="detail-preset__meta">Fewest clauses</span>
                         </Template>
                     </RadzenSelectBarItem>
-                    <RadzenSelectBarItem Value="350">
+                    <RadzenSelectBarItem Value="350" role="radio"
+                                         aria-checked="@((DetailPresetFor(DescriptionLength) == 350).ToString().ToLowerInvariant())">
                         <Template>
                             <span class="detail-preset__name">Standard</span>
                             <span class="detail-preset__meta">Balanced &middot; recommended</span>
                         </Template>
                     </RadzenSelectBarItem>
-                    <RadzenSelectBarItem Value="500">
+                    <RadzenSelectBarItem Value="500" role="radio"
+                                         aria-checked="@((DetailPresetFor(DescriptionLength) == 500).ToString().ToLowerInvariant())">
                         <Template>
                             <span class="detail-preset__name">Detailed</span>
                             <span class="detail-preset__meta">Most clauses</span>

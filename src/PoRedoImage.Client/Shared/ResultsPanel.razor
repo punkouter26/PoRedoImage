@@ -37,7 +37,7 @@
 @* ── Prompt Evolution & Iterative Remixing ───────────────────────── *@
 @if (ResultImageUrl is not null)
 {
-    <div class="card bg-dark border-secondary p-3 mb-4">
+    <div class="card p-3 mb-4">
         <div class="d-flex align-items-center justify-content-between mb-2">
             <span class="text-warning fw-semibold">
                 <i class="bi bi-diagram-3 me-2"></i>Evolve &amp; Remix Prompt
@@ -85,16 +85,16 @@
 
 @* The "More options" disclosure was removed: it hid two ordinary buttons behind a click for
    no protective reason, and the secondary actions are cheap enough to just show. *@
-<div class="results-more mb-4">
-    <div class="results-more__panel d-flex gap-2 flex-wrap">
-        <button class="flap-btn flap-btn--sm" @onclick="OnDownloadOriginal">
-            <i class="bi bi-download me-1"></i>Download Original
-        </button>
-        @if (AdditionalMoreOptions != null)
-        {
-            @AdditionalMoreOptions
-        }
-    </div>
+@* One wrapper, not two. .results-more / .results-more__panel were the disclosure's own
+   hooks and never had rules; the utilities below are what actually lay this row out. *@
+<div class="d-flex gap-2 flex-wrap mb-4">
+    <button class="flap-btn flap-btn--sm" @onclick="OnDownloadOriginal">
+        <i class="bi bi-download me-1"></i>Download Original
+    </button>
+    @if (AdditionalMoreOptions != null)
+    {
+        @AdditionalMoreOptions
+    }
 </div>
 
 @if (FooterContent != null)

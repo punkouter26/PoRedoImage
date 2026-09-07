@@ -59,11 +59,19 @@
     </div>
 </footer>
 
-@* Radzen hosts. Notification was already here; Dialog is new and is what gives the
-   gallery lightbox a focus trap, an Escape handler and focus restore — see
-   Shared/GalleryLightbox.razor for why that is worth a dependency. *@
+@* Radzen hosts. Notification was already here; Dialog is what gives the gallery lightbox a
+   focus trap, an Escape handler and focus restore — see Shared/GalleryLightbox.razor for why
+   that is worth a dependency.
+
+   EVERY Radzen service needs its host component rendered here or it fails SILENTLY: the
+   service resolves from DI, the call succeeds, and nothing appears. Tooltip and ContextMenu
+   were missing, which is exactly what happened — TooltipService.Open on the gallery's icon
+   buttons ran and painted nothing. If you add another Radzen *Service*, add its host here in
+   the same change. *@
 <RadzenNotification />
 <RadzenDialog />
+<RadzenTooltip />
+<RadzenContextMenu />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

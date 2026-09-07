@@ -311,6 +311,35 @@ public partial class Gallery
         _ => "bi-image"
     };
 
+    /// <summary>
+    /// Right-click menu for a gallery card, offering the same four actions as the button row.
+    /// Deliberately a duplicate path, not a replacement: a context menu is invisible until
+    /// discovered and unreachable by keyboard, so it may add convenience but must never be the
+    /// only way to reach an action.
+    /// </summary>
+    private void ShowCardMenu(MouseEventArgs e, UserImageDto img) =>
+        ContextMenuService.Open(e,
+        [
+            new ContextMenuItem { Text = "View full size", Value = "view", Icon = "fullscreen" },
+            new ContextMenuItem { Text = "Use as session input", Value = "input", Icon = "arrow_circle_right" },
+            new ContextMenuItem { Text = "Copy to clipboard", Value = "copy", Icon = "content_copy" },
+            new ContextMenuItem { Text = "Delete", Value = "delete", Icon = "delete" },
+        ],
+        async args =>
+        {
+            ContextMenuService.Close();
+            switch (args.Value as string)
+            {
+                case "view": await OpenLightboxAsync(img); break;
+                case "input": UseAsInput(img); break;
+                case "copy": await CopyToClipboardAsync(img.ImageUrl); break;
+                // Routes through the same confirm as the button — a right-click must not be a
+                // faster way to destroy something.
+                case "delete": await DeleteSingleAsync(img); break;
+            }
+            StateHasChanged();
+        });
+
     /// <summary>True when every currently-filtered image is selected (and there is at least one).</summary>
     private bool AllSelected => FilteredImages.Count > 0 && _selectedIds.Count == FilteredImages.Count;
 

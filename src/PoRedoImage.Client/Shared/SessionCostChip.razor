@@ -23,10 +23,17 @@
             <div class="session-cost-popover" role="dialog" aria-label="Session AI Cost Breakdown">
                 <div class="session-cost-popover__header d-flex justify-content-between align-items-center">
                     <span class="fw-bold"><i class="bi bi-cpu me-1 text-warning"></i>SESSION AI BREAKDOWN</span>
-                    <button type="button" class="btn-close btn-close-white btn-sm" aria-label="Close" @onclick="ToggleBreakdown"></button>
+                    @* btn-close / btn-close-white are gone with the Bootstrap bundle, so this
+                       was an invisible zero-content button. RadzenButton draws the glyph. *@
+                    <RadzenButton Icon="close" Variant="Variant.Text" ButtonStyle="ButtonStyle.Light"
+                                  Size="ButtonSize.ExtraSmall" aria-label="Close"
+                                  Click="ToggleBreakdown" />
                 </div>
                 <div class="session-cost-popover__body">
-                    <table class="table table-sm table-dark table-borderless mb-2">
+                    @* .session-cost-table replaces table/table-sm/table-dark/table-borderless,
+                       none of which exists any more — the breakdown was rendering as a bare
+                       browser table. *@
+                    <table class="session-cost-table">
                         <tbody>
                             @foreach (var item in Cost.GetBreakdown())
                             {
@@ -38,7 +45,7 @@
                             }
                         </tbody>
                         <tfoot>
-                            <tr class="border-top border-secondary">
+                            <tr>
                                 <td class="fw-bold">Total Estimated</td>
                                 <td class="text-end text-muted">@Cost.TotalOperations ops</td>
                                 <td class="text-end fw-bold text-amber">@Cost.Format(Cost.EstimatedTotal)</td>
@@ -47,7 +54,7 @@
                     </table>
                     <div class="d-flex justify-content-between align-items-center mt-2">
                         <small class="text-muted fst-italic session-cost-caption">Indicative estimate · not billing</small>
-                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 session-cost-chip-text" @onclick="ResetCost">
+                        <button type="button" class="flap-btn flap-btn--sm session-cost-chip-text" @onclick="ResetCost">
                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
                         </button>
                     </div>
