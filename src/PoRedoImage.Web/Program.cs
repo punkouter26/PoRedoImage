@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using PoRedoImage.Web.Platform;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
@@ -385,6 +386,9 @@ try
         }
     }).AllowAnonymous();
     app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+    // Uniform cross-app liveness probe (see PoPlatform). Same shape in every Po app, which
+    // is what lets the portfolio dashboard poll them all and render one uptime grid.
+    app.MapPoLiveness();
 
     // Minimal API endpoints (Vertical Slice)
     app.MapAntiforgeryEndpoints();

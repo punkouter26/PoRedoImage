@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
@@ -147,6 +147,14 @@ public static class AuthServiceExtensions
                         ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         ctx.HandleResponse();
                     }
+                    return Task.CompletedTask;
+                };
+                // Records the canonical UserSignedIn event. OnTokenValidated fires exactly once per
+                // interactive sign-in — after the token is validated, before the cookie is issued —
+                // so no dedupe is needed here, and a failed sign-in never reaches it.
+                options.Events.OnTokenValidated = ctx =>
+                {
+                    SignInTelemetry.TrackFrom(ctx.HttpContext, ctx.Principal, "PoRedoImage");
                     return Task.CompletedTask;
                 };
                 // AzureAd:AllowedTenantIds (comma-separated) restricts access to specific tenants.
