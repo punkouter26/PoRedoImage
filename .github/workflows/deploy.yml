@@ -268,9 +268,40 @@ jobs:
         # same remediation text. When the CI SP lacks read on PoShared - which is the state that
         # broke this step while the policy was present and correct the whole time - that advice
         # sends the operator to grant something that is already granted.
+        #
+        # WHAT IS AUTHORITATIVE: the App Service configreferences API, queried first below. It
+        # reports, per App Setting, whether the platform actually RESOLVED each reference — the
+        # fact this step exists to establish. Reading the vault only shows that a policy row looks
+        # right; resolution can still fail on a deleted or renamed secret, a wrong vault name, or a
+        # vault firewall, and every one of those passes a policy check and then crash-loops the
+        # container. configreferences also lives in the app's OWN resource group, which this
+        # pipeline holds Contributor on, so it cannot be defeated by the CI SP's reach into
+        # PoShared changing again — which is exactly what silenced this step before.
         run: |
           PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query identity.principalId -o tsv)
           echo "App managed identity: $PRINCIPAL"
+
+          # Authoritative check: did the platform resolve every @Microsoft.KeyVault(...) setting?
+          # Note this reports the state of the CURRENT configuration, before this run's deploy —
+          # which is what makes it a useful pre-flight: the settings and the vault grant are both
+          # already in place by now, so an unresolved reference here is a real, present fault.
+          if REFS=$(az rest --method GET --url \
+              "https://management.azure.com/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.Web/sites/${{ env.AZURE_WEBAPP_NAME }}/config/configreferences/appsettings?api-version=2022-03-01" 2>&1); then
+            # One line on purpose: a multi-line `python3 -c` script would need lines at column 0,
+            # which ends the YAML block scalar and breaks the workflow file.
+            BAD=$(printf '%s' "$REFS" | python3 -c "import sys,json;v=json.load(sys.stdin).get('value',[]);[sys.stderr.write('  %-40s %s\n'%(i.get('name','?'),(i.get('properties') or {}).get('status'))) for i in v];print(','.join(i.get('name','?') for i in v if (i.get('properties') or {}).get('status')!='Resolved'))")
+            if [ -n "$BAD" ]; then
+              echo "::error::App Service cannot resolve these Key Vault references: $BAD"
+              echo "::error::Stopping rather than writing the secrets back as plaintext App Settings."
+              echo "::error::If the access policy below looks correct, suspect a deleted/renamed secret or a vault firewall."
+            else
+              echo "All Key Vault references resolve."
+            fi
+          else
+            echo "::warning::Could not query configreferences; falling back to the access-policy check alone."
+            echo "$REFS" | head -3
+            BAD=""
+          fi
 
           # Two different failures, told apart — and only ONE of them is a reason to stop.
           #
@@ -291,6 +322,9 @@ jobs:
             echo "::warning::'Reader' on the PoShared resource group:"
             echo "::warning::  az role assignment create --role Reader --assignee ${{ vars.AZURE_CLIENT_ID }} --scope /subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared"
             echo "::warning::Proceeding — the post-deploy health check verifies secret resolution for real."
+            # ...unless the authoritative check above already saw a broken reference. Skipping a
+            # diagnostic is fine; skipping a confirmed failure is not.
+            [ -z "$BAD" ] || exit 1
             exit 0
           fi
 
@@ -310,6 +344,9 @@ jobs:
               ;;
           esac
           echo "Managed identity holds a 'get' secrets access policy on kv-poshared."
+          # The policy is right, so if references are still unresolved the cause lies elsewhere —
+          # stop anyway. The diagnostic above has already named the likely suspects.
+          [ -z "$BAD" ] || exit 1
       - name: Wait for App Service configuration update
         # Key Vault references are verified resolvable by the previous step.
         # Short 10s wait allows the App Service platform to stabilize configuration before deployment.
