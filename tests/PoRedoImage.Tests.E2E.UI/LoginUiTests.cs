@@ -90,31 +90,6 @@ public sealed class LoginUiTests : IClassFixture<PlaywrightBrowserFixture>
         await Assertions.Expect(page.Locator("h1")).ToContainTextAsync("Studio");
     }
 
-    // ─── /style-director legacy alias still resolves to Studio ────────────
-
-    [LiveServerFact]
-    public async Task StyleDirector_legacy_alias_renders_Studio()
-    {
-        // The /style-director URL was the page's first name; an old share link could still
-        // land here. The route is bound on the Studio component itself (Studio.razor) so both
-        // / and /style-director render the same board. A 404 here would mean the alias was
-        // dropped during a refactor.
-        await using var context = await _browser.CreateContextAsync(PlaywrightViewports.DesktopLandscape());
-        var page = await context.NewPageAsync();
-
-        await page.GotoAsync(
-            $"{LiveServerFactAttribute.BaseUrl}/dev-login?email=guest@guest.local",
-            new() { WaitUntil = WaitUntilState.NetworkIdle });
-
-        await page.GotoAsync(
-            $"{LiveServerFactAttribute.BaseUrl}/style-director",
-            new() { WaitUntil = WaitUntilState.NetworkIdle });
-
-        Assert.DoesNotContain("/login", page.Url, StringComparison.OrdinalIgnoreCase);
-        // The route is bound to Studio, so the visible heading is "Studio", not "Style Director".
-        await Assertions.Expect(page.Locator("h1")).ToContainTextAsync("Studio");
-    }
-
     private static BrowserNewContextOptions ViewportByName(string name) => name switch
     {
         "DesktopLandscape" => PlaywrightViewports.DesktopLandscape(),

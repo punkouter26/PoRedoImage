@@ -481,6 +481,7 @@ poredoimage-logs*/
 *-logs2/
 
 # LLM-generated docs (auto-generated, not source of truth)
+DOCS/
 LLMDOCS/
 
 # Environment variable files (never commit secrets)

@@ -1,6 +1,7 @@
 using Deque.AxeCore.Commons;
 using Deque.AxeCore.Playwright;
 using Microsoft.Playwright;
+using PoRedoImage.Shared.DTOs;
 
 namespace PoRedoImage.Tests.E2E.UI;
 
@@ -83,11 +84,18 @@ public sealed class AccessibilityUiTests : IClassFixture<PlaywrightBrowserFixtur
         // Both radio-group fieldsets and the audio player are the parts most likely to regress
         // here. A bare "legend" locator used to be enough; the intensity dial added a second
         // fieldset, and matching by text is what keeps this pinned to the controls it means.
-        await Assertions.Expect(page.Locator("legend", new() { HasTextString = "Beat style" })).ToBeVisibleAsync();
+        // "Beat style" until 066dac7 renamed the fieldset to "Delivery". The rename shipped and
+        // this assertion did not follow it, which went unnoticed because CI runs only the Unit and
+        // Architecture tiers — this suite fails only on a local run.
+        await Assertions.Expect(page.Locator("legend", new() { HasTextString = "Delivery" })).ToBeVisibleAsync();
         await Assertions.Expect(page.Locator("legend", new() { HasTextString = "How hard should it hit" })).ToBeVisibleAsync();
         // The dial's radios are visually replaced by lamps, so they are the exact shape that turns
         // into an unlabelled control if the visually-hidden treatment is ever changed to display:none.
-        await Assertions.Expect(page.Locator("input[name='roast-intensity']")).ToHaveCountAsync(3);
+        // Counted from the enum, not hard-coded. This assertion said 3 while the dial had grown to
+        // 4 (Nuclear was added in 066dac7); deriving the count means adding a stop updates the test
+        // instead of breaking it.
+        var intensityStops = Enum.GetValues<RoastIntensity>().Length;
+        await Assertions.Expect(page.Locator("input[name='roast-intensity']")).ToHaveCountAsync(intensityStops);
 
         await AssertNoViolationsAsync(page);
     }

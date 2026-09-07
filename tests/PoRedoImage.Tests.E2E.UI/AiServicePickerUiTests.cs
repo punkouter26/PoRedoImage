@@ -46,9 +46,15 @@ public sealed class AiServicePickerUiTests : IClassFixture<PlaywrightBrowserFixt
         // Wait for Blazor WASM to hydrate and render the interactive selectors
         await Assertions.Expect(page.Locator(".ai-picker__select").First).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
+        // At least two: AnalyzeImage and EnhanceDescription. GenerateImage used to make a third,
+        // on the strength of a "Gemini Imagen 3 Fast" entry that never ran — the fast tier was only
+        // constructed when Google:Imagen3FastModel was configured, and it was configured nowhere, so
+        // the option resolved to the standard service while advertising half its price. What this
+        // test actually protects is the invariant asserted in the loop below: every selector the
+        // picker renders offers a real choice.
         var choosableSelects = page.Locator(".ai-picker__select");
         var selectCount = await choosableSelects.CountAsync();
-        Assert.True(selectCount >= 3, $"Expected at least 3 choosable selectors, found {selectCount}.");
+        Assert.True(selectCount >= 2, $"Expected at least 2 choosable selectors, found {selectCount}.");
 
         for (int i = 0; i < selectCount; i++)
         {

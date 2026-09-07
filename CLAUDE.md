@@ -108,7 +108,7 @@ resolve those services. See [RenderModes.cs](src/PoRedoImage.Client/RenderModes.
 
 Server code is **Vertical Slice** under [src/PoRedoImage.Web/Features/](src/PoRedoImage.Web/Features/)
 — `{Auth, BulkGenerate, Diagnostics, Idempotency, ImageAnalysis, MemeTemplates, Pricing, RapRoast,
-Shared, UserImages}/`, each co-locating endpoint, DTO, and validator. Minimal APIs
+Shared, UserImages, VideoGenerate}/`, each co-locating endpoint, DTO, and validator. Minimal APIs
 only — no MVC controllers; `MapGroup` plus static handler methods. `Domain`/`Application`/
 `Infrastructure` supply cross-slice primitives only. **VSA wins over Onion when both would apply**:
 a new feature is a new slice, not a new layer.
@@ -161,6 +161,15 @@ authenticated write.
 `IImageGenerationRouter.Resolve(...)` maps every id — recognized, unrecognized, or null — to Gemini;
 the indirection is kept as the slot where a second provider returns. `ImageGen:Provider` is vestigial.
 HuggingFace was removed in 2026-08 and must not return without an explicit decision.
+
+The router also had a **fast tier** (`remote:gemini-imagen3-fast`, offered in the picker at
+"~$0.020/image" against the standard "~$0.039"). It never ran: the second `GeminiImagen3Service` was
+constructed only when `Google:Imagen3FastModel` was set, and that key was set nowhere — not
+appsettings, not `infra/main.bicep`, not Key Vault — so the null guard always fell through to the
+standard service and the user was billed the standard rate at the fast tier's advertised price. The
+option, the config key, the id and the branch were all removed. Re-add it **with** the configuration
+or not at all; a priced choice that silently resolves to the other option is the same class of defect
+as a silent fallback.
 
 `IChatCompletionService` resolves **once at startup**, not per request: `OllamaChatCompletionService`
 when `Ollama:ChatModel` is set, `AzureOpenAiChatCompletionService` otherwise. A single Azure
@@ -275,16 +284,20 @@ went undocumented here for a while. It holds a rule *registry* rather than one m
 its whole ruleset costs two methods against the ceiling however many rules it grows.
 
 Approximate headroom, so you know which tier can absorb a new test.
-Counted from `dotnet test --list-tests` on 2026-09-06; the per-tier ceiling tests rebuild these
-numbers every CI run, so refresh this table when the counts drift.
+Test **methods**, not test cases — a `[Theory]` counts once however many `InlineData` rows it has,
+which is why these numbers are far below what a `dotnet test` run reports. Counted 2026-09-07; the
+per-tier ceiling tests recompute them every CI run, so refresh this table when they drift.
 
 | Tier | Methods | Ceiling |
 |---|---|---|
-| Unit | 91 | 100 |
-| Integration | 46 | 50 |
-| E2E.ApiSmoke | 11 | 25 |
-| E2E.UI | 12 | 25 |
-| Architecture | 9 | 10 |
+| Unit | 89 | 100 |
+| Integration | 44 | 50 |
+| E2E.ApiSmoke | 15 | 25 |
+| E2E.UI | 11 | 25 |
+| Architecture | 2 | 10 |
+
+Architecture reads as 2 by design, not by undercounting: it holds a rule *registry*, so its whole
+ruleset costs two methods however many rules it grows. The table previously said 9.
 
 Unit and Integration are the tight ones. Integration sat at exactly 50/50 — one test from breaking
 the build — until the per-rule pass/fail method pairs in `Contracts/` were folded into single

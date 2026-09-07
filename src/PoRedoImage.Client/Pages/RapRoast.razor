@@ -31,7 +31,8 @@
             ImagePreviewUrl="@imagePreviewUrl"
             ErrorMessage="@errorMessage"
             CanProcess="@canProcessImage"
-            OnFileChange="LoadFile" />
+            OnFileChange="LoadFile"
+            OnImageIntake="HandleImageIntake" />
 
         <fieldset class="flap-fieldset mt-3">
             <legend class="flap-fieldset__legend">Delivery</legend>
@@ -50,7 +51,7 @@
         </fieldset>
 
         @* ── Intensity dial ───────────────────────────────────────────────
-           A three-stop dial rather than a slider: the levels are named tones the
+           A stepped dial rather than a slider: the levels are named tones the
            ghostwriter is actually instructed in, not a continuum, and a slider would
            promise a granularity the prompt cannot deliver. *@
         <fieldset class="flap-fieldset mt-3">

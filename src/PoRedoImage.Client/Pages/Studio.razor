@@ -1,10 +1,4 @@
 ﻿@page "/"
-@* Legacy alias. The page used to live at /style-director; once the studio brief was settled on
-   "Studio" the canonical URL became "/", but a non-trivial body of inbound traffic still asks for
-   /style-director. Keep both routes bound to the same page rather than 410 — a redirect would
-   break direct links inside user-shared screenshots and bookmarks, and the page content is the
-   same in either case. *@
-@page "/style-director"
 @inject ImageSessionService SessionService
 @inject IJSRuntime Js
 

@@ -4,12 +4,13 @@
 @implements IDisposable
 @inject LocalAiService LocalAi
 @inject AiSelectionState Selection
+@inject IWebAssemblyHostEnvironment HostEnv
 
 @*
     One selector per capability — but only for the capabilities that actually offer a choice.
 
-    Four of the six (Style Director, Scene detail, Create audio, Generate image) have exactly one
-    entry in the catalog and rendered as `disabled` selects reading "Only provider configured".
+    Scene detail, Create audio and Generate image have exactly one entry in the catalog and used to
+    render as `disabled` selects reading "Only provider configured".
     They still cost a label, a full-width control and a row of vertical rhythm each, and on the home
     page they owned the left rail on desktop and an entire screen above the feature list on mobile.
     A control that cannot be operated is not a control; it is a fact. Facts belong on one line.
@@ -22,7 +23,7 @@
 
     @foreach (var capability in Choosable)
     {
-        var options = AiServiceCatalog.OptionsFor(capability);
+        var options = AiServiceCatalog.OptionsFor(capability, _includeDevOnly);
         var selectId = $"ai-picker-{capability}";
 
         <div class="ai-picker__row">
@@ -57,7 +58,7 @@
             <ul class="ai-picker__fixed-list">
                 @foreach (var capability in Fixed)
                 {
-                    var only = AiServiceCatalog.OptionsFor(capability)[0];
+                    var only = AiServiceCatalog.OptionsFor(capability, _includeDevOnly)[0];
                     <li class="ai-picker__fixed-item">
                         <span class="ai-picker__fixed-label">@AiServiceCatalog.LabelFor(capability)</span>
                         <span class="ai-picker__fixed-value">@only.DisplayName</span>
@@ -92,13 +93,16 @@
     private DeviceCapabilities? _capabilities;
     private bool _browserUnsupported;
 
+    // Dev-only providers (Ollama) need a service on the developer's own machine, so they are
+    // offered in Development and withheld everywhere else. This is why Choosable/Fixed are instance
+    // members rather than static: the split depends on the environment the client booted into.
+    private bool _includeDevOnly;
+
     /// <summary>Capabilities with a real decision behind them — these get a select.</summary>
-    private static IReadOnlyList<AiCapability> Choosable { get; } =
-        AiServiceCatalog.All.Where(c => AiServiceCatalog.OptionsFor(c).Count > 1).ToArray();
+    private IReadOnlyList<AiCapability> Choosable { get; set; } = [];
 
     /// <summary>Capabilities with exactly one provider — stated, not offered.</summary>
-    private static IReadOnlyList<AiCapability> Fixed { get; } =
-        AiServiceCatalog.All.Where(c => AiServiceCatalog.OptionsFor(c).Count == 1).ToArray();
+    private IReadOnlyList<AiCapability> Fixed { get; set; } = [];
 
     // Only meaningful once a browser-executed model is actually chosen — showing GPU status while
     // every capability is remote would be noise.
@@ -107,6 +111,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _includeDevOnly = HostEnv.IsDevelopment();
+        Choosable = AiServiceCatalog.All
+            .Where(c => AiServiceCatalog.OptionsFor(c, _includeDevOnly).Count > 1).ToArray();
+        Fixed = AiServiceCatalog.All
+            .Where(c => AiServiceCatalog.OptionsFor(c, _includeDevOnly).Count == 1).ToArray();
+
         _capabilities = await LocalAi.GetCapabilitiesAsync();
 
         // Not a blocker: DtypeChain prunes to wasm-capable variants and execution continues on the

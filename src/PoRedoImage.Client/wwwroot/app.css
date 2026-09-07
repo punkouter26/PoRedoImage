@@ -1027,14 +1027,6 @@ body.po-drop-active::after {
 
 .processing-pill__cancel:hover { color: var(--flap-white); }
 
-.result-image.loaded { opacity: 1; }
-
-.result-image.error {
-    opacity: 0.85;
-    border: 1px solid var(--cancel-red);
-    background-color: rgba(211,47,47,0.1);
-}
-
 .results-actions { display: flex; gap: 1px; flex-wrap: wrap; }
 
 /* .results-more__toggle is gone with the "More options" disclosure it opened; the panel's
@@ -1512,14 +1504,11 @@ body.po-drop-active::after {
 
 .gallery-undo__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--steel); }
 
-.gallery-undo__btn { padding: 0.3rem 0.8rem; font-size: var(--text-2xs); }
-
 .gallery-undo__dismiss { background: transparent; border: none; color: var(--steel-dark); cursor: pointer; }
 
 .gallery-undo__dismiss:hover { color: var(--flap-white); }
 
 /* ═══ Overlays ═══════════════════════════════════════════════════════════ */
-.bulk-modal-backdrop,
 .gallery-lightbox {
     position: fixed;
     inset: 0;
@@ -1559,43 +1548,6 @@ body.po-drop-active::after {
     overflow: auto;
 }
 
-.bulk-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.55rem 0.9rem;
-    background: var(--steel-face);
-    border-bottom: 1px solid rgba(0,0,0,0.6);
-}
-
-.bulk-modal-num {
-    font-family: var(--font-flap);
-    font-size: var(--text-sm);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: #14161a;
-    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
-}
-
-.bulk-modal-close,
-.gallery-lightbox__close {
-    background: var(--flap-black);
-    border: 1px solid rgba(0,0,0,0.5);
-    border-radius: 0;
-    color: var(--steel);
-    font-size: var(--text-md);
-    width: 28px; height: 28px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    transition: color var(--motion-fast), background var(--motion-fast);
-}
-
-.gallery-lightbox__close { position: absolute; top: 0.5rem; right: 0.5rem; width: 30px; height: 30px; border-color: var(--rule-strong); }
-
-.bulk-modal-close:hover,
-.gallery-lightbox__close:hover { color: var(--flap-black); background: var(--amber); }
-
 .bulk-modal-img-wrap {
     background: var(--flap-shadow);
     box-shadow: var(--inset-cell);
@@ -1620,8 +1572,6 @@ body.po-drop-active::after {
 }
 
 .bulk-modal-actions { display: flex; gap: 1px; }
-
-.btn-dl-modal { flex: 1; }
 
 .gallery-lightbox__img { max-width: 100%; max-height: 65vh; object-fit: contain; border-radius: 0; background: var(--flap-shadow); }
 
@@ -1777,9 +1727,7 @@ body.po-drop-active::after {
 
 .prompt-drawer__actions { display: flex; gap: 1px; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--rule); }
 
-.prompt-drawer__btn { flex: 1; padding: 0.45rem 0.5rem; font-size: var(--text-2xs); }
 
-.prompt-drawer__btn i { font-size: var(--text-md); }
 
 .prompt-drawer__hint {
     padding: 0.5rem 0.9rem;
@@ -2053,11 +2001,8 @@ input.form-control:focus {
 }
 
 /* Status colours on a badge come from the four-value vocabulary, nowhere else. */
-.badge--done,
 .badge.bg-success { background: var(--flap-white); color: var(--flap-black); }
-.badge--working,
 .badge.bg-warning { background: var(--amber); color: var(--flap-black); }
-.badge--failed,
 .badge.bg-danger  { background: var(--cancel-red); color: var(--flap-white); }
 .badge.bg-info,
 .badge.bg-primary,
@@ -2432,3 +2377,74 @@ code { color: var(--amber); }
     padding: 0.5rem 0.75rem;
     border-radius: 0 4px 4px 0;
 }
+
+/* ═══ Camera capture ═══════════════════════════════════════════════════
+   The live-preview alternative to the drop zone. Same steel frame and square
+   corners as the board's other bays, so opening the camera reads as the intake
+   bay changing mode rather than a modal arriving from somewhere else. */
+.upload-panel__camera-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: 1px dashed var(--steel);
+    border-radius: 0;
+    color: var(--flap-white);
+    font-family: inherit;
+    font-size: var(--text-sm);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color .12s linear, color .12s linear;
+}
+
+.upload-panel__camera-btn:hover:not(:disabled),
+.upload-panel__camera-btn:focus-visible {
+    border-color: var(--amber);
+    color: var(--amber);
+}
+
+.upload-panel__camera-btn:disabled { opacity: .5; cursor: default; }
+
+.camera {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.camera__stage {
+    position: relative;
+    /* Matches the drop zone's footprint so switching modes does not jump the page. */
+    aspect-ratio: 4 / 3;
+    background: var(--flap-black);
+    border: 1px solid var(--steel);
+    overflow: hidden;
+}
+
+.camera__video {
+    width: 100%;
+    height: 100%;
+    /* cover, not contain: letterboxing a live preview inside an already-framed bay reads as
+       a broken image rather than a deliberate crop. */
+    object-fit: cover;
+    display: block;
+}
+
+/* Front lens only. capturePhoto() mirrors the captured frame to match, so what is saved is
+   what was on screen. */
+.camera__video--mirrored { transform: scaleX(-1); }
+
+.camera__controls {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .upload-panel__camera-btn { transition: none; }
+}
+

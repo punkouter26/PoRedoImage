@@ -36,7 +36,6 @@ public static class AiProviderIds
     public const string AzureOpenAiVision = "remote:azure-openai-vision";
     public const string GeminiVision = "remote:gemini-vision";
     public const string GeminiImagen3 = "remote:gemini-imagen3";
-    public const string GeminiImagen3Fast = "remote:gemini-imagen3-fast";
     public const string GoogleLyria = "remote:google-lyria";
 
     // Ollama (local service, dev only)

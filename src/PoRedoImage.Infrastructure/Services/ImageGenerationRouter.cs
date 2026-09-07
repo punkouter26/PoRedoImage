@@ -11,27 +11,17 @@ namespace PoRedoImage.Infrastructure.Services;
 /// The type is kept rather than collapsed into a direct dependency because callers pass a
 /// per-request model id and the indirection is where a second provider would slot back in. It had
 /// a HuggingFace branch until 2026-08; see <c>InfrastructureServiceExtensions</c> for why that went.
+///
+/// It also had a "fast tier" branch returning a second Gemini instance for
+/// <c>remote:gemini-imagen3-fast</c>. That branch was unreachable: the fast instance was only
+/// constructed when <c>Google:Imagen3FastModel</c> was configured, and that key was set nowhere in
+/// the repo or the deployed app settings, so the branch's null guard always fell through to the
+/// standard service while the picker advertised a lower price. Re-add it together with the config,
+/// or not at all.
 /// </remarks>
-public sealed class ImageGenerationRouter : IImageGenerationRouter
+public sealed class ImageGenerationRouter(IImageGenerationService gemini) : IImageGenerationRouter
 {
-    private readonly IImageGenerationService _gemini;
-    private readonly IImageGenerationService? _fastGemini;
-
-    public ImageGenerationRouter(
-        IImageGenerationService gemini,
-        IImageGenerationService? fastGemini = null)
-    {
-        _gemini = gemini;
-        _fastGemini = fastGemini;
-    }
-
-    public IImageGenerationService Resolve(string? modelId)
-    {
-        if (string.Equals(modelId, AiProviderIds.GeminiImagen3Fast, StringComparison.Ordinal) && _fastGemini is not null)
-            return _fastGemini;
-
-        return _gemini;
-    }
+    public IImageGenerationService Resolve(string? modelId) => gemini;
 }
 
 /// <summary>

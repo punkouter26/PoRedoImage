@@ -111,25 +111,13 @@ public static class InfrastructureServiceExtensions
                 sp.GetRequiredService<IMemoryCache>(),
                 sp.GetRequiredService<ILogger<CachingGenerativeAiService>>()));
 
-            // Image generation: Google Gemini/Imagen, with optional fast/budget tier.
+            // Image generation: Google Gemini/Imagen, the only provider.
             services.AddSingleton<GeminiImagen3Service>();
             services.AddSingleton<IImageGenerationService>(sp =>
                 sp.GetRequiredService<GeminiImagen3Service>());
 
             services.AddSingleton<IImageGenerationRouter>(sp =>
-            {
-                var standard = sp.GetRequiredService<GeminiImagen3Service>();
-                var config = sp.GetRequiredService<IConfiguration>();
-                var fastModel = config[ConfigKeys.GoogleImagen3FastModel];
-                var fast = !string.IsNullOrWhiteSpace(fastModel)
-                    ? new GeminiImagen3Service(
-                        config,
-                        sp.GetRequiredService<IHttpClientFactory>(),
-                        sp.GetRequiredService<ILogger<GeminiImagen3Service>>(),
-                        fastModel)
-                    : null;
-                return new ImageGenerationRouter(standard, fast);
-            });
+                new ImageGenerationRouter(sp.GetRequiredService<GeminiImagen3Service>()));
 
             // Chat + vision powering the Rap Roast scene describer and its lyric writer.
             // Azure OpenAI is the only backend: one deployment serves both text

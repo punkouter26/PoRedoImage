@@ -56,6 +56,46 @@
         </div>
     }
 
+    @* ── Camera ─────────────────────────────────────────────────────── *@
+    @* Replaces the drop zone rather than sitting beside it: the two are alternative ways to
+       answer the same question ("which photo?"), and showing a live camera above an empty
+       drop target reads as two separate pending tasks. Rendered only where the hosting page
+       wired OnImageIntake, because a capture travels the same path as a paste. *@
+    @if (_cameraOpen)
+    {
+        <div class="camera" role="group" aria-label="Camera">
+            <div class="camera__stage">
+                @* muted + playsinline are required for an inline autoplaying preview on iOS.
+                   The front lens is mirrored so moving left moves the preview left; capturePhoto
+                   mirrors the captured frame to match. *@
+                <video @ref="_video"
+                       class="camera__video @(_facing == "user" ? "camera__video--mirrored" : null)"
+                       autoplay muted playsinline
+                       aria-label="Live camera preview"></video>
+            </div>
+
+            <div class="camera__controls">
+                <button type="button" class="flap-btn flap-btn--sm" @onclick="CloseCameraAsync">
+                    <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Cancel
+                </button>
+
+                @if (_canFlip)
+                {
+                    <button type="button" class="flap-btn flap-btn--sm" @onclick="FlipCameraAsync"
+                            aria-label="Switch camera">
+                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Flip
+                    </button>
+                }
+
+                <button type="button" class="flap-btn flap-btn--primary flap-btn--sm"
+                        @onclick="CapturePhotoAsync" disabled="@_cameraBusy">
+                    <i class="bi bi-camera-fill me-1" aria-hidden="true"></i>Capture
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
     @* ── Drop Zone ──────────────────────────────────────────────────── *@
     <div class="drop-zone @(_isDragging ? "drop-zone--active" : "") @(ImagePreviewUrl != null ? "drop-zone--has-image" : "")"
          @ondragover:preventDefault
@@ -99,7 +139,25 @@
                    aria-label="Upload an image (JPG or PNG, up to 20 MB)" />
     </div>
 
+    @* Outside the drop zone: the InputFile overlay covers that whole area, so a button placed
+       inside it would be unclickable. *@
+    @if (OnImageIntake.HasDelegate && _cameraSupported)
+    {
+        <button type="button" class="upload-panel__camera-btn" @onclick="OpenCameraAsync" disabled="@_cameraBusy">
+            <i class="bi bi-camera me-2" aria-hidden="true"></i>Take a photo with your camera
+        </button>
+    }
+    }
+
     @* ── Error ─────────────────────────────────────────────────────── *@
+    @if (!string.IsNullOrEmpty(_cameraError))
+    {
+        <div class="alert alert-danger d-flex align-items-center gap-2 mt-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0" aria-hidden="true"></i>
+            <span>@_cameraError</span>
+        </div>
+    }
+
     @if (!string.IsNullOrEmpty(ErrorMessage))
     {
         <div class="alert alert-danger d-flex align-items-center gap-2 mt-3">
@@ -141,13 +199,141 @@
     private bool _isDragging;
     private DotNetObjectReference<ImageUploadPanel>? _selfRef;
 
+    // ── Camera ──────────────────────────────────────────────────────────────
+    // A capture is pushed through poUx's intake path, exactly like a paste or a drop, so it
+    // arrives at the hosting page as an IntakeImage and needs no second handler. That is also
+    // why the button is gated on OnImageIntake.HasDelegate: without a handler the photo would
+    // be taken and then silently dropped.
+    private ElementReference _video;
+    private bool _cameraSupported = true;
+    private bool _cameraOpen;
+    private bool _cameraBusy;
+    private string? _cameraError;
+    private string _facing = "user";
+    private bool _canFlip;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || !OnImageIntake.HasDelegate) return;
         _selfRef = DotNetObjectReference.Create(this);
         try { await JSRuntime.InvokeVoidAsync("poUx.registerIntake", _selfRef); }
         catch (JSException) { /* helpers script unavailable — <InputFile> still works */ }
+
+        // Hide the button rather than let it fail on click. A browser with no getUserMedia, or
+        // a page served over plain http to something that is not localhost, can never capture.
+        try
+        {
+            var availability = await JSRuntime.InvokeAsync<string>("poUx.cameraAvailable");
+            _cameraSupported = availability == "ok";
+            if (_cameraSupported) _canFlip = await JSRuntime.InvokeAsync<bool>("poUx.hasMultipleCameras");
+            StateHasChanged();
+        }
+        catch (JSException) { _cameraSupported = false; }
     }
+
+    private async Task OpenCameraAsync()
+    {
+        _cameraError = null;
+        _cameraBusy = true;
+        _cameraOpen = true;
+        // Render first: startCamera needs the <video> element to exist before it can bind a
+        // stream to it, and the element only exists once _cameraOpen has been through a render.
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var result = await JSRuntime.InvokeAsync<string>("poUx.startCamera", _video, _facing);
+            if (result != "ok")
+            {
+                _cameraOpen = false;
+                _cameraError = DescribeCameraFailure(result);
+            }
+        }
+        catch (JSException)
+        {
+            _cameraOpen = false;
+            _cameraError = "The camera could not be started.";
+        }
+        finally
+        {
+            _cameraBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task FlipCameraAsync()
+    {
+        _cameraBusy = true;
+        try
+        {
+            var result = await JSRuntime.InvokeAsync<string>("poUx.flipCamera", _video);
+            if (result == "ok")
+            {
+                _facing = _facing == "user" ? "environment" : "user";
+            }
+            else
+            {
+                // The other lens failed, so the first one is already stopped — say so rather
+                // than leaving a dead preview on screen.
+                _cameraOpen = false;
+                _cameraError = DescribeCameraFailure(result);
+            }
+        }
+        catch (JSException) { _cameraError = "The camera could not be switched."; }
+        finally { _cameraBusy = false; }
+    }
+
+    private async Task CapturePhotoAsync()
+    {
+        _cameraBusy = true;
+        try
+        {
+            // capturePhoto stops the stream and pushes the frame into AcceptIntake itself, so a
+            // successful capture needs nothing further here beyond closing the view.
+            var result = await JSRuntime.InvokeAsync<string>("poUx.capturePhoto");
+            if (result == "ok")
+            {
+                _cameraOpen = false;
+            }
+            else
+            {
+                _cameraError = result == "notready"
+                    ? "The camera is still warming up — try again in a moment."
+                    : "The photo could not be captured.";
+            }
+        }
+        catch (JSException) { _cameraError = "The photo could not be captured."; }
+        finally { _cameraBusy = false; }
+    }
+
+    private async Task CloseCameraAsync()
+    {
+        _cameraOpen = false;
+        _cameraError = null;
+        await StopCameraAsync();
+    }
+
+    private async Task StopCameraAsync()
+    {
+        try { await JSRuntime.InvokeVoidAsync("poUx.stopCamera"); }
+        catch (JSDisconnectedException) { /* page tearing down */ }
+        catch (JSException) { }
+    }
+
+    /// <summary>
+    /// Turns a poUx failure code into something the user can act on. Every branch names the
+    /// remedy — a capture that fails silently reads as the button being broken.
+    /// </summary>
+    private static string DescribeCameraFailure(string code) => code switch
+    {
+        "denied" => "Camera access was blocked. Allow camera access for this site in your browser, then try again.",
+        "notfound" => "No camera was found on this device.",
+        "busy" => "The camera is already in use by another app.",
+        "insecure" => "The camera needs a secure connection (https). Upload a file instead.",
+        "unsupported" => "This browser cannot open a camera. Upload a file instead.",
+        _ => "The camera could not be started.",
+    };
 
     /// <summary>Callback target for <c>poUx.registerIntake</c>. Public only because JS invokes it.</summary>
     [JSInvokable]
@@ -155,6 +341,10 @@
 
     public async ValueTask DisposeAsync()
     {
+        // Unconditional, and before the _selfRef guard: the hardware must be released even if
+        // this panel never registered an intake ref.
+        await StopCameraAsync();
+
         if (_selfRef is null) return;
         try { await JSRuntime.InvokeVoidAsync("poUx.unregisterIntake"); }
         catch (JSDisconnectedException) { /* page tearing down */ }

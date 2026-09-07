@@ -54,7 +54,6 @@ public static class ConfigKeys
     // ── Google (Gemini / Imagen) ────────────────────────────────────────
     public const string GoogleApiKey = "Google:ApiKey";
     public const string GoogleImagen3Model = "Google:Imagen3Model";
-    public const string GoogleImagen3FastModel = "Google:Imagen3FastModel";
     public const string GoogleVisionModel = "Google:VisionModel";
 
     /// <summary>

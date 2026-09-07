@@ -21,11 +21,36 @@ public class AiServiceCatalogTests
         Assert.Contains(AiProviderIds.OllamaVision, analyze);
         Assert.Contains(AiProviderIds.BrowserFlorence2, analyze);
 
-        // These two genuinely have one implementation each. EnhanceDescription used to be here
+        // These genuinely have one implementation each. EnhanceDescription used to be here
         // too, on the grounds that "browser-local text enhancement is unimplemented" — it is
         // implemented now (ImageAnalysisRequest.PrecomputedEnhancedPrompt), so it moved out.
+        // GenerateImage moved IN: its second entry advertised a fast tier that was never
+        // constructed (Google:Imagen3FastModel was configured nowhere), so picking it billed the
+        // standard rate at the fast tier's price.
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.SceneDetail));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.CreateAudio));
+        Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.GenerateImage));
+    }
+
+    [Fact]
+    public void Dev_only_providers_are_withheld_outside_Development()
+    {
+        // Ollama needs a service listening on the developer's own machine. Offering it to a
+        // deployed visitor advertises a choice that can only fail for them.
+        var deployed = AiServiceCatalog.OptionsFor(AiCapability.AnalyzeImage, includeDevOnly: false)
+            .Select(o => o.Id).ToList();
+        Assert.DoesNotContain(AiProviderIds.OllamaVision, deployed);
+        Assert.Contains(AiProviderIds.AzureComputerVision, deployed);
+
+        var dev = AiServiceCatalog.OptionsFor(AiCapability.AnalyzeImage, includeDevOnly: true)
+            .Select(o => o.Id).ToList();
+        Assert.Contains(AiProviderIds.OllamaVision, dev);
+
+        // A capability whose every option is dev-only must not render an empty selector.
+        foreach (var capability in AiServiceCatalog.All)
+        {
+            Assert.NotEmpty(AiServiceCatalog.OptionsFor(capability, includeDevOnly: false));
+        }
     }
 
     [Fact]

@@ -1,7 +1,8 @@
 // poUx — small, dependency-free UX helpers shared by the feature pages.
 //
-//   * Image intake  : clipboard paste (Ctrl+V) and drop-anywhere, both funnelled through the
-//                     same validation the C# ImageLoadHelper applies to <InputFile> uploads.
+//   * Image intake  : clipboard paste (Ctrl+V), drop-anywhere and webcam capture, all funnelled
+//                     through the same validation the C# ImageLoadHelper applies to <InputFile>
+//                     uploads.
 //   * Share         : Web Share API (level 2, files) with a clipboard-image fallback.
 //   * Zip           : STORE-method (no deflate) ZIP writer. PNG/JPEG are already compressed,
 //                     so storing costs nothing and keeps this file dependency-free.
@@ -17,6 +18,20 @@ window.poUx = (function () {
     // ── Image intake ────────────────────────────────────────────────────────
     let intake = null;   // { ref, onPaste, onDragOver, onDragLeave, onDrop }
     let dragDepth = 0;   // dragenter/dragleave fire per child element; count to avoid flicker
+
+    // ── Camera ──────────────────────────────────────────────────────────────
+    // The live MediaStream, its <video>, and which lens it came from. Module-scoped rather
+    // than per-call because the tracks MUST be stopped explicitly — a MediaStream outlives the
+    // element that displayed it, and an unstopped track leaves the camera light on after the
+    // user has closed the capture view.
+    let camera = null;   // { stream, video, facing }
+
+    // Long-edge cap for a captured frame. A 4K webcam frame re-encodes to well over the 20 MB
+    // ceiling readImage() enforces, so the capture would be rejected by the same validation that
+    // guards paste and drop. Downscaling here keeps a capture from failing for a reason the user
+    // cannot see or act on.
+    const CAPTURE_MAX_EDGE = 1920;
+    const CAPTURE_QUALITY = 0.92;
 
     function extensionFor(type) {
         return type === 'image/png' ? 'png' : 'jpg';
@@ -141,6 +156,108 @@ window.poUx = (function () {
             setDragOverlay(false);
             dragDepth = 0;
             intake = null;
+        },
+
+        // ── Camera ──────────────────────────────────────────────────────────
+        // getUserMedia needs a secure context. https:// qualifies, and so does localhost —
+        // which covers both dev ports (4000/4001) — but a LAN IP over plain http does not, so
+        // a phone pointed at the dev box by IP reports 'insecure' rather than failing opaquely.
+        cameraAvailable: function () {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return window.isSecureContext ? 'unsupported' : 'insecure';
+            }
+            return 'ok';
+        },
+
+        // Binds a live camera preview into `video`. Returns 'ok' or a reason string that the
+        // caller shows verbatim — every failure here is something the user can act on (grant
+        // permission, plug a camera in, switch to https), so none of them are swallowed.
+        startCamera: async function (video, facing) {
+            const available = this.cameraAvailable();
+            if (available !== 'ok') return available;
+
+            await this.stopCamera();
+            const wanted = facing === 'environment' ? 'environment' : 'user';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: wanted, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    audio: false
+                });
+                camera = { stream: stream, video: video, facing: wanted };
+                video.srcObject = stream;
+                // iOS Safari will not start an inline stream without these set on the element.
+                video.setAttribute('playsinline', '');
+                video.muted = true;
+                try { await video.play(); } catch { /* autoplay policy — the frame still paints */ }
+                return 'ok';
+            } catch (err) {
+                const name = err && err.name;
+                if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
+                if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'notfound';
+                if (name === 'NotReadableError') return 'busy';
+                return 'failed';
+            }
+        },
+
+        // True when the device exposes more than one camera, so the caller can decide whether a
+        // flip control is worth rendering. Label enumeration needs permission, but the COUNT does
+        // not, so this is safe to call before the stream starts.
+        hasMultipleCameras: async function () {
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return false;
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                return devices.filter(function (d) { return d.kind === 'videoinput'; }).length > 1;
+            } catch { return false; }
+        },
+
+        flipCamera: async function (video) {
+            const next = camera && camera.facing === 'user' ? 'environment' : 'user';
+            return await this.startCamera(video, next);
+        },
+
+        // Grabs the current frame and pushes it down the SAME intake path as paste and drop, so
+        // every page that already handles OnImageIntake accepts a capture with no extra wiring.
+        // Returns 'ok', or a reason string.
+        capturePhoto: async function () {
+            if (!camera || !camera.video) return 'failed';
+            const video = camera.video;
+            const w = video.videoWidth, h = video.videoHeight;
+            if (!w || !h) return 'notready';
+
+            const scale = Math.min(1, CAPTURE_MAX_EDGE / Math.max(w, h));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(w * scale);
+            canvas.height = Math.round(h * scale);
+
+            const ctx = canvas.getContext('2d');
+            // The preview is mirrored for the front lens (a selfie that moves the wrong way is
+            // disorienting), so the capture is mirrored to match. Photographing the world with
+            // the rear lens is not mirrored in either place.
+            if (camera.facing === 'user') {
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+            }
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const blob = await new Promise(function (resolve) {
+                canvas.toBlob(resolve, 'image/jpeg', CAPTURE_QUALITY);
+            });
+            if (!blob) return 'failed';
+
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const file = new File([blob], 'camera-' + stamp + '.jpg', { type: 'image/jpeg' });
+            await this.stopCamera();
+            await push(file, 'camera');
+            return 'ok';
+        },
+
+        // Idempotent, and safe to call from a disposal path. Stopping every track is the part
+        // that actually releases the hardware and turns the camera indicator off.
+        stopCamera: async function () {
+            if (!camera) return;
+            try { camera.stream.getTracks().forEach(function (t) { t.stop(); }); } catch { }
+            try { if (camera.video) camera.video.srcObject = null; } catch { }
+            camera = null;
         },
 
         // ── Share ───────────────────────────────────────────────────────────

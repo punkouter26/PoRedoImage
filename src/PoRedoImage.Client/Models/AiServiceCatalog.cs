@@ -38,13 +38,19 @@ public static class AiServiceCatalog
             new(AiProviderIds.AzureOpenAiVision, "Azure OpenAI vision", CategoryRemote, "Best descriptions, one call"),
             new(AiProviderIds.GeminiVision, "Google Gemini Vision", CategoryRemote, "Multimodal flash, ~$0.0003"),
             BrowserOption(AiProviderIds.BrowserFlorence2, LocalCapability.Vision),
-            new(AiProviderIds.OllamaVision, "Ollama", CategoryOllama, "Local service, dev only"),
+            new(AiProviderIds.OllamaVision, "Ollama", CategoryOllama, "Local service", DevOnly: true),
         ],
 
+        // One entry, and that is the honest count. There used to be a second, "Gemini Imagen 3 Fast
+        // — Google fast tier, ~$0.020/image". It never ran: the fast tier is constructed only when
+        // Google:Imagen3FastModel is configured, and that key was set nowhere — not appsettings, not
+        // infra/main.bicep, not Key Vault — so ImageGenerationRouter always fell through to the
+        // standard service. Picking it billed the standard ~$0.039 rate while the label promised
+        // half that. A priced choice that silently resolves to the other option is worse than no
+        // choice, so it is gone until the fast model is actually configured.
         [AiCapability.GenerateImage] =
         [
             new(AiProviderIds.GeminiImagen3, "Gemini Imagen 3", CategoryRemote, "Google, ~$0.039/image"),
-            new(AiProviderIds.GeminiImagen3Fast, "Gemini Imagen 3 Fast", CategoryRemote, "Google fast tier, ~$0.020/image"),
         ],
 
         // Browser-local enhancement is implemented now: the client writes the image-generation
@@ -89,8 +95,23 @@ public static class AiServiceCatalog
         AiCapability.CreateAudio,
     ];
 
-    /// <summary>Options offered for a capability.</summary>
+    /// <summary>Options offered for a capability, including any marked dev-only.</summary>
     public static IReadOnlyList<AiProviderOption> OptionsFor(AiCapability capability) => Catalog[capability];
+
+    /// <summary>
+    /// Options offered for a capability in a given environment. Outside Development the
+    /// <see cref="AiProviderOption.DevOnly"/> entries are withheld, because they name a backend the
+    /// visitor's machine cannot reach. Never returns empty: a capability whose every option is
+    /// dev-only keeps its full list rather than rendering a selector with nothing in it.
+    /// </summary>
+    public static IReadOnlyList<AiProviderOption> OptionsFor(AiCapability capability, bool includeDevOnly)
+    {
+        var all = Catalog[capability];
+        if (includeDevOnly) return all;
+
+        var offered = all.Where(o => !o.DevOnly).ToArray();
+        return offered.Length > 0 ? offered : all;
+    }
 
     /// <summary>The default option — the first registered, which is the preferred one.</summary>
     public static AiProviderOption DefaultFor(AiCapability capability) => Catalog[capability][0];
