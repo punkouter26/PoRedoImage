@@ -1,0 +1,119 @@
+@namespace PoRedoImage.Client.Pages
+@using PoRedoImage.Client.Models
+@inject DialogService Dialog
+
+@*
+    The 2x2 pin comparison matrix, hosted by Radzen's DialogService from BulkGallery.
+
+    It used to be an inline `<div class="modal show d-block">` with a hand-written backdrop
+    colour and z-index in a style attribute. Every structural class it relied on —
+    modal, modal-dialog, modal-xl, modal-dialog-centered, modal-content, modal-header,
+    modal-body, modal-footer, btn-close — came from the Bootstrap bundle and stopped
+    existing when that was dropped, so the overlay was being held up by the inline style
+    alone: no focus trap, no Escape handler, nothing making the page behind it inert.
+
+    Its sibling (BulkImageModal, the single-variation lightbox) had already moved to
+    DialogService for exactly those reasons; this one never followed. It does now.
+
+    The grid keeps its OWN copy of the pinned items rather than reading the parent's set:
+    a Radzen dialog is a separate component instance, so a parent re-render does not reach
+    it, and unpinning would leave a tile on screen that is no longer pinned. Unpins are
+    applied here and mirrored to the parent through OnUnpin.
+*@
+<div class="compare-matrix">
+    @if (_items.Count == 0)
+    {
+        <p class="compare-matrix__empty">Nothing pinned. Pin up to four variations to compare them here.</p>
+    }
+    else
+    {
+        <div class="compare-matrix__grid">
+            @foreach (var item in _items)
+            {
+                <figure class="compare-matrix__cell">
+                    <figcaption class="compare-matrix__head">
+                        <span class="badge">Variation #@(item.Index + 1)</span>
+                        <RadzenButton Icon="close"
+                                      Variant="Variant.Text"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Size="ButtonSize.ExtraSmall"
+                                      aria-label="@($"Unpin variation {item.Index + 1}")"
+                                      Click="@(() => Unpin(item.Index))" />
+                    </figcaption>
+
+                    <div class="compare-matrix__img-wrap">
+                        <img src="@item.ImageUrl" alt="@($"Variation {item.Index + 1}")" />
+                    </div>
+
+                    <p class="compare-matrix__prompt" title="@item.Prompt">@item.Prompt</p>
+
+                    <div class="compare-matrix__actions">
+                        <RadzenButton Text="Save"
+                                      Icon="download"
+                                      Variant="Variant.Outlined"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Size="ButtonSize.Small"
+                                      Click="@(() => OnDownload.InvokeAsync(item.Index))" />
+                        <RadzenButton Icon="@(Favorites.Contains(item.Index) ? "favorite" : "favorite_border")"
+                                      Variant="Variant.Text"
+                                      ButtonStyle="ButtonStyle.Danger"
+                                      Size="ButtonSize.Small"
+                                      aria-label="@(Favorites.Contains(item.Index) ? "Remove from favourites" : "Add to favourites")"
+                                      Click="@(() => OnToggleFavorite.InvokeAsync(item.Index))" />
+                    </div>
+                </figure>
+            }
+        </div>
+    }
+
+    <div class="compare-matrix__footer">
+        <RadzenButton Text="Clear pinned"
+                      Variant="Variant.Outlined"
+                      ButtonStyle="ButtonStyle.Light"
+                      Size="ButtonSize.Small"
+                      Disabled="@(_items.Count == 0)"
+                      Click="ClearAll" />
+        <RadzenButton Text="Close"
+                      Variant="Variant.Filled"
+                      ButtonStyle="ButtonStyle.Warning"
+                      Size="ButtonSize.Small"
+                      Click="@(() => Dialog.Close(true))" />
+    </div>
+</div>
+
+@code {
+    /// <summary>The pinned variations to show, already resolved and ordered by the caller.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<BulkGenerateImageResult> Items { get; set; } = [];
+
+    [Parameter] public IReadOnlySet<int> Favorites { get; set; } = new HashSet<int>();
+
+    /// <summary>Raised per unpinned index so the caller's pinned set stays in step with this grid.</summary>
+    [Parameter] public EventCallback<int> OnUnpin { get; set; }
+
+    [Parameter] public EventCallback<int> OnToggleFavorite { get; set; }
+    [Parameter] public EventCallback<int> OnDownload { get; set; }
+
+    private List<BulkGenerateImageResult> _items = [];
+
+    protected override void OnParametersSet() => _items = Items.ToList();
+
+    private async Task Unpin(int index)
+    {
+        _items.RemoveAll(i => i.Index == index);
+        await OnUnpin.InvokeAsync(index);
+
+        // An empty grid is not worth a dialog. Closing on the last unpin means the user does not
+        // have to dismiss a panel that has nothing left to compare.
+        if (_items.Count == 0) Dialog.Close(true);
+    }
+
+    private async Task ClearAll()
+    {
+        foreach (var index in _items.Select(i => i.Index).ToList())
+        {
+            await OnUnpin.InvokeAsync(index);
+        }
+        _items.Clear();
+        Dialog.Close(true);
+    }
+}

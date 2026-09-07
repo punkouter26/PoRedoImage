@@ -24,7 +24,7 @@
                 <div class="d-flex gap-2">
                     @if (_pinnedIndices.Count >= 2)
                     {
-                        <button type="button" class="flap-btn flap-btn--sm flap-btn--primary" @onclick="@(() => _showCompareMatrix = true)">
+                        <button type="button" class="flap-btn flap-btn--sm flap-btn--primary" @onclick="OpenCompareMatrixAsync">
                             <i class="bi bi-grid-fill me-1 text-warning"></i>2x2 Matrix (@_pinnedIndices.Count)
                         </button>
                     }
@@ -168,58 +168,10 @@
         </div>
     }
 
-    @* ── Idea #10 — 2x2 Pin Comparison Matrix Modal ── *@
-    @if (_showCompareMatrix)
-    {
-        <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.85); z-index: 1060;">
-            <div class="modal-dialog modal-xl modal-dialog-centered">
-                <div class="modal-content bg-dark text-light border-secondary">
-                    <div class="modal-header border-secondary">
-                        <h5 class="modal-title text-warning"><i class="bi bi-grid-fill me-2"></i>2x2 Comparison Matrix</h5>
-                        <button type="button" class="btn-close btn-close-white" @onclick="@(() => _showCompareMatrix = false)"></button>
-                    </div>
-                    <div class="modal-body p-3">
-                        <div class="row g-3">
-                            @foreach (var idx in _pinnedIndices.Take(4))
-                            {
-                                var item = Results.FirstOrDefault(r => r.Index == idx);
-                                if (item != null && item.ImageUrl != null)
-                                {
-                                    <div class="col-6">
-                                        <div class="border border-secondary rounded p-2 h-100 d-flex flex-column bg-black">
-                                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                                <span class="badge bg-secondary">Variation #@(item.Index + 1)</span>
-                                                <button class="btn btn-sm btn-link text-muted p-0" @onclick="@(() => TogglePin(item.Index))">
-                                                    <i class="bi bi-x-lg"></i>
-                                                </button>
-                                            </div>
-                                            <div class="ratio ratio-1x1 mb-2 bg-dark rounded overflow-hidden">
-                                                <img src="@item.ImageUrl" class="object-fit-contain w-100 h-100" alt="Variation @(item.Index + 1)" />
-                                            </div>
-                                            <p class="small text-muted text-truncate mb-2" title="@item.Prompt">@item.Prompt</p>
-                                            <div class="mt-auto d-flex gap-2">
-                                                <button class="flap-btn flap-btn--sm flex-grow-1" @onclick="@(() => OnDownloadImage.InvokeAsync(item.Index))">
-                                                    <i class="bi bi-download me-1"></i>Save
-                                                </button>
-                                                <button class="flap-btn flap-btn--sm @(Favorites.Contains(item.Index) ? "flap-btn--active" : "")"
-                                                        @onclick="@(() => OnToggleFavorite.InvokeAsync(item.Index))">
-                                                    <i class="bi @(Favorites.Contains(item.Index) ? "bi-heart-fill text-danger" : "bi-heart")"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                }
-                            }
-                        </div>
-                    </div>
-                    <div class="modal-footer border-secondary">
-                        <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => _pinnedIndices.Clear())">Clear Pinned</button>
-                        <button type="button" class="flap-btn flap-btn--primary flap-btn--sm" @onclick="@(() => _showCompareMatrix = false)">Close Matrix</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
+    @* The 2x2 comparison matrix is opened via DialogService.OpenAsync from
+       OpenCompareMatrixAsync, the same way the single-variation modal above is. Its content
+       lives in BulkCompareMatrix.razor — see that file for why it moved off the inline
+       Bootstrap modal markup it used to be. *@
 </div>
 
 @code {
@@ -248,12 +200,55 @@
     private List<BulkRerollVariation> _rerollVariations = [];
     private int _rerollSourceIndex = -1;
     private readonly HashSet<int> _pinnedIndices = [];
-    private bool _showCompareMatrix;
     private bool _zipping;
 
     /// <summary>Opens the variation lightbox via Radzen's DialogService. The dialog's Escape
     /// handler, focus trap, inert backdrop and focus restore come from Radzen — see the
     /// why-Radzen comment at the top of GalleryLightbox.razor for the rationale.</summary>
+    /// <summary>
+    /// Opens the pin comparison matrix. Mirrors <see cref="OpenVariationModalAsync"/> — Radzen owns
+    /// the focus trap, Escape handling and the inert backdrop, none of which the inline modal this
+    /// replaced had once its Bootstrap classes stopped existing.
+    /// </summary>
+    private async Task OpenCompareMatrixAsync()
+    {
+        // Resolved here rather than inside the dialog: the dialog is a separate component instance
+        // with no access to Results, and it should render what was pinned at the moment it opened.
+        var items = _pinnedIndices
+            .Take(4)
+            .Select(idx => Results.FirstOrDefault(r => r.Index == idx))
+            .Where(r => r is { ImageUrl: not null })
+            .Select(r => r!)
+            .OrderBy(r => r.Index)
+            .ToList();
+
+        var parameters = new Dictionary<string, object>
+        {
+            ["Items"] = items,
+            ["Favorites"] = Favorites.ToHashSet(),
+            ["OnUnpin"] = EventCallback.Factory.Create<int>(this, TogglePin),
+            ["OnToggleFavorite"] = EventCallback.Factory.Create<int>(this, idx => OnToggleFavorite.InvokeAsync(idx)),
+            ["OnDownload"] = EventCallback.Factory.Create<int>(this, idx => OnDownloadImage.InvokeAsync(idx)),
+        };
+
+        await DialogService.OpenAsync<BulkCompareMatrix>(
+            title: "2x2 comparison matrix",
+            parameters: parameters,
+            options: new DialogOptions
+            {
+                Width = "min(900px, 94vw)",
+                CloseDialogOnOverlayClick = true,
+                CloseDialogOnEsc = true,
+                ShowClose = true,
+                Draggable = false,
+                Resizable = false,
+            });
+
+        // The dialog mutates the pinned set through OnUnpin, so the trigger button's count is stale
+        // by the time it closes.
+        StateHasChanged();
+    }
+
     private async Task OpenVariationModalAsync(BulkGenerateImageResult result)
     {
         var parameters = new Dictionary<string, object>
