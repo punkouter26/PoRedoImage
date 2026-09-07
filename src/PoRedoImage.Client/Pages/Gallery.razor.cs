@@ -152,8 +152,35 @@ public partial class Gallery
             NotificationService.Notify(NotificationSeverity.Warning, "Unavailable", "Clipboard copy failed or unsupported in this browser.", duration: 3000);
     }
 
+    /// <summary>
+    /// Shared confirm styling. Radzen's DialogService owns the focus trap, the Escape handler and
+    /// the inert backdrop, which a raw <c>window.confirm</c> cannot be styled into and a hand-rolled
+    /// overlay would have to reimplement. Returns true only on an explicit Yes — Radzen returns
+    /// null when the dialog is dismissed, and a null must never read as consent to delete.
+    /// </summary>
+    private async Task<bool> ConfirmAsync(string message, string title, string okText)
+    {
+        var confirmed = await DialogService.Confirm(message, title, new ConfirmOptions
+        {
+            OkButtonText = okText,
+            CancelButtonText = "Cancel",
+            CssClass = "flap-confirm",
+        });
+        return confirmed == true;
+    }
+
     private async Task DeleteSingleAsync(UserImageDto item)
     {
+        // Deletion is permanent here — unlike the MyImagesGallery strip, this page has no undo bar,
+        // so the confirm IS the safety net.
+        if (!await ConfirmAsync(
+                $"Delete \"{item.FileName}\"? This cannot be undone.",
+                "Delete image",
+                "Delete"))
+        {
+            return;
+        }
+
         _deletingId = item.Id;
         try
         {
@@ -182,6 +209,19 @@ public partial class Gallery
     private async Task DeleteSelectedAsync()
     {
         if (_selectedIds.Count == 0 || _batchWorking) return;
+
+        // The count goes in the message because this is the one action on the page that can destroy
+        // a whole selection in a single click, and "Delete 14 images" is a different decision from
+        // "Delete 1 image".
+        var count = _selectedIds.Count;
+        if (!await ConfirmAsync(
+                $"Delete {count} selected image{(count == 1 ? "" : "s")}? This cannot be undone.",
+                "Delete selected",
+                $"Delete {count}"))
+        {
+            return;
+        }
+
         _batchWorking = true;
         int deleted = 0;
         var toDelete = _selectedIds.ToList();
@@ -225,6 +265,43 @@ public partial class Gallery
         }
     }
 
+    /// <summary>
+    /// The kinds offered as filter chips, in board order. Listed explicitly rather than from
+    /// <c>Enum.GetValues</c> so a new <see cref="UserImageKind"/> added for internal bookkeeping
+    /// does not silently grow the filter bar.
+    /// </summary>
+    /// <summary>
+    /// Opens a Radzen tooltip on an icon-only button. <c>TooltipService</c> comes free with
+    /// <c>AddRadzenComponents()</c> and had no callers in the app before this; a native
+    /// <c>title</c> cannot be styled to the board and does not appear on keyboard focus.
+    /// The buttons keep their <c>aria-label</c> — this is decoration on top of the name, not
+    /// a replacement for it.
+    /// </summary>
+    private void ShowTooltip(ElementReference element, string text) =>
+        TooltipService.Open(element, text, new TooltipOptions
+        {
+            Position = TooltipPosition.Top,
+            Delay = 350,
+            CssClass = "flap-tooltip",
+        });
+
+    private static readonly UserImageKind[] FilterKinds =
+    [
+        UserImageKind.Original,
+        UserImageKind.Regeneration,
+        UserImageKind.Meme,
+        UserImageKind.BulkVariation,
+    ];
+
+    private static string KindLabel(UserImageKind kind) => kind switch
+    {
+        UserImageKind.Original => "Originals",
+        UserImageKind.Regeneration => "Regen",
+        UserImageKind.Meme => "Memes",
+        UserImageKind.BulkVariation => "Bulk",
+        _ => kind.ToString(),
+    };
+
     private static string KindIcon(UserImageKind kind) => kind switch
     {
         UserImageKind.Original => "bi-camera",
@@ -233,6 +310,16 @@ public partial class Gallery
         UserImageKind.BulkVariation => "bi-grid-3x3",
         _ => "bi-image"
     };
+
+    /// <summary>True when every currently-filtered image is selected (and there is at least one).</summary>
+    private bool AllSelected => FilteredImages.Count > 0 && _selectedIds.Count == FilteredImages.Count;
+
+    /// <summary>
+    /// Tri-state for the "select all" box: true = all, false = none, null = some. The partial case
+    /// is why this is a tri-state checkbox rather than a boolean — a plain box would have to claim
+    /// "all selected" or "none selected" while neither is true.
+    /// </summary>
+    private bool? SelectAllState => AllSelected ? true : _selectedIds.Count == 0 ? false : null;
 
     private static string KindBadgeClass(UserImageKind kind) => kind switch
     {

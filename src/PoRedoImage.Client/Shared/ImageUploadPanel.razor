@@ -26,33 +26,36 @@
        now buys more distinct visual clauses, not more prose. See
        AzureOpenAiService.EnhanceDescriptionAsync. *@
     <span class="preset-section__label"><i class="bi bi-sliders me-1"></i>Prompt detail</span>
-            <div class="flap-choices flap-choices--tight" role="radiogroup" aria-label="Prompt detail">
-                <button type="button"
-                        class="flap-choice flap-choice--stack @(DescriptionLength <= 220 ? "flap-choice--active" : null)"
-                        role="radio"
-                        aria-checked="@((DescriptionLength <= 220).ToString().ToLowerInvariant())"
-                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(200))">
-                    <span class="flap-choice__name">Quick</span>
-                    <span class="flap-choice__meta">Fewest clauses</span>
-                </button>
-                <button type="button"
-                        class="flap-choice flap-choice--stack @(DescriptionLength > 220 && DescriptionLength <= 420 ? "flap-choice--active" : null)"
-                        role="radio"
-                        aria-checked="@((DescriptionLength > 220 && DescriptionLength <= 420).ToString().ToLowerInvariant())"
-                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(350))">
-                    <span class="flap-choice__name">Standard</span>
-                    <span class="flap-choice__meta">Balanced</span>
-                    <span class="flap-choice__badge">Recommended</span>
-                </button>
-                <button type="button"
-                        class="flap-choice flap-choice--stack @(DescriptionLength > 420 ? "flap-choice--active" : null)"
-                        role="radio"
-                        aria-checked="@((DescriptionLength > 420).ToString().ToLowerInvariant())"
-                        @onclick="@(() => OnDescriptionLengthChanged.InvokeAsync(500))">
-                    <span class="flap-choice__name">Detailed</span>
-                    <span class="flap-choice__meta">Most clauses</span>
-                </button>
-            </div>
+            @* One RadzenSelectBar in place of three hand-rolled buttons that each recomputed
+               their own aria-checked and active class from an overlapping range test. The
+               ranges stay in DetailPresetFor so a value arriving from a saved session still
+               lands on the right segment; the Template keeps the two-line stacked face. *@
+            <RadzenSelectBar TValue="int"
+                             Value="@DetailPresetFor(DescriptionLength)"
+                             ValueChanged="@(v => OnDescriptionLengthChanged.InvokeAsync(v))"
+                             Size="ButtonSize.Small"
+                             aria-label="Prompt detail">
+                <Items>
+                    <RadzenSelectBarItem Value="200">
+                        <Template>
+                            <span class="detail-preset__name">Quick</span>
+                            <span class="detail-preset__meta">Fewest clauses</span>
+                        </Template>
+                    </RadzenSelectBarItem>
+                    <RadzenSelectBarItem Value="350">
+                        <Template>
+                            <span class="detail-preset__name">Standard</span>
+                            <span class="detail-preset__meta">Balanced &middot; recommended</span>
+                        </Template>
+                    </RadzenSelectBarItem>
+                    <RadzenSelectBarItem Value="500">
+                        <Template>
+                            <span class="detail-preset__name">Detailed</span>
+                            <span class="detail-preset__meta">Most clauses</span>
+                        </Template>
+                    </RadzenSelectBarItem>
+                </Items>
+            </RadzenSelectBar>
         </div>
     }
 
@@ -195,6 +198,19 @@
     /// Leave unset to opt the hosting page out of paste/drop intake entirely.
     /// </summary>
     [Parameter] public EventCallback<IntakeImage> OnImageIntake { get; set; }
+
+    /// <summary>
+    /// Snaps an arbitrary length onto the preset that owns it. The three buttons this replaced
+    /// each carried their own half of the range test (<c>&lt;= 220</c>, <c>&gt; 220 &amp;&amp; &lt;= 420</c>,
+    /// <c>&gt; 420</c>); folding them into one function is what stops the segments from ever
+    /// disagreeing about which of them is active.
+    /// </summary>
+    private static int DetailPresetFor(int length) => length switch
+    {
+        <= 220 => 200,
+        <= 420 => 350,
+        _ => 500,
+    };
 
     private bool _isDragging;
     private DotNetObjectReference<ImageUploadPanel>? _selfRef;

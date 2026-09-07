@@ -8,6 +8,7 @@
 @inject ImageSessionService SessionService
 @inject NotificationService NotificationService
 @inject DialogService DialogService
+@inject TooltipService TooltipService
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<Gallery> Logger
@@ -34,62 +35,52 @@
     <div class="card bg-dark border-secondary mb-4">
         <div class="card-body p-3">
             <div class="row g-2 align-items-center">
+                @* RadzenTextBox + RadzenButton rather than a Bootstrap input-group: the
+                   input-group/form-control/btn-outline-secondary classes stopped existing when the
+                   Bootstrap bundle was dropped, so this control was rendering unstyled. Radzen owns
+                   the field chrome now and app.css retints it into the board's palette. *@
                 <div class="col-md-5">
                     <label class="visually-hidden" for="gallery-search">Search images</label>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text bg-secondary border-secondary text-light"><i class="bi bi-search"></i></span>
-                        <input id="gallery-search" type="text" class="form-control bg-dark border-secondary text-light"
-                               placeholder="Search by file name or AI tag..."
-                               aria-label="Search images"
-                               @bind="_searchQuery" @bind:event="oninput" />
+                    <div class="gallery-search">
+                        <i class="bi bi-search gallery-search__icon" aria-hidden="true"></i>
+                        <RadzenTextBox @bind-Value="_searchQuery"
+                                       Name="gallery-search"
+                                       Placeholder="Search by file name or AI tag..."
+                                       aria-label="Search images"
+                                       class="gallery-search__input"
+                                       @oninput="@(e => _searchQuery = e.Value?.ToString() ?? string.Empty)" />
                         @if (!string.IsNullOrWhiteSpace(_searchQuery))
                         {
-                            <button class="btn btn-outline-secondary" type="button"
-                                    aria-label="Clear search"
-                                    @onclick="@(() => _searchQuery = string.Empty)">
-                                <i class="bi bi-x" aria-hidden="true"></i>
-                            </button>
+                            <RadzenButton Icon="close"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Variant="Variant.Text"
+                                          Size="ButtonSize.Small"
+                                          class="gallery-search__clear"
+                                          aria-label="Clear search"
+                                          Click="@(() => _searchQuery = string.Empty)" />
                         }
                     </div>
                 </div>
 
+                @* One RadzenSelectBar instead of five hand-rolled buttons that each re-derived
+                   their own aria-checked and active class. The counts stay in the labels because
+                   "Memes (0)" is what tells you a filter is worth clicking. *@
                 <div class="col-md-7">
-                    <div class="d-flex gap-1 flex-wrap justify-content-md-end" role="radiogroup" aria-label="Filter by image kind">
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == null ? "flap-btn--active" : null)"
-                                type="button"
-                                role="radio"
-                                aria-checked="@((_selectedKind == null).ToString().ToLowerInvariant())"
-                                @onclick="@(() => _selectedKind = null)">
-                            All (@_images.Count)
-                        </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Original ? "flap-btn--active" : null)"
-                                type="button"
-                                role="radio"
-                                aria-checked="@((_selectedKind == UserImageKind.Original).ToString().ToLowerInvariant())"
-                                @onclick="@(() => _selectedKind = UserImageKind.Original)">
-                            <i class="bi bi-camera me-1" aria-hidden="true"></i>Originals (@CountFor(UserImageKind.Original))
-                        </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Regeneration ? "flap-btn--active" : null)"
-                                type="button"
-                                role="radio"
-                                aria-checked="@((_selectedKind == UserImageKind.Regeneration).ToString().ToLowerInvariant())"
-                                @onclick="@(() => _selectedKind = UserImageKind.Regeneration)">
-                            <i class="bi bi-palette2 me-1" aria-hidden="true"></i>Regen (@CountFor(UserImageKind.Regeneration))
-                        </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.Meme ? "flap-btn--active" : null)"
-                                type="button"
-                                role="radio"
-                                aria-checked="@((_selectedKind == UserImageKind.Meme).ToString().ToLowerInvariant())"
-                                @onclick="@(() => _selectedKind = UserImageKind.Meme)">
-                            <i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Memes (@CountFor(UserImageKind.Meme))
-                        </button>
-                        <button class="flap-btn flap-btn--sm @(_selectedKind == UserImageKind.BulkVariation ? "flap-btn--active" : null)"
-                                type="button"
-                                role="radio"
-                                aria-checked="@((_selectedKind == UserImageKind.BulkVariation).ToString().ToLowerInvariant())"
-                                @onclick="@(() => _selectedKind = UserImageKind.BulkVariation)">
-                            <i class="bi bi-grid-3x3 me-1" aria-hidden="true"></i>Bulk (@CountFor(UserImageKind.BulkVariation))
-                        </button>
+                    <div class="gallery-kinds">
+                        <RadzenSelectBar @bind-Value="_selectedKind"
+                                         TValue="UserImageKind?"
+                                         Size="ButtonSize.Small"
+                                         Change="@(_ => _selectedIds.Clear())"
+                                         aria-label="Filter by image kind">
+                            <Items>
+                                <RadzenSelectBarItem Text="@($"All ({_images.Count})")" Value="@((UserImageKind?)null)" />
+                                @foreach (var kind in FilterKinds)
+                                {
+                                    <RadzenSelectBarItem Text="@($"{KindLabel(kind)} ({CountFor(kind)})")"
+                                                         Value="@((UserImageKind?)kind)" />
+                                }
+                            </Items>
+                        </RadzenSelectBar>
                     </div>
                 </div>
             </div>
@@ -166,10 +157,17 @@
     {
         <div class="d-flex justify-content-between align-items-center mb-2 px-1">
             <div class="small text-muted">Showing <strong>@FilteredImages.Count</strong> item(s)</div>
-            <button class="btn btn-link btn-sm text-secondary text-decoration-none p-0" @onclick="ToggleSelectAll">
-                <i class="bi @(_selectedIds.Count == FilteredImages.Count ? "bi-check-square-fill" : "bi-square") me-1"></i>
-                @(_selectedIds.Count == FilteredImages.Count ? "Deselect All" : "Select All")
-            </button>
+            @* A checkbox, not a link styled as one: "select all" is a toggle, and RadzenCheckBox
+               already renders the indeterminate state for a partial selection. The old markup used
+               btn-link / text-decoration-none, neither of which exists any more. *@
+            <label class="gallery-selectall">
+                <RadzenCheckBox TValue="bool?"
+                                TriState="true"
+                                Value="@SelectAllState"
+                                Change="@(_ => ToggleSelectAll())"
+                                aria-label="Select all images" />
+                <span>@(AllSelected ? "Deselect all" : "Select all")</span>
+            </label>
         </div>
 
         <div class="row g-3">
@@ -178,14 +176,20 @@
                 var isSelected = _selectedIds.Contains(img.Id);
                 <div class="col-6 col-md-4 col-lg-3">
                     <div class="card bg-dark border-secondary h-100 gallery-card @(isSelected ? "border-warning" : "")">
-                        <div class="position-relative gallery-card__thumb-wrapper">
-                            <img src="@img.ImageUrl" alt="@img.FileName" class="card-img-top gallery-card__img" loading="lazy" />
-                            <span class="badge position-absolute top-0 start-0 m-2 @KindBadgeClass(img.Kind)">
+                        @* The kind chip and the select box are positioned by .gallery-card__* rules
+                           below. They used to ride on `position-absolute top-0 start-0 / end-0`,
+                           Bootstrap utilities that no longer exist — so neither was positioned and
+                           the checkbox rendered inline straight through the chip's label. *@
+                        <div class="gallery-card__thumb-wrapper">
+                            <img src="@img.ImageUrl" alt="@img.FileName" class="gallery-card__img" loading="lazy" />
+                            <span class="badge gallery-card__kind @KindBadgeClass(img.Kind)">
                                 <i class="bi @KindIcon(img.Kind) me-1"></i>@img.Kind
                             </span>
-                            <div class="form-check position-absolute top-0 end-0 m-2">
-                                <input class="form-check-input" type="checkbox" checked="@isSelected"
-                                       @onchange="@(() => ToggleSelect(img.Id))" />
+                            <div class="gallery-card__select">
+                                <RadzenCheckBox TValue="bool"
+                                                Value="@isSelected"
+                                                Change="@(_ => ToggleSelect(img.Id))"
+                                                aria-label="@($"Select {img.FileName}")" />
                             </div>
                         </div>
 
@@ -217,26 +221,39 @@
                                 }
                             </div>
 
-                            <div class="gallery-card__actions mt-3 pt-2 border-top border-secondary d-flex justify-content-between align-items-center">
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-secondary btn-sm" title="View full size"
-                                            @onclick="@(() => OpenLightboxAsync(img))">
-                                        <i class="bi bi-arrows-fullscreen"></i>
-                                    </button>
-                                    <button class="btn btn-outline-secondary btn-sm" title="Use as session input"
-                                            @onclick="@(() => UseAsInput(img))">
-                                        <i class="bi bi-arrow-right-circle text-warning"></i>
-                                    </button>
-                                    <button class="btn btn-outline-secondary btn-sm" title="Copy to clipboard"
-                                            @onclick="@(() => CopyToClipboardAsync(img.ImageUrl))">
-                                        <i class="bi bi-clipboard"></i>
-                                    </button>
+                            @* RadzenButton + TooltipService. These were `btn btn-outline-secondary
+                               btn-sm` / `btn-outline-danger` — Bootstrap classes that stopped
+                               existing when the bundle was dropped, so the row was rendering as
+                               four unstyled icons. The native `title` attribute is replaced by a
+                               real tooltip: TooltipService was already registered by
+                               AddRadzenComponents() and had no callers anywhere in the app.
+                               aria-label carries the same text, because a tooltip is not an
+                               accessible name. *@
+                            <div class="gallery-card__actions">
+                                <div class="gallery-card__actions-group">
+                                    <RadzenButton Icon="fullscreen" Variant="Variant.Text" Size="ButtonSize.Small"
+                                                  ButtonStyle="ButtonStyle.Light"
+                                                  aria-label="View full size"
+                                                  MouseEnter="@(el => ShowTooltip(el, "View full size"))"
+                                                  Click="@(() => OpenLightboxAsync(img))" />
+                                    <RadzenButton Icon="arrow_circle_right" Variant="Variant.Text" Size="ButtonSize.Small"
+                                                  ButtonStyle="ButtonStyle.Warning"
+                                                  aria-label="Use as session input"
+                                                  MouseEnter="@(el => ShowTooltip(el, "Use as session input"))"
+                                                  Click="@(() => UseAsInput(img))" />
+                                    <RadzenButton Icon="content_copy" Variant="Variant.Text" Size="ButtonSize.Small"
+                                                  ButtonStyle="ButtonStyle.Light"
+                                                  aria-label="Copy to clipboard"
+                                                  MouseEnter="@(el => ShowTooltip(el, "Copy to clipboard"))"
+                                                  Click="@(() => CopyToClipboardAsync(img.ImageUrl))" />
                                 </div>
-                                <button class="btn btn-outline-danger btn-sm" title="Delete image"
-                                        disabled="@(_deletingId == img.Id)"
-                                        @onclick="@(() => DeleteSingleAsync(img))">
-                                    <i class="bi @(_deletingId == img.Id ? "bi-hourglass-split" : "bi-trash")"></i>
-                                </button>
+                                <RadzenButton Icon="@(_deletingId == img.Id ? "hourglass_top" : "delete")"
+                                              Variant="Variant.Text" Size="ButtonSize.Small"
+                                              ButtonStyle="ButtonStyle.Danger"
+                                              Disabled="@(_deletingId == img.Id)"
+                                              aria-label="Delete image"
+                                              MouseEnter="@(el => ShowTooltip(el, "Delete image"))"
+                                              Click="@(() => DeleteSingleAsync(img))" />
                             </div>
                         </div>
                     </div>

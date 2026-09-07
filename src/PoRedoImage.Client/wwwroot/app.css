@@ -2205,6 +2205,233 @@ input.form-control:focus {
 .rz-grid-table tbody tr,
 .rz-datatable-data tr { background-color: var(--flap-black); color: var(--flap-white); }
 
+/* ── Select bar (Gallery kind filter) ─────────────────────────────────────
+   Radzen's default paints the selected segment in its own blue and the rest in
+   white-on-white, which is the one thing this board cannot absorb. Retinted to the
+   four-value vocabulary: steel faces, amber for the active segment, square corners,
+   tracked flap caps. Every size class is covered because Size is a component
+   parameter — changing it in markup must not silently fall back to the blue. */
+.rz-selectbutton {
+    /* inline-flex, so the bar is exactly as wide as its segments — as a block it stretched
+       and the container's rule colour showed through as a dead grey tail. */
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    border: 1px solid var(--rule-strong);
+    background: var(--rule-strong);
+    border-radius: 0;
+    overflow: hidden;
+}
+
+.rz-selectbutton .rz-button {
+    border-radius: 0 !important;
+    border: none;
+    background: var(--flap-black);
+    color: var(--steel);
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: var(--track-flap);
+    box-shadow: none;
+    transition: color var(--motion-fast), background var(--motion-fast);
+}
+
+.rz-selectbutton .rz-button:hover { background: var(--flap-shadow); color: var(--flap-white); }
+
+.rz-selectbutton .rz-button.rz-state-active,
+.rz-selectbutton .rz-button.rz-button-xs.rz-state-active,
+.rz-selectbutton .rz-button.rz-button-sm.rz-state-active,
+.rz-selectbutton .rz-button.rz-button-md.rz-state-active,
+.rz-selectbutton .rz-button.rz-button-lg.rz-state-active {
+    background: var(--amber);
+    color: var(--flap-black);
+    font-weight: 700;
+}
+
+.rz-selectbutton .rz-button:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: -2px;
+}
+
+/* Stacked select-bar faces (prompt detail presets): a name over a qualifier, which is
+   the same two-line face the flap-choice buttons used before Radzen took the control.
+   Radzen wraps Template content in its own .rz-button-text span, so the column has to be
+   declared on BOTH the button and that wrapper — styling only the button leaves the two
+   lines sitting side by side. Each segment also flexes so the bar has no dead tail. */
+.rz-selectbutton .rz-button:has(.detail-preset__name),
+.rz-selectbutton .rz-button:has(.detail-preset__name) .rz-button-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    line-height: var(--lh-tight);
+}
+
+.rz-selectbutton .rz-button:has(.detail-preset__name) {
+    flex: 1 1 0;
+    padding-block: 0.45rem;
+}
+
+.preset-section .rz-selectbutton { display: flex; width: 100%; }
+
+.detail-preset__name { font-weight: 700; }
+
+.detail-preset__meta {
+    font-family: var(--font-ui);
+    font-size: var(--text-2xs);
+    text-transform: none;
+    letter-spacing: 0;
+    opacity: 0.75;
+}
+
+/* ── Gallery card ─────────────────────────────────────────────────────────
+   The card, its thumbnail frame and the two overlays. All of this used to lean on
+   Bootstrap utilities (card, position-relative/absolute, top-0, start-0, end-0,
+   card-img-top, ratio) that stopped existing with the bundle, which is why the kind
+   chip and the select box collided on top of each other. */
+.gallery-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--flap-black);
+    border: 1px solid var(--rule);
+    border-radius: 0;
+}
+
+.gallery-card.border-warning { border-color: var(--amber); }
+
+.gallery-card__thumb-wrapper {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--flap-shadow);
+}
+
+.gallery-card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.gallery-card__kind { position: absolute; top: 0.5rem; left: 0.5rem; z-index: 1; }
+
+.gallery-card__select { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1; }
+
+/* Radzen's checkbox on a photo: square, and dark enough to read against a light image. */
+.gallery-card__select .rz-chkbox-box,
+.gallery-selectall .rz-chkbox-box {
+    border-radius: 0;
+    background: var(--flap-black);
+    border: 1px solid var(--steel);
+}
+
+.gallery-card__select .rz-chkbox-box.rz-state-active,
+.gallery-selectall .rz-chkbox-box.rz-state-active {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--flap-black);
+}
+
+.gallery-selectall {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    color: var(--steel);
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: var(--track-flap);
+}
+
+.gallery-selectall:hover { color: var(--flap-white); }
+
+/* ── Gallery card action row ──────────────────────────────────────────────
+   Was `btn-group` + `btn-outline-*`, all Bootstrap classes that no longer exist.
+   RadzenButton supplies the control; these rules supply the board's hairline rule
+   and square corners. */
+.gallery-card__actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--rule);
+}
+
+.gallery-card__actions-group { display: flex; gap: 1px; }
+
+.gallery-card__actions .rz-button {
+    border-radius: 0;
+    min-width: 0;
+    padding: 0.3rem 0.5rem;
+}
+
+.gallery-card__actions .rz-button:hover { background: var(--flap-shadow); }
+
+/* Tooltip, in the board's voice rather than Radzen's rounded grey bubble. */
+.flap-tooltip .rz-tooltip-content,
+.rz-tooltip.flap-tooltip .rz-tooltip-content {
+    background: var(--steel-face);
+    color: #14161a;
+    border-radius: 0;
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: var(--track-flap);
+    box-shadow: var(--shadow-md);
+}
+
+/* Confirm dialog: square, flap-black, so a destructive question does not arrive
+   looking like a different product. */
+.flap-confirm .rz-dialog-content { background: var(--flap-black); color: var(--flap-white); }
+
+.flap-confirm .rz-dialog-confirm-buttons .rz-button { border-radius: 0; }
+
+/* ── Text input (Gallery search) ──────────────────────────────────────────── */
+.rz-textbox {
+    background: var(--flap-shadow);
+    border: 1px solid var(--rule-strong);
+    border-radius: 0;
+    color: var(--flap-white);
+    font-family: var(--font-ui);
+    box-shadow: var(--inset-cell);
+}
+
+.rz-textbox:focus,
+.rz-textbox:focus-visible {
+    border-color: var(--amber);
+    outline: none;
+}
+
+.rz-textbox::placeholder {
+    color: var(--steel-dark);
+    font-family: var(--font-flap);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: var(--track-flap);
+}
+
+/* Search field: the magnifier sits inside the box, so the input is padded past it
+   rather than the icon being a separate input-group segment (the Bootstrap
+   input-group classes this used to rely on no longer exist). */
+.gallery-search { position: relative; display: flex; align-items: center; }
+
+.gallery-search__icon {
+    position: absolute;
+    left: 0.6rem;
+    color: var(--steel-dark);
+    font-size: var(--text-sm);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.gallery-search__input { width: 100%; padding-left: 2rem !important; padding-right: 2rem !important; }
+
+.gallery-search__clear { position: absolute; right: 0.15rem; color: var(--steel); }
+
+.gallery-kinds { display: flex; justify-content: flex-start; }
+
+@media (min-width: 768px) {
+    .gallery-kinds { justify-content: flex-end; }
+}
+
 .rz-notification-item,
 .rz-dialog,
 .rz-card,
