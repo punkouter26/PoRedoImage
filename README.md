@@ -166,7 +166,6 @@ dotnet test tests/PoRedoImage.Tests.E2E.UI                      # E2E UI (Playwr
 | POST | `/api/images/analyze` | Analyze + process image |
 | GET | `/api/bulk-generate/prompts` | Load saved art prompts |
 | POST | `/api/bulk-generate/prompts` | Save art prompts |
-| POST | `/api/style-director/run` | Style Director AI prompt synthesizer |
 | POST | `/api/rap-roast` | Multimedia Rap Roast performance |
 | GET | `/scalar/v1` | Interactive API docs |
 
@@ -181,7 +180,6 @@ src/PoRedoImage.Web/        # API/BFF host
     Diagnostics/      # /api/diag endpoint, middleware
     ImageAnalysis/    # ComputerVisionService, OpenAIService, MemeGeneratorService
     RapRoast/         # RapRoast multimedia endpoints
-    StyleDirector/    # StyleDirector prompt synthesis
   Components/         # App.razor host document + _Imports (renders the Client's <Routes> as WASM)
   Configuration/      # KeyVaultSecretNameMapping
 src/PoRedoImage.Client/     # Blazor WASM SPA

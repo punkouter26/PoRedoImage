@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using PoRedoImage.Application.Features.RapRoast;
@@ -27,12 +27,22 @@ public class RapRoastTests
         chat.SetupGet(c => c.IsConfigured).Returns(false);
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
 
-        var result = await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: false);
+        var result = await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Roast, softened: false);
 
         // The fallback must be structurally identical to the AI output — the music model relies on
         // the section tags, so a bare paragraph would change how the track is performed.
         Assert.Contains("[Verse]", result.Text, StringComparison.Ordinal);
         Assert.Contains("[Chorus]", result.Text, StringComparison.Ordinal);
+
+        // And it has to say it is the stock verse. These bars are mild and clean by construction,
+        // so an unexplained fallback is indistinguishable from the model deciding to go easy —
+        // which is precisely how a content-filter rejection presented before this carried a reason.
+        Assert.NotNull(result.FallbackReason);
+        Assert.Contains("stock bars", result.FallbackReason, StringComparison.Ordinal);
+
+        // An absent provider is an outage, not censorship. The filter report counts rejections, so
+        // conflating the two would show "100% filtered" on a machine with no chat model configured.
+        Assert.False(result.FilterRejected);
         chat.Verify(c => c.CompleteAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -56,8 +66,11 @@ public class RapRoastTests
             .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
-        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: false);
-        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: true);
+        await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Roast, softened: false);
+        await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Roast, softened: true);
+        var standUpSystem = capturedSystem;
+        await writer.WriteAsync(Description, Tags, RapStyle.Trap, RoastIntensity.Roast, softened: false);
+        var rapSystem = capturedSystem;
 
         // The guardrail is what keeps the roast on choices rather than characteristics — and what
         // keeps the music provider's safety filter from refusing the track outright.
@@ -70,6 +83,22 @@ public class RapRoastTests
         // Only the retry pass tells the model it was already rejected.
         Assert.DoesNotContain("SECOND attempt", userPrompts[0], StringComparison.Ordinal);
         Assert.Contains("SECOND attempt", userPrompts[1], StringComparison.Ordinal);
+
+        // Delivery changes the FORM, not just a descriptive line. Stand-up asks for prose
+        // punchlines and explicitly un-asks for rhyme; the rap styles still demand it. Without
+        // this, picking Stand-up would have produced rapped bars under a different button.
+        Assert.NotNull(standUpSystem);
+        Assert.NotNull(rapSystem);
+        Assert.Contains("stand-up comedian", standUpSystem, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Rhyme is not required", standUpSystem, StringComparison.Ordinal);
+        Assert.DoesNotContain("scan to a beat", standUpSystem, StringComparison.Ordinal);
+        Assert.Contains("battle rap", rapSystem, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("scan to a beat", rapSystem, StringComparison.Ordinal);
+
+        // Both forms keep the section tags: Lyria performs what they delimit and the karaoke
+        // highlighting derives its line timings from them.
+        Assert.Contains("[Verse]", standUpSystem, StringComparison.Ordinal);
+        Assert.Contains("[Chorus]", standUpSystem, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -82,7 +111,7 @@ public class RapRoastTests
             .ReturnsAsync(new ChatCompletionResult("```\n[Verse]\nbars here\n[Chorus]\nhook\n```", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
-        var result = await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Roast, softened: false);
+        var result = await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Roast, softened: false);
 
         // A stray fence would otherwise be handed to the music model and performed as a lyric.
         Assert.DoesNotContain("```", result.Text, StringComparison.Ordinal);
@@ -102,13 +131,14 @@ public class RapRoastTests
             .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
-        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Gentle, softened: false);
-        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Scorched, softened: false);
-        await writer.WriteAsync(Description, Tags, RapStyle.BoomBap, RoastIntensity.Scorched, softened: true);
+        await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Gentle, softened: false);
+        await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Scorched, softened: false);
+        await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Scorched, softened: true);
+        await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Nuclear, softened: false);
 
         // The dial has to reach the model, or it is a control that does nothing.
         Assert.Contains("affectionate", userPrompts[0], StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("merciless", userPrompts[1], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("destroy them", userPrompts[1], StringComparison.OrdinalIgnoreCase);
 
         // Turning it up must never widen what may be targeted — Scorched is a harsher delivery at
         // the same targets, and the prompt says so out loud because that is when a model reaches
@@ -119,9 +149,62 @@ public class RapRoastTests
         // Scorched retries as Roast, so the user still gets close to the track they asked for.
         Assert.Contains("SECOND attempt", userPrompts[2], StringComparison.Ordinal);
         Assert.Contains("good-natured", userPrompts[2], StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("merciless", userPrompts[2], StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("destroy them", userPrompts[2], StringComparison.OrdinalIgnoreCase);
+        // The ceiling has to read as a different instruction from Scorched, or it is a label.
+        Assert.Contains("ceiling", userPrompts[3], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("hold nothing back", userPrompts[3], StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(RoastIntensity.Scorched, RoastLyricsWriter.StepDown(RoastIntensity.Nuclear));
         Assert.Equal(RoastIntensity.Roast, RoastLyricsWriter.StepDown(RoastIntensity.Scorched));
         Assert.Equal(RoastIntensity.Gentle, RoastLyricsWriter.StepDown(RoastIntensity.Gentle));
+    }
+
+    [Fact]
+    public async Task Explicit_language_moves_only_the_language_rule_and_the_retry_gives_it_up_first()
+    {
+        var systemPrompts = new List<string>();
+        var userPrompts = new List<string>();
+
+        var chat = new Mock<IChatCompletionService>();
+        chat.SetupGet(c => c.IsConfigured).Returns(true);
+        chat.Setup(c => c.CompleteAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, byte[]?, CancellationToken>((sys, user, _, _) =>
+            {
+                systemPrompts.Add(sys);
+                userPrompts.Add(user);
+            })
+            .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
+
+        var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
+        await writer.WriteAsync(Description, Tags, RapStyle.StandUp, RoastIntensity.Scorched, softened: false);
+        await writer.WriteAsync(
+            Description, Tags, RapStyle.StandUp, RoastIntensity.Scorched, softened: false, explicitLanguage: true);
+        var retry = await writer.WriteAsync(
+            Description, Tags, RapStyle.StandUp, RoastIntensity.Scorched, softened: true, explicitLanguage: true);
+
+        // Clean is the default: the toggle has to be asked for, not merely not-refused.
+        Assert.Contains("no profanity", systemPrompts[0], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("EXPLICIT MODE", systemPrompts[1], StringComparison.Ordinal);
+
+        // The whole point of splitting the constant: turning the language up must not move the
+        // targets. Both prompts carry the identical target guardrail, slur ban included.
+        Assert.Contains(RoastLyricsWriter.TargetGuardrail, systemPrompts[0], StringComparison.Ordinal);
+        Assert.Contains(RoastLyricsWriter.TargetGuardrail, systemPrompts[1], StringComparison.Ordinal);
+        Assert.Contains("slur", systemPrompts[1], StringComparison.OrdinalIgnoreCase);
+
+        // The craft rules ride on every prompt regardless of dial. A live Scorched run returned an
+        // accurate inventory of the photo with no jokes in it, so "each line is a punchline, not a
+        // description" is load-bearing, not decoration.
+        Assert.Contains("must be a JOKE", systemPrompts[0], StringComparison.Ordinal);
+        Assert.Contains("must be a JOKE", systemPrompts[1], StringComparison.Ordinal);
+
+        // A refused explicit draft concedes the swearing, NOT the intensity — the user keeps the
+        // Scorched punchlines they asked for and only loses the words.
+        Assert.Contains("no profanity", systemPrompts[2], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("destroy them", userPrompts[2], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("explicit language has been switched off", userPrompts[2], StringComparison.Ordinal);
+        Assert.True(retry.ExplicitDropped);
     }
 
     // ── RapRoastOrchestrator ─────────────────────────────────────────

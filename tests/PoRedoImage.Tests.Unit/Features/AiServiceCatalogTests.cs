@@ -21,10 +21,9 @@ public class AiServiceCatalogTests
         Assert.Contains(AiProviderIds.OllamaVision, analyze);
         Assert.Contains(AiProviderIds.BrowserFlorence2, analyze);
 
-        // These three genuinely have one implementation each. EnhanceDescription used to be here
+        // These two genuinely have one implementation each. EnhanceDescription used to be here
         // too, on the grounds that "browser-local text enhancement is unimplemented" — it is
         // implemented now (ImageAnalysisRequest.PrecomputedEnhancedPrompt), so it moved out.
-        Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.StyleDirector));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.SceneDetail));
         Assert.Single(AiServiceCatalog.OptionsFor(AiCapability.CreateAudio));
     }
@@ -88,7 +87,6 @@ public class AiServiceCatalogTests
     [InlineData(AiCapability.AnalyzeImage, "Analyze image")]
     [InlineData(AiCapability.GenerateImage, "Generate image")]
     [InlineData(AiCapability.EnhanceDescription, "Enhance description & captions")]
-    [InlineData(AiCapability.StyleDirector, "Style Director")]
     [InlineData(AiCapability.SceneDetail, "Scene detail (OCR)")]
     [InlineData(AiCapability.CreateAudio, "Create audio")]
     public void LabelFor_ReturnsTheRowHeading(AiCapability capability, string expected)
@@ -166,7 +164,6 @@ public class AiServiceCatalogTests
                 AiCapability.AnalyzeImage,
                 AiCapability.GenerateImage,
                 AiCapability.EnhanceDescription,
-                AiCapability.StyleDirector,
                 AiCapability.SceneDetail,
                 AiCapability.CreateAudio,
             ],

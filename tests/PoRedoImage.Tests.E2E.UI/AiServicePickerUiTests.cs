@@ -17,7 +17,7 @@ public sealed class AiServicePickerUiTests : IClassFixture<PlaywrightBrowserFixt
     private static readonly string[] AiCapabilityNames =
     [
         "AnalyzeImage", "GenerateImage", "EnhanceDescription",
-        "StyleDirector", "SceneDetail", "CreateAudio",
+        "SceneDetail", "CreateAudio",
     ];
 
     private readonly PlaywrightBrowserFixture _fixture;

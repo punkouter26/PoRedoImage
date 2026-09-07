@@ -21,7 +21,6 @@ using PoRedoImage.Web.Features.MemeTemplates;
 using PoRedoImage.Web.Features.Pricing;
 using PoRedoImage.Web.Features.RapRoast;
 using PoRedoImage.Web.Features.Shared;
-using PoRedoImage.Web.Features.StyleDirector;
 using PoRedoImage.Web.Features.UserImages;
 using PoRedoImage.Web.Features.VideoGenerate;
 using Radzen;
@@ -395,7 +394,6 @@ try
     app.MapBulkGenerateEndpoints();
     app.MapUserImageEndpoints();
     app.MapMemeTemplateEndpoints();
-    app.MapStyleDirectorEndpoints();
     app.MapRapRoastEndpoints();
     app.MapVideoGenerateEndpoints();
     app.MapPricingEndpoints();

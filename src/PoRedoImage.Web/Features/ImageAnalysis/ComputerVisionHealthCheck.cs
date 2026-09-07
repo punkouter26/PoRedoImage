@@ -36,7 +36,7 @@ public sealed class ComputerVisionHealthCheck : IHealthCheck
         CancellationToken cancellationToken = default)
     {
         var endpoint = _configuration[ConfigKeys.ComputerVisionEndpoint];
-        var apiKey = _configuration[ConfigKeys.ComputerVisionApiKey] ?? _configuration[ConfigKeys.ComputerVisionKeyLegacy];
+        var apiKey = _configuration[ConfigKeys.ComputerVisionApiKey];
 
         // See OpenAIHealthCheck: an unresolved @Microsoft.KeyVault(...) reference is the
         // cold-start race where the app process started before the platform populated

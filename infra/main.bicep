@@ -17,7 +17,7 @@ param storageAccountName string = 'stporedoimage26'
 @description('Storage account location — matches the existing stporedoimage26 account (eastus). Changing this fails with InvalidResourceLocation on an existing account.')
 param storageLocation string = 'eastus'
 
-@description('Name of the App Service Plan to bind the web app to. Dedicated F1 (Free) plan for this app, now co-located with the site in the PoRedoImage RG. The site was destroyed and recreated to achieve this: a site can only bind a plan in its own webSpace, and webSpace is derived from the resource group at creation and is NOT rewritten by a resource-group move (see ADR-031).')
+@description('Name of the App Service Plan to bind the web app to. Dedicated F1 (Free) plan for this app, co-located with the site in the PoRedoImage RG. The site was destroyed and recreated to achieve this: a site can only bind a plan in its own webSpace, and webSpace is derived from the resource group at creation and is NOT rewritten by a resource-group move (see ADR-031). This template REFERENCES the existing plan; it does NOT create, update, or delete it. Plan provisioning/cleanup lives outside this template.')
 param appServicePlanName string = 'asp-PoRedoImage-f1'
 
 @description('Resource group that owns the App Service Plan. Same RG as the web app — the plan is dedicated to this app, not shared.')
@@ -113,25 +113,23 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
   }
 }
 
-// ─── App Service Plan (existing, shared) ───────────────────────────────────
-// The web app is bound to a SHARED App Service Plan (asp-PoShared-b1) owned by the
-// PoShared resource group — consolidating the per-app B1 plans into one shared
-// capacity pool (see ADR-031). This template only references the existing plan; it
-// does NOT create, update, or delete it. The plan's home stamp is fixed by Azure at
-// creation time, so the live poredoimage-web instance (still bound to its original
-// in-RG plan on a different stamp) cannot be migrated without either an `az webapp
-// clone` (new hostname) or a destroy+recreate. New deploys of a fresh web app to
-// this template land on the shared plan.
-resource sharedAppServicePlan 'Microsoft.Web/serverfarms@2024-04-01' existing = {
+// ─── App Service Plan (existing, dedicated) ───────────────────────────────
+// The web app is bound to its dedicated F1 plan (asp-PoRedoImage-f1) in the
+// PoRedoImage resource group. This template only references the existing plan;
+// it does NOT create, update, or delete it. The plan's home stamp is fixed by
+// Azure at creation time, so the live poredoimage-web instance cannot be migrated
+// to a different plan without either an `az webapp clone` (new hostname) or a
+// destroy+recreate (see ADR-031).
+resource dedicatedAppServicePlan 'Microsoft.Web/serverfarms@2024-04-01' existing = {
   name: appServicePlanName
   scope: resourceGroup(appServicePlanResourceGroup)
 }
 
 // ─── App Service ────────────────────────────────────────────────────────────
-// Bound to the SHARED App Service Plan (asp-PoShared-b1 in RG PoShared) referenced
-// above. System-assigned managed identity is enabled for Key Vault access. Note:
-// for the existing live site, ARM keeps the existing serverFarmId if the live site
-// is already bound to a different plan — see the shared-plan comment above for the
+// Bound to the dedicated F1 App Service Plan (asp-PoRedoImage-f1 in RG PoRedoImage)
+// referenced above. System-assigned managed identity is enabled for Key Vault access.
+// Note: for the existing live site, ARM keeps the existing serverFarmId if the live
+// site is already bound to a different plan — see the plan comment above for the
 // stamp-affinity caveat that blocks automated re-parenting.
 resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   name: appServiceName
@@ -141,7 +139,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
     type: 'SystemAssigned'
   }
   properties: {
-    serverFarmId: sharedAppServicePlan.id
+    serverFarmId: dedicatedAppServicePlan.id
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
@@ -186,11 +184,10 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'ComputerVision__ApiKey', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-ApiKey') }
         { name: 'ComputerVision__Endpoint', value: kvRef(keyVaultName, 'PoRedoImage-ComputerVision-Endpoint') }
         { name: 'ApplicationInsights__ConnectionString', value: kvRef(keyVaultName, 'PoRedoImage-ApplicationInsights-ConnectionString') }
-        // Telemetry budget (audit item: "aggressive App Insights sampling"). Set EXPLICITLY here so the
-        // production sampling ratio is auditable in the portal rather than relying on the 0.1 code default
-        // in HostBootstrapExtensions.AddPoRedoImageTelemetry. ErrorPreservingSampler keeps all error spans
-        // and heartbeat/exception telemetry regardless of this ratio.
-        { name: 'ApplicationInsights__SamplingRatio', value: '0.1' }
+        // Telemetry sampling ratio is owned by code (HostBootstrapExtensions.AddPoRedoImageTelemetry
+        // defaults to 0.1 in Production) — single source of truth, overridable via configuration
+        // without redeploy. ErrorPreservingSampler keeps all error spans and heartbeat/exception
+        // telemetry regardless of the ratio.
         { name: 'Storage__ConnectionString', value: kvRef(keyVaultName, 'PoRedoImage-StorageConnectionString') }
         { name: 'AzureAd__ClientId', value: kvRef(keyVaultName, 'PoRedoImage-AzureAd-ClientId') }
         { name: 'AzureAd__ClientSecret', value: kvRef(keyVaultName, 'PoRedoImage-AzureAd-ClientSecret') }

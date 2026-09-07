@@ -88,7 +88,7 @@ public class MobileApiClient : IMobileApiClient
 
     public async Task<RapRoastResponse> ProcessRapRoastAsync(
         ImageCaptureResult image,
-        RapStyle style = RapStyle.BoomBap,
+        RapStyle style = RapStyle.StandUp,
         RoastIntensity intensity = RoastIntensity.Roast,
         CancellationToken ct = default)
     {

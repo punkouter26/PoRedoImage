@@ -31,8 +31,6 @@ public static class FeatureCatalog
             "Generate up to 10 artistic variations at once via Gemini 2.0 Flash."),
         new("/rap-roast", "Rap Roast", "bi-mic",
             "AI writes a roast verse about your photo, then performs it over a beat."),
-        new("/style-director", "Style Director", "bi-sliders",
-            "AI synthesizes the optimal art-style direction and refined prompt, then Gemini paints it."),
         new("/video", "Video", "bi-film",
             "Describe what should happen and Veo animates your photo into an 8-second clip with sound."),
     ];

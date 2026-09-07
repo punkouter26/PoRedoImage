@@ -105,8 +105,6 @@
     <PromptDrawer
         Prompts="@_prompts"
         IsSaving="@_isSaving"
-        ImageBytes="@_imageBytes"
-        ContentType="@_imageContentType"
         OnPromptsChanged="@(p => { _prompts = p; StateHasChanged(); })"
         OnSaveRequested="SavePrompts"
         OnLoadRequested="LoadPrompts" />

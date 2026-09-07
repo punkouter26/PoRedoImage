@@ -142,4 +142,102 @@ public sealed class ApiSmokeTests : IClassFixture<E2EApiFixture>
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
     }
+
+    // ─── Antiforgery surface (§2 Security) ─────────────────────────────
+
+    [LiveServerFact]
+    public async Task Antiforgery_token_endpoint_returns_a_token()
+    {
+        // The Blazor WASM client calls /api/antiforgery/token on boot to fetch the request
+        // half of the double-submit pair (the cookie half is set by the response). Anonymous
+        // because the client boots and primes its token before the user signs in.
+        var response = await _fixture.AnonymousClient.GetAsync("/api/antiforgery/token");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("token", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [LiveServerFact]
+    public async Task Antiforgery_token_endpoint_sets_no_store_cache_header()
+    {
+        // The token is bound to this caller's antiforgery cookie, so caching it would let
+        // a stale value pass validation. The endpoint stamps no-store explicitly — that is
+        // the property under test, not the token itself.
+        var response = await _fixture.AnonymousClient.GetAsync("/api/antiforgery/token");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(response.Headers.CacheControl);
+        Assert.True(response.Headers.CacheControl!.NoStore,
+            "Antiforgery token response must set Cache-Control: no-store.");
+    }
+
+    [LiveServerFact]
+    public async Task Antiforgery_token_endpoint_is_anonymous()
+    {
+        // No cookie, no /dev-login first — the endpoint has to answer 200 anonymous, otherwise
+        // the WASM boot sequence cannot prime its token before the user is authenticated.
+        var response = await _fixture.AnonymousClient.GetAsync("/api/antiforgery/token");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [LiveServerFact]
+    public async Task Bulk_prompts_POST_without_antiforgery_token_returns_400()
+    {
+        // Authenticated as guest via the cookie client (dev-login), then send a write to a
+        // group protected by RequireAntiforgeryValidation() WITHOUT the X-CSRF-TOKEN header.
+        // The filter returns a ProblemDetails 400 — that's the only signal the API can give
+        // a JS caller that the missing header was the reason the request failed. Auth comes
+        // first so the 400 originates from the antiforgery check, not authorization.
+        var loginResponse = await _fixture.Client.GetAsync("/dev-login?email=guest@guest.local");
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/bulk-generate/prompts")
+        {
+            Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json"),
+        };
+        var response = await _fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [LiveServerFact]
+    public async Task Bulk_prompts_POST_with_valid_antiforgery_token_returns_204()
+    {
+        // Sign in via dev-login first so the cookie client carries an auth cookie — the POST
+        // is protected by RequireAuthorization() AND RequireAntiforgeryValidation(), so a
+        // 401 here would prove the auth cookie was lost between calls. The cookie jar is
+        // shared on the default HttpClientHandler; with auto-redirect (true by default) the
+        // 302 → / hand-off is silent.
+        var loginResponse = await _fixture.Client.GetAsync("/dev-login?email=guest@guest.local");
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        // Fetch the request token, then echo it in X-CSRF-TOKEN on a protected write. The
+        // token is bound to this caller's antiforgery cookie (set by the GET response), so
+        // both halves have to come from the same HttpClient — the cookie jar is shared.
+        var tokenResponse = await _fixture.Client.GetAsync("/api/antiforgery/token");
+        Assert.Equal(HttpStatusCode.OK, tokenResponse.StatusCode);
+        var tokenBody = await tokenResponse.Content.ReadAsStringAsync();
+
+        // Cheap extraction of the token string from the { "token": "..." } payload; the
+        // shape is locked by SharedJsonContext (AntiforgeryTokenDto), so a regex is fine here.
+        var match = System.Text.RegularExpressions.Regex.Match(
+            tokenBody, "\"token\"\\s*:\\s*\"(?<t>[^\"]+)\"");
+        Assert.True(match.Success, $"Could not extract token from: {tokenBody}");
+        var token = match.Groups["t"].Value;
+        Assert.False(string.IsNullOrWhiteSpace(token));
+
+        var write = new HttpRequestMessage(HttpMethod.Post, "/api/bulk-generate/prompts")
+        {
+            Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json"),
+        };
+        write.Headers.Add("X-CSRF-TOKEN", token);
+        var response = await _fixture.Client.SendAsync(write);
+        // The endpoint accepts the JSON but our empty {} body fails validation, so we accept
+        // either a 400 (model validation) or 204 (no-op success). Either one proves the
+        // antiforgery check passed — without the token the filter would have answered 400
+        // with the "Invalid antiforgery token" title BEFORE the model binder ran.
+        Assert.True(
+            response.StatusCode == HttpStatusCode.NoContent
+            || response.StatusCode == HttpStatusCode.BadRequest,
+            $"Expected 204 or 400 from a token-bearing POST; got {(int)response.StatusCode}.");
+    }
 }

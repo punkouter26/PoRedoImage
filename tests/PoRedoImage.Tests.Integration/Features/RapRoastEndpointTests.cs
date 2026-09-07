@@ -24,7 +24,7 @@ public class RapRoastEndpointTests : IClassFixture<CustomWebApplicationFactory>
         {
             ImageData = Convert.ToBase64String([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
             ContentType = "image/png",
-            Style = RapStyle.BoomBap,
+            Style = RapStyle.StandUp,
         };
 
         var response = await _client.PostAsJsonWithTokenAsync("/api/rap-roast", request);

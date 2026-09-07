@@ -129,7 +129,7 @@ public static class ArchitectureRules
     private static readonly string[] Slices =
     [
         "Auth", "BulkGenerate", "Diagnostics", "Idempotency", "ImageAnalysis",
-        "MemeTemplates", "Pricing", "RapRoast", "StyleDirector", "UserImages"
+        "MemeTemplates", "Pricing", "RapRoast", "UserImages"
     ];
 
     public static IReadOnlyList<ArchitectureRule> All { get; } = BuildAll();

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
@@ -108,11 +108,26 @@ public sealed class RapRoastOrchestrator(
         RoastLyrics? lyrics = null;
         MusicGenerationResult? music = null;
 
+        // Every provider call this run makes, recorded as it happens. Built here rather than
+        // reconstructed at the end because only this loop knows how many attempts actually ran —
+        // an early return on an unconfigured music provider makes 1 and 2 look identical after
+        // the fact.
+        var attempts = new List<FilterAttemptDto>();
+
         for (var attempt = 1; attempt <= MaxMusicAttempts; attempt++)
         {
             var softened = attempt > 1;
             lyrics = await lyricsWriter.WriteAsync(
-                description, tags, request.Style, request.Intensity, softened, ct);
+                description, tags, request.Style, request.Intensity, softened, request.ExplicitLanguage, ct);
+
+            attempts.Add(new FilterAttemptDto
+            {
+                Gate = "Lyric model",
+                Provider = "Azure OpenAI",
+                Attempt = attempt,
+                Rejected = lyrics.FilterRejected,
+                Reason = lyrics.FilterRejected ? lyrics.FallbackReason : null,
+            });
 
             if (!musicService.IsConfigured)
             {
@@ -120,16 +135,25 @@ public sealed class RapRoastOrchestrator(
                 // rather than failing the whole request.
                 logger.LogInformation("Music provider not configured — returning lyrics only.");
                 return Finish(response, lyrics, music: null, total,
-                    refusalReason: "Music generation is not configured on this environment.");
+                    refusalReason: "Music generation is not configured on this environment.", attempts);
             }
 
             music = await musicService.GenerateAsync(lyrics.Text, StylePrompt(request.Style), ct);
+
+            attempts.Add(new FilterAttemptDto
+            {
+                Gate = "Music model",
+                Provider = "Lyria",
+                Attempt = attempt,
+                Rejected = music.Refused,
+                Reason = music.Refused ? music.RefusalReason : null,
+            });
 
             if (!music.Refused)
             {
                 logger.LogInformation(
                     "Roast track generated on attempt {Attempt}. Softened={Softened}", attempt, softened);
-                return Finish(response, lyrics, music, total, refusalReason: null);
+                return Finish(response, lyrics, music, total, refusalReason: null, attempts);
             }
 
             logger.LogInformation(
@@ -140,7 +164,7 @@ public sealed class RapRoastOrchestrator(
         // Exhausted the attempts — the user still gets the lyrics.
         logger.LogInformation("Music provider refused every attempt; returning lyrics only.");
         return Finish(response, lyrics!, music: null, total, music?.RefusalReason
-            ?? "The music provider declined to perform these lyrics.");
+            ?? "The music provider declined to perform these lyrics.", attempts);
     }
 
     /// <summary>
@@ -180,10 +204,24 @@ public sealed class RapRoastOrchestrator(
         RoastLyrics lyrics,
         MusicGenerationResult? music,
         Stopwatch total,
-        string? refusalReason)
+        string? refusalReason,
+        IReadOnlyList<FilterAttemptDto> attempts)
     {
         response.Lyrics = lyrics.Text;
         response.LyricsSoftened = lyrics.Softened;
+        response.ExplicitDropped = lyrics.ExplicitDropped;
+        response.LyricsFallbackReason = lyrics.FallbackReason;
+
+        var rejected = attempts.Count(a => a.Rejected);
+        response.FilterReport = new FilterReportDto
+        {
+            Attempts = attempts,
+            TotalAttempts = attempts.Count,
+            RejectedAttempts = rejected,
+            // Integer division is deliberate: this is a headline badge, and "67%" carries exactly
+            // as much truth as "66.67%" would when the denominator is at most four.
+            RejectedPercent = attempts.Count == 0 ? 0 : rejected * 100 / attempts.Count,
+        };
 
         if (music is not null)
         {
@@ -214,9 +252,19 @@ public sealed class RapRoastOrchestrator(
         MostIncongruousDetail = s.MostIncongruousDetail,
     };
 
-    /// <summary>Musical direction handed to the music model alongside the lyrics.</summary>
+    /// <summary>Performance direction handed to the music model alongside the lyrics.</summary>
+    /// <remarks>
+    /// Lyria is a music model, so the stand-up direction asks it for the thinnest possible bed and a
+    /// spoken delivery rather than none at all — "return no audio" is not something it can do.
+    /// Expect it to lean more musical than a real club recording would.
+    /// </remarks>
     private static string StylePrompt(RapStyle style) => style switch
     {
+        RapStyle.StandUp =>
+            "A live stand-up comedy club recording. SPOKEN delivery, not sung and not rapped — a "
+            + "comedian working a microphone, dry and conversational, with comic timing and pauses "
+            + "for laughs. Small room tone, scattered crowd laughter and reactions. Little or no "
+            + "musical backing; if any, a barely-there jazz brush loop under the voice.",
         RapStyle.Trap =>
             "A modern trap rap track. Booming 808 sub-bass, rapid hi-hat rolls, half-time feel around "
             + "140 BPM. Confident male rap vocal, clear diction, punchy delivery.",

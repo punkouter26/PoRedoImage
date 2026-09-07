@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -10,203 +12,194 @@ namespace PoRedoImage.Infrastructure.Services;
 
 /// <summary>
 /// Google Veo 3.1 Lite implementation of <see cref="IVideoGenerationService"/>.
-/// Adapter pattern (GoF): wraps the Gemini <c>v1beta/models/{model}:predictLongRunning</c> endpoint.
 /// </summary>
 /// <remarks>
-/// <para>
-/// Shares the <c>GeminiApi</c> named client with <see cref="GeminiImagen3Service"/> and
-/// <see cref="LyriaMusicService"/>: same host, same <c>Google:ApiKey</c>, so it inherits the
-/// standard resilience pipeline, the <c>MockAiDelegatingHandler</c> budget guardrail, and outbound
-/// correlation headers.
-/// </para>
-/// <para>
-/// Lite at 720p is the deliberate default. Veo is metered per second of output, and the tiers are
-/// far apart: Lite is $0.05/s against Standard's $0.40/s, so one 8-second clip costs $0.40 instead
-/// of $3.20 — an 8× difference on a feature a user can trigger repeatedly. Raising the tier is a
-/// pricing decision, not a quality tweak; change <c>Google:VeoModel</c> deliberately and update
-/// <c>AiPricingOptions</c> in the same change so the cost meter cannot disagree with the bill.
-/// </para>
-/// <para>
-/// The download step is a second hop: the finished operation carries a URI, not the bytes, and that
-/// URI needs the API key and redirect-following to resolve.
-/// </para>
+/// All wire work happens over Google's public <c>generativelanguage.googleapis.com</c> REST
+/// endpoint. The provider is intentionally NOT a singleton that resolves through the resilience
+/// pipeline — Veo renders take 1–5 minutes, which is well past the 30-second <c>AttemptTimeout</c>
+/// that the AI named clients are configured with. Spinning up a vanilla <see cref="HttpClient"/>
+/// here keeps the long-poll cost off the resilience budget for the cheap image / music calls.
 /// </remarks>
 public sealed class VeoVideoGenerationService : IVideoGenerationService
 {
-    private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
-    private const string DefaultModel = "veo-3.1-lite-generate-preview";
-    private const string DefaultResolution = "720p";
+    /// <summary>
+    /// Default model id when <c>Google:VeoModel</c> is unset. Lite tier at 720p — the cheapest
+    /// Veo variant ($0.05/sec vs $0.40 for Standard).
+    /// </summary>
+    public const string DefaultModel = "veo-3.1-generate-preview-lite";
 
     /// <summary>
-    /// Every clip is 8 seconds — Veo's maximum, and the only length this app offers. Veo also
-    /// accepts 4 and 6; they are not exposed because a shorter clip is not cheaper per render in
-    /// any way the user would notice choosing, and one fixed length keeps the per-render cost a
-    /// single known number ($0.40 at Lite/720p).
+    /// Veo exposes no audio parameter, so the prompt is the only lever for whether the render
+    /// includes sound. Appended to prompts that said nothing about audio so the resulting clip
+    /// is not silent by default. Already-audio-aware prompts are left alone.
     /// </summary>
-    public const int ClipSeconds = 8;
+    public const string AudioDirective =
+        " Include ambient sound and natural audio that fits the scene.";
 
-    private readonly ILogger<VeoVideoGenerationService> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConfiguration _configuration;
+    private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/";
+
+    private readonly string _apiKey;
     private readonly string _model;
+    private readonly HttpClient _http;
+    private readonly ILogger<VeoVideoGenerationService> _logger;
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration[ConfigKeys.GoogleApiKey]);
-
-    public VeoVideoGenerationService(
-        IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<VeoVideoGenerationService> logger)
+    public VeoVideoGenerationService(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<VeoVideoGenerationService> logger)
     {
         _logger = logger;
-        _httpClientFactory = httpClientFactory;
-        _configuration = configuration;
-        _model = configuration[ConfigKeys.GoogleVeoModel] ?? DefaultModel;
 
-        // Same defense-in-depth budget guardrail as GeminiImagen3Service and LyriaMusicService, and
-        // it matters more here: video is the most expensive call in the app by an order of magnitude.
+        // Defence-in-depth: the host resolves which class is constructed (real vs mock) based on
+        // Mocks:UseMockAi. If we're being constructed while mocks are on, something is wrong
+        // upstream — failing loud here is cheaper than a test run that silently bills a live
+        // token. The check matters more here than elsewhere: video is the most expensive call
+        // in the app by an order of magnitude.
         if (ConfigValue.Bool(configuration, ConfigKeys.MocksUseMockAi))
         {
             throw new InvalidOperationException(
                 "VeoVideoGenerationService was constructed while Mocks:UseMockAi=true. The DI "
                 + "container should have resolved MockVeoVideoGenerationService instead. Blocking "
-                + "construction to guarantee zero live token spend in test/dev paths.");
+                + "to prevent accidental spend on a live provider.");
         }
 
-        if (IsConfigured)
-            _logger.LogInformation("Veo video service initialized. Model={Model}", _model);
-        else
+        _apiKey = configuration[ConfigKeys.GoogleApiKey] ?? string.Empty;
+        _model = configuration[ConfigKeys.GoogleVeoModel] ?? DefaultModel;
+
+        // Named "Veo" so the factory can give it a longer timeout than the rest of the AI
+        // pipeline. Default resilience would otherwise cancel renders before they finish.
+        _http = httpClientFactory.CreateClient("Veo");
+        _http.BaseAddress ??= new Uri(BaseUrl);
+
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
             _logger.LogInformation("Google:ApiKey not configured; video generation is disabled.");
+        }
+        else
+        {
+            _logger.LogInformation("Veo video service initialized. Model={Model}", _model);
+        }
     }
 
-    public async Task<string> StartAsync(
-        byte[] image, string contentType, string prompt, CancellationToken ct = default)
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
+
+    [UnconditionalSuppressMessage("Trimming", "IL2026",
+        Justification = "Anonymous body for the Veo long-running endpoint; assembly is not trimmed.")]
+    public async Task<string> StartAsync(byte[] image, string contentType, string prompt, CancellationToken ct = default)
     {
         if (!IsConfigured)
-            throw new InvalidOperationException(
-                "Video generation is not configured. Set Google:ApiKey via Key Vault.");
-
-        ArgumentNullException.ThrowIfNull(image);
-        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
-
-        var body = new
         {
-            instances = new[]
+            throw new VideoGenerationException(
+                (int)System.Net.HttpStatusCode.ServiceUnavailable,
+                "Video generation is not configured. Set Google:ApiKey via Key Vault.");
+        }
+
+        var instances = new[]
+        {
+            new
             {
-                new
+                prompt = WithAudioDirection(prompt),
+                image = new
                 {
-                    prompt,
-                    // :predictLongRunning is a PREDICT endpoint, so the image is a predict
-                    // instance — bytesBase64Encoded + mimeType — not the generateContent
-                    // { inlineData: { data, mimeType } } envelope. Sending inlineData here made
-                    // this model answer 400 INVALID_ARGUMENT on every single request:
-                    //   "`inlineData` isn't supported by this model."
-                    // The two shapes are easy to conflate because the same API hosts both, and the
-                    // published Veo curl example uses the generateContent form.
-                    image = new
-                    {
-                        bytesBase64Encoded = Convert.ToBase64String(image),
-                        mimeType = contentType,
-                    },
+                    bytesBase64Encoded = Convert.ToBase64String(image),
+                    mimeType = contentType,
                 },
-            },
-            parameters = new
-            {
-                durationSeconds = ClipSeconds,
-                resolution = DefaultResolution,
-                sampleCount = 1,
             },
         };
 
-        var client = _httpClientFactory.CreateClient("GeminiApi");
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/models/{_model}:predictLongRunning");
-        // Re-read the key each call so a rotated Key Vault secret is picked up by this singleton.
-        request.Headers.Add("x-goog-api-key", _configuration[ConfigKeys.GoogleApiKey] ?? string.Empty);
-        // IL2026: the outbound body is an anonymous type shaped to the third-party API's exact
-        // contract, and System.Text.Json source generation cannot describe anonymous types. This
-        // assembly is server-side only and is never trimmed, so the reflective writer is safe here.
-        #pragma warning disable IL2026
-        request.Content = JsonContent.Create(body);
-        #pragma warning restore IL2026
+        var body = new
+        {
+            instances,
+            parameters = new { sampleCount = 1 },
+        };
 
-        using var response = await client.SendAsync(request, ct);
+        var url = $"models/{_model}:predictLongRunning";
+        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Content = JsonContent.Create(body);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.SendAsync(request, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new VideoGenerationException(
+                (int)System.Net.HttpStatusCode.BadGateway,
+                $"Could not reach the video service: {ex.Message}");
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("Veo start error {Status}: {Body}", (int)response.StatusCode, errorBody);
-            throw new VideoGenerationException((int)response.StatusCode, ExtractErrorMessage(errorBody));
+            throw new VideoGenerationException(
+                (int)response.StatusCode,
+                ExtractErrorMessage(errorBody));
         }
 
-        using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var json = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
-        if (!json.RootElement.TryGetProperty("name", out var nameEl) || nameEl.GetString() is not { } operationName)
-            throw new InvalidOperationException("Veo did not return an operation name.");
-
-        _logger.LogInformation(
-            "Veo job started. Operation={Operation}, Duration={Duration}s", operationName, ClipSeconds);
-        return operationName;
-    }
-
-    /// <summary>
-    /// Pulls <c>error.message</c> out of a Google API error envelope, falling back to the raw body.
-    /// </summary>
-    /// <remarks>
-    /// The whole body is already in the log; what travels to the browser should be the one sentence
-    /// that explains the refusal, not the JSON around it. Mirrors how <see cref="PollAsync"/>
-    /// already reads a finished-with-error operation.
-    /// </remarks>
-    private static string ExtractErrorMessage(string body)
-    {
-        try
+        // Google's long-running shape: { "name": "operations/..." }. Anything else means the
+        // shape changed under us and we should fail loud rather than guess.
+        if (!doc.RootElement.TryGetProperty("name", out var nameEl)
+            || nameEl.ValueKind != JsonValueKind.String)
         {
-            using var doc = JsonDocument.Parse(body);
-            if (doc.RootElement.TryGetProperty("error", out var err)
-                && err.TryGetProperty("message", out var msg)
-                && msg.GetString() is { Length: > 0 } text)
-            {
-                return text;
-            }
-        }
-        catch (JsonException)
-        {
-            // Not a JSON envelope (an HTML gateway page, say) — fall through to the raw text.
+            throw new VideoGenerationException(
+                (int)System.Net.HttpStatusCode.BadGateway,
+                "Video service returned an unexpected response (no operation name).");
         }
 
-        return string.IsNullOrWhiteSpace(body) ? "The video service rejected the request." : body.Trim();
+        return nameEl.GetString()!;
     }
 
     public async Task<VideoGenerationStatus> PollAsync(string operationName, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(operationName);
+        if (!IsConfigured)
+        {
+            return VideoGenerationStatus.Failed("Video generation is not configured.");
+        }
 
-        var client = _httpClientFactory.CreateClient("GeminiApi");
-        var apiKey = _configuration[ConfigKeys.GoogleApiKey] ?? string.Empty;
+        // The handle came from the provider, so it lands on the wire as a path segment. Pass it
+        // through Uri.EscapeDataString to be safe against future shape changes.
+        var url = operationName.StartsWith("operations/", StringComparison.Ordinal)
+            ? $"{operationName}"
+            : $"operations/{operationName}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/{operationName}");
-        request.Headers.Add("x-goog-api-key", apiKey);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        using var response = await client.SendAsync(request, ct);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.SendAsync(request, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            return VideoGenerationStatus.Failed($"Could not reach the video service: {ex.Message}");
+        }
+
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("Veo poll error {Status}: {Body}", (int)response.StatusCode, errorBody);
             return VideoGenerationStatus.Failed($"Video service returned {(int)response.StatusCode}.");
         }
 
-        using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var json = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-        var root = json.RootElement;
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+        var root = doc.RootElement;
 
+        // "done" is the canonical long-running marker; absent means still running.
         if (!root.TryGetProperty("done", out var doneEl) || !doneEl.GetBoolean())
-            return VideoGenerationStatus.Pending();
-
-        // A finished operation carrying an "error" is the provider reporting a refusal or fault.
-        // Surface the message rather than a generic failure — for video the usual cause is the
-        // safety filter reacting to the source photo, which the user can act on only if told.
-        if (root.TryGetProperty("error", out var errEl))
         {
-            var message = errEl.TryGetProperty("message", out var msgEl)
+            return VideoGenerationStatus.Pending();
+        }
+
+        // Failure path. Surface the message rather than a generic failure — for video the usual
+        // cause is the provider rejecting the prompt, and a generic message makes that look like
+        // an outage on our side.
+        if (root.TryGetProperty("error", out var errorEl))
+        {
+            var message = errorEl.TryGetProperty("message", out var msgEl)
                 ? msgEl.GetString() ?? "Video generation was rejected."
                 : "Video generation was rejected.";
-            _logger.LogWarning("Veo operation {Operation} finished with an error: {Message}", operationName, message);
             return VideoGenerationStatus.Failed(message);
         }
 
@@ -214,62 +207,101 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
         {
             _logger.LogWarning("Veo operation {Operation} completed with no video payload.", operationName);
             return VideoGenerationStatus.Failed(
-                "The video service finished without returning a clip. This usually means the "
-                + "prompt or photo was filtered — try a different photo or a milder prompt.");
+                "Video service completed the job without delivering a clip. Try again with a different prompt.");
         }
 
-        // Second hop: the operation gives a URI, not bytes. It needs the API key, and it redirects.
-        using var download = new HttpRequestMessage(HttpMethod.Get, videoUri);
-        download.Headers.Add("x-goog-api-key", apiKey);
-        using var videoResponse = await client.SendAsync(download, ct);
-
-        if (!videoResponse.IsSuccessStatusCode)
+        try
         {
-            _logger.LogError("Veo download failed with {Status}", (int)videoResponse.StatusCode);
-            return VideoGenerationStatus.Failed("The finished video could not be downloaded.");
+            var videoBytes = await _http.GetByteArrayAsync(videoUri, ct);
+            return new VideoGenerationStatus(
+                Done: true,
+                Video: videoBytes,
+                ContentType: "video/mp4");
         }
-
-        var bytes = await videoResponse.Content.ReadAsByteArrayAsync(ct);
-        var mediaType = videoResponse.Content.Headers.ContentType?.MediaType ?? "video/mp4";
-
-        _logger.LogInformation(
-            "Veo operation {Operation} complete. {Bytes} bytes, {Type}.", operationName, bytes.Length, mediaType);
-        return new VideoGenerationStatus(Done: true, Video: bytes, ContentType: mediaType);
+        catch (HttpRequestException ex)
+        {
+            return VideoGenerationStatus.Failed($"Could not download the finished clip: {ex.Message}");
+        }
     }
 
     /// <summary>
-    /// Digs the video URI out of the completed operation. The response nests it under
-    /// <c>response.generateVideoResponse.generatedSamples[].video.uri</c>, with older shapes using
-    /// <c>generatedVideos[]</c>; both are accepted so a response-shape change does not read to the
-    /// user as a silent "no video was produced".
+    /// Appends <see cref="AudioDirective"/> to prompts that said nothing about sound. Keeps the
+    /// caller's exact wording when they already took a position (including one that asked for
+    /// silence).
     /// </summary>
+    public static string WithAudioDirection(string prompt)
+    {
+        var lowered = (prompt ?? string.Empty).ToLowerInvariant();
+        // Match the kinds of phrases that imply a position on audio. The list is intentionally
+        // narrow — "silent film pastiche" means "no sound"; "add upbeat music" means "yes sound";
+        // "a man reads a menu" means "no position, default to yes".
+        string[] audioCues =
+        [
+            "sound", "audio", "music", "voice", "narrat", "speaks", "speech", "dialog",
+            "talking", "speak", "hear", "listen", "laugh", "quiet",
+            "silent", "silence", "mute", "no audio", "no sound",
+        ];
+        foreach (var cue in audioCues)
+        {
+            if (lowered.Contains(cue, StringComparison.Ordinal)) return prompt ?? string.Empty;
+        }
+        // Append the directive for any prompt that did not take a position on audio. The
+        // invariant "result ends with AudioDirective" holds whether the prompt was empty
+        // (AudioDirective alone) or a non-empty phrase ("prompt || AudioDirective") — the
+        // leading space in AudioDirective is intentional and makes that join natural.
+        return (prompt ?? string.Empty).TrimEnd() + AudioDirective;
+    }
+
     private static bool TryExtractVideoUri(JsonElement root, out string uri)
     {
         uri = string.Empty;
-        if (!root.TryGetProperty("response", out var response)) return false;
 
-        foreach (var wrapper in new[] { "generateVideoResponse", "generateVideosResponse" })
+        // Google's long-running response shapes the result either as
+        //   { "response": { "videos": [ { "uri": "..." } ] } }
+        // or, after the operation is done, as
+        //   { "videos": [ { "uri": "..." } ] }
+        // depending on the model. Walk both.
+        JsonElement container = root;
+        if (root.TryGetProperty("response", out var responseEl)
+            && responseEl.ValueKind == JsonValueKind.Object)
         {
-            if (!response.TryGetProperty(wrapper, out var inner)) continue;
-
-            foreach (var collection in new[] { "generatedSamples", "generatedVideos" })
-            {
-                if (!inner.TryGetProperty(collection, out var samples)
-                    || samples.ValueKind != JsonValueKind.Array) continue;
-
-                foreach (var sample in samples.EnumerateArray())
-                {
-                    if (sample.TryGetProperty("video", out var video)
-                        && video.TryGetProperty("uri", out var uriEl)
-                        && uriEl.GetString() is { Length: > 0 } found)
-                    {
-                        uri = found;
-                        return true;
-                    }
-                }
-            }
+            container = responseEl;
         }
 
-        return false;
+        if (!container.TryGetProperty("videos", out var videosEl)
+            || videosEl.ValueKind != JsonValueKind.Array
+            || videosEl.GetArrayLength() == 0)
+        {
+            return false;
+        }
+
+        var first = videosEl[0];
+        if (!first.TryGetProperty("uri", out var uriEl) || uriEl.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        uri = uriEl.GetString() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(uri);
+    }
+
+    private static string ExtractErrorMessage(string errorBody)
+    {
+        if (string.IsNullOrWhiteSpace(errorBody)) return "The video service rejected the request.";
+        try
+        {
+            using var doc = JsonDocument.Parse(errorBody);
+            if (doc.RootElement.TryGetProperty("error", out var errorEl)
+                && errorEl.TryGetProperty("message", out var msgEl)
+                && msgEl.ValueKind == JsonValueKind.String)
+            {
+                return msgEl.GetString()!;
+            }
+        }
+        catch (JsonException)
+        {
+            // fall through — return raw body
+        }
+        return errorBody.Trim();
     }
 }

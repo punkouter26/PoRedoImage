@@ -17,9 +17,6 @@ public enum AiCapability
     /// </summary>
     EnhanceDescription = 2,
 
-    /// <summary>Style Director reasoning agents (<c>IChatCompletionService</c>).</summary>
-    StyleDirector = 3,
-
     /// <summary>OCR, dense captions, objects (<c>ISceneDetailProvider</c>).</summary>
     SceneDetail = 4,
 

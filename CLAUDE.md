@@ -108,7 +108,7 @@ resolve those services. See [RenderModes.cs](src/PoRedoImage.Client/RenderModes.
 
 Server code is **Vertical Slice** under [src/PoRedoImage.Web/Features/](src/PoRedoImage.Web/Features/)
 — `{Auth, BulkGenerate, Diagnostics, Idempotency, ImageAnalysis, MemeTemplates, Pricing, RapRoast,
-Shared, StyleDirector, UserImages}/`, each co-locating endpoint, DTO, and validator. Minimal APIs
+Shared, UserImages}/`, each co-locating endpoint, DTO, and validator. Minimal APIs
 only — no MVC controllers; `MapGroup` plus static handler methods. `Domain`/`Application`/
 `Infrastructure` supply cross-slice primitives only. **VSA wins over Onion when both would apply**:
 a new feature is a new slice, not a new layer.
@@ -180,7 +180,7 @@ reports green — that is exactly what the HuggingFace removal was about. Two li
 Computer Vision's `Caption`/`DenseCaptions` are region-unavailable, so `AzureVisionService` falls back
 to joined tags on *every* call; and when the vision call itself fails (429 is common), `SceneDescriber`
 falls back to that same tag list. **Any new fallback path must set a user-facing reason** (see
-`RapRoastResponse.DescriptionFallbackReason`, `StyleDirectorResponse.FallbackReason`) — silent
+`RapRoastResponse.DescriptionFallbackReason`, `ImageAnalysisResponse.DescriptionFallbackReason`) — silent
 degradation reads to the user as "the AI ignored my photo".
 
 Model selection is per-capability, not one global choice. `AiProviderIds` namespaces every id by
@@ -274,15 +274,17 @@ silently.
 went undocumented here for a while. It holds a rule *registry* rather than one method per rule, so
 its whole ruleset costs two methods against the ceiling however many rules it grows.
 
-Approximate headroom, so you know which tier can absorb a new test:
+Approximate headroom, so you know which tier can absorb a new test.
+Counted from `dotnet test --list-tests` on 2026-09-06; the per-tier ceiling tests rebuild these
+numbers every CI run, so refresh this table when the counts drift.
 
 | Tier | Methods | Ceiling |
 |---|---|---|
-| Unit | ~95 | 100 |
-| Integration | ~47 | 50 |
-| E2E.ApiSmoke | ~10 | 25 |
-| E2E.UI | ~11 | 25 |
-| Architecture | ~8 | 10 |
+| Unit | 91 | 100 |
+| Integration | 46 | 50 |
+| E2E.ApiSmoke | 11 | 25 |
+| E2E.UI | 12 | 25 |
+| Architecture | 9 | 10 |
 
 Unit and Integration are the tight ones. Integration sat at exactly 50/50 — one test from breaking
 the build — until the per-rule pass/fail method pairs in `Contracts/` were folded into single

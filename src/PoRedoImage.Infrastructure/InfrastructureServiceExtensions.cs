@@ -4,8 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Configuration;
-using PoRedoImage.Application.Agents;
-using PoRedoImage.Application.Agents.StyleDirector;
 using PoRedoImage.Application.Features.BulkGenerate;
 using PoRedoImage.Application.Features.ImageAnalysis;
 using PoRedoImage.Application.Features.RapRoast;
@@ -63,8 +61,8 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IImageGenerationRouter>(sp =>
                 new SingleImageGenerationRouter(sp.GetRequiredService<IImageGenerationService>()));
 
-            // Chat completion (Style Director reasoning): mock reports IsConfigured=false so the agents
-            // deterministically use their heuristic path — zero network, stable test output.
+            // Chat completion (Rap Roast scene describer + lyric writer): the mock reports
+            // IsConfigured=false so callers take their deterministic path — zero network, stable output.
             services.AddSingleton<MockChatCompletionService>();
             services.AddSingleton<IChatCompletionService>(sp => sp.GetRequiredService<MockChatCompletionService>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockChatCompletionService>());
@@ -133,8 +131,8 @@ public static class InfrastructureServiceExtensions
                 return new ImageGenerationRouter(standard, fast);
             });
 
-            // Chat + vision powering the Style Director agents, the Rap Roast scene describer, and
-            // its lyric writer. Azure OpenAI is the only backend: one deployment serves both text
+            // Chat + vision powering the Rap Roast scene describer and its lyric writer.
+            // Azure OpenAI is the only backend: one deployment serves both text
             // and image content parts, so image-to-text needs no second provider or model id.
             //
             // Note for anyone re-adding a provider switch here: every caller of
@@ -154,14 +152,14 @@ public static class InfrastructureServiceExtensions
                 services.AddSingleton<IChatCompletionService, AzureOpenAiChatCompletionService>();
             }
 
-            // Music generation for the Rap Roast slice: Google Lyria, which performs supplied
-            // lyrics rather than producing an instrumental bed.
-            services.AddSingleton<IMusicGenerationService, LyriaMusicService>();
-
             // Image-to-video for the Video slice: Google Veo 3.1 Lite at 720p. The most expensive
             // call in the app per invocation ($0.40 per 8-second clip), which is why the Lite tier
             // is the default and the mock above is wired for every non-production run.
             services.AddSingleton<IVideoGenerationService, VeoVideoGenerationService>();
+
+            // Music generation for the Rap Roast slice: Google Lyria, which performs supplied
+            // lyrics rather than producing an instrumental bed.
+            services.AddSingleton<IMusicGenerationService, LyriaMusicService>();
 
             // OCR (Read), region captions (DenseCaptions), objects and people — the grounded facts
             // the scene describer hands to the vision model so it does not have to guess them.
@@ -179,7 +177,9 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<IUserImageRepository, AzureBlobUserImageRepository>();
         services.AddScoped<IUserImageService, UserImageService>();
 
-        // Application layer orchestrator
+        // Application layer orchestrator + the vision pass that writes its image-generation prompt
+        // (Transient so the scoped logger flows correctly, matching SceneDescriber below).
+        services.AddTransient<ReproductionPromptWriter>();
         services.AddScoped<IImageAnalysisOrchestrator, ImageAnalysisOrchestrator>();
 
         // Bulk board fan-out (concurrency cap, per-slot failure policy, re-roll seeding)
@@ -190,9 +190,6 @@ public static class InfrastructureServiceExtensions
         services.AddTransient<SceneDescriber>();
         services.AddTransient<RoastLyricsWriter>();
         services.AddScoped<IRapRoastOrchestrator, RapRoastOrchestrator>();
-
-        // Style Director prompt synthesis workflow
-        services.AddTransient<StyleDirectorWorkflow>();
 
         // Defense-in-depth budget guardrail: an HTTP-pipeline interceptor that blocks any outbound AI
         // call when Mocks:UseMockAi=true. Registered on the AI named clients below. In mock mode the
@@ -215,8 +212,21 @@ public static class InfrastructureServiceExtensions
             .AddHttpMessageHandler<MockAiDelegatingHandler>()
             .AddStandardResilienceHandler(ConfigureGenerativeAiResilience);
 
+        // Named HttpClient for Veo video (long-running). No resilience pipeline: Veo renders
+        // take 1–5 minutes, well past the AttemptTimeout / TotalRequestTimeout the standard
+        // resilience handler would otherwise impose. A single long-poll call is exactly the
+        // shape the BFF promises to the client.
+        services.AddHttpClient("Veo", c =>
+        {
+            c.BaseAddress = new Uri(BaseUrl);
+            c.Timeout = TimeSpan.FromMinutes(15);
+        })
+        .AddHttpMessageHandler<MockAiDelegatingHandler>();
+
         return services;
     }
+
+    private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/";
 
     /// <summary>
     /// Resilience for the generative-AI HTTP client (Gemini image generation and Lyria music).

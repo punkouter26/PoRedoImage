@@ -34,7 +34,7 @@
             OnFileChange="LoadFile" />
 
         <fieldset class="flap-fieldset mt-3">
-            <legend class="flap-fieldset__legend">Beat style</legend>
+            <legend class="flap-fieldset__legend">Delivery</legend>
             <div class="flap-choices">
                 @foreach (var option in StyleOptions)
                 {
@@ -70,11 +70,27 @@
             </div>
         </fieldset>
 
+        @* ── Language toggle ──────────────────────────────────────────────
+           Kept off the intensity dial on purpose. Language and target are separate
+           questions, and folding profanity into "Scorched" would have made asking for
+           a dirtier mouth the same request as asking for a crueller joke. *@
+        <label class="roast-explicit @(_explicitLanguage ? "roast-explicit--on" : "")">
+            <input type="checkbox" checked="@_explicitLanguage"
+                   @onchange="@(e => _explicitLanguage = (bool)(e.Value ?? false))" />
+            <span class="roast-explicit__badge" aria-hidden="true">E</span>
+            <span class="roast-explicit__text">
+                <span class="roast-explicit__name">Explicit language</span>
+                <span class="roast-explicit__meta">Uncensored, swears throughout. Lyria may refuse to sing it.</span>
+            </span>
+        </label>
+
         <p class="roast-disclaimer">
             <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-            Every setting stays on styling, pose and vibe — never on appearance traits like
-            race, body size, age or disability. <strong>Scorched</strong> changes how hard the
-            jab lands, not what it lands on. Best used on photos of yourself and friends.
+            Everything you chose is fair game — the fit, the pose, the room, the taste, the
+            decision to upload this one. Off limits at every setting: race, body size, age,
+            disability and the rest of who you are, and slurs. <strong>Scorched</strong> and
+            <strong>Explicit</strong> change how hard it hits and how it talks, never what it hits.
+            Best used on photos of yourself and friends.
         </p>
 
         @* The action, now downstream of everything it reads. Disabled until there is a photo —
@@ -158,12 +174,63 @@
             </div>
         }
 
-        @if (_result.LyricsSoftened)
+        @if (!string.IsNullOrWhiteSpace(_result.LyricsFallbackReason))
+        {
+            <p class="roast-softened small" role="status">
+                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                @_result.LyricsFallbackReason
+            </p>
+        }
+        else if (_result.ExplicitDropped)
+        {
+            <p class="roast-softened small" role="status">
+                <i class="bi bi-emoji-smile me-1" aria-hidden="true"></i>
+                The explicit draft was refused by the music model, so this cut keeps the punchlines
+                and drops the swearing.
+            </p>
+        }
+        else if (_result.LyricsSoftened)
         {
             <p class="roast-softened small" role="status">
                 <i class="bi bi-emoji-smile me-1" aria-hidden="true"></i>
                 The first draft was too spicy for the music model, so this is the friendlier cut.
             </p>
+        }
+
+        @* ── Filter report ────────────────────────────────────────────────
+           Which safety gate bit, and how hard. Rendered even on a clean run: "0%
+           filtered" is the evidence that a tame verse was the model's own choice
+           rather than something a filter ate, which is the exact ambiguity that
+           made a working Explicit toggle look broken. *@
+        @if (_result.FilterReport.TotalAttempts > 0)
+        {
+            var report = _result.FilterReport;
+            <section class="roast-filters @(report.RejectedAttempts > 0 ? "roast-filters--hit" : "")"
+                     aria-label="Safety filter report">
+                <p class="roast-filters__headline">
+                    <span class="roast-filters__pct">@report.RejectedPercent%</span>
+                    filtered — @report.RejectedAttempts of @report.TotalAttempts provider
+                    @(report.TotalAttempts == 1 ? "call was" : "calls were") rejected
+                </p>
+                <ul class="roast-filters__list">
+                    @foreach (var a in report.Attempts)
+                    {
+                        <li class="roast-filters__row @(a.Rejected ? "is-rejected" : "is-passed")">
+                            <span class="roast-filters__gate">@a.Gate</span>
+                            <span class="roast-filters__provider">@a.Provider</span>
+                            <span class="roast-filters__try">try @a.Attempt</span>
+                            <span class="roast-filters__verdict">@(a.Rejected ? "rejected" : "passed")</span>
+                        </li>
+                    }
+                </ul>
+                @if (_sessionAttempts > _result.FilterReport.TotalAttempts)
+                {
+                    <p class="roast-filters__session">
+                        This page session: @_sessionRejected of @_sessionAttempts rejected
+                        (@SessionRejectedPercent%) across @_sessionRoasts roasts. Resets on reload.
+                    </p>
+                }
+            </section>
         }
 
         <section class="roast-lyrics" aria-label="Roast lyrics">

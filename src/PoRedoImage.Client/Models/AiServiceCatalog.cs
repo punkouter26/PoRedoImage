@@ -57,13 +57,6 @@ public static class AiServiceCatalog
             BrowserOption(AiProviderIds.BrowserQwen25, LocalCapability.Text),
         ],
 
-        // The Style Director agents reason through IChatCompletionService, which is Azure OpenAI —
-        // the same deployment that reads images for the scene describer.
-        [AiCapability.StyleDirector] =
-        [
-            new(AiProviderIds.AzureOpenAi, "Azure OpenAI", CategoryRemote, "Only provider configured"),
-        ],
-
         [AiCapability.SceneDetail] =
         [
             new(AiProviderIds.AzureComputerVision, "Azure Computer Vision", CategoryRemote, "Only provider configured"),
@@ -81,7 +74,6 @@ public static class AiServiceCatalog
         AiCapability.AnalyzeImage => "Analyze image",
         AiCapability.GenerateImage => "Generate image",
         AiCapability.EnhanceDescription => "Enhance description & captions",
-        AiCapability.StyleDirector => "Style Director",
         AiCapability.SceneDetail => "Scene detail (OCR)",
         AiCapability.CreateAudio => "Create audio",
         _ => capability.ToString(),
@@ -93,7 +85,6 @@ public static class AiServiceCatalog
         AiCapability.AnalyzeImage,
         AiCapability.GenerateImage,
         AiCapability.EnhanceDescription,
-        AiCapability.StyleDirector,
         AiCapability.SceneDetail,
         AiCapability.CreateAudio,
     ];

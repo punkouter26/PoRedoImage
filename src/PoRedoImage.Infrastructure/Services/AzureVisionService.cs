@@ -37,7 +37,7 @@ public sealed class AzureVisionService : IVisionService
     /// </remarks>
     private volatile bool _captionUnsupported;
 
-    private string? CurrentKey => _configuration[ConfigKeys.ComputerVisionApiKey] ?? _configuration[ConfigKeys.ComputerVisionKeyLegacy];
+    private string? CurrentKey => _configuration[ConfigKeys.ComputerVisionApiKey];
 
     public AzureVisionService(IConfiguration configuration, ILogger<AzureVisionService> logger)
     {

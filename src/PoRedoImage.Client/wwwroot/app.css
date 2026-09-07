@@ -28,11 +28,7 @@
 .card,
 .diag-stat,
 .shimmer-wrapper,
-.style-director-trace,
 .meme-template-card,
-.style-director-intro,
-.style-director-summary,
-.style-director-final,
 .send-to,
 .gallery-bar {
     position: relative;
@@ -597,8 +593,7 @@ body.po-drop-active::after {
    Parts: __name (the tracked cap), __meta (the sub-label), __badge (corner flag),
           __lamp (the dot).                                                        */
 
-.flap-choice,
-.direction-cell {
+.flap-choice {
     position: relative;
     display: flex;
     gap: 0.7rem;
@@ -626,8 +621,7 @@ body.po-drop-active::after {
     column-gap: 0.55rem;
 }
 
-.flap-choice:hover,
-.direction-cell:hover {
+.flap-choice:hover {
     color: var(--flap-white);
     border-color: var(--steel-dark);
     background: #22232a;
@@ -1674,67 +1668,6 @@ body.po-drop-active::after {
 
 .meme-template-zones { background: var(--flap-shadow); box-shadow: var(--inset-cell); border-radius: 0; padding: 0.85rem; }
 
-.style-director-intro,
-.style-director-summary,
-.style-director-final { padding: 0.9rem 1rem; }
-
-.style-director-final { border-color: var(--amber); }
-
-.style-director-source img {
-    width: 100%;
-    max-height: 320px;
-    object-fit: contain;
-    border-radius: 0;
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-}
-
-.style-director-trace { padding: 1rem; }
-
-/* Agent trace = successive board rows, each one a stop on the line. */
-.trace-step {
-    position: relative;
-    padding: 0.55rem 0.75rem 0.55rem 2.4rem;
-    margin-bottom: 1px;
-    border: none;
-    border-bottom: 1px solid var(--rule);
-    background: var(--flap-shadow);
-}
-
-.trace-step:last-child { border-bottom: none; }
-
-.trace-step__head {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: var(--font-flap);
-    font-size: var(--text-sm);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--flap-white);
-}
-
-.trace-step__head i {
-    position: absolute;
-    left: 0.55rem;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--flap-black);
-    color: var(--steel);
-    width: 22px; height: 22px;
-    border-radius: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: var(--text-sm);
-}
-
-.trace-step:last-child .trace-step__head i { color: var(--amber); }
-
-.trace-step__body { margin: 0.3rem 0 0; font-size: var(--text-md); color: var(--steel); max-width: 66ch; }
-
-.direction-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1px; }
-
-.direction-cell { flex-direction: column; cursor: default; }
 
 /* ═══ Bulk generate ══════════════════════════════════════════════════════ */
 .bulk-upload-preview {
@@ -1931,8 +1864,7 @@ input.form-control:focus {
     opacity: 1;
 }
 
-.prompt-drawer__reset,
-.prompt-drawer__improve {
+.prompt-drawer__reset {
     flex-shrink: 0;
     margin-top: 0.3rem;
     width: 1.9rem; height: 1.9rem;
@@ -1945,64 +1877,8 @@ input.form-control:focus {
     transition: color var(--motion-fast), border-color var(--motion-fast);
 }
 
-.prompt-drawer__reset:hover,
-.prompt-drawer__improve:hover:not(:disabled) { color: var(--amber); border-color: var(--amber); transform: none; }
+.prompt-drawer__reset:hover { color: var(--amber); border-color: var(--amber); transform: none; }
 
-.prompt-drawer__improve:disabled { cursor: wait; opacity: 0.7; }
-
-.prompt-drawer__improve--busy { border-color: var(--amber); color: var(--amber); }
-
-.prompt-drawer__improve .spinner-border-sm { width: 0.85rem; height: 0.85rem; }
-
-.prompt-drawer__trace {
-    width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.55rem 0.7rem;
-    background: var(--flap-shadow);
-    box-shadow: var(--inset-cell);
-    border: 1px solid var(--rule-strong);
-    border-radius: 0;
-    font-size: var(--text-xs);
-    color: var(--steel);
-}
-
-.prompt-drawer__trace-toggle {
-    display: flex; align-items: center; gap: 0.5rem;
-    width: 100%;
-    background: transparent; border: none; padding: 0;
-    color: inherit; cursor: pointer; text-align: left; font: inherit;
-}
-
-.prompt-drawer__trace-toggle:hover { color: var(--amber); }
-
-.prompt-drawer__trace-toggle .badge { font-size: var(--text-2xs); font-weight: 700; border-radius: 0; }
-
-.prompt-drawer__trace-rationale { flex: 1; color: var(--steel-dark); font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.prompt-drawer__trace-list {
-    list-style: none;
-    padding: 0.5rem 0 0;
-    margin: 0.5rem 0 0;
-    border-top: 1px solid var(--rule);
-    display: flex; flex-direction: column; gap: 0.35rem;
-}
-
-.prompt-drawer__trace-row {
-    display: grid;
-    grid-template-columns: 1.1rem auto auto 1fr;
-    gap: 0.5rem;
-    align-items: baseline;
-    font-size: var(--text-xs);
-    color: var(--steel);
-}
-
-.prompt-drawer__trace-row i { color: var(--amber); font-size: var(--text-sm); }
-
-.prompt-drawer__trace-row strong { color: var(--flap-white); font-weight: 700; }
-
-.prompt-drawer__trace-ms { font-variant-numeric: tabular-nums; font-size: var(--text-2xs); color: var(--steel-dark); }
-
-.prompt-drawer__trace-summary { line-height: 1.4; }
 
 /* ═══ Prompt history ═════════════════════════════════════════════════════ */
 .prompt-history { padding: 0.5rem 0.75rem; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }

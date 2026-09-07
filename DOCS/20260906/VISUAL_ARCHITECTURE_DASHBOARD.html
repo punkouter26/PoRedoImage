@@ -3,1070 +3,1168 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PoRedoImage Visual Architecture</title>
+<title>Visual Architecture Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* ── Tokens ─────────────────────────────────────────────────────────────────
-   Selenium-toned neutrals (cool grey paper, ferrotype ink) with a single
-   safelight-oxide accent reserved for one job: marking a degraded path.
-   Chart series come from the validated categorical set; the accent never
-   appears as a series colour, so a fallback rail can never read as data. */
+/* ── Tokens ───────────────────────────────────────────────────────────
+   Light is the base declaration; dark redefines tokens only, under both
+   the OS media query (guarded so an explicit light stamp wins) and the
+   [data-theme="dark"] stamp (so the viewer toggle wins the other way). */
 :root {
   color-scheme: light;
 
-  --paper:      #edeff0;
-  --surface:    #fafbfb;
-  --surface-2:  #f2f5f6;
-  --ink:        #10161a;
-  --ink-2:      #4c5a61;
-  --ink-3:      #7c8a91;
-  --rule:       #d8dee0;
-  --hair:       rgba(16, 22, 26, 0.10);
-  --shadow:     rgba(16, 22, 26, 0.07);
+  --plane:        #eceeef;   /* page ground — cool neutral, faint teal bias */
+  --surface:      #fbfcfc;   /* raised panels, tables, figures */
+  --surface-sunk: #e5e9ea;   /* code wells, inset strips */
 
-  --safelight:  #a33a1e;
-  --safelight-wash: #f7e9e3;
+  --ink:    #0f1416;
+  --ink-2:  #4b5457;
+  --ink-3:  #788387;
 
-  --s1: #2a78d6;  --s2: #eb6834;  --s3: #1baf7a;  --s4: #eda100;  --s5: #e87ba4;
-  --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
-  --grid: #e2e6e8; --axis: #c3cbce;
+  --rule:        #dde1e3;
+  --rule-strong: #c0c8cb;
 
-  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
-  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --accent:      #0d6b76;
+  --accent-soft: #dceef0;
+  --accent-ink:  #08535c;
 
-  --measure: 68ch;
-  --gap: 22px;
+  /* Status — fixed, never themed. Always paired with a glyph + word. */
+  --good:     #0ca30c;
+  --warning:  #fab219;
+  --serious:  #ec835a;
+  --critical: #d03b3b;
+
+  /* Chart series — validated categorical order, light steps */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+
+  --viz-surface: #fcfcfb;
+  --viz-grid:    #e1e0d9;
+  --viz-axis:    #c3c2b7;
+  --viz-muted:   #898781;
+
+  --shadow: 0 1px 2px rgba(15, 20, 22, .05), 0 6px 18px -10px rgba(15, 20, 22, .18);
+
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  --measure: 74ch;
+  --gutter: clamp(1.1rem, 4vw, 2.75rem);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --paper:      #0b0e10;
-    --surface:    #14191c;
-    --surface-2:  #1b2226;
-    --ink:        #e8eef0;
-    --ink-2:      #a0b0b7;
-    --ink-3:      #71828a;
-    --rule:       #242d32;
-    --hair:       rgba(232, 238, 240, 0.12);
-    --shadow:     rgba(0, 0, 0, 0.5);
-    --safelight:  #e27246;
-    --safelight-wash: #2a1912;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
-    --grid: #232b2f; --axis: #39444a;
+    --plane:        #0b0e0f;
+    --surface:      #14191a;
+    --surface-sunk: #1b2122;
+    --ink:    #eef3f3;
+    --ink-2:  #a9b4b7;
+    --ink-3:  #788387;
+    --rule:        #242b2d;
+    --rule-strong: #37403f;
+    --accent:      #4bb6c2;
+    --accent-soft: #10333a;
+    --accent-ink:  #7fd2dc;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --viz-surface: #1a1a19;
+    --viz-grid:    #2c2c2a;
+    --viz-axis:    #383835;
+    --viz-muted:   #898781;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 22px -12px rgba(0, 0, 0, .7);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper:      #0b0e10;
-  --surface:    #14191c;
-  --surface-2:  #1b2226;
-  --ink:        #e8eef0;
-  --ink-2:      #a0b0b7;
-  --ink-3:      #71828a;
-  --rule:       #242d32;
-  --hair:       rgba(232, 238, 240, 0.12);
-  --shadow:     rgba(0, 0, 0, 0.5);
-  --safelight:  #e27246;
-  --safelight-wash: #2a1912;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
-  --grid: #232b2f; --axis: #39444a;
+  --plane:        #0b0e0f;
+  --surface:      #14191a;
+  --surface-sunk: #1b2122;
+  --ink:    #eef3f3;
+  --ink-2:  #a9b4b7;
+  --ink-3:  #788387;
+  --rule:        #242b2d;
+  --rule-strong: #37403f;
+  --accent:      #4bb6c2;
+  --accent-soft: #10333a;
+  --accent-ink:  #7fd2dc;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --viz-surface: #1a1a19;
+  --viz-grid:    #2c2c2a;
+  --viz-axis:    #383835;
+  --viz-muted:   #898781;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 22px -12px rgba(0, 0, 0, .7);
 }
 
-/* ── Base ───────────────────────────────────────────────────────────────── */
-* { box-sizing: border-box; }
+/* ── Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--paper);
+  background: var(--plane);
   color: var(--ink);
-  font-family: var(--f-body);
-  font-size: 16.5px;
+  font-family: var(--body);
+  font-size: 15.5px;
   line-height: 1.62;
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4 {
-  font-family: var(--f-display);
-  font-weight: 650;
-  letter-spacing: -0.017em;
-  line-height: 1.14;
-  text-wrap: balance;
-  margin: 0;
-}
+a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--ink); }
 
-h1 { font-size: clamp(28px, 4.2vw, 44px); }
-h2 { font-size: clamp(22px, 2.7vw, 30px); }
-h3 { font-size: 19px; letter-spacing: -0.01em; }
-h4 { font-size: 15px; }
-
-p { margin: 0 0 1em; max-width: var(--measure); }
-p:last-child { margin-bottom: 0; }
-
-a { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--safelight); }
-a:hover { color: var(--safelight); }
-:focus-visible { outline: 2px solid var(--safelight); outline-offset: 3px; border-radius: 2px; }
-
-code, kbd, .mono { font-family: var(--f-mono); font-size: 0.86em; }
-code {
-  background: var(--surface-2);
-  border: 1px solid var(--hair);
-  padding: 0.08em 0.36em;
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-strong { font-weight: 600; }
-
-/* ── Header + Detail Switcher ───────────────────────────────────────────── */
-.hdr {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--rule);
-}
-
-.hdr-in {
-  max-width: 1220px;
-  margin: 0 auto;
-  padding: 13px 26px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-
-.brand-mark {
-  font-family: var(--f-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--safelight);
-  white-space: nowrap;
-}
-
-.brand-title {
-  font-family: var(--f-display);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.012em;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.switch {
-  display: flex;
-  align-items: stretch;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--surface);
-}
-
-.switch button {
-  appearance: none;
-  border: 0;
-  border-left: 1px solid var(--rule);
-  background: transparent;
-  color: var(--ink-2);
-  font-family: var(--f-mono);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  padding: 7px 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.14s, color 0.14s;
-}
-
-.switch button:first-child { border-left: 0; }
-.switch button:hover { background: var(--surface-2); color: var(--ink); }
-
-.switch button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--surface);
-  font-weight: 600;
-}
-
-.switch button .n { opacity: 0.55; margin-right: 6px; }
-.switch button[aria-pressed="true"] .n { opacity: 0.7; }
-
-/* Cumulative disclosure: level 1 = tier 1 only, 2 = tiers 1+2, 3 = everything. */
-:root[data-level="1"] [data-tier="2"],
-:root[data-level="1"] [data-tier="3"],
-:root[data-level="2"] [data-tier="3"] { display: none !important; }
-
-/* ── Page frame ─────────────────────────────────────────────────────────── */
-.wrap { max-width: 1220px; margin: 0 auto; padding: 0 26px 96px; }
-
-.lede { padding: 44px 0 30px; border-bottom: 1px solid var(--rule); }
-.lede h1 { margin-bottom: 14px; }
-.lede .sub { font-size: 18px; color: var(--ink-2); max-width: 62ch; }
-
-.eyebrow {
-  font-family: var(--f-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  margin-bottom: 12px;
-}
-
-section { padding: 40px 0 4px; border-top: 1px solid var(--rule); }
-section:first-of-type { border-top: 0; }
-
-.sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
-
-.tier {
-  font-family: var(--f-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 2px 7px;
-  white-space: nowrap;
-  flex: none;
-}
-
-.sec-note { color: var(--ink-2); font-size: 16px; margin: 6px 0 22px; max-width: var(--measure); }
-
-.stack { display: flex; flex-direction: column; gap: var(--gap); }
-
-/* ── Cards & grids ──────────────────────────────────────────────────────── */
-.grid { display: grid; gap: var(--gap); }
-.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-.g3 { grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); }
-.g4 { grid-template-columns: repeat(auto-fit, minmax(204px, 1fr)); }
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--hair);
-  border-radius: 5px;
-  padding: 20px 22px;
-}
-
-.card h3 { margin-bottom: 8px; }
-.card p { font-size: 15.5px; color: var(--ink-2); }
-
-.card-k {
-  font-family: var(--f-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  margin-bottom: 10px;
-}
-
-/* Navigation matrix cards read as destinations, not content blocks. */
-a.nav-card {
-  display: block;
-  text-decoration: none;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  padding: 22px;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-
-a.nav-card:hover {
-  border-color: var(--safelight);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px var(--shadow);
-  color: var(--ink);
-}
-
-a.nav-card h3 { margin-bottom: 7px; }
-a.nav-card p { font-size: 15px; color: var(--ink-2); margin-bottom: 14px; }
-
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.chip {
-  font-family: var(--f-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 2px 7px;
-  color: var(--ink-2);
-  background: var(--surface-2);
-  white-space: nowrap;
-}
-
-.chip.on { border-color: color-mix(in srgb, var(--good) 45%, var(--rule)); color: var(--ink); }
-.chip.hot { border-color: color-mix(in srgb, var(--safelight) 55%, var(--rule)); color: var(--safelight); }
-
-/* Status is never colour alone: every dot ships with its label. */
-.st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 11.5px; white-space: nowrap; }
-.st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ink-3); }
-.st.good::before { background: var(--good); }
-.st.warn::before { background: var(--warn); }
-.st.serious::before { background: var(--serious); }
-.st.crit::before { background: var(--crit); }
-
-/* ── Stat tiles — used only where the figure is the point ───────────────── */
-.stat { background: var(--surface); border: 1px solid var(--hair); border-radius: 5px; padding: 18px 20px; }
-.stat .v { font-family: var(--f-display); font-size: 32px; font-weight: 650; letter-spacing: -0.028em; line-height: 1; }
-.stat .l { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin-top: 9px; }
-.stat .d { font-size: 14px; color: var(--ink-2); margin-top: 7px; line-height: 1.45; }
-
-/* ── Tables ─────────────────────────────────────────────────────────────── */
-.scroll { overflow-x: auto; border: 1px solid var(--hair); border-radius: 5px; background: var(--surface); }
-
-table { border-collapse: collapse; width: 100%; font-size: 14px; }
-
-thead th {
-  font-family: var(--f-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  text-align: left;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--rule);
-  white-space: nowrap;
-  background: var(--surface-2);
-}
-
-tbody td { padding: 11px 14px; border-bottom: 1px solid var(--hair); vertical-align: top; color: var(--ink-2); }
-tbody tr:last-child td { border-bottom: 0; }
-tbody td:first-child { color: var(--ink); font-weight: 500; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-mono); }
-td .mono, th .mono { font-size: 12.5px; }
-td code { font-size: 12.5px; }
-.nw { white-space: nowrap; }
-
-/* ── Code blocks ────────────────────────────────────────────────────────── */
-pre.code {
-  margin: 0;
-  overflow-x: auto;
-  background: var(--surface);
-  border: 1px solid var(--hair);
-  border-radius: 5px;
-  padding: 16px 18px;
-  font-family: var(--f-mono);
-  font-size: 12.5px;
-  line-height: 1.62;
-  color: var(--ink-2);
-  tab-size: 2;
-}
-
-pre.code b { color: var(--ink); font-weight: 600; }
-pre.code i { color: var(--ink-3); font-style: normal; }
-pre.code em { color: var(--safelight); font-style: normal; }
-
-.cap { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-3); margin-top: 9px; }
-
-/* ── The degradation rail — the one place the accent is spent ───────────── */
-.degrade {
-  background: var(--safelight-wash);
-  border: 1px solid color-mix(in srgb, var(--safelight) 26%, transparent);
-  border-left: 3px solid var(--safelight);
-  border-radius: 0 5px 5px 0;
-  padding: 16px 20px;
-}
-
-.degrade .card-k { color: var(--safelight); }
-.degrade p { font-size: 15px; color: var(--ink-2); }
-.degrade p:last-child { margin-bottom: 0; }
-
-/* ── Diagrams ───────────────────────────────────────────────────────────── */
-.diagram {
-  background: var(--surface);
-  border: 1px solid var(--hair);
-  border-radius: 5px;
-  padding: 20px 18px;
-  overflow-x: auto;
-}
-
-.diagram pre.mermaid { margin: 0; background: none; border: 0; padding: 0; text-align: center; }
-.diagram svg { max-width: 100%; height: auto; }
-
-/* ── Charts ─────────────────────────────────────────────────────────────── */
-/* Capped to its own content so the card does not trail dead space to the right
-   of a fixed-width plot; the scroll container handles anything narrower. */
-.chart { background: var(--surface); border: 1px solid var(--hair); border-radius: 5px;
-  padding: 20px 22px 16px; max-width: 860px; }
-.chart h4 { margin-bottom: 3px; }
-.chart .sub { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
-.chart-body { overflow-x: auto; }
-.chart svg { display: block; }
-.chart svg text { font-family: var(--f-mono); fill: var(--ink-2); }
-.chart svg text.lab { fill: var(--ink); font-size: 12px; }
-.chart svg text.val { fill: var(--ink); font-size: 12px; font-weight: 600; }
-.chart svg text.tick { fill: var(--ink-3); font-size: 10.5px; }
-.chart svg .gridline { stroke: var(--grid); stroke-width: 1; }
-.chart svg .baseline { stroke: var(--axis); stroke-width: 1; }
-
-.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--hair); }
-.legend span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-2); }
-.legend i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-
-/* ── Footer ─────────────────────────────────────────────────────────────── */
-.foot { margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--rule); font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 8px 24px; }
-
-@media (max-width: 640px) {
-  .wrap, .hdr-in { padding-left: 17px; padding-right: 17px; }
-  body { font-size: 16px; }
-  .switch button { padding: 7px 9px; font-size: 11px; }
-  .switch button .n { margin-right: 4px; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-  a.nav-card:hover { transform: none; }
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+/* ── Masthead ─────────────────────────────────────────────────────── */
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--plane) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.masthead__bar {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: .7rem var(--gutter) 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .5rem 1.25rem;
+}
+
+.brand {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -.02em;
+  margin: 0;
+  white-space: nowrap;
+}
+.brand span { color: var(--accent-ink); }
+
+.brand-meta {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Detail switcher — the three ordered levels, cumulative */
+.switcher {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.switcher__label {
+  font-family: var(--mono);
+  font-size: .64rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: .42rem .6rem;
+  border-right: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.sw {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .03em;
+  padding: .42rem .72rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sw:last-child { border-right: 0; }
+.sw:hover { background: var(--surface-sunk); color: var(--ink); }
+.sw[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+:root[data-theme="dark"] .sw[aria-pressed="true"],
+:root:not([data-theme="light"]) .sw[aria-pressed="true"] { color: #06181b; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .sw[aria-pressed="true"] { color: #fff; }
+}
+
+/* Tab strip */
+.tabs {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: .55rem var(--gutter) 0;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tab {
+  font-family: var(--mono);
+  font-size: .72rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-decoration: none;
+  padding: .5rem .85rem;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  background: none;
+  border-top: 0; border-left: 0; border-right: 0;
+  cursor: pointer;
+  font-weight: 500;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-current="page"], .tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Page frame ───────────────────────────────────────────────────── */
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) 5rem;
+}
+
+.hero {
+  padding: 2.6rem 0 1.6rem;
+  border-bottom: 1px solid var(--rule);
+}
+.hero h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.85rem, 4.6vw, 2.9rem);
+  letter-spacing: -.03em;
+  line-height: 1.06;
+  margin: .35rem 0 .7rem;
+  text-wrap: balance;
+  max-width: 20ch;
+}
+.hero p {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--ink-2);
+  font-size: 1.02rem;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+.eyebrow::before {
+  content: "";
+  width: 1.6rem;
+  height: 2px;
+  background: var(--accent);
+  flex: none;
+}
+
+/* Tier band — the structural unit. The eyebrow states the tier because
+   the tier is real information about depth, not decoration. */
+.tier {
+  padding: 2.4rem 0 .4rem;
+  border-top: 1px solid var(--rule);
+  margin-top: 2.2rem;
+}
+.tier:first-of-type { border-top: 0; margin-top: 0; }
+.tier > h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.28rem, 2.6vw, 1.6rem);
+  letter-spacing: -.02em;
+  margin: .55rem 0 .4rem;
+  text-wrap: balance;
+}
+.tier > .lede {
+  margin: 0 0 1.5rem;
+  max-width: var(--measure);
+  color: var(--ink-2);
+}
+.tier h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: -.005em;
+  margin: 2rem 0 .55rem;
+}
+.tier h4 {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: .74rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 1.5rem 0 .5rem;
+}
+.tier p, .tier li { max-width: var(--measure); }
+.tier p { margin: 0 0 .85rem; }
+.tier ul, .tier ol { margin: 0 0 1rem; padding-left: 1.15rem; }
+.tier li { margin-bottom: .3rem; }
+
+/* ── Tables ───────────────────────────────────────────────────────── */
+.scroll-x {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface);
+  margin: 0 0 1.35rem;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 34rem;
+  font-size: .84rem;
+}
+th, td {
+  text-align: left;
+  padding: .58rem .8rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+thead th {
+  font-family: var(--mono);
+  font-size: .66rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  background: var(--surface-sunk);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { font-size: .95em; }
+.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+table.mono td:first-child { font-family: var(--mono); font-size: .78rem; white-space: nowrap; }
+
+/* ── Code ─────────────────────────────────────────────────────────── */
+code {
+  font-family: var(--mono);
+  font-size: .855em;
+  background: var(--surface-sunk);
+  padding: .08em .34em;
+  border-radius: 2px;
+  overflow-wrap: anywhere;
+}
+pre {
+  margin: 0 0 1.35rem;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  padding: .95rem 1.1rem;
+  overflow-x: auto;
+  font-size: .8rem;
+  line-height: 1.62;
+}
+pre code {
+  background: none;
+  padding: 0;
+  font-size: 1em;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+/* ── Status pills & pipe badges ───────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .34rem;
+  font-family: var(--mono);
+  font-size: .66rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: .12rem .45rem .12rem .38rem;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+.pill::before { font-size: .82em; line-height: 1; }
+.pill--good     { color: var(--good); }
+.pill--good::before { content: "\25CF"; }
+.pill--warning  { color: #8a6100; }
+:root[data-theme="dark"] .pill--warning,
+:root:not([data-theme="light"]) .pill--warning { color: var(--warning); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .pill--warning { color: #8a6100; } }
+.pill--warning::before { content: "\25B2"; }
+.pill--serious  { color: #a1441c; }
+:root[data-theme="dark"] .pill--serious,
+:root:not([data-theme="light"]) .pill--serious { color: var(--serious); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .pill--serious { color: #a1441c; } }
+.pill--serious::before { content: "\25C6"; }
+.pill--critical { color: var(--critical); }
+.pill--critical::before { content: "\2715"; }
+.pill--neutral  { color: var(--ink-3); }
+.pill--neutral::before { content: "\2013"; }
+
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: .66rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-radius: 2px;
+  padding: .1rem .4rem;
+  white-space: nowrap;
+}
+
+/* ── Summary strip (Tier 1, 30-second read) ───────────────────────── */
+.summary {
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 1.6rem;
+}
+.summary__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: .6rem .9rem;
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--surface-sunk);
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.summary__row {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr) auto;
+  gap: .5rem 1rem;
+  padding: .62rem .9rem;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+}
+.summary__row:last-child { border-bottom: 0; }
+.summary__row dt {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0;
+}
+.summary__row dd { margin: 0; font-size: .885rem; color: var(--ink); }
+.summary__row dd b { font-weight: 600; }
+@media (max-width: 640px) {
+  .summary__row { grid-template-columns: 1fr auto; }
+  .summary__row dt { grid-column: 1 / -1; }
+}
+
+/* ── Navigation matrix (hub cards) ────────────────────────────────── */
+.matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
+  gap: 1px;
+  background: var(--rule-strong);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.matrix__card {
+  background: var(--surface);
+  padding: 1.05rem 1.05rem 1.15rem;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+}
+.matrix__card:hover { background: var(--surface-sunk); color: inherit; }
+.matrix__card h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0;
+  letter-spacing: -.01em;
+}
+.matrix__card p { margin: 0; font-size: .845rem; color: var(--ink-2); max-width: none; }
+.matrix__card .row-tags { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: auto; padding-top: .5rem; }
+
+/* ── Service board rows (the app's own idiom: SERVICE / STATUS) ───── */
+.board {
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface);
+  margin-bottom: 1.5rem;
+}
+.board__head, .board__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1.1fr) minmax(0, 2.3fr) 9.5rem;
+  gap: .9rem;
+  padding: .6rem .9rem;
+  align-items: baseline;
+}
+.board__head {
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--rule-strong);
+  font-family: var(--mono);
+  font-size: .64rem;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.board__row { border-bottom: 1px solid var(--rule); }
+.board__row:last-child { border-bottom: 0; }
+.board__name {
+  font-family: var(--mono);
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.board__desc { font-size: .85rem; color: var(--ink-2); }
+@media (max-width: 720px) {
+  .board__head { display: none; }
+  .board__row { grid-template-columns: 1fr; gap: .3rem; }
+}
+
+/* ── Callout ──────────────────────────────────────────────────────── */
+.note {
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--warning);
+  border-radius: 3px;
+  background: var(--surface);
+  padding: .85rem 1rem;
+  margin: 0 0 1.4rem;
+  max-width: var(--measure);
+}
+.note--critical { border-left-color: var(--critical); }
+.note--accent { border-left-color: var(--accent); }
+.note p { margin: 0 0 .5rem; }
+.note p:last-child { margin-bottom: 0; }
+.note__title {
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-2);
+  display: block;
+  margin-bottom: .35rem;
+}
+
+/* ── Figures: diagrams & charts ───────────────────────────────────── */
+figure {
+  margin: 0 0 1.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface);
+  overflow: hidden;
+}
+figure > .figure__body { padding: 1rem; overflow-x: auto; }
+figcaption {
+  font-family: var(--mono);
+  font-size: .7rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+  padding: .55rem .9rem;
+  border-top: 1px solid var(--rule);
+  background: var(--surface-sunk);
+}
+figcaption b { color: var(--ink); font-weight: 600; }
+
+pre.mermaid {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  overflow-x: auto;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+
+/* Charts: own surface tokens, per the viz palette */
+.viz { display: block; width: 100%; height: auto; }
+.viz text { font-family: var(--body); }
+.viz .viz-label { fill: var(--ink-2); font-size: 11px; }
+.viz .viz-tick { fill: var(--viz-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.viz .viz-value { fill: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.viz .viz-grid { stroke: var(--viz-grid); stroke-width: 1; }
+.viz .viz-axis { stroke: var(--viz-axis); stroke-width: 1; }
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem 1.1rem;
+  padding: 0 1rem .9rem;
+  font-family: var(--mono);
+  font-size: .68rem;
+  color: var(--ink-2);
+}
+.legend span { display: inline-flex; align-items: center; gap: .38rem; }
+.legend i { width: .62rem; height: .62rem; border-radius: 1px; display: inline-block; flex: none; }
+
+/* ── Footer ───────────────────────────────────────────────────────── */
+.colophon {
+  border-top: 1px solid var(--rule-strong);
+  margin-top: 3rem;
+  padding-top: 1.1rem;
+  font-family: var(--mono);
+  font-size: .7rem;
+  line-height: 1.7;
+  color: var(--ink-3);
+  max-width: var(--measure);
+}
+
+/* ── Detail switcher mechanics ────────────────────────────────────── */
+/* Nothing is hidden until the page reports ready, so diagrams always
+   render at full width before any tier is collapsed. */
+html.docs-ready main[data-level="1"] [data-tier="2"],
+html.docs-ready main[data-level="1"] [data-tier="3"],
+html.docs-ready main[data-level="2"] [data-tier="3"] { display: none; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Tab panels (unified dashboard only) */
+.panel[hidden] { display: none; }
 </style>
+</head>
+<body>
+<a class="visually-hidden" href="#main">Skip to content</a>
+<header class="masthead">
+  <div class="masthead__bar">
+    <p class="brand">PoRedoImage <span>/ docs</span></p>
+    <div class="switcher" role="group" aria-label="Level of detail">
+      <span class="switcher__label">Detail</span>
+      <button type="button" class="sw" data-level="1" aria-pressed="false">1 &middot; Simple</button>
+      <button type="button" class="sw" data-level="2" aria-pressed="false">2 &middot; Standard</button>
+      <button type="button" class="sw" data-level="3" aria-pressed="true">3 &middot; All details</button>
+    </div>
+    <span class="brand-meta">2026&#8209;09&#8209;06</span>
+  </div>
+  <nav class="tabs" aria-label="Reports">
+      <a class="tab" href="index.html">Hub</a>
+      <a class="tab" href="AI_SERVICES_REPORT.html">AI Services</a>
+      <a class="tab" href="ROLES_PERMISSIONS_MATRIX.html">Roles &amp; Permissions</a>
+      <a class="tab" href="USER_WORKFLOW.html">User Workflow</a>
+      <a class="tab" href="VISUAL_ARCHITECTURE_DASHBOARD.html" aria-current="page">Visual Architecture</a>
+  </nav>
+</header>
+
+<main id="main" data-level="3">
+<section class="hero">
+  <p class="eyebrow">Report 04 &middot; Visual architecture</p>
+  <h1>Topology and Boundaries</h1>
+  <p>Two web projects whose split is the thing most likely to trip you up, ten API route groups over five test tiers with hard ceilings, and a storage schema with no foreign keys because the partition key <i>is</i> the boundary.</p>
+</section>
+
+<!-- ══ TIER 1 ══════════════════════════════════════════════════════ -->
+<section class="tier" data-tier="1">
+  <p class="eyebrow">Tier 1 &middot; Executive</p>
+  <h2>System topology</h2>
+
+  <dl class="summary">
+    <div class="summary__head"><span>Layer</span><span>Shape</span></div>
+    <div class="summary__row">
+      <dt>PoRedoImage.Client</dt>
+      <dd>The Blazor WASM SPA. Owns <code>Routes.razor</code>, layout, <b>every interactive page</b>, and the only <code>wwwroot</code> in the solution. The one assembly that ships to the browser.</dd>
+      <dd><span class="pill pill--good">Browser</span></dd>
+    </div>
+    <div class="summary__row">
+      <dt>PoRedoImage.Web</dt>
+      <dd>ASP.NET Core BFF / API host. <code>Components/App.razor</code> is a host document only. Server code is <b>vertical slices</b> under <code>Features/</code>, minimal APIs, no MVC controllers.</dd>
+      <dd><span class="pill pill--good">Server</span></dd>
+    </div>
+    <div class="summary__row">
+      <dt>Domain / Application / Infrastructure</dt>
+      <dd>Cross-slice primitives only &mdash; interfaces and entities, orchestrators, provider implementations plus DI wiring. A new <i>feature</i> is a new slice, never a new layer.</dd>
+      <dd><span class="pill pill--warning">Support</span></dd>
+    </div>
+    <div class="summary__row">
+      <dt>PoRedoImage.Shared</dt>
+      <dd>DTOs and validation crossing the WASM boundary, so it must stay <b>trim-safe</b>. Serialization runs through one resolver chain used by both sides.</dd>
+      <dd><span class="pill pill--critical">Trim-safe</span></dd>
+    </div>
+    <div class="summary__row">
+      <dt>PoRedoImage.Mobile</dt>
+      <dd>MAUI Android head in its own solution. Talks to the API over HTTP, holds no provider keys, references only <code>.Shared</code>.</dd>
+      <dd><span class="pill pill--neutral">Separate slnx</span></dd>
+    </div>
+    <div class="summary__row">
+      <dt>Azure</dt>
+      <dd>Linux App Service on an existing plan, StorageV2 (blob + table, <code>Standard_LRS</code>, 30-day expiry on generated blobs), shared Key Vault <code>kv-poshared</code>, Application Insights.</dd>
+      <dd><span class="pill pill--good">Bicep</span></dd>
+    </div>
+  </dl>
+
+  <h3>Dependency rules</h3>
+  <div class="board">
+    <div class="board__head"><span>Rule</span><span>Rationale</span><span>Violation</span></div>
+    <div class="board__row">
+      <span class="board__name">UI only in .Client</span>
+      <span class="board__desc">The WASM client owns the only DI container, so a server-rendered component could not resolve <code>ImageSessionService</code> or the deserialized auth state.</span>
+      <span><span class="pill pill--critical">Fails review</span></span>
+    </div>
+    <div class="board__row">
+      <span class="board__name">No prerendering</span>
+      <span class="board__desc"><code>RenderModes.WasmNoPrerender</code> is the only mode. <code>InteractiveServer</code> breaks the contract outright.</span>
+      <span><span class="pill pill--critical">Fails review</span></span>
+    </div>
+    <div class="board__row">
+      <span class="board__name">VSA beats Onion</span>
+      <span class="board__desc">When both would apply, a feature becomes a slice. The three layer projects supply primitives, not feature homes.</span>
+      <span><span class="pill pill--critical">Fails review</span></span>
+    </div>
+    <div class="board__row">
+      <span class="board__name">Infrastructure sees no ASP.NET</span>
+      <span class="board__desc">It is a plain SDK project, so it cannot reach <code>IHttpContextAccessor</code>. Named clients it registers are re-opened by name in the host to attach correlation.</span>
+      <span><span class="pill pill--good">By construction</span></span>
+    </div>
+    <div class="board__row">
+      <span class="board__name">Centrally managed packages</span>
+      <span class="board__desc">A <code>PackageReference</code> with an inline version does not build. NuGet audit runs at <code>low</code>, so a vulnerable package breaks the build.</span>
+      <span><span class="pill pill--good">Build gate</span></span>
+    </div>
+    <div class="board__row">
+      <span class="board__name">Warnings are errors</span>
+      <span class="board__desc"><code>TreatWarningsAsErrors</code> plus <code>EnableTrimAnalyzer</code>. Three deliberate <code>IL2026</code> suppressions exist in <code>Program.cs</code>, each with a written reason.</span>
+      <span><span class="pill pill--good">Build gate</span></span>
+    </div>
+  </div>
+
+  <h3>Test capacity</h3>
+  <figure>
+    <div class="figure__body">
+      <svg class="viz" viewBox="0 0 720 268" role="img" aria-label="Test tier capacity used against each tier's method ceiling: Integration 46 of 50, Unit 91 of 100, Architecture 9 of 10, E2E UI 12 of 25, API Smoke 11 of 25. A threshold at 90 percent marks the tiers that are effectively full.">
+        <text class="viz-tick" x="627" y="12" text-anchor="end" fill="var(--warning)">&#9650; 90% &mdash; consolidate before adding</text>
+        <line x1="627" y1="18" x2="627" y2="214" stroke="var(--warning)" stroke-width="2" stroke-dasharray="4 3"/>
+
+        <line class="viz-grid" x1="281" y1="18" x2="281" y2="214"/>
+        <line class="viz-grid" x1="414" y1="18" x2="414" y2="214"/>
+        <line class="viz-grid" x1="547" y1="18" x2="547" y2="214"/>
+        <line class="viz-grid" x1="680" y1="18" x2="680" y2="214"/>
+
+        <text class="viz-label" x="138" y="36" text-anchor="end">Integration</text>
+        <rect x="148" y="22" width="489" height="20" rx="4" fill="var(--series-1)"/>
+        <text class="viz-value" x="643" y="36">46 / 50</text>
+
+        <text class="viz-label" x="138" y="76" text-anchor="end">Unit</text>
+        <rect x="148" y="62" width="484" height="20" rx="4" fill="var(--series-1)"/>
+        <text class="viz-value" x="638" y="76">91 / 100</text>
+
+        <text class="viz-label" x="138" y="116" text-anchor="end">Architecture</text>
+        <rect x="148" y="102" width="479" height="20" rx="4" fill="var(--series-1)"/>
+        <text class="viz-value" x="633" y="116">9 / 10</text>
+
+        <text class="viz-label" x="138" y="156" text-anchor="end">E2E &middot; UI</text>
+        <rect x="148" y="142" width="255" height="20" rx="4" fill="var(--series-1)"/>
+        <text class="viz-value" x="409" y="156">12 / 25</text>
+
+        <text class="viz-label" x="138" y="196" text-anchor="end">E2E &middot; ApiSmoke</text>
+        <rect x="148" y="182" width="234" height="20" rx="4" fill="var(--series-1)"/>
+        <text class="viz-value" x="388" y="196">11 / 25</text>
+
+        <line class="viz-axis" x1="148" y1="214" x2="680" y2="214"/>
+        <text class="viz-tick" x="148" y="232" text-anchor="middle">0</text>
+        <text class="viz-tick" x="281" y="232" text-anchor="middle">25%</text>
+        <text class="viz-tick" x="414" y="232" text-anchor="middle">50%</text>
+        <text class="viz-tick" x="547" y="232" text-anchor="middle">75%</text>
+        <text class="viz-tick" x="680" y="232" text-anchor="middle">100%</text>
+        <text class="viz-tick" x="414" y="254" text-anchor="middle">Share of each tier's method ceiling in use</text>
+      </svg>
+    </div>
+    <figcaption><b>Adding a test past a ceiling breaks the build.</b> Three tiers are effectively full. Integration sat at exactly 50/50 &mdash; one test from failing &mdash; until the per-rule pass/fail method pairs in <code>Contracts/</code> were folded into single theories covering both sides. Do that before reaching for the ceiling constant. A <code>[Theory]</code> counts once regardless of its <code>InlineData</code>.</figcaption>
+  </figure>
+
+  <div class="note">
+    <span class="note__title">CI runs two tiers, not five</span>
+    <p>The single workflow builds <code>PoRedoImage.slnx</code>, runs <b>Unit</b> and <b>Architecture</b>, then publishes and deploys. Integration needs Docker for Testcontainers; the two E2E tiers need a live app on :4000 plus Playwright browsers. Nothing but a local run catches a break in those three &mdash; run them before pushing anything that touches storage, auth, or a page's render path.</p>
+  </div>
+</section>
+
+<!-- ══ TIER 2 ══════════════════════════════════════════════════════ -->
+<section class="tier" data-tier="2">
+  <p class="eyebrow">Tier 2 &middot; Architectural</p>
+  <h2>C4 Level 2 &mdash; containers</h2>
+
+  <figure>
+    <div class="figure__body">
+<pre class="mermaid">
+flowchart TB
+  P(["Person with a photo"])
+  subgraph AZ["Azure — App Service (Linux) + Storage + Key Vault"]
+    WEB["PoRedoImage.Web<br/><i>BFF / API host, .NET 10</i><br/>Minimal APIs, vertical slices"]
+    CLI["PoRedoImage.Client<br/><i>Blazor WASM SPA</i><br/>served from Web's wwwroot"]
+    ST[("Azure Storage<br/>Blob + Table, Standard_LRS")]
+    KV[("Key Vault kv-poshared")]
+    AI[("Application Insights")]
+  end
+  MOB["PoRedoImage.Mobile<br/><i>MAUI Android head</i>"]
+  CV["Azure Computer Vision"]
+  OA["Azure OpenAI"]
+  GG["Google Gemini / Imagen / Lyria"]
+  OL["Ollama daemon<br/><i>local, opt-in</i>"]
+
+  P -->|"HTTPS"| CLI
+  CLI -->|"fetch, HttpOnly cookie<br/>X-CSRF-TOKEN"| WEB
+  MOB -->|"HTTP, no provider keys"| WEB
+  WEB --> ST
+  WEB -->|"DefaultAzureCredential<br/>reload every 30 min"| KV
+  WEB -->|"OpenTelemetry + Serilog"| AI
+  WEB --> CV
+  WEB --> OA
+  WEB --> GG
+  WEB -.->|"when Ollama:* is set"| OL
+</pre>
+    </div>
+    <figcaption><b>The client is a container, not a component of the host.</b> It is served by <code>.Web</code> but runs entirely in the browser with its own DI container. Local runs read the same Key Vault the deployed app does, so <code>az login</code> with <i>Key Vault Secrets User</i> is the normal development path.</figcaption>
+  </figure>
+
+  <h2>C4 Level 3 &mdash; routes mapped to endpoints</h2>
+  <figure>
+    <div class="figure__body">
+<pre class="mermaid">
+flowchart LR
+  subgraph R["Client routes (.Client/Pages)"]
+    direction TB
+    r0["/ and /style-director<br/>Studio.razor"]
+    r1["/image-regeneration"]
+    r2["/meme-generation"]
+    r3["/bulk-generate"]
+    r4["/rap-roast"]
+    r8["/video"]
+    r5["/gallery"]
+    r6["/diag"]
+    r7["/login"]
+  end
+  subgraph S["Client state (scoped, WASM)"]
+    direction TB
+    s1["ImageSessionService"]
+    s2["AiSelectionState"]
+    s3["SessionCostService"]
+    s4["PromptHistoryService"]
+    s5["UserImageSaveService"]
+  end
+  subgraph E["Server slices (.Web/Features)"]
+    direction TB
+    e1["/api/images/analyze"]
+    e2["/api/bulk-generate/*"]
+    e3["/api/rap-roast"]
+    e4["/api/user-images/*"]
+    e5["/api/meme-templates/*"]
+    e8["/api/video/*"]
+    e6["/api/pricing"]
+    e7["/api/diag"]
+  end
+  r0 --> s1
+  r1 --> e1
+  r2 --> e1
+  r3 --> e2
+  r4 --> e3
+  r8 --> e8
+  r5 --> e4
+  r6 --> e7
+  s2 -.->|"model ids on every request"| e1
+  s3 -.-> e6
+  s4 -.-> e2
+  s5 -.-> e4
+</pre>
+    </div>
+    <figcaption><b>Regeneration and Meme share one endpoint.</b> <code>ProcessingMode</code> on the request selects the branch inside <code>ImageAnalysisOrchestrator</code>. <code>AiSelectionState</code> is what turns the per-capability model picker into the <code>modelId</code> and <code>imageGenModelId</code> fields carried on each call.</figcaption>
+  </figure>
+
+  <h2>Storage relationships</h2>
+  <figure>
+    <div class="figure__body">
+<pre class="mermaid">
+erDiagram
+  USER ||--o{ USER_IMAGE_ENTITY : owns
+  USER ||--o| BULK_PROMPT : "has one set"
+  USER_IMAGE_ENTITY ||--|| IMAGE_BLOB : "addresses"
+
+  USER {
+    string NameIdentifier PK "guest|GUEST######## or dev|email or Entra sub"
+  }
+  USER_IMAGE_ENTITY {
+    string PartitionKey PK "= UserId"
+    string RowKey PK "= 32-char hex image id"
+    string FileName
+    string ContentType
+    string Kind "Original|Regeneration|Meme|BulkVariation"
+    datetime CreatedAt
+    long SizeBytes
+  }
+  IMAGE_BLOB {
+    string Name PK "userId/imageId"
+    string ContentType
+    string Metadata_Tags "comma-joined vision tags"
+  }
+  BULK_PROMPT {
+    string PartitionKey PK "literal 'prompts'"
+    string RowKey PK "= UserId"
+    string Name "= UserId"
+    string PromptText "JSON array of 10 strings"
+    datetime CreatedAt
+  }
+</pre>
+    </div>
+    <figcaption><b>There are no foreign keys, because Table Storage has none.</b> The relationship is positional: an image's blob name is <code>{PartitionKey}/{RowKey}</code>, so ownership is enforced by the partition key on every query rather than by a resource-authorization handler. Tags live as blob metadata &mdash; cheaper than widening the table and naturally scoped to the bytes themselves.</figcaption>
+  </figure>
+</section>
+
+<!-- ══ TIER 3 ══════════════════════════════════════════════════════ -->
+<section class="tier" data-tier="3">
+  <p class="eyebrow">Tier 3 &middot; Implementation</p>
+  <h2>Root routing, DI and schema</h2>
+
+  <h3>Middleware pipeline, in order</h3>
+<pre><code> 1  UseExceptionHandler("/Error") + UseHsts        // non-Development only
+ 2  UseWhen(!path.StartsWith("/api"))
+       -> UseStatusCodePagesWithReExecute("/not-found")
+       // API paths keep their real 4xx/5xx instead of a 302 to a pretty page
+ 3  UseHttpsRedirection                            // skipped in Dev and Test
+ 4  RequestContextMiddleware                       // CorrelationId, SessionId
+ 5  UseSerilogRequestLogging                       // static assets drop to Verbose
+ 6  UseRateLimiter
+ 7  UseAuthentication
+ 8  UserContextMiddleware                          // MUST follow 7 — context.User
+                                                   // is empty before it
+ 9  inline middleware: stamp AllowAnonymous on /_framework endpoints
+10  UseAuthorization                               // fail-closed FallbackPolicy
+11  UseAntiforgery                                 // arms the filter, validates
+                                                   // nothing on its own for JSON
+12  MapOpenApi().AllowAnonymous()
+    MapScalarApiReference().AllowAnonymous()
+13  MapHealthChecks("/health")  + MapHealthChecks("/alive", Predicate: _ => false)
+14  MapAntiforgery / Auth / ImageAnalysis / Diagnostics / BulkGenerate /
+    UserImage / MemeTemplate / RapRoast / Pricing / VideoGenerate endpoints
+15  GET /favicon.ico -> 301 /favicon.png
+16  Map("/api/{**rest}") -> 404          // a literal first segment outranks the
+                                          // SPA catch-all, so unknown API paths
+                                          // stay JSON instead of returning HTML
+17  MapStaticAssets().AllowAnonymous()
+18  MapRazorComponents&lt;App&gt;()
+      .AddInteractiveWebAssemblyRenderMode()
+      .AddAdditionalAssemblies(Client._Imports assembly)
+      .AllowAnonymous()</code></pre>
+
+  <h3>Client route table</h3>
+  <div class="scroll-x">
+    <table class="mono">
+      <thead><tr><th>Route</th><th>Page</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>/</td><td>Studio.razor</td><td>The board. Intake bay plus the four service rows.</td></tr>
+        <tr><td>/style-director</td><td>Studio.razor</td><td>Legacy alias kept bound rather than 410'd &mdash; direct links live inside user-shared screenshots.</td></tr>
+        <tr><td>/image-regeneration</td><td>ImageRegeneration.razor</td><td><code>ProcessingMode.ImageRegeneration</code></td></tr>
+        <tr><td>/meme-generation</td><td>MemeGeneration.razor</td><td><code>ProcessingMode.MemeGeneration</code></td></tr>
+        <tr><td>/bulk-generate</td><td>BulkGenerate.razor</td><td>Consumes the NDJSON stream</td></tr>
+        <tr><td>/rap-roast</td><td>RapRoast.razor</td><td>Renders the refusal state from <code>AudioRefused</code></td></tr>
+        <tr><td>/video</td><td>VideoGenerate.razor</td><td>Starts a Veo job, then polls its handle every 6 s for up to 8 min</td></tr>
+        <tr><td>/gallery</td><td>Gallery.razor</td><td>Authenticated</td></tr>
+        <tr><td>/diag</td><td>Diag.razor</td><td>Masked config + health entries</td></tr>
+        <tr><td>/login</td><td>Login.razor</td><td>Microsoft OAuth, plus GUEST in Dev</td></tr>
+        <tr><td>/not-found</td><td>NotFound.razor</td><td>Also carries <code>/{*MissingRoute}</code> so a mistyped page URL boots the SPA</td></tr>
+        <tr><td>/Error</td><td>Error.razor</td><td>Re-execute target for non-API paths</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Dependency injection registration</h3>
+  <div class="scroll-x">
+    <table class="mono">
+      <thead><tr><th>Registration</th><th>Lifetime</th><th>Host</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>IVisionService / Router</td><td>Singleton</td><td>Server</td><td>Clients own long-lived HTTP and SDK resources</td></tr>
+        <tr><td>IGenerativeAiService</td><td>Singleton</td><td>Server</td><td>Decorated with a memory-cache wrapper</td></tr>
+        <tr><td>IImageGenerationService / Router</td><td>Singleton</td><td>Server</td><td>Fast tier constructed inline when configured</td></tr>
+        <tr><td>IChatCompletionService</td><td>Singleton</td><td>Server</td><td>Backend chosen once, at startup</td></tr>
+        <tr><td>IMusicGenerationService</td><td>Singleton</td><td>Server</td><td>&ndash;</td></tr>
+        <tr><td>IVideoGenerationService</td><td>Singleton</td><td>Server</td><td>Long-running start/poll; no orchestrator, no router</td></tr>
+        <tr><td>ISceneDetailProvider</td><td>Singleton</td><td>Server</td><td>&ndash;</td></tr>
+        <tr><td>IBulkPromptRepository</td><td>Singleton</td><td>Server</td><td><code>TableClient</code> is thread-safe; avoids a <code>CreateIfNotExists</code> per request</td></tr>
+        <tr><td>IUserImageRepository</td><td>Singleton</td><td>Server</td><td>Blob + table clients are both thread-safe</td></tr>
+        <tr><td>IUserImageService</td><td>Scoped</td><td>Server</td><td>&ndash;</td></tr>
+        <tr><td>IImageAnalysisOrchestrator</td><td>Scoped</td><td>Server</td><td>&ndash;</td></tr>
+        <tr><td>IBulkGenerationService</td><td>Scoped</td><td>Server</td><td>Concurrency cap, per-slot failure policy</td></tr>
+        <tr><td>IRapRoastOrchestrator</td><td>Scoped</td><td>Server</td><td>&ndash;</td></tr>
+        <tr><td>SceneDescriber, RoastLyricsWriter</td><td>Transient</td><td>Server</td><td>So the scoped logger flows correctly</td></tr>
+        <tr><td>IMemeGeneratorService</td><td>Scoped</td><td>Server</td><td>ImageSharp render</td></tr>
+        <tr><td>IMemeTemplateService</td><td>Singleton</td><td>Server</td><td>Immutable catalog</td></tr>
+        <tr><td>IdempotencyKeyFilter</td><td>Scoped</td><td>Server</td><td>Holds per-request tee state</td></tr>
+        <tr><td>StartupSecretValidator</td><td>HostedService</td><td>Server</td><td>Fails the host fast, naming each unresolved secret</td></tr>
+        <tr><td>ClientRequestContext</td><td>Singleton</td><td>Client</td><td>Session id stable for the tab's lifetime</td></tr>
+        <tr><td>HttpClient</td><td>Scoped</td><td>Client</td><td>Correlation handler wraps antiforgery handler; 4 min timeout</td></tr>
+        <tr><td>ImageSessionService</td><td>Scoped</td><td>Client</td><td>Carries the photo across pages</td></tr>
+        <tr><td>AiSelectionState</td><td>Scoped</td><td>Client</td><td>Per-capability model choice</td></tr>
+        <tr><td>SessionCostService</td><td>Scoped</td><td>Client</td><td>Loads <code>/api/pricing</code> once, counts operations</td></tr>
+        <tr><td>LocalAiService</td><td>Scoped</td><td>Client</td><td>WebGPU with a WASM fallback</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The mock-mode decision is resolved in the <i>host</i> by <code>MockAiGate.IsEnabled(...)</code> and passed into <code>AddPoRedoImageInfrastructure</code>, because Infrastructure deliberately has no ASP.NET types in scope. In mock mode each concrete mock is registered once and surfaced under both its service interface <i>and</i> <code>IMockable</code>, so the client banner can enumerate reasons without constructing the service twice.</p>
+
+  <h3>Compact schema &mdash; keys only</h3>
+<pre><code>Table  UserImages
+  PartitionKey  string   = UserId                       (the ownership boundary)
+  RowKey        string   = 32-char hex GUID, "N" format
+  --------------------------------------------------------------------
+  Blob  user-images/{PartitionKey}/{RowKey}             (private container)
+        metadata["Tags"] = comma-joined vision tags
+        lifecycle rule "expire-generated-blobs-30d"
+
+Table  BulkPrompts
+  PartitionKey  string   = "prompts"                    (literal, single partition)
+  RowKey        string   = UserId                       (upsert -> one set per user)
+
+Cache  IMemoryCache
+  idem:{userId|anonymous}:{uuid}        24 h    idempotent replay body
+  vision:azure-cv|ollama|openai|gemini  sliding vision result by content hash
+
+Cache  HybridCache
+  meme-templates:catalog                process  immutable DTO projection</code></pre>
+  <p>Ids are validated by <code>UserImageId.TryParse</code>, which uses <code>Guid.TryParseExact(value, "N")</code> &mdash; that rejects braces, hyphens and every non-hex character, precisely the set that would break a blob name or a Table Storage <code>RowKey</code>. It replaced an ad-hoc regex that accepted any hex string up to 64 characters.</p>
+
+  <h3>Global payload envelopes</h3>
+<pre><code>Success        the DTO itself; no wrapper, no "data" key
+Error          RFC 9457 application/problem+json from Results.Problem(...)
+Auth rejection bare 401 / 403 with an EMPTY body — AddProblemDetails() is not
+               registered, so there is nothing to serialize
+Stream         application/x-ndjson, one BulkBatchItem per line
+Image bytes    Results.File(bytes, contentType) — raw, not base64
+Health         a bespoke anonymous projection; the deploy smoke test greps this
+               exact shape, which is why it stays anonymous rather than becoming
+               a Shared DTO the browser would never deserialize
+               { Status, Duration, Entries[{ Key, Status, Duration,
+                                             Description, Error }] }</code></pre>
+  <p>Health checks registered under the <code>ready</code> tag: <code>key-vault</code>, <code>computer-vision</code>, <code>openai</code>, <code>table-storage</code>, <code>imagen3</code>. <code>/alive</code> runs none of them &mdash; its predicate is <code>_ =&gt; false</code> &mdash; because it exists purely as a liveness gate for <code>SCRIPTS/run-e2e.ps1</code> and the deploy smoke test.</p>
+  <p>There is <b>no Veo health check</b>. Video shares <code>Google:ApiKey</code> with Imagen, so <code>imagen3</code> covers the credential, but not the Veo model id or that model's own availability. A misconfigured <code>Google:VeoModel</code> surfaces only as a 422 on a real, paid request.</p>
+</section>
+  <p class="colophon">
+    PoRedoImage engineering documentation &middot; generated 2026&#8209;09&#8209;06 from the repository at
+    <code>master</code>. Figures are read out of source, configuration and Bicep &mdash; not estimated.
+    Where the project defines no policy (latency SLOs, roles), this documentation says so rather than
+    inventing one.
+  </p>
+</main>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: dark ? 'dark' : 'neutral',
+    securityLevel: 'loose',
+    fontFamily: '"IBM Plex Sans", system-ui, sans-serif'
+  });
+</script>
 <script>
-/* Detail Switcher — cumulative disclosure.
-   1 Simple      = tier 1
-   2 Standard    = tier 1 + 2
-   3 All details = tier 1 + 2 + 3
-   Level lands on <html data-level> before first paint so nothing flashes, and
-   the choice rides along in localStorage so it survives a hop between reports. */
+/* Detail switcher — three cumulative levels.
+   1 Simple = tier 1 · 2 Standard = tier 1+2 · 3 All details = tier 1+2+3
+   Sections carry data-tier; buttons carry data-level; the level lands on <main>
+   and CSS does the collapsing. Hiding is gated behind html.docs-ready so any
+   Mermaid diagram has laid out at full width before it can be collapsed. */
 (function () {
-  var KEY = "poredoimage-detail-level";
-  var root = document.documentElement;
+  var KEY = 'poredoimage-docs-level';
+  var DEFAULT = '3';
 
   function read() {
     try {
-      var v = localStorage.getItem(KEY);
-      if (v === "1" || v === "2" || v === "3") return v;
-    } catch (e) { /* private window, blocked storage — fall through */ }
-    return "3";
+      var v = window.localStorage.getItem(KEY);
+      return (v === '1' || v === '2' || v === '3') ? v : DEFAULT;
+    } catch (e) { return DEFAULT; }
+  }
+
+  function write(v) {
+    try { window.localStorage.setItem(KEY, v); } catch (e) { /* private mode: preference just isn't kept */ }
   }
 
   function apply(level) {
-    root.setAttribute("data-level", level);
-    var btns = document.querySelectorAll(".switch button[data-level]");
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].setAttribute("aria-pressed", btns[i].getAttribute("data-level") === level ? "true" : "false");
+    var mains = document.querySelectorAll('main[data-level]');
+    for (var i = 0; i < mains.length; i++) { mains[i].setAttribute('data-level', level); }
+    var btns = document.querySelectorAll('.sw[data-level]');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].setAttribute('aria-pressed', btns[j].getAttribute('data-level') === level ? 'true' : 'false');
     }
   }
 
-  apply(read());
+  var current = read();
+  apply(current);
 
-  document.addEventListener("click", function (ev) {
-    var btn = ev.target.closest ? ev.target.closest(".switch button[data-level]") : null;
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('.sw[data-level]') : null;
     if (!btn) return;
-    var level = btn.getAttribute("data-level");
-    apply(level);
-    try { localStorage.setItem(KEY, level); } catch (e) { /* nothing to persist to */ }
+    current = btn.getAttribute('data-level');
+    apply(current);
+    write(current);
   });
 
-  document.addEventListener("DOMContentLoaded", function () { apply(root.getAttribute("data-level") || "3"); });
+  /* Report ready once every diagram has an <svg>, or after a bounded wait. */
+  function markReady() { document.documentElement.classList.add('docs-ready'); }
+
+  var diagrams = document.querySelectorAll('pre.mermaid');
+  if (!diagrams.length) {
+    markReady();
+  } else {
+    var settled = false;
+    var finish = function () { if (!settled) { settled = true; markReady(); } };
+    var check = function () {
+      for (var k = 0; k < diagrams.length; k++) {
+        if (!diagrams[k].querySelector('svg')) return;
+      }
+      finish();
+    };
+    if (window.MutationObserver) {
+      var obs = new MutationObserver(check);
+      for (var m = 0; m < diagrams.length; m++) {
+        obs.observe(diagrams[m], { childList: true, subtree: true });
+      }
+    }
+    check();
+    setTimeout(finish, 2500);
+  }
 })();
-</script>
-</head>
-<body>
-<header class="hdr">
-  <div class="hdr-in">
-    <div class="brand">
-      <span class="brand-mark"><a href="index.html" style="color:inherit;text-decoration:none">&larr; Portal</a></span>
-      <span class="brand-title">Visual Architecture</span>
-    </div>
-    <div class="switch" role="group" aria-label="Level of detail">
-      <button type="button" data-level="1" aria-pressed="false"><span class="n">1</span>Simple</button>
-      <button type="button" data-level="2" aria-pressed="false"><span class="n">2</span>Standard</button>
-      <button type="button" data-level="3" aria-pressed="true"><span class="n">3</span>All details</button>
-    </div>
-  </div>
-</header>
-
-<div class="wrap">
-
-  <div class="lede">
-    <div class="eyebrow">Report 04 &middot; Topology, boundaries and storage</div>
-    <h1>Visual Architecture</h1>
-    <p class="sub">Six projects, one of which reaches the browser; vertical slices that beat layers when
-    both would apply; and two Azure tables where a relational schema would normally sit.</p>
-  </div>
-
-  <!-- ═══ TIER 1 ═══ -->
-  <section data-tier="1">
-    <div class="sec-head"><h2>Project topology</h2><span class="tier">TIER 1</span></div>
-    <p class="sec-note">The split between the two web projects is the thing most likely to trip you up:
-    <code>.Client</code> owns every interactive page and the only <code>wwwroot</code>;
-    <code>.Web</code> is a host document plus an API surface.</p>
-
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Project</th><th>Kind</th><th>Owns</th><th>May reference</th></tr></thead>
-        <tbody>
-          <tr><td><span class="mono">PoRedoImage.Client</span></td><td>Blazor WASM</td><td>Routes, layout, every page, LocalAi, the AI picker, the session cost meter. The only assembly that ships to the browser.</td><td>Shared, Domain</td></tr>
-          <tr><td><span class="mono">PoRedoImage.Web</span></td><td>ASP.NET Core BFF</td><td>Host document, minimal APIs under <span class="mono">Features/</span>, auth, telemetry, health.</td><td>Client, Infrastructure, Application, Shared, Domain</td></tr>
-          <tr><td><span class="mono">PoRedoImage.Shared</span></td><td>Class library</td><td>DTOs, validation attributes, provider ids, config keys, the JSON resolver. <strong>Must stay trim-safe.</strong></td><td>Domain</td></tr>
-          <tr><td><span class="mono">PoRedoImage.Domain</span></td><td>Class library</td><td>Entities and service interfaces. No dependencies at all.</td><td>&mdash;</td></tr>
-          <tr><td><span class="mono">PoRedoImage.Application</span></td><td>Class library</td><td>Orchestrators and the Style Director workflow &mdash; cross-slice primitives only.</td><td>Domain, Shared</td></tr>
-          <tr><td><span class="mono">PoRedoImage.Infrastructure</span></td><td>Class library</td><td>Provider adapters, repositories, cache decorators, mocks, and all DI wiring. No ASP.NET types in scope.</td><td>Domain, Application, Shared</td></tr>
-          <tr><td><span class="mono">PoRedoImage.Mobile</span></td><td>MAUI Android</td><td>A separate solution. Talks to the same HTTP API and holds no provider keys.</td><td>Shared only</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section data-tier="1">
-    <div class="sec-head"><h2>Boundary rules</h2><span class="tier">TIER 1</span></div>
-    <p class="sec-note">Five of these are enforced by a rule registry in
-    <code>PoRedoImage.Tests.Architecture</code>, which holds a registry rather than one method per rule
-    &mdash; so the whole ruleset costs two methods against its ceiling however many rules it grows.</p>
-
-    <div class="grid g2">
-      <div class="card">
-        <div class="card-k">Rule 01</div>
-        <h3>Vertical slices beat onion layers</h3>
-        <p>A new feature is a new folder under <code>Features/</code> holding its endpoint, DTO and
-        validator &mdash; not a new class in a Domain/Application/Infrastructure trio. Those three supply
-        cross-slice primitives only.</p>
-      </div>
-      <div class="card">
-        <div class="card-k">Rule 02</div>
-        <h3>All interactive UI lives in <code>.Client</code></h3>
-        <p>Prerendering is off deliberately: the WASM client owns the only DI container &mdash;
-        <code>ImageSessionService</code>, <code>IWebAssemblyHostEnvironment</code>, the deserialized auth
-        state &mdash; so a server prerender pass could not resolve those services.
-        <code>RenderMode.InteractiveServer</code> breaks the contract.</p>
-      </div>
-      <div class="card">
-        <div class="card-k">Rule 03</div>
-        <h3>Minimal APIs only</h3>
-        <p><code>MapGroup</code> plus static handler methods. No MVC controllers anywhere in the
-        solution.</p>
-      </div>
-      <div class="card">
-        <div class="card-k">Rule 04</div>
-        <h3>No magic configuration strings</h3>
-        <p>Every key is a constant on <code>ConfigKeys</code>; prefer <code>IOptions&lt;T&gt;</code>.
-        <code>ConfigurationBinder.GetValue&lt;T&gt;</code> is banned &mdash; it trips IL2026 under the
-        trim analyzer, and warnings are errors. Use <code>ConfigValue.Bool/Float/Double</code>.</p>
-      </div>
-      <div class="card">
-        <div class="card-k">Rule 05</div>
-        <h3>Async all the way</h3>
-        <p>No <code>Task.Result</code>, no <code>.Wait()</code>.</p>
-      </div>
-      <div class="card">
-        <div class="card-k">Rule 06</div>
-        <h3>Zero waste</h3>
-        <p>Dead code is deleted in the same change that orphans it. Four parallel &ldquo;canonical&rdquo;
-        auth routes were removed rather than migrated to, because nothing in <code>src/</code> or
-        <code>tests/</code> ever called them.</p>
-      </div>
-    </div>
-  </section>
-
-  <section data-tier="1">
-    <div class="sec-head"><h2>Test tiers and headroom</h2><span class="tier">TIER 1</span></div>
-    <p class="sec-note">Five tiers, each with a hard method ceiling asserted by a meta-test in its own
-    assembly. Adding a test past a ceiling breaks the build &mdash; the intent is that you consolidate
-    rather than raise the number quietly. A <code>[Theory]</code> counts once regardless of how many
-    <code>InlineData</code> rows it carries.</p>
-
-    <div class="chart">
-      <h4>Ceiling consumed, by tier</h4>
-      <div class="sub">Percentage of each tier's own ceiling. Unit and Integration are the tight ones:
-      Integration sat at exactly 50 of 50 &mdash; one test from breaking the build &mdash; until the
-      per-rule pass/fail method pairs were folded into single theories covering both sides.</div>
-      <div class="chart-body">
-        <svg viewBox="0 0 760 202" width="760" role="img" aria-label="Percentage of each test tier's method ceiling consumed. Unit 95 of 100. Integration 45 of 50. Architecture 8 of 10. E2E UI 11 of 25. E2E ApiSmoke 10 of 25.">
-          <g>
-            <line class="gridline" x1="310" y1="22" x2="310" y2="182"></line>
-            <line class="gridline" x1="420" y1="22" x2="420" y2="182"></line>
-            <line class="gridline" x1="530" y1="22" x2="530" y2="182"></line>
-            <text class="tick" x="200" y="14" text-anchor="middle">0</text>
-            <text class="tick" x="310" y="14" text-anchor="middle">25%</text>
-            <text class="tick" x="420" y="14" text-anchor="middle">50%</text>
-            <text class="tick" x="530" y="14" text-anchor="middle">75%</text>
-            <text class="tick" x="640" y="14" text-anchor="middle">ceiling</text>
-            <line class="baseline" x1="200" y1="182" x2="200" y2="22"></line>
-            <line class="baseline" x1="640" y1="182" x2="640" y2="22" stroke-dasharray="4 3"></line>
-          </g>
-          <g>
-            <text class="lab" x="182" y="51" text-anchor="end">Unit</text>
-            <rect x="200" y="40" width="440" height="14" rx="3" fill="var(--grid)"></rect>
-            <rect x="200" y="40" width="418" height="14" rx="3" fill="var(--s1)"></rect>
-            <text class="val" x="652" y="51">95 / 100</text>
-
-            <text class="lab" x="182" y="81" text-anchor="end">Integration</text>
-            <rect x="200" y="70" width="440" height="14" rx="3" fill="var(--grid)"></rect>
-            <rect x="200" y="70" width="396" height="14" rx="3" fill="var(--s1)"></rect>
-            <text class="val" x="652" y="81">45 / 50</text>
-
-            <text class="lab" x="182" y="111" text-anchor="end">Architecture</text>
-            <rect x="200" y="100" width="440" height="14" rx="3" fill="var(--grid)"></rect>
-            <rect x="200" y="100" width="352" height="14" rx="3" fill="var(--s1)"></rect>
-            <text class="val" x="652" y="111">8 / 10</text>
-
-            <text class="lab" x="182" y="141" text-anchor="end">E2E &middot; UI</text>
-            <rect x="200" y="130" width="440" height="14" rx="3" fill="var(--grid)"></rect>
-            <rect x="200" y="130" width="194" height="14" rx="3" fill="var(--s1)"></rect>
-            <text class="val" x="652" y="141">11 / 25</text>
-
-            <text class="lab" x="182" y="171" text-anchor="end">E2E &middot; ApiSmoke</text>
-            <rect x="200" y="160" width="440" height="14" rx="3" fill="var(--grid)"></rect>
-            <rect x="200" y="160" width="176" height="14" rx="3" fill="var(--s1)"></rect>
-            <text class="val" x="652" y="171">10 / 25</text>
-          </g>
-        </svg>
-      </div>
-      <div class="legend">
-        <span><i style="background:var(--s1)"></i>Methods in the assembly</span>
-        <span><i style="background:var(--grid)"></i>Remaining headroom</span>
-      </div>
-    </div>
-
-    <div style="height:22px"></div>
-
-    <div class="degrade">
-      <div class="card-k">What CI actually runs</div>
-      <p>Unit and Architecture only. Integration needs Docker for the Testcontainers Azurite instance;
-      both E2E tiers need a live app on port 4000 plus Playwright browsers. Nothing but a local run
-      catches a break in those three &mdash; so run them before pushing anything that touches storage,
-      auth, or a page's render path. CI does build the whole solution, so a test-only compile break is
-      still caught.</p>
-    </div>
-  </section>
-
-  <!-- ═══ TIER 2 ═══ -->
-  <section data-tier="2">
-    <div class="sec-head"><h2>C4 level 2 &mdash; containers</h2><span class="tier">TIER 2</span></div>
-
-    <div class="diagram">
-<pre class="mermaid">flowchart TB
-  subgraph browser["Browser"]
-    SPA["`PoRedoImage.Client
-Blazor WASM · the only wwwroot
-WebGPU local models`"]
-  end
-  subgraph appservice["Azure App Service · Linux · :8080"]
-    HOST["`PoRedoImage.Web
-host document + minimal APIs`"]
-    APP["`Application
-orchestrators · Style Director`"]
-    INF["`Infrastructure
-adapters · repositories · caches`"]
-    DOM["`Domain
-entities + interfaces`"]
-    SHR["`Shared
-DTOs · trim-safe`"]
-  end
-  subgraph data["Azure Storage"]
-    BLOB[("`Blob
-user-images`")]
-    TBL[("`Tables
-UserImages · BulkPrompts`")]
-  end
-  EXT["`AI providers
-Azure CV · Azure OpenAI
-Gemini · Lyria · Veo`"]
-  SPA -- "HTTPS · cookie · same origin" --> HOST
-  SPA -. "DTOs + validators" .-> SHR
-  HOST --> APP
-  HOST --> INF
-  APP --> DOM
-  INF --> DOM
-  INF --> BLOB
-  INF --> TBL
-  INF --> EXT
-  HOST --> SHR</pre>
-    </div>
-  </section>
-
-  <section data-tier="2">
-    <div class="sec-head"><h2>C4 level 3 &mdash; routes to endpoints</h2><span class="tier">TIER 2</span></div>
-    <p class="sec-note">Client pages on the left, the slice they call on the right. Studio is the hub;
-    every result panel can hand its output to any other feature.</p>
-
-    <div class="diagram">
-<pre class="mermaid">flowchart LR
-  subgraph pages["Client pages"]
-    ST["/ Studio"]
-    IR["/image-regeneration"]
-    MG["/meme-generation"]
-    BG["/bulk-generate"]
-    RR["/rap-roast"]
-    SD["/style-director"]
-    VD["/video"]
-    GA["/gallery"]
-    DG["/diag"]
-    LG["/login"]
-  end
-  subgraph state["Client state"]
-    IS["`ImageSessionService
-the active image`"]
-    AS["`AiSelectionState
-per-capability picker`"]
-    SC["`SessionCostService
-running estimate`"]
-  end
-  subgraph api["Minimal API slices"]
-    A1["/api/images/analyze"]
-    A2["/api/bulk-generate/*"]
-    A3["/api/rap-roast"]
-    A4["/api/style-director/run"]
-    A5["/api/video/*"]
-    A6["/api/meme-templates/*"]
-    A7["/api/user-images/*"]
-    A8["/api/pricing"]
-    A9["/api/diag"]
-  end
-  ST --> IS
-  IR --> A1
-  MG --> A1
-  MG --> A6
-  BG --> A2
-  RR --> A3
-  SD --> A4
-  VD --> A5
-  GA --> A7
-  DG --> A9
-  IS -.-> IR
-  IS -.-> MG
-  IS -.-> BG
-  IS -.-> RR
-  IS -.-> SD
-  IS -.-> VD
-  AS -.-> A1
-  A8 --> SC</pre>
-    </div>
-  </section>
-
-  <section data-tier="2">
-    <div class="sec-head"><h2>Storage model</h2><span class="tier">TIER 2</span></div>
-    <p class="sec-note">There is no relational database and no ORM. Two Azure Tables carry metadata, one
-    Blob container carries bytes, and the &ldquo;join&rdquo; is the composite blob name
-    <code>{userId}/{imageId}</code> &mdash; the same two values that are the table's partition and row
-    keys.</p>
-
-    <div class="diagram">
-<pre class="mermaid">erDiagram
-  USER_IMAGES {
-    string PartitionKey PK "userId"
-    string RowKey       PK "imageId — 32-char hex GUID"
-    string FileName
-    string ContentType
-    string Kind         "Original | Regeneration | Meme | BulkVariation"
-    datetime CreatedAt
-    long   SizeBytes
-    datetime Timestamp  "table-managed"
-  }
-  IMAGE_BLOB {
-    string Name         PK "userId/imageId"
-    binary Content
-    string ContentType  "blob HTTP header"
-    string Tags         "metadata — comma-joined vision tags"
-  }
-  BULK_PROMPTS {
-    string PartitionKey PK "literal 'prompts'"
-    string RowKey       PK "userId — one row per user"
-    string Name            "userId"
-    string PromptText      "JSON array of exactly 10 prompts"
-    datetime CreatedAt
-  }
-  USER_IMAGES ||--|| IMAGE_BLOB : "named by userId/imageId"
-  BULK_PROMPTS ||--o{ USER_IMAGES : "same userId, no enforced key"</pre>
-    </div>
-
-    <div style="height:22px"></div>
-
-    <div class="grid g2">
-      <div class="card">
-        <div class="card-k">Why tags live on the blob</div>
-        <p>Vision tags ride as blob metadata rather than widening the table schema. They are naturally
-        scoped to the bytes and survive a read-back without a second round trip. Values are stripped to
-        the HTTP header grammar on the way in &mdash; commas inside a tag become semicolons.</p>
-      </div>
-      <div class="card">
-        <div class="card-k">Lifecycle</div>
-        <p>Generated blobs expire on a 30-day management policy. Both clients create their container or
-        table on first use behind a <code>SemaphoreSlim</code>, and both degrade to a no-op with a
-        warning when <code>Storage:ConnectionString</code> is empty &mdash; the gallery simply
-        disappears rather than crashing the host.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ TIER 3 ═══ -->
-  <section data-tier="3">
-    <div class="sec-head"><h2>Root routing architecture</h2><span class="tier">TIER 3</span></div>
-    <p class="sec-note">Mapping order in <code>Program.cs</code>, and the two precedence rules that make
-    it work.</p>
-
-<pre class="code"><i>// documentation, public — the fallback policy would otherwise gate these</i>
-app.MapOpenApi().AllowAnonymous();
-app.MapScalarApiReference().AllowAnonymous();
-
-<i>// health — /health runs the five ready checks, /alive runs none</i>
-app.MapHealthChecks("/health", …).AllowAnonymous();
-app.MapHealthChecks("/alive", new { Predicate = _ =&gt; false }).AllowAnonymous();
-
-<i>// the eleven vertical slices</i>
-app.MapAntiforgeryEndpoints();   app.MapAuthEndpoints();
-app.MapImageAnalysisEndpoints(); app.MapDiagnosticsEndpoints();
-app.MapBulkGenerateEndpoints();  app.MapUserImageEndpoints();
-app.MapMemeTemplateEndpoints();  app.MapStyleDirectorEndpoints();
-app.MapRapRoastEndpoints();      app.MapVideoGenerateEndpoints();
-app.MapPricingEndpoints();
-
-app.MapGet("/favicon.ico", () =&gt; Results.Redirect("/favicon.png", permanent: true));
-
-<em>// unknown /api paths stay JSON 404s. NotFound.razor carries a catch-all @page so a
-// mistyped PAGE url boots the SPA and renders the board's Not Found screen — that
-// catch-all would otherwise swallow /api/does-not-exist and answer with an HTML
-// document. This route wins because a literal first segment outranks a catch-all.</em>
-app.Map("/api/{**rest}", () =&gt; Results.NotFound()).AllowAnonymous();
-
-<i>// static assets and the SPA host shell must load for anonymous users, so the
-// client-side /login page can render at all</i>
-app.MapStaticAssets().AllowAnonymous();
-app.MapRazorComponents&lt;App&gt;()
-   .<b>AddInteractiveWebAssemblyRenderMode()</b>
-   .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly)
-   .AllowAnonymous();</pre>
-
-    <div style="height:22px"></div>
-
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Client route</th><th>Component</th><th>Note</th></tr></thead>
-        <tbody>
-          <tr><td><span class="mono">/</span></td><td>Studio</td><td>The board &mdash; feature cards rendered from <span class="mono">FeatureCatalog</span></td></tr>
-          <tr><td><span class="mono">/image-regeneration</span></td><td>ImageRegeneration</td><td rowspan="6">All six inherit <span class="mono">FeaturePageBase</span> &mdash; shared intake, tag extraction, and the &ldquo;send result to&hellip;&rdquo; row</td></tr>
-          <tr><td><span class="mono">/meme-generation</span></td><td>MemeGeneration</td></tr>
-          <tr><td><span class="mono">/bulk-generate</span></td><td>BulkGenerate</td></tr>
-          <tr><td><span class="mono">/rap-roast</span></td><td>RapRoast</td></tr>
-          <tr><td><span class="mono">/style-director</span></td><td>StyleDirector</td></tr>
-          <tr><td><span class="mono">/video</span></td><td>VideoGenerate</td></tr>
-          <tr><td><span class="mono">/gallery</span></td><td>Gallery</td><td>Lists <span class="mono">/api/user-images</span></td></tr>
-          <tr><td><span class="mono">/diag</span></td><td>Diag</td><td>Masked configuration + live health</td></tr>
-          <tr><td><span class="mono">/login</span></td><td>Login</td><td>Microsoft OAuth, and GUEST in Dev/Test</td></tr>
-          <tr><td><span class="mono">/not-found</span> and <span class="mono">/{*MissingRoute}</span></td><td>NotFound</td><td>The catch-all that makes a mistyped page URL boot the SPA</td></tr>
-          <tr><td><span class="mono">/Error</span></td><td>Error</td><td>Re-executed for non-API paths only, so API calls keep their real status codes</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section data-tier="3">
-    <div class="sec-head"><h2>Dependency injection registration</h2><span class="tier">TIER 3</span></div>
-
-    <div class="grid g2">
-      <div>
-        <h4 style="margin-bottom:10px">Server &mdash; <span class="mono">Web/Program.cs</span></h4>
-<pre class="code">AddRazorComponents()
-  .AddInteractiveWebAssemblyComponents()
-  .<b>AddAuthenticationStateSerialization()</b>   <i>// claims only, never tokens</i>
-AddRadzenComponents()
-AddOpenApi()
-AddAntiforgery(HeaderName = <b>"X-CSRF-TOKEN"</b>, HttpOnly, SameSite=Strict)
-ConfigureHttpJsonOptions(<b>SharedJsonOptions.CreateResolver()</b>)
-AddOptions&lt;OpenAiOptions&gt;().ValidateOnStart()
-AddOptions&lt;StorageOptions&gt;().ValidateOnStart()
-Configure&lt;AiPricingOptions&gt;()
-AddHostedService&lt;<b>StartupSecretValidator</b>&gt;()      <i>// fail fast, names each secret</i>
-AddMemoryCache() · AddHybridCache() · AddScoped&lt;IdempotencyKeyFilter&gt;()
-AddRateLimiter("ai-endpoints" — sliding, 10/min per user)
-AddHealthChecks() ×5 tagged "ready"
-AddHttpClient("BffApi").AddStandardResilienceHandler(…)
-<b>AddPoRedoImageInfrastructure(config, useMockAi)</b>
-AddHttpClient("Ollama" | "GeminiApi")
-  .AddHttpMessageHandler&lt;OutboundCorrelationHandler&gt;()
-<b>AddPoRedoImageAuth(config, environment)</b></pre>
-      </div>
-      <div>
-        <h4 style="margin-bottom:10px">Browser &mdash; <span class="mono">Client/Program.cs</span></h4>
-<pre class="code">AddSingleton&lt;ClientRequestContext&gt;()      <i>// stable per-tab session id</i>
-AddScoped&lt;HttpClient&gt;(correlation → antiforgery → fetch)
-AddRadzenComponents()
-AddScoped&lt;<b>ImageSessionService</b>&gt;()        <i>// the active image</i>
-AddScoped&lt;LocalAiService&gt;()               <i>// WebGPU, workers disposed per circuit</i>
-AddScoped&lt;<b>AiSelectionState</b>&gt;()           <i>// session-only, resets on reload</i>
-AddScoped&lt;AudioFeedbackService&gt;()         <i>// synthesized, zero asset cost</i>
-AddScoped&lt;UserImageSaveService&gt;()         <i>// idempotency key + retry toast</i>
-AddScoped&lt;PromptHistoryService&gt;()         <i>// localStorage</i>
-AddScoped&lt;<b>SessionCostService</b>&gt;()         <i>// seeded from GET /api/pricing</i>
-AddAuthorizationCore()
-AddCascadingAuthenticationState()
-<b>AddAuthenticationStateDeserialization()</b>
-
-<i>// startup probe — anonymous, 3 s timeout, failures swallowed</i>
-GET api/diag/mock-status → IMockable per reason → the mock banner</pre>
-        <div class="cap">The provider selection is deliberately session-only: a persisted choice could
-        strand a user on a provider that has since been removed.</div>
-      </div>
-    </div>
-
-    <div style="height:22px"></div>
-
-    <div class="degrade">
-      <div class="card-k">Three deliberate IL2026 suppressions</div>
-      <p>Warnings are errors solution-wide, and the trim analyzer is on. The options-binding suppression
-      is the load-bearing one: those option types use <code>init</code>-only properties, which the
-      configuration binding source generator cannot assign &mdash; enabling it silently binds every
-      value to empty and the host fail-fasts at startup. The other two are the Razor component
-      registration and the anonymous health payload.</p>
-    </div>
-  </section>
-
-  <section data-tier="3">
-    <div class="sec-head"><h2>Compact storage schema</h2><span class="tier">TIER 3</span></div>
-    <p class="sec-note">Keys only. Every query is a partition scan or a point read &mdash; there is no
-    secondary index and none is needed at this scale.</p>
-
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Store</th><th>Partition key</th><th>Row key / name</th><th>Access pattern</th></tr></thead>
-        <tbody>
-          <tr>
-            <td>Table <span class="mono">UserImages</span></td>
-            <td><span class="mono">userId</span></td>
-            <td><span class="mono">imageId</span> &mdash; 32-char hex GUID</td>
-            <td><span class="mono">PartitionKey eq '{userId}'</span> then ordered by <span class="mono">CreatedAt</span> descending in memory; point read for a single image.</td>
-          </tr>
-          <tr>
-            <td>Blob <span class="mono">user-images</span></td>
-            <td colspan="2"><span class="mono">{userId}/{imageId}</span> &mdash; the two table keys, concatenated</td>
-            <td>Point read, streamed straight to the response by <span class="mono">Results.File</span>. Container access is <span class="mono">None</span> &mdash; no anonymous blob reads.</td>
-          </tr>
-          <tr>
-            <td>Table <span class="mono">BulkPrompts</span></td>
-            <td><span class="mono">"prompts"</span> &mdash; a literal</td>
-            <td><span class="mono">userId</span></td>
-            <td>One row per user, upserted whole. The ten prompts are a serialised JSON array in a single column.</td>
-          </tr>
-          <tr>
-            <td>In-process caches</td>
-            <td colspan="2"><span class="mono">vision:{backend}:{sha256}</span> &middot; <span class="mono">idem:{userId}:{key}</span> &middot; <span class="mono">meme-templates:catalog</span></td>
-            <td>Vision 6&nbsp;h; idempotency 24&nbsp;h; the template catalogue is immutable for the process lifetime and held in <span class="mono">HybridCache</span> for its stampede protection.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div style="height:22px"></div>
-
-    <div class="degrade">
-      <div class="card-k">Why <code>UserImageId</code> is a struct, not a string</div>
-      <p>The value doubles as both the Table row key and the blob name, so it must stay free of the
-      characters those stores reject &mdash; <code>Guid.TryParseExact</code> with the <code>"N"</code>
-      format rejects braces, hyphens and any non-hex character, which is precisely that set. Modelling
-      it as a <code>readonly record struct</code> costs no allocation while making it impossible to pass
-      a <code>userId</code> where an image id is expected; the two were previously both bare strings
-      sitting next to each other in every repository signature.</p>
-    </div>
-  </section>
-
-  <div class="foot">
-    <span>Report 04 &mdash; Visual Architecture</span>
-    <span><a href="index.html">Back to the portal</a></span>
-    <span>Test counts read from the assemblies on 2026-09-06</span>
-  </div>
-</div>
-<script type="module">
-/* Mermaid, themed from the page's own tokens and re-rendered when the viewer's
-   theme flips — a diagram initialised once against the light palette is
-   unreadable on the dark ground, which is the whole reason this re-runs. */
-import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-
-const sources = new Map();
-document.querySelectorAll("pre.mermaid").forEach((el, i) => {
-  el.id = el.id || "mmd-" + i;
-  sources.set(el.id, el.textContent);
-});
-
-function tok(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
-async function draw() {
-  const ink = tok("--ink"), ink2 = tok("--ink-2"), rule = tok("--rule");
-  const surface = tok("--surface"), surface2 = tok("--surface-2"), accent = tok("--safelight");
-
-  mermaid.initialize({
-    startOnLoad: false,
-    // "strict" disables HTML labels, which silently drops every <br/> in a node
-    // label and runs the lines together. The diagram sources here are authored in
-    // this file, not user input, so loose + htmlLabels is the correct trade.
-    securityLevel: "loose",
-    flowchart: { htmlLabels: true, useMaxWidth: true, curve: "basis", padding: 12 },
-    sequence: { useMaxWidth: true, wrap: true, width: 160 },
-    er: { useMaxWidth: true },
-    // A system monospace stack, deliberately NOT the page's webfont: mermaid sizes
-    // every label box by measuring text at render time, and a webfont that lands
-    // afterwards is wider than the fallback it measured — which clips node labels
-    // and subgraph titles with no error.
-    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-    theme: "base",
-    themeVariables: {
-      background: surface,
-      primaryColor: surface2,
-      primaryTextColor: ink,
-      primaryBorderColor: rule,
-      secondaryColor: surface,
-      tertiaryColor: surface,
-      lineColor: ink2,
-      textColor: ink,
-      mainBkg: surface2,
-      nodeBorder: rule,
-      clusterBkg: "transparent",
-      clusterBorder: rule,
-      titleColor: ink,
-      edgeLabelBackground: surface,
-      actorBkg: surface2,
-      actorBorder: rule,
-      actorTextColor: ink,
-      actorLineColor: ink2,
-      signalColor: ink2,
-      signalTextColor: ink2,
-      labelBoxBkgColor: surface2,
-      labelBoxBorderColor: accent,
-      labelTextColor: ink,
-      loopTextColor: ink2,
-      noteBkgColor: surface2,
-      noteBorderColor: accent,
-      noteTextColor: ink2,
-      sequenceNumberColor: surface,
-      activationBkgColor: surface2,
-      activationBorderColor: ink2,
-      altBackground: surface2
-    }
-  });
-
-  for (const [id, src] of sources) {
-    const host = document.getElementById(id);
-    if (!host) continue;
-    try {
-      const { svg } = await mermaid.render(id + "-svg-" + Date.now(), src);
-      host.innerHTML = svg;
-      host.removeAttribute("data-processed");
-    } catch (err) {
-      host.textContent = src;
-    }
-  }
-}
-
-(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(draw);
-
-const mq = window.matchMedia("(prefers-color-scheme: dark)");
-mq.addEventListener("change", draw);
-new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 </script>
 </body>
 </html>

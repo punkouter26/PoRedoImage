@@ -1,19 +1,8 @@
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Components.Forms;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using PoRedoImage.Client.LocalAi;
-using PoRedoImage.Client.Models;
-using PoRedoImage.Client.Services;
-using PoRedoImage.Client.Shared;
-using PoRedoImage.Domain.Entities;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Json;
 using Radzen;
-using Radzen.Blazor;
 
 namespace PoRedoImage.Client.Pages;
 
@@ -21,10 +10,10 @@ namespace PoRedoImage.Client.Pages;
 /// Code-behind for <c>VideoGenerate.razor</c> — the image-to-video feature.
 /// </summary>
 /// <remarks>
-/// The server starts a Veo job and hands back the provider's operation handle; this page then polls
-/// <c>GET /api/video/status</c> until the clip is ready. It is not a blocking call because a Veo
-/// render takes one to five minutes and Azure App Service drops an idle HTTP request at ~230
-/// seconds — a single long request would work locally and fail in production.
+/// The server starts a Veo job and hands back the provider's operation handle; this page then
+/// polls <c>GET /api/video/status</c> until the clip is ready. It is not a blocking call because
+/// a Veo render takes 1–5 minutes and Azure App Service drops an idle HTTP request at ~230
+/// seconds — a single long request would pass locally and fail in production.
 /// </remarks>
 public partial class VideoGenerate : IDisposable
 {
@@ -32,20 +21,15 @@ public partial class VideoGenerate : IDisposable
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(6);
 
     /// <summary>
-    /// Give up after this long. Veo's own guidance is one to five minutes; eight is generous enough
-    /// that a slow-but-healthy render still lands, while still ending rather than polling forever.
+    /// Give up after this long. Veo's own guidance is 1–5 minutes; eight is generous enough that
+    /// a slow-but-healthy render still lands, while still ending rather than polling forever.
     /// </summary>
     private static readonly TimeSpan PollTimeout = TimeSpan.FromMinutes(8);
 
     private string _prompt = string.Empty;
     private string? _videoUrl;
     private CancellationTokenSource? _pollCts;
-
-    /// <summary>
-    /// Unlike the other feature pages, an image alone is not enough — Veo needs to be told what
-    /// should happen, and an empty prompt produces a clip that ignores the user's intent.
-    /// </summary>
-    private bool CanCreateVideo => canProcessImage && !string.IsNullOrWhiteSpace(_prompt);
+    private bool _disposed;
 
     private async Task CreateVideo()
     {
@@ -139,7 +123,7 @@ public partial class VideoGenerate : IDisposable
             if (!string.IsNullOrWhiteSpace(status.ErrorMessage) || string.IsNullOrWhiteSpace(status.VideoData))
             {
                 // Always name the reason. A video that just fails to appear reads as the app being
-                // broken, which is the same silent-degradation trap the AI fallbacks guard against.
+                // broken — the same silent-degradation trap the AI fallbacks guard against.
                 errorMessage = status?.ErrorMessage ?? "The video service returned no clip.";
                 isProcessing = false;
                 return;
@@ -165,7 +149,23 @@ public partial class VideoGenerate : IDisposable
         isProcessing = false;
     }
 
-    private bool _disposed;
+    /// <summary>
+    /// Triggers a browser download of the rendered clip. The video bytes arrived base64-encoded in
+    /// the polling response; reconstitute them on the client and hand the resulting blob URL to the
+    /// browser so the user gets a real .mp4 file rather than a navigation to a data: URI.
+    /// </summary>
+    private async Task DownloadVideoAsync()
+    {
+        if (string.IsNullOrEmpty(_videoUrl)) return;
+        try
+        {
+            await Js.InvokeVoidAsync("poVideo.downloadFromDataUri", _videoUrl, "poredoimage.mp4");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Video download failed");
+        }
+    }
 
     public void Dispose()
     {

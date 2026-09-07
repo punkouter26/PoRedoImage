@@ -63,12 +63,21 @@ public class ImageAnalysisEndpointTests : IClassFixture<MockedServicesWebApplica
         using var doc = JsonDocument.Parse(content);
         var root = doc.RootElement;
 
-        // In ImageRegeneration mode, the description is replaced by the enhanced version from OpenAI
-        Assert.Equal("An enhanced detailed description of the image", root.GetProperty("description").GetString());
+        // In ImageRegeneration mode the description is the prompt the generator drew from, and it
+        // must come from the vision pass that actually read the image — not from
+        // EnhanceDescriptionAsync, which only ever sees Computer Vision's tag-join and whose output
+        // ("An enhanced detailed description of the image") is now the degraded fallback.
+        Assert.Equal(
+            MockedServicesWebApplicationFactory.ReproductionPromptText,
+            root.GetProperty("description").GetString());
         Assert.True(root.GetProperty("tags").GetArrayLength() > 0);
 
-        // Verify enhanced description from OpenAI flows through
-        Assert.NotNull(root.GetProperty("description").GetString());
+        // The fallback notice is the user's only signal that the prompt was written blind, so its
+        // absence here is part of the contract, not incidental. Null is omitted from the payload
+        // entirely, so "no property" and "property is null" both mean no degradation.
+        Assert.True(
+            !root.TryGetProperty("descriptionFallbackReason", out var reason)
+            || reason.ValueKind == JsonValueKind.Null);
 
         // Verify regenerated image is present
         Assert.NotNull(root.GetProperty("regeneratedImageData").GetString());
@@ -180,6 +189,11 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
             ReplaceService<IVisionServiceRouter>(services, new SingleVisionServiceRouter(mockVision));
             ReplaceService<IGenerativeAiService>(services, CreateMockOpenAI());
             ReplaceService<IMemeGeneratorService>(services, CreateMockMemeGenerator());
+            // Writes the image-generation prompt for the regeneration branch. Like the routers above
+            // it is a constructor dependency of the orchestrator, so leaving it out does not merely
+            // change behaviour — the real AzureOpenAiChatCompletionService gets constructed and trips
+            // its own Mocks:UseMockAi guard before the endpoint runs at all.
+            ReplaceService<IChatCompletionService>(services, CreateMockChat());
 
             var mockImagen3 = CreateMockImagen3();
             ReplaceService<IImageGenerationService>(services, mockImagen3);
@@ -234,6 +248,26 @@ public class MockedServicesWebApplicationFactory : WebApplicationFactory<Program
 
         return mock.Object;
     }
+
+    /// <summary>
+    /// Stands in for the vision-language pass that writes the reproduction prompt. Returns something
+    /// no other mock in this file could have produced, so a test asserting on the description proves
+    /// the prompt came from the model that looked at the image rather than from the tag-derived
+    /// <see cref="IGenerativeAiService.EnhanceDescriptionAsync"/> fallback.
+    /// </summary>
+    internal static IChatCompletionService CreateMockChat()
+    {
+        var mock = new Mock<IChatCompletionService>();
+        mock.SetupGet(s => s.IsConfigured).Returns(true);
+        mock.Setup(s => s.CompleteAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChatCompletionResult(ReproductionPromptText, 300, 400L));
+        return mock.Object;
+    }
+
+    /// <summary>The prompt <see cref="CreateMockChat"/> writes; asserted on by the regeneration test.</summary>
+    internal const string ReproductionPromptText =
+        "candid photograph, a tabby cat sitting on a windowsill, soft afternoon backlight";
 
     private static IMemeGeneratorService CreateMockMemeGenerator()
     {
@@ -357,6 +391,10 @@ public class ThrowingComputerVisionWebApplicationFactory : WebApplicationFactory
             MockedServicesWebApplicationFactory.ReplaceService<IImageGenerationRouter>(
                 services, new SingleImageGenerationRouter(throwingTestImagen3));
             MockedServicesWebApplicationFactory.ReplaceService<IMemeGeneratorService>(services, Mock.Of<IMemeGeneratorService>());
+            // Same eager-construction reason as the routers above: the prompt writer is built with
+            // the orchestrator, before vision throws.
+            MockedServicesWebApplicationFactory.ReplaceService<IChatCompletionService>(
+                services, MockedServicesWebApplicationFactory.CreateMockChat());
         });
 
         return base.CreateHost(builder);
@@ -472,6 +510,8 @@ public class RealImageGenRouterWebApplicationFactory : WebApplicationFactory<Pro
                     It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(("An enhanced detailed description of the image", 120, 250L));
             MockedServicesWebApplicationFactory.ReplaceService<IGenerativeAiService>(services, mockOpenAi.Object);
+            MockedServicesWebApplicationFactory.ReplaceService<IChatCompletionService>(
+                services, MockedServicesWebApplicationFactory.CreateMockChat());
 
             // The two arms the real router picks between. Only their generated bytes differ, so a
             // test assertion on the response body proves which one actually ran.

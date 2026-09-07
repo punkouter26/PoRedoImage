@@ -21,7 +21,7 @@ public class ImageAnalysisResponse
     /// </summary>
     /// <remarks>
     /// Mirrors <c>RapRoastResponse.DescriptionFallbackReason</c> and
-    /// <c>StyleDirectorResponse.FallbackReason</c>. Image analysis is the app's primary flow and was
+    /// <c>RapRoastResponse.DescriptionFallbackReason</c>. Image analysis is the app's primary flow and was
     /// the one degrading silently: on a region without Caption support every single request returned
     /// tag-derived text with no indication the photo was never described, which reads to the user as
     /// "the AI ignored my photo".

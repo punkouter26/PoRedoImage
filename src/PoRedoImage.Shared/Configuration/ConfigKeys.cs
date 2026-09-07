@@ -5,9 +5,7 @@
 /// </summary>
 /// <remarks>
 /// These were previously 74 string literals spread across the Web and Infrastructure projects, where
-/// a typo produced a silent null rather than a compile error and drift went unnoticed — the
-/// <see cref="ComputerVisionApiKey"/> / <see cref="ComputerVisionKeyLegacy"/> pair below is exactly
-/// that kind of divergence, caught only because it was collected here.
+/// a typo produced a silent null rather than a compile error and drift went unnoticed.
 /// <para>
 /// Lives in Shared because both Web (a Web SDK project) and Infrastructure (a plain SDK project)
 /// need it, and Infrastructure cannot reference Web. Options classes still exist for the sections
@@ -46,13 +44,6 @@ public static class ConfigKeys
 
     // ── Azure Computer Vision ───────────────────────────────────────────
     public const string ComputerVisionApiKey = "ComputerVision:ApiKey";
-
-    /// <summary>
-    /// Legacy alias for <see cref="ComputerVisionApiKey"/>. Read sites use
-    /// <c>ApiKey ?? Key</c> so pre-existing configuration under either spelling keeps working; the Key Vault mapping and
-    /// <c>infra/main.bicep</c> only ever provision the <c>ApiKey</c> form.
-    /// </summary>
-    public const string ComputerVisionKeyLegacy = "ComputerVision:Key";
 
     public const string ComputerVisionEndpoint = "ComputerVision:Endpoint";
     public const string ComputerVisionMinTagConfidence = "ComputerVision:MinTagConfidence";

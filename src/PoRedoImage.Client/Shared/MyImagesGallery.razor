@@ -13,7 +13,11 @@
         <div class="gallery-bar__scroll" role="list" aria-label="Loading gallery">
             @for (int i = 0; i < 4; i++)
             {
-                <div class="gallery-thumb gallery-thumb--skeleton shimmer-anim" aria-label="Loading..."></div>
+                // Skeletons are placeholder thumbnails. role="listitem" satisfies axe's
+                // aria-required-children check on the parent role="list"; aria-hidden keeps
+                // a generic placeholder from polluting the accessibility tree (the parent
+                // aria-busy="true" already announces the loading state).
+                <div class="gallery-thumb gallery-thumb--skeleton shimmer-anim" role="listitem" aria-hidden="true"></div>
             }
         </div>
     </div>

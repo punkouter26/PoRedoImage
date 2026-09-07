@@ -24,8 +24,15 @@ namespace PoRedoImage.Client.Pages;
 public partial class RapRoast : FeaturePageBase
 {
     private RapRoastResponse? _result;
-    private RapStyle _style = RapStyle.BoomBap;
-    private RoastIntensity _intensity = RoastIntensity.Roast;
+    private RapStyle _style = RapStyle.StandUp;
+    private RoastIntensity _intensity = RoastIntensity.Nuclear;
+
+    // A second axis, not a fourth stop on the dial: how the bars talk, independent of how hard they
+    // hit. Defaults ON here, unlike the wire DTO, which stays off so the mobile head and any older
+    // client keep the behaviour they shipped with. A live run picked Scorched, left this unticked,
+    // and got a verse with no profanity in it at all — working exactly as built, and not at all
+    // what was wanted. The page opens where this app's roasts are actually meant to sit.
+    private bool _explicitLanguage = true;
 
     // Snapshotted when the roast is submitted, not read live: the session image can change while a
     // result is on screen, which would leave the bars describing a photo that is no longer shown.
@@ -41,6 +48,18 @@ public partial class RapRoast : FeaturePageBase
     private bool _canRecord;
     private bool _exporting;
 
+    // ── Session filter tally ─────────────────────────────────────────────────
+    // A single run makes at most four provider calls, so its own percentage moves in steps of 25
+    // and says little on its own. Accumulating across the visit is what turns "did this one get
+    // filtered" into "is this setting actually usable". Page-instance state on purpose: nothing
+    // here is worth a round-trip or a storage bill, and the UI says it resets on reload.
+    private int _sessionAttempts;
+    private int _sessionRejected;
+    private int _sessionRoasts;
+
+    private int SessionRejectedPercent =>
+        _sessionAttempts == 0 ? 0 : _sessionRejected * 100 / _sessionAttempts;
+
     /// <summary>-1 when idle; 0–100 while a video is recording.</summary>
     private int _exportProgress = -1;
     private double _syncOffset;
@@ -52,7 +71,7 @@ public partial class RapRoast : FeaturePageBase
 
     private static readonly (RapStyle Value, string Label, string Hint)[] StyleOptions =
     [
-        (RapStyle.BoomBap, "Boom-bap", "90s, dusty drums"),
+        (RapStyle.StandUp, "Stand-up", "Spoken set, no beat"),
         (RapStyle.Trap, "Trap", "808s, hi-hat rolls"),
         (RapStyle.OldSchool, "Old-school", "Funk break, horns"),
     ];
@@ -61,7 +80,8 @@ public partial class RapRoast : FeaturePageBase
     [
         (RoastIntensity.Gentle, "Gentle", "Warm teasing, no real burns"),
         (RoastIntensity.Roast, "Roast", "Real punchlines, good-natured"),
-        (RoastIntensity.Scorched, "Scorched", "Merciless — still only about choices"),
+        (RoastIntensity.Scorched, "Scorched", "No mercy. It will not be nice to you"),
+        (RoastIntensity.Nuclear, "Nuclear", "Written to end you. Nothing held back"),
     ];
 
     protected override void OnGalleryImageSelected() => _result = null;
@@ -100,6 +120,7 @@ public partial class RapRoast : FeaturePageBase
                 ContentType = SessionService.ContentType ?? "image/png",
                 Style = _style,
                 Intensity = _intensity,
+                ExplicitLanguage = _explicitLanguage,
             };
 
             var response = await Http.PostAsJsonAsync("/api/rap-roast", request, SharedJsonOptions.Default);
@@ -140,6 +161,15 @@ public partial class RapRoast : FeaturePageBase
             isComplete = _result is not null;
             if (isComplete)
             {
+                // Tally before anything can clear _result, so the running rate survives a
+                // subsequent gallery pick or a "Roast another".
+                if (_result?.FilterReport is { TotalAttempts: > 0 } report)
+                {
+                    _sessionAttempts += report.TotalAttempts;
+                    _sessionRejected += report.RejectedAttempts;
+                    _sessionRoasts++;
+                }
+
                 Cost.RecordVision(1);
                 Cost.RecordTextReasoning(1);
                 if (!string.IsNullOrEmpty(_result?.AudioData) || _result?.AudioRefused == false)
@@ -233,7 +263,8 @@ public partial class RapRoast : FeaturePageBase
 
     /// <summary>Beat style and intensity, stamped on the exported card so a share carries its recipe.</summary>
     private string ExportMeta =>
-        $"{StyleOptions.First(o => o.Value == _style).Label} · {IntensityOptions.First(o => o.Value == _intensity).Label}";
+        $"{StyleOptions.First(o => o.Value == _style).Label} · {IntensityOptions.First(o => o.Value == _intensity).Label}"
+        + (_explicitLanguage ? " · Explicit" : "");
 
     private async Task SaveCardAsync()
     {

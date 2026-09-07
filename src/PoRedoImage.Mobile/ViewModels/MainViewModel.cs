@@ -332,7 +332,7 @@ public partial class MainViewModel : ObservableObject
             ProcessingProgress = 0.3;
 
             var response = await _apiClient.ProcessRapRoastAsync(
-                CapturedImage, RapStyle.BoomBap, RoastIntensity.Roast);
+                CapturedImage, RapStyle.StandUp, RoastIntensity.Roast);
 
             ProcessingStage = "Dropping 16 bars of heat…";
             ProcessingProgress = 0.8;

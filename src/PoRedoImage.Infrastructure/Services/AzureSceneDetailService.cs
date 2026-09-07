@@ -54,7 +54,7 @@ public sealed class AzureSceneDetailService : ISceneDetailProvider, ICombinedVis
     private VisualFeatures? _supportedFeatures;
 
     private string? CurrentKey =>
-        _configuration[ConfigKeys.ComputerVisionApiKey] ?? _configuration[ConfigKeys.ComputerVisionKeyLegacy];
+        _configuration[ConfigKeys.ComputerVisionApiKey];
 
     public bool IsConfigured => _client is not null;
 
