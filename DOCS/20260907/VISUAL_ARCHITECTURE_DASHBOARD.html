@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture Dashboard</title>
+<meta name="description" content="PoRedoImage engineering reference — generated from the repository on 2026-09-07.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   PoRedoImage documentation system
+   Palette grounded in the prepress primaries the app itself works in (C·M·Y·K).
+   Categorical steps validated for CVD separation in both modes.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* neutrals — a "Key" grey pulled slightly cyan, never a flat mid-grey */
+  --ground:      #EEF2F3;
+  --surface:     #FFFFFF;
+  --surface-2:   #F7FAFB;
+  --surface-3:   #E7EDEF;
+  --border:      #D6DFE2;
+  --border-firm: #B9C6CB;
+  --ink:         #0E1417;
+  --ink-2:       #3D4A50;
+  --ink-3:       #68787F;
+
+  /* brand: the M of CMY */
+  --accent:      #A3175E;
+  --accent-soft: #FBEBF3;
+  --accent-line: #E8B9D1;
+
+  /* categorical — fixed order, never cycled. C · M · Y · indigo · green */
+  --cat-1: #A3175E;
+  --cat-2: #12A0B8;
+  --cat-3: #946800;
+  --cat-4: #4453B5;
+  --cat-5: #2F7F4A;
+
+  /* status — reserved, never reused as a series colour */
+  --good:      #2F7F4A;
+  --good-bg:   #E6F2EA;
+  --warn:      #946800;
+  --warn-bg:   #F8F0DC;
+  --crit:      #B3261E;
+  --crit-bg:   #FBE9E7;
+  --info-bg:   #E4F4F7;
+
+  --grid:      #E2E9EB;
+
+  --radius:    3px;
+  --shadow:    0 1px 2px rgba(14, 20, 23, .06), 0 4px 14px rgba(14, 20, 23, .05);
+
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Familjen Grotesk", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0C1113;
+    --surface:     #141C1F;
+    --surface-2:   #1A2427;
+    --surface-3:   #202C30;
+    --border:      #263539;
+    --border-firm: #3A4C52;
+    --ink:         #E9EFF1;
+    --ink-2:       #A6B6BC;
+    --ink-3:       #74858C;
+
+    --accent:      #DE3F86;
+    --accent-soft: #2A1420;
+    --accent-line: #5B2843;
+
+    --cat-1: #DE3F86;
+    --cat-2: #0F9FB8;
+    --cat-3: #B3820C;
+    --cat-4: #7480DE;
+    --cat-5: #35A566;
+
+    --good:      #35A566;
+    --good-bg:   #10251A;
+    --warn:      #B3820C;
+    --warn-bg:   #291F08;
+    --crit:      #E4695F;
+    --crit-bg:   #2C1412;
+    --info-bg:   #0D242A;
+
+    --grid:      #223034;
+    --shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #0C1113;
+  --surface:     #141C1F;
+  --surface-2:   #1A2427;
+  --surface-3:   #202C30;
+  --border:      #263539;
+  --border-firm: #3A4C52;
+  --ink:         #E9EFF1;
+  --ink-2:       #A6B6BC;
+  --ink-3:       #74858C;
+
+  --accent:      #DE3F86;
+  --accent-soft: #2A1420;
+  --accent-line: #5B2843;
+
+  --cat-1: #DE3F86;
+  --cat-2: #0F9FB8;
+  --cat-3: #B3820C;
+  --cat-4: #7480DE;
+  --cat-5: #35A566;
+
+  --good:      #35A566;
+  --good-bg:   #10251A;
+  --warn:      #B3820C;
+  --warn-bg:   #291F08;
+  --crit:      #E4695F;
+  --crit-bg:   #2C1412;
+  --info-bg:   #0D242A;
+
+  --grid:      #223034;
+  --shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── masthead ─────────────────────────────────────────────────────────── */
+
+.masthead {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.masthead-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 30px 28px 26px;
+}
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+}
+.crumb a { color: var(--ink-3); text-decoration: none; border-bottom: 1px solid var(--border-firm); }
+.crumb a:hover { color: var(--accent); border-color: var(--accent); }
+.crumb .sep { color: var(--border-firm); }
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.wordmark .c { color: var(--cat-2); }
+.wordmark .m { color: var(--cat-1); }
+.wordmark .y { color: var(--cat-3); }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.4vw, 45px);
+  line-height: 1.06;
+  letter-spacing: -.022em;
+  margin: 0 0 12px;
+  text-wrap: balance;
+}
+.standfirst {
+  max-width: 65ch;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0;
+}
+.masthead-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 20px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.masthead-meta b { color: var(--ink-2); font-weight: 500; }
+
+/* ── detail switcher (sticky) ─────────────────────────────────────────── */
+
+.switchbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+}
+.switchbar-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.switch-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.switch {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-firm);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.switch button {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.switch button:last-child { border-right: 0; }
+.switch button .n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  border: 1px solid var(--border-firm);
+  border-radius: 2px;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.switch button:hover { background: var(--surface-3); color: var(--ink); }
+.switch button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+.switch button[aria-pressed="true"] .n { color: #fff; border-color: rgba(255,255,255,.55); }
+.switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.switch-hint {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-left: auto;
+}
+.switch-hint b { color: var(--ink-2); font-weight: 500; }
+
+/* ── layout ───────────────────────────────────────────────────────────── */
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 8px 28px 90px;
+}
+
+section[data-tier] {
+  padding: 34px 0 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 22px;
+}
+section[data-tier]:first-of-type { border-top: 0; margin-top: 0; }
+section[hidden] { display: none !important; }
+
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.tier-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+  border: 1px solid;
+}
+.tier-1 { color: var(--cat-2); border-color: var(--cat-2); background: var(--info-bg); }
+.tier-2 { color: var(--cat-4); border-color: var(--cat-4); background: transparent; }
+.tier-3 { color: var(--cat-3); border-color: var(--cat-3); background: transparent; }
+
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -.016em;
+  margin: 0;
+  text-wrap: balance;
+}
+h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18.5px;
+  letter-spacing: -.01em;
+  margin: 30px 0 10px;
+}
+h4 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  margin: 22px 0 8px;
+  color: var(--ink-2);
+}
+.sec-sub {
+  max-width: 68ch;
+  color: var(--ink-2);
+  margin: 4px 0 22px;
+  font-size: 15px;
+}
+p { max-width: 68ch; }
+p.wide { max-width: none; }
+a { color: var(--accent); }
+
+/* ── cards ────────────────────────────────────────────────────────────── */
+
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 17px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.card .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.card .v {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.card .d { font-size: 13.2px; color: var(--ink-2); line-height: 1.5; margin: 0; max-width: none; }
+
+/* nav matrix cards — the only cards that lift, because they are the one
+   interactive object on the portal page */
+a.navcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 19px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color .13s, transform .13s, box-shadow .13s;
+}
+a.navcard:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--border-firm); border-left-color: var(--accent); }
+a.navcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a.navcard .t { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -.01em; }
+a.navcard .f { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+a.navcard .d { font-size: 13.4px; color: var(--ink-2); line-height: 1.5; margin: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--border-firm);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.pill.ok    { color: var(--good); border-color: var(--good); background: var(--good-bg); }
+.pill.warn  { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
+.pill.crit  { color: var(--crit); border-color: var(--crit); background: var(--crit-bg); }
+.pill.info  { color: var(--cat-2); border-color: var(--cat-2); background: var(--info-bg); }
+.pill.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── tables ───────────────────────────────────────────────────────────── */
+
+.tw { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 14px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 13.2px; min-width: 560px; }
+thead th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border-firm);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+tbody td { padding: 9px 13px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--surface-2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); white-space: nowrap; }
+table code { font-size: 12px; }
+
+code {
+  font-family: var(--mono);
+  font-size: 12.6px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  padding: 1px 4px;
+  color: var(--ink);
+  word-break: break-word;
+}
+.route { color: var(--accent); }
+.verb {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  margin-right: 6px;
+}
+.verb.get { color: var(--cat-2); }
+.verb.post { color: var(--cat-5); }
+.verb.del { color: var(--crit); }
+
+pre {
+  font-family: var(--mono);
+  font-size: 12.4px;
+  line-height: 1.62;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-firm);
+  border-radius: var(--radius);
+  padding: 15px 17px;
+  overflow-x: auto;
+  margin: 12px 0;
+  color: var(--ink);
+  tab-size: 2;
+}
+pre b   { color: var(--accent); font-weight: 600; }
+pre i   { color: var(--ink-3); font-style: normal; }
+pre u   { color: var(--cat-2); text-decoration: none; }
+pre em  { color: var(--cat-3); font-style: normal; }
+
+.caption {
+  font-size: 12.4px;
+  color: var(--ink-3);
+  margin: 7px 0 0;
+  max-width: 72ch;
+}
+.caption b { color: var(--ink-2); font-weight: 500; }
+
+/* ── callouts ─────────────────────────────────────────────────────────── */
+
+.note {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 13px 16px;
+  margin: 16px 0;
+  font-size: 13.6px;
+  line-height: 1.56;
+}
+.note p { margin: 0; max-width: none; }
+.note p + p { margin-top: 8px; }
+.note .lede {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-3);
+}
+.note.trap  { border-left-color: var(--crit); background: var(--crit-bg); }
+.note.trap .lede { color: var(--crit); }
+.note.deg   { border-left-color: var(--warn); background: var(--warn-bg); }
+.note.deg .lede { color: var(--warn); }
+.note.inv   { border-left-color: var(--cat-2); background: var(--info-bg); }
+.note.inv .lede { color: var(--cat-2); }
+
+/* ── mermaid ──────────────────────────────────────────────────────────── */
+
+.dia {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 14px;
+  margin: 14px 0;
+  overflow-x: auto;
+}
+.dia .mermaid { display: flex; justify-content: center; min-width: 500px; }
+.dia svg { max-width: 100%; height: auto; }
+
+/* ── charts ───────────────────────────────────────────────────────────── */
+
+figure { margin: 16px 0; }
+figure .fig-t {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15.5px;
+  letter-spacing: -.005em;
+  margin-bottom: 2px;
+}
+figure .fig-s { font-size: 12.8px; color: var(--ink-3); margin-bottom: 12px; }
+.chart-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 20px 14px;
+  overflow-x: auto;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 12.4px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+
+.chart svg { display: block; width: 100%; height: auto; }
+.chart text { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }
+.chart .lbl { fill: var(--ink-2); }
+.chart .val { fill: var(--ink); font-weight: 600; }
+.chart .mut { fill: var(--ink-3); font-size: 10px; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .axis { stroke: var(--border-firm); stroke-width: 1; }
+.chart .bar { transition: opacity .12s; }
+.chart g.row:hover .bar { opacity: .82; }
+
+/* meter — used for the test-tier headroom, where a track/fill pair is the
+   honest form: each tier has a hard ceiling, so the empty space is the datum */
+.meters { display: flex; flex-direction: column; gap: 11px; }
+.meter { display: grid; grid-template-columns: 128px 1fr 86px; gap: 14px; align-items: center; font-size: 13px; }
+.meter .mname { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.meter .track { height: 15px; background: var(--surface-3); border-radius: 2px; position: relative; overflow: hidden; }
+.meter .fill { height: 100%; border-radius: 2px 0 0 2px; }
+.meter .mval { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.meter .mval b { color: var(--ink); font-weight: 600; }
+
+/* ── dependency / boundary rules ──────────────────────────────────────── */
+
+.rules { list-style: none; padding: 0; margin: 14px 0; display: flex; flex-direction: column; gap: 9px; }
+.rules li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 11px;
+  align-items: start;
+  font-size: 13.6px;
+  line-height: 1.55;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 11px 14px;
+}
+.rules .mark { font-family: var(--mono); font-weight: 600; font-size: 14px; line-height: 1.5; }
+.rules .yes .mark { color: var(--good); }
+.rules .no .mark { color: var(--crit); }
+
+ul.plain { padding-left: 19px; max-width: 68ch; }
+ul.plain li { margin-bottom: 6px; line-height: 1.55; }
+
+/* ── footer ───────────────────────────────────────────────────────────── */
+
+footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  margin-top: 40px;
+}
+.footer-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 28px 34px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.footer-in a { color: var(--ink-3); }
+
+@media (max-width: 620px) {
+  .masthead-in, .switchbar-in, main, .footer-in { padding-left: 17px; padding-right: 17px; }
+  .meter { grid-template-columns: 96px 1fr 74px; gap: 9px; }
+  .switch-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-in">
+    <div class="crumb">
+      <a href="index.html"><span class="wordmark">Po<span class="c">Redo</span><span class="m">Image</span></span></a>
+      <span class="sep">/</span>
+      <span>Architecture</span>
+    </div>
+    <h1>Architecture Dashboard</h1>
+    <p class="standfirst">
+      Six assemblies, ten vertical slices, and a set of dependency rules that are not conventions
+      but build&#8209;time assertions. This is the map, the boundaries, and the storage schema behind
+      them.
+    </p>
+    <div class="masthead-meta">
+      <span><b>Assemblies</b> 6 + 1 Android head</span>
+      <span><b>Slices</b> 10</span>
+      <span><b>Arch rules</b> 26, enforced in CI</span>
+      <span><b>Generated</b> 2026-09-07</span>
+    </div>
+  </div>
+</header>
+
+<nav class="switchbar" aria-label="Detail level">
+  <div class="switchbar-in">
+    <span class="switch-label">Detail</span>
+    <div class="switch" role="group" aria-label="Choose how much detail to show">
+      <button type="button" data-level="1" aria-pressed="false"><span class="n">1</span> Simple</button>
+      <button type="button" data-level="2" aria-pressed="true"><span class="n">2</span> Standard</button>
+      <button type="button" data-level="3" aria-pressed="false"><span class="n">3</span> All details</button>
+    </div>
+    <span class="switch-hint" id="switch-hint"></span>
+  </div>
+</nav>
+
+<main>
+
+<!-- ══════════════════════ TIER 1 ══════════════════════ -->
+<section data-tier="1">
+  <div class="sec-head">
+    <span class="tier-chip tier-1">Tier 1 &middot; Executive</span>
+    <h2>Topology and the rules that hold it together</h2>
+  </div>
+  <p class="sec-sub">
+    The architecture is deliberately hybrid, and knowing which half you are in decides how you add
+    a feature.
+  </p>
+
+  <div class="grid g4">
+    <div class="card">
+      <span class="k">Server style</span>
+      <span class="v">Vertical slice</span>
+      <p class="d">A new feature is a new folder under <code>Features/</code> with its endpoint,
+         DTO and validator together. <b>VSA beats Onion</b> when both would apply.</p>
+    </div>
+    <div class="card">
+      <span class="k">Cross-slice primitives</span>
+      <span class="v">3 layers</span>
+      <p class="d"><code>Domain</code>, <code>Application</code>, <code>Infrastructure</code> exist
+         only to supply what more than one slice needs. Adding a layer for one feature will fail
+         review.</p>
+    </div>
+    <div class="card">
+      <span class="k">Browser assemblies</span>
+      <span class="v">2</span>
+      <p class="d">Only <code>.Client</code> and <code>.Shared</code> ship to the browser. Three
+         rules assert that server code and the Azure SDKs never follow them there.</p>
+    </div>
+    <div class="card">
+      <span class="k">Render mode</span>
+      <span class="v">WASM, no prerender</span>
+      <p class="d">The WASM client owns the only DI container, so a server prerender pass could not
+         resolve its services. Not a performance choice.</p>
+    </div>
+  </div>
+
+  <div class="dia">
+    <pre class="mermaid">
+flowchart TB
+  subgraph browser["Ships to the browser"]
+    CL["PoRedoImage.Client<br/><i>Routes, layout, every page</i>"]
+    SH["PoRedoImage.Shared<br/><i>DTOs + validation, trim-safe</i>"]
+  end
+  subgraph server["Stays on the server"]
+    WB["PoRedoImage.Web<br/><i>BFF host · Features/*</i>"]
+    AP["PoRedoImage.Application<br/><i>orchestrators</i>"]
+    IN["PoRedoImage.Infrastructure<br/><i>provider clients, repositories</i>"]
+    DM["PoRedoImage.Domain<br/><i>entities + interfaces, plain library</i>"]
+  end
+  MO["PoRedoImage.Mobile<br/><i>MAUI Android · HTTP only</i>"]
+
+  CL --> SH
+  MO --> SH
+  WB --> SH
+  WB --> AP
+  WB --> IN
+  AP --> DM
+  IN --> DM
+  IN --> AP
+  MO -. "HTTP" .-> WB
+  CL -. "HTTP" .-> WB
+    </pre>
+  </div>
+  <p class="caption">
+    Solid edges are assembly references; dotted edges are network calls. Every arrow that is
+    <em>absent</em> here is absent because a test asserts it cannot exist.
+  </p>
+
+  <h3>Boundary rules, as enforced</h3>
+  <p>
+    <code>PoRedoImage.Tests.Architecture</code> holds a rule <em>registry</em> rather than one test
+    method per rule, so 26 rules cost two methods against the tier's ceiling. They run in CI on
+    every push.
+  </p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Category</th><th class="num">Rules</th><th>Asserts</th></tr></thead>
+      <tbody>
+        <tr><td>Core isolation</td><td class="num">5</td><td><code>Domain</code> depends on nothing &mdash; not Application, not Infrastructure, not the host, not ASP.NET Core.</td></tr>
+        <tr><td>Persistence isolation</td><td class="num">1</td><td><code>Domain</code> holds no <code>Azure.Data.Tables</code> or <code>Azure.Storage</code> types.</td></tr>
+        <tr><td>Layer boundaries</td><td class="num">5</td><td><code>Application</code> reaches Domain abstractions only; <code>Infrastructure</code> never reaches the host or the client.</td></tr>
+        <tr><td>Contract isolation</td><td class="num">3</td><td><code>Shared</code> touches no server layer, no client, and no Azure SDK &mdash; it must stay trim&#8209;safe.</td></tr>
+        <tr><td>Browser boundary</td><td class="num">3</td><td><code>Client</code> never references Infrastructure, the host assembly, or <code>Azure.Identity</code>.</td></tr>
+        <tr><td>Vertical slice encapsulation</td><td class="num">9</td><td>Each named slice must not depend on a sibling slice.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note deg">
+    <span class="lede">Gap worth knowing about</span>
+    <p>The slice&#8209;isolation list names nine slices: <code>Auth</code>,
+    <code>BulkGenerate</code>, <code>Diagnostics</code>, <code>Idempotency</code>,
+    <code>ImageAnalysis</code>, <code>MemeTemplates</code>, <code>Pricing</code>,
+    <code>RapRoast</code>, <code>UserImages</code>. <b><code>VideoGenerate</code> is not among
+    them</b> &mdash; it is the newest slice and was not added to the registry, so nothing currently
+    asserts that it stays free of its siblings. Adding the string to <code>Slices</code> costs no
+    additional test methods.</p>
+  </div>
+
+  <h3>Test tiers and their headroom</h3>
+  <p>
+    Each tier enforces its own method ceiling, and exceeding one <b>breaks the build</b> rather than
+    warning. A <code>[Theory]</code> counts once regardless of how many <code>InlineData</code> rows
+    it carries, which is the lever to reach for before raising a ceiling.
+  </p>
+  <figure>
+    <div class="fig-t">Method count against ceiling</div>
+    <div class="fig-s">Counted from <code>dotnet test --list-tests</code> &middot; the ceiling tests recompute this every CI run</div>
+    <div class="chart-box">
+      <div class="meters">
+        <div class="meter">
+          <span class="mname">Unit</span>
+          <span class="track"><span class="fill" style="width:91%;background:var(--warn)"></span></span>
+          <span class="mval"><b>91</b> / 100</span>
+        </div>
+        <div class="meter">
+          <span class="mname">Integration</span>
+          <span class="track"><span class="fill" style="width:92%;background:var(--warn)"></span></span>
+          <span class="mval"><b>46</b> / 50</span>
+        </div>
+        <div class="meter">
+          <span class="mname">E2E.ApiSmoke</span>
+          <span class="track"><span class="fill" style="width:44%;background:var(--good)"></span></span>
+          <span class="mval"><b>11</b> / 25</span>
+        </div>
+        <div class="meter">
+          <span class="mname">E2E.UI</span>
+          <span class="track"><span class="fill" style="width:48%;background:var(--good)"></span></span>
+          <span class="mval"><b>12</b> / 25</span>
+        </div>
+        <div class="meter">
+          <span class="mname">Architecture</span>
+          <span class="track"><span class="fill" style="width:90%;background:var(--warn)"></span></span>
+          <span class="mval"><b>9</b> / 10</span>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--good)"></i> comfortable headroom</span>
+        <span><i style="background:var(--warn)"></i> ≥ 90 % of ceiling — consolidate before adding</span>
+      </div>
+    </div>
+    <p class="caption">
+      Integration sat at exactly <b>50/50</b> &mdash; one test from breaking the build &mdash; until
+      the per&#8209;rule pass/fail method pairs in <code>Contracts/</code> were folded into single
+      theories covering both sides. <b>CI runs Unit and Architecture only</b>; Integration needs
+      Docker for Testcontainers and both E2E tiers need a live app on&nbsp;:4000, so a break in
+      those three is caught locally or not at all.
+    </p>
+  </figure>
+</section>
+
+<!-- ══════════════════════ TIER 2 ══════════════════════ -->
+<section data-tier="2">
+  <div class="sec-head">
+    <span class="tier-chip tier-2">Tier 2 &middot; Architectural</span>
+    <h2>C4 level 3 &mdash; inside the BFF host</h2>
+  </div>
+  <p class="sec-sub">
+    Client routes map onto slices; slices map onto orchestrators; orchestrators map onto provider
+    interfaces. Nothing in <code>Features/</code> references a sibling slice.
+  </p>
+
+  <div class="dia">
+    <pre class="mermaid">
+flowchart LR
+  subgraph routes["Client routes"]
+    R1["/"]
+    R2["/image-regeneration"]
+    R3["/meme-generation"]
+    R4["/rap-roast"]
+    R5["/bulk-generate"]
+    R6["/video"]
+    R7["/gallery"]
+    R8["/diag"]
+  end
+  subgraph slices["Features/ — vertical slices"]
+    F1["ImageAnalysis"]
+    F2["MemeTemplates"]
+    F3["RapRoast"]
+    F4["BulkGenerate"]
+    F5["VideoGenerate"]
+    F6["UserImages"]
+    F7["Diagnostics"]
+    F8["Pricing"]
+    F9["Auth"]
+    F10["Idempotency"]
+    F11["Shared<br/><i>filters + policy names</i>"]
+  end
+  subgraph app["Application — orchestrators"]
+    O1["ImageAnalysisOrchestrator<br/>+ ReproductionPromptWriter"]
+    O2["RapRoastOrchestrator<br/>+ SceneDescriber<br/>+ RoastLyricsWriter"]
+    O3["BulkGenerationService"]
+    O4["UserImageService"]
+  end
+  subgraph dom["Domain — interfaces"]
+    I1["IVisionService(Router)"]
+    I2["IGenerativeAiService"]
+    I3["IChatCompletionService"]
+    I4["IImageGenerationService"]
+    I5["IVideoGenerationService"]
+    I6["IMusicGenerationService"]
+    I7["IUserImageRepository"]
+    I8["IBulkPromptRepository"]
+  end
+
+  R1 --> F1
+  R2 --> F1
+  R3 --> F1
+  R3 --> F2
+  R4 --> F3
+  R5 --> F4
+  R6 --> F5
+  R7 --> F6
+  R8 --> F7
+  F1 --> O1
+  F3 --> O2
+  F4 --> O3
+  F6 --> O4
+  O1 --> I1
+  O1 --> I2
+  O1 --> I4
+  O2 --> I1
+  O2 --> I3
+  O2 --> I6
+  O3 --> I4
+  O3 --> I8
+  O4 --> I7
+  F5 --> I5
+    </pre>
+  </div>
+  <p class="caption">
+    <code>Idempotency</code> and <code>Shared</code> are cross&#8209;cutting: they contribute
+    endpoint filters rather than routes. <code>Shared</code> is also where policy <em>names</em>
+    live &mdash; a policy is inherently cross&#8209;slice (Auth defines it, another slice requires
+    it), so naming it there keeps both depending on a shared vocabulary instead of on each other.
+  </p>
+
+  <h3>Storage entity relationships</h3>
+  <div class="dia">
+    <pre class="mermaid">
+erDiagram
+  USER ||--o{ USERIMAGE_ENTITY : owns
+  USERIMAGE_ENTITY ||--|| IMAGE_BLOB : "1:1 by convention"
+  PROMPT_PARTITION ||--o{ BULKPROMPT : contains
+
+  USER {
+    string userId PK "claim: NameIdentifier"
+  }
+  USERIMAGE_ENTITY {
+    string PartitionKey PK "= userId"
+    string RowKey       PK "= imageId, 32-hex GUID"
+    string FileName
+    string ContentType
+    int    Kind         "Original|Regeneration|Meme|BulkVariation"
+    date   CreatedAt
+    long   SizeBytes
+    string Tags         "serialized"
+  }
+  IMAGE_BLOB {
+    string name PK "user-images/{userId}/{imageId}"
+    binary content
+    string contentType
+  }
+  PROMPT_PARTITION {
+    string PartitionKey PK "constant literal 'prompts'"
+  }
+  BULKPROMPT {
+    string PartitionKey PK "= 'prompts'"
+    string RowKey       PK "= GUID"
+    string Name
+    string PromptText
+    date   CreatedAt
+  }
+    </pre>
+  </div>
+  <div class="note trap">
+    <span class="lede">Two things this ERD is telling you</span>
+    <p><b>1.</b> There is no foreign key from blob to table row &mdash; the relationship is the
+    <em>blob name convention</em> <code>{userId}/{imageId}</code>. Delete has to remove both, and
+    they can drift.</p>
+    <p><b>2.</b> <code>BulkPrompt.PartitionKey</code> is the constant literal
+    <code>"prompts"</code>, not a user id. The prompt board is therefore <b>global, not
+    per&#8209;user</b>: every authenticated caller reads and writes the same partition. The
+    endpoints require authentication, but they do not scope by identity the way
+    <code>/api/user-images</code> does.</p>
+  </div>
+
+  <h3>Deployed topology</h3>
+  <div class="dia">
+    <pre class="mermaid">
+flowchart TB
+  subgraph rg1["RG: PoRedoImage"]
+    ASP["asp-PoRedoImage-f1<br/><i>F1 plan, existing — never created here</i>"]
+    APP["poredoimage-web<br/>App Service · Linux · DOTNETCORE|10.0<br/><i>westus3</i>"]
+    ST["stporedoimage26<br/>StorageV2 · Standard_LRS · <i>eastus</i><br/>Blob + Table"]
+  end
+  subgraph rg2["RG: PoShared"]
+    KV["kv-poshared<br/>Key Vault"]
+    AI["Application Insights"]
+    AOAI["po-aiservices-shared<br/>Azure OpenAI + Computer Vision"]
+  end
+  APP --> ASP
+  APP -- "@Microsoft.KeyVault(...)" --> KV
+  APP --> ST
+  APP --> AI
+  APP --> AOAI
+  KV -.-> AOAI
+    </pre>
+  </div>
+  <p class="caption">
+    The Bicep template <b>references</b> the App Service plan and never creates, updates or deletes
+    it: the plan's home stamp is fixed by Azure at creation time, so the live instance cannot be
+    migrated without a clone (new hostname) or a destroy&#8209;and&#8209;recreate. A blob lifecycle
+    policy tiers to cool at <b>7 days</b> and deletes at <b>30</b> &mdash; generated images are not
+    archival.
+  </p>
+</section>
+
+<!-- ══════════════════════ TIER 3 ══════════════════════ -->
+<section data-tier="3">
+  <div class="sec-head">
+    <span class="tier-chip tier-3">Tier 3 &middot; Implementation</span>
+    <h2>Routing, registration and schema</h2>
+  </div>
+
+  <h3>Root routing architecture</h3>
+  <p>
+    Route precedence does real work here. A literal first segment outranks a catch&#8209;all, which
+    is what keeps a mistyped API path returning JSON instead of an HTML document.
+  </p>
+<pre><i>// Program.cs — pipeline order, abridged to the parts that matter</i>
+app.UseExceptionHandler(<em>"/Error"</em>, createScopeForErrors: true);
+app.UseStatusCodePagesWithReExecute(<em>"/not-found"</em>);       <i>// branch: non-API only</i>
+app.UseHttpsRedirection();                              <i>// skipped in Dev/Test</i>
+app.UseMiddleware&lt;<b>RequestContextMiddleware</b>&gt;();          <i>// correlation + session ids</i>
+app.UseAuthentication();
+app.UseMiddleware&lt;<b>UserContextMiddleware</b>&gt;();             <i>// AFTER authn — see note below</i>
+app.Use(/* stamp AllowAnonymous on /_framework */);     <i>// the one escape hatch</i>
+app.UseAuthorization();
+app.UseRateLimiter();
+app.UseAntiforgery();                                   <i>// enables the filter; enforces nothing alone</i>
+
+app.MapOpenApi().AllowAnonymous();
+app.MapScalarApiReference().AllowAnonymous();
+app.MapHealthChecks(<em>"/health"</em>, ...).AllowAnonymous();     <i>// 5 "ready"-tagged checks</i>
+app.MapHealthChecks(<em>"/alive"</em>, new(){ Predicate = _ =&gt; false }).AllowAnonymous();
+
+<i>// Vertical slices, in registration order</i>
+app.MapAntiforgeryEndpoints();   app.MapAuthEndpoints();
+app.MapImageAnalysisEndpoints(); app.MapDiagnosticsEndpoints();
+app.MapBulkGenerateEndpoints();  app.MapUserImageEndpoints();
+app.MapMemeTemplateEndpoints();  app.MapRapRoastEndpoints();
+app.MapVideoGenerateEndpoints(); app.MapPricingEndpoints();
+
+app.Map(<em>"/api/{**rest}"</em>, () =&gt; Results.NotFound()).AllowAnonymous();
+app.MapStaticAssets().AllowAnonymous();
+app.MapRazorComponents&lt;App&gt;()
+   .AddInteractiveWebAssemblyRenderMode()
+   .AddAdditionalAssemblies(typeof(PoRedoImage.Client._Imports).Assembly);</pre>
+
+  <div class="note trap">
+    <span class="lede">Order bug this codebase already paid for</span>
+    <p><code>UserContextMiddleware</code> <b>must</b> follow <code>UseAuthentication()</code>.
+    <code>context.User</code> is not populated before it, and when the order was wrong every log
+    line was stamped <code>UserId="anonymous"</code> &mdash; including 53 genuinely signed&#8209;in
+    sessions.</p>
+  </div>
+
+  <h3>Dependency injection registration</h3>
+<pre><i>// Program.cs — host concerns</i>
+Configure&lt;FormOptions&gt;(MultipartBodyLengthLimit = <u>25 MB</u>);
+Kestrel.Limits.MaxRequestBodySize                = <u>25 MB</u>;
+AddMemoryCache();                    <i>// backs idempotency de-dup</i>
+AddHybridCache();                    <i>// tiered L1 + stampede protection — meme template catalog</i>
+AddScoped&lt;IdempotencyKeyFilter&gt;();
+AddRateLimiter(<em>"ai-endpoints"</em>: sliding window, 10 / 1 min, 6 segments, queue 2);
+AddHealthChecks(): key-vault · computer-vision · openai · table-storage · imagen3   <i>// tag "ready"</i>
+AddHttpClient(<em>"BffApi"</em>).AddStandardResilienceHandler(...);
+AddHttpContextAccessor(); AddTransient&lt;OutboundCorrelationHandler&gt;();
+foreach (var c in [<em>"Ollama"</em>, <em>"GeminiApi"</em>]) AddHttpClient(c).AddHttpMessageHandler&lt;OutboundCorrelationHandler&gt;();
+<b>AddPoRedoImageInfrastructure</b>(config, MockAiGate.IsEnabled(config, env));
+<b>AddPoRedoImageAuth</b>(config, env);
+
+<i>// InfrastructureServiceExtensions — application + persistence</i>
+AddScoped &lt;IMemeGeneratorService,   ImageSharpMemeGeneratorService&gt;();
+AddSingleton&lt;IMemeTemplateService,  MemeTemplateService&gt;();
+AddSingleton&lt;IBulkPromptRepository, AzureTableBulkPromptRepository&gt;();  <i>// TableClient is thread-safe</i>
+AddSingleton&lt;IUserImageRepository,  AzureBlobUserImageRepository&gt;();
+AddScoped &lt;IUserImageService,       UserImageService&gt;();
+AddTransient&lt;ReproductionPromptWriter&gt;();   <i>// Transient so the scoped logger flows correctly</i>
+AddTransient&lt;SceneDescriber&gt;();
+AddTransient&lt;RoastLyricsWriter&gt;();
+AddScoped &lt;IImageAnalysisOrchestrator, ImageAnalysisOrchestrator&gt;();
+AddScoped &lt;IBulkGenerationService,     BulkGenerationService&gt;();
+AddScoped &lt;IRapRoastOrchestrator,      RapRoastOrchestrator&gt;();</pre>
+
+  <p class="caption">
+    <b>The mock decision is resolved in exactly one place.</b> <code>MockAiGate.IsEnabled</code>
+    runs in the host and its result is passed <em>into</em> Infrastructure, because that assembly
+    deliberately has no ASP.NET types in scope. In mock mode each concrete mock is registered once
+    and surfaced under both its service interface and <code>IMockable</code>, so the
+    "USING MOCK DATA" banner can enumerate reasons without constructing the service twice.
+  </p>
+
+  <h3>Compact storage schema &mdash; keys only</h3>
+  <div class="tw">
+    <table>
+      <thead>
+        <tr><th>Store</th><th>Name</th><th>Partition key</th><th>Row key</th><th>Scoping</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Table</td><td><code>UserImages</code></td>
+          <td><code>userId</code></td><td><code>imageId</code> &mdash; 32&#8209;hex GUID</td>
+          <td><span class="pill ok dot">per user</span> queries filter <code>PartitionKey eq '{userId}'</code></td>
+        </tr>
+        <tr>
+          <td>Blob</td><td><code>user-images</code></td>
+          <td colspan="2"><code>{userId}/{imageId}</code> &mdash; the name <em>is</em> the key</td>
+          <td><span class="pill ok dot">per user</span> <code>PublicAccessType.None</code></td>
+        </tr>
+        <tr>
+          <td>Table</td><td><code>BulkPrompts</code></td>
+          <td><code>"prompts"</code> &mdash; constant</td><td>GUID</td>
+          <td><span class="pill warn dot">global</span> shared by every authenticated caller</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+<pre><i>// UserImageId — a value type whose only job is to be safe as a key.
+// Guid.TryParseExact with "N" rejects braces, hyphens and any non-hex character:
+// precisely the set that would break a blob name or a Table Storage RowKey.</i>
+public readonly record struct <b>UserImageId</b>
+{
+    public static UserImageId New()   =&gt; new(Guid.NewGuid().ToString(<em>"N"</em>));
+    public static UserImageId Parse(string v);          <i>// throws with the value in the message</i>
+    public static bool TryParse(string? v, out UserImageId id);
+}
+
+<i>// Both repositories degrade to a no-op when Storage:ConnectionString is empty —
+// _blobContainer is null and the calls return empty rather than throwing, so the
+// app runs without Azure. Containers and tables are CreateIfNotExists on first use.</i></pre>
+
+  <h3>Global payload envelopes</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Situation</th><th>Status</th><th>Body</th></tr></thead>
+      <tbody>
+        <tr><td>Success</td><td><code>200</code></td><td>The slice's typed DTO, bare &mdash; there is no wrapper envelope.</td></tr>
+        <tr><td>Validation failure</td><td><code>400</code></td><td><code>application/problem+json</code> from <code>ValidationFilter&lt;T&gt;</code></td></tr>
+        <tr><td>Bad idempotency key</td><td><code>400</code></td><td>problem+json, title <code>"Invalid Idempotency Key"</code></td></tr>
+        <tr><td>Antiforgery failure</td><td><code>400</code></td><td>empty &mdash; the client retries once with a fresh token</td></tr>
+        <tr><td>Unauthenticated</td><td><code>401</code></td><td>problem+json (page navigations get a 302 to <code>/login</code> instead)</td></tr>
+        <tr><td>Policy denied</td><td><code>403</code></td><td>problem+json</td></tr>
+        <tr><td>Unknown API path</td><td><code>404</code></td><td>empty JSON 404 &mdash; never the SPA's HTML</td></tr>
+        <tr><td>Provider declined the content</td><td><code>422</code></td><td>problem+json carrying the <b>provider's own reason</b></td></tr>
+        <tr><td>Rate limited</td><td><code>429</code></td><td>empty</td></tr>
+        <tr><td>Upstream unwell</td><td><code>502</code></td><td>problem+json, title <code>"…Service Error"</code></td></tr>
+        <tr><td>Capability unconfigured</td><td><code>503</code></td><td>problem+json, e.g. <code>"Video Unavailable"</code></td></tr>
+        <tr><td>Idempotent replay</td><td><i>cached</i></td><td>the original 2xx body + <code>Idempotent-Replay: true</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Build gates</h3>
+  <p>
+    <code>Directory.Build.props</code> applies to every project: net10.0, <code>Nullable</code>,
+    <code>TreatWarningsAsErrors</code>, <code>EnableTrimAnalyzer</code> (diagnostics only &mdash;
+    <code>IsTrimmable</code> stays off), and NuGet audit at <code>low</code>, so a vulnerable
+    package breaks the build. Packages are centrally managed; a <code>PackageReference</code> with
+    an inline version will not build. Versioning is MinVer from git tags.
+  </p>
+<pre><i>// Because warnings are errors, IL2026 from the trim analyzer breaks the build.
+// Three deliberate suppressions exist in Program.cs, each with its reason:</i>
+#pragma warning disable IL2026
+  <u>1.</u> Razor component registration   <i>— reflective by nature</i>
+  <u>2.</u> Options binding                <i>— the option types use init-only properties, which the
+                                    configuration binding source generator cannot assign.
+                                    Enabling it silently binds every value to empty and the
+                                    host fail-fasts at startup.</i>
+  <u>3.</u> The anonymous health payload   <i>— the deploy smoke test greps that exact shape</i>
+#pragma warning restore IL2026
+
+<i>// Everywhere else: use ConfigValue.Bool / Float / Double, never ConfigurationBinder.GetValue&lt;T&gt;.</i></pre>
+
+  <div class="note inv">
+    <span class="lede">Why the Android head lives in its own solution</span>
+    <p><code>PoRedoImage.Mobile</code> is the only project using <code>TargetFrameworks</code>
+    (plural), and <code>Directory.Build.props</code> is imported <em>before</em> the project body,
+    so its "no TFM set yet" guard stamps on <code>TargetFramework=net10.0</code>. Left in place that
+    beats <code>TargetFrameworks</code> and the solution build tries to build the MAUI head as plain
+    net10.0 (<code>NETSDK1005</code>). The csproj clears it with an empty
+    <code>&lt;TargetFramework&gt;&lt;/TargetFramework&gt;</code>. The head moved to
+    <code>PoRedoImage.Mobile.slnx</code> so the main solution stays pure net10.0 and
+    <code>ubuntu-latest</code> restore no longer dies on the missing
+    <code>maui-android</code> workload.</p>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="footer-in">
+    <span>PoRedoImage &mdash; engineering reference</span>
+    <span>Generated 2026-09-07 from commit <code>d8b65be</code></span>
+    <span>Source of truth: <code>CLAUDE.md</code> at the repo root</span>
+    <span><a href="index.html">Portal index</a></span>
+  </div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>
+/* Detail switcher — cumulative. Level 1 = Tier 1, 2 = Tier 1+2, 3 = everything.
+   Buttons carry data-level; content sections carry data-tier. */
+(function () {
+  var KEY = 'poredo-docs-detail-level';
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-level]'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('[data-tier]'));
+
+  function apply(level) {
+    sections.forEach(function (s) {
+      s.hidden = parseInt(s.getAttribute('data-tier'), 10) > level;
+    });
+    buttons.forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-level') === String(level) ? 'true' : 'false');
+    });
+    var hint = document.getElementById('switch-hint');
+    if (hint) {
+      var shown = sections.filter(function (s) { return !s.hidden; }).length;
+      hint.innerHTML = 'Showing <b>' + shown + '</b> of ' + sections.length + ' sections';
+    }
+    try { localStorage.setItem(KEY, String(level)); } catch (e) { /* private mode */ }
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      apply(parseInt(b.getAttribute('data-level'), 10));
+    });
+  });
+
+  var start = 2;
+  try {
+    var saved = parseInt(localStorage.getItem(KEY), 10);
+    if (saved === 1 || saved === 2 || saved === 3) { start = saved; }
+  } catch (e) { /* private mode */ }
+
+  /* Mermaid renders at its container's measured width, so every diagram must be
+     laid out while visible. Render first, filter second — otherwise a Tier 3
+     diagram that starts hidden comes back at zero width when it is revealed. */
+  function ready() { apply(start); }
+
+  if (window.mermaid) {
+    var dark = matchMedia('(prefers-color-scheme: dark)').matches
+      && document.documentElement.getAttribute('data-theme') !== 'light'
+      || document.documentElement.getAttribute('data-theme') === 'dark';
+    var css = getComputedStyle(document.documentElement);
+    var t = function (n) { return css.getPropertyValue(n).trim(); };
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+      themeVariables: {
+        darkMode: dark,
+        background: t('--surface'),
+        primaryColor: t('--surface-2'),
+        primaryTextColor: t('--ink'),
+        primaryBorderColor: t('--border-firm'),
+        secondaryColor: t('--surface-3'),
+        tertiaryColor: t('--surface-3'),
+        lineColor: t('--ink-3'),
+        textColor: t('--ink-2'),
+        mainBkg: t('--surface-2'),
+        nodeBorder: t('--border-firm'),
+        clusterBkg: 'transparent',
+        clusterBorder: t('--border'),
+        actorBkg: t('--surface-2'),
+        actorBorder: t('--border-firm'),
+        actorTextColor: t('--ink'),
+        actorLineColor: t('--ink-3'),
+        signalColor: t('--ink-2'),
+        signalTextColor: t('--ink-2'),
+        labelBoxBkgColor: t('--surface-3'),
+        labelBoxBorderColor: t('--border-firm'),
+        labelTextColor: t('--ink'),
+        loopTextColor: t('--ink-2'),
+        noteBkgColor: t('--accent-soft'),
+        noteBorderColor: t('--accent-line'),
+        noteTextColor: t('--ink'),
+        altBackground: t('--surface-2'),
+        sequenceNumberColor: t('--surface'),
+        attributeBackgroundColorOdd: t('--surface'),
+        attributeBackgroundColorEven: t('--surface-2')
+      }
+    });
+    window.mermaid.run({ querySelector: '.mermaid' }).then(ready, ready);
+  } else {
+    ready();
+  }
+})();
+</script>
+</body>
+</html>

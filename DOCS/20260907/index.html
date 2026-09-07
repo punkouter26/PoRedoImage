@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoRedoImage Docs Portal</title>
+<meta name="description" content="PoRedoImage engineering reference — generated from the repository on 2026-09-07.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   PoRedoImage documentation system
+   Palette grounded in the prepress primaries the app itself works in (C·M·Y·K).
+   Categorical steps validated for CVD separation in both modes.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* neutrals — a "Key" grey pulled slightly cyan, never a flat mid-grey */
+  --ground:      #EEF2F3;
+  --surface:     #FFFFFF;
+  --surface-2:   #F7FAFB;
+  --surface-3:   #E7EDEF;
+  --border:      #D6DFE2;
+  --border-firm: #B9C6CB;
+  --ink:         #0E1417;
+  --ink-2:       #3D4A50;
+  --ink-3:       #68787F;
+
+  /* brand: the M of CMY */
+  --accent:      #A3175E;
+  --accent-soft: #FBEBF3;
+  --accent-line: #E8B9D1;
+
+  /* categorical — fixed order, never cycled. C · M · Y · indigo · green */
+  --cat-1: #A3175E;
+  --cat-2: #12A0B8;
+  --cat-3: #946800;
+  --cat-4: #4453B5;
+  --cat-5: #2F7F4A;
+
+  /* status — reserved, never reused as a series colour */
+  --good:      #2F7F4A;
+  --good-bg:   #E6F2EA;
+  --warn:      #946800;
+  --warn-bg:   #F8F0DC;
+  --crit:      #B3261E;
+  --crit-bg:   #FBE9E7;
+  --info-bg:   #E4F4F7;
+
+  --grid:      #E2E9EB;
+
+  --radius:    3px;
+  --shadow:    0 1px 2px rgba(14, 20, 23, .06), 0 4px 14px rgba(14, 20, 23, .05);
+
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Familjen Grotesk", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0C1113;
+    --surface:     #141C1F;
+    --surface-2:   #1A2427;
+    --surface-3:   #202C30;
+    --border:      #263539;
+    --border-firm: #3A4C52;
+    --ink:         #E9EFF1;
+    --ink-2:       #A6B6BC;
+    --ink-3:       #74858C;
+
+    --accent:      #DE3F86;
+    --accent-soft: #2A1420;
+    --accent-line: #5B2843;
+
+    --cat-1: #DE3F86;
+    --cat-2: #0F9FB8;
+    --cat-3: #B3820C;
+    --cat-4: #7480DE;
+    --cat-5: #35A566;
+
+    --good:      #35A566;
+    --good-bg:   #10251A;
+    --warn:      #B3820C;
+    --warn-bg:   #291F08;
+    --crit:      #E4695F;
+    --crit-bg:   #2C1412;
+    --info-bg:   #0D242A;
+
+    --grid:      #223034;
+    --shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #0C1113;
+  --surface:     #141C1F;
+  --surface-2:   #1A2427;
+  --surface-3:   #202C30;
+  --border:      #263539;
+  --border-firm: #3A4C52;
+  --ink:         #E9EFF1;
+  --ink-2:       #A6B6BC;
+  --ink-3:       #74858C;
+
+  --accent:      #DE3F86;
+  --accent-soft: #2A1420;
+  --accent-line: #5B2843;
+
+  --cat-1: #DE3F86;
+  --cat-2: #0F9FB8;
+  --cat-3: #B3820C;
+  --cat-4: #7480DE;
+  --cat-5: #35A566;
+
+  --good:      #35A566;
+  --good-bg:   #10251A;
+  --warn:      #B3820C;
+  --warn-bg:   #291F08;
+  --crit:      #E4695F;
+  --crit-bg:   #2C1412;
+  --info-bg:   #0D242A;
+
+  --grid:      #223034;
+  --shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── masthead ─────────────────────────────────────────────────────────── */
+
+.masthead {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.masthead-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 30px 28px 26px;
+}
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+}
+.crumb a { color: var(--ink-3); text-decoration: none; border-bottom: 1px solid var(--border-firm); }
+.crumb a:hover { color: var(--accent); border-color: var(--accent); }
+.crumb .sep { color: var(--border-firm); }
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.wordmark .c { color: var(--cat-2); }
+.wordmark .m { color: var(--cat-1); }
+.wordmark .y { color: var(--cat-3); }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.4vw, 45px);
+  line-height: 1.06;
+  letter-spacing: -.022em;
+  margin: 0 0 12px;
+  text-wrap: balance;
+}
+.standfirst {
+  max-width: 65ch;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0;
+}
+.masthead-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 20px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.masthead-meta b { color: var(--ink-2); font-weight: 500; }
+
+/* ── detail switcher (sticky) ─────────────────────────────────────────── */
+
+.switchbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+}
+.switchbar-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.switch-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.switch {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-firm);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.switch button {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.switch button:last-child { border-right: 0; }
+.switch button .n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  border: 1px solid var(--border-firm);
+  border-radius: 2px;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.switch button:hover { background: var(--surface-3); color: var(--ink); }
+.switch button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+.switch button[aria-pressed="true"] .n { color: #fff; border-color: rgba(255,255,255,.55); }
+.switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.switch-hint {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-left: auto;
+}
+.switch-hint b { color: var(--ink-2); font-weight: 500; }
+
+/* ── layout ───────────────────────────────────────────────────────────── */
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 8px 28px 90px;
+}
+
+section[data-tier] {
+  padding: 34px 0 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 22px;
+}
+section[data-tier]:first-of-type { border-top: 0; margin-top: 0; }
+section[hidden] { display: none !important; }
+
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.tier-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+  border: 1px solid;
+}
+.tier-1 { color: var(--cat-2); border-color: var(--cat-2); background: var(--info-bg); }
+.tier-2 { color: var(--cat-4); border-color: var(--cat-4); background: transparent; }
+.tier-3 { color: var(--cat-3); border-color: var(--cat-3); background: transparent; }
+
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -.016em;
+  margin: 0;
+  text-wrap: balance;
+}
+h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18.5px;
+  letter-spacing: -.01em;
+  margin: 30px 0 10px;
+}
+h4 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  margin: 22px 0 8px;
+  color: var(--ink-2);
+}
+.sec-sub {
+  max-width: 68ch;
+  color: var(--ink-2);
+  margin: 4px 0 22px;
+  font-size: 15px;
+}
+p { max-width: 68ch; }
+p.wide { max-width: none; }
+a { color: var(--accent); }
+
+/* ── cards ────────────────────────────────────────────────────────────── */
+
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 17px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.card .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.card .v {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.card .d { font-size: 13.2px; color: var(--ink-2); line-height: 1.5; margin: 0; max-width: none; }
+
+/* nav matrix cards — the only cards that lift, because they are the one
+   interactive object on the portal page */
+a.navcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 19px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color .13s, transform .13s, box-shadow .13s;
+}
+a.navcard:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--border-firm); border-left-color: var(--accent); }
+a.navcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a.navcard .t { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -.01em; }
+a.navcard .f { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+a.navcard .d { font-size: 13.4px; color: var(--ink-2); line-height: 1.5; margin: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--border-firm);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.pill.ok    { color: var(--good); border-color: var(--good); background: var(--good-bg); }
+.pill.warn  { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
+.pill.crit  { color: var(--crit); border-color: var(--crit); background: var(--crit-bg); }
+.pill.info  { color: var(--cat-2); border-color: var(--cat-2); background: var(--info-bg); }
+.pill.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── tables ───────────────────────────────────────────────────────────── */
+
+.tw { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 14px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 13.2px; min-width: 560px; }
+thead th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border-firm);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+tbody td { padding: 9px 13px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--surface-2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); white-space: nowrap; }
+table code { font-size: 12px; }
+
+code {
+  font-family: var(--mono);
+  font-size: 12.6px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  padding: 1px 4px;
+  color: var(--ink);
+  word-break: break-word;
+}
+.route { color: var(--accent); }
+.verb {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  margin-right: 6px;
+}
+.verb.get { color: var(--cat-2); }
+.verb.post { color: var(--cat-5); }
+.verb.del { color: var(--crit); }
+
+pre {
+  font-family: var(--mono);
+  font-size: 12.4px;
+  line-height: 1.62;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-firm);
+  border-radius: var(--radius);
+  padding: 15px 17px;
+  overflow-x: auto;
+  margin: 12px 0;
+  color: var(--ink);
+  tab-size: 2;
+}
+pre b   { color: var(--accent); font-weight: 600; }
+pre i   { color: var(--ink-3); font-style: normal; }
+pre u   { color: var(--cat-2); text-decoration: none; }
+pre em  { color: var(--cat-3); font-style: normal; }
+
+.caption {
+  font-size: 12.4px;
+  color: var(--ink-3);
+  margin: 7px 0 0;
+  max-width: 72ch;
+}
+.caption b { color: var(--ink-2); font-weight: 500; }
+
+/* ── callouts ─────────────────────────────────────────────────────────── */
+
+.note {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 13px 16px;
+  margin: 16px 0;
+  font-size: 13.6px;
+  line-height: 1.56;
+}
+.note p { margin: 0; max-width: none; }
+.note p + p { margin-top: 8px; }
+.note .lede {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-3);
+}
+.note.trap  { border-left-color: var(--crit); background: var(--crit-bg); }
+.note.trap .lede { color: var(--crit); }
+.note.deg   { border-left-color: var(--warn); background: var(--warn-bg); }
+.note.deg .lede { color: var(--warn); }
+.note.inv   { border-left-color: var(--cat-2); background: var(--info-bg); }
+.note.inv .lede { color: var(--cat-2); }
+
+/* ── mermaid ──────────────────────────────────────────────────────────── */
+
+.dia {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 14px;
+  margin: 14px 0;
+  overflow-x: auto;
+}
+.dia .mermaid { display: flex; justify-content: center; min-width: 500px; }
+.dia svg { max-width: 100%; height: auto; }
+
+/* ── charts ───────────────────────────────────────────────────────────── */
+
+figure { margin: 16px 0; }
+figure .fig-t {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15.5px;
+  letter-spacing: -.005em;
+  margin-bottom: 2px;
+}
+figure .fig-s { font-size: 12.8px; color: var(--ink-3); margin-bottom: 12px; }
+.chart-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 20px 14px;
+  overflow-x: auto;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 12.4px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+
+.chart svg { display: block; width: 100%; height: auto; }
+.chart text { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }
+.chart .lbl { fill: var(--ink-2); }
+.chart .val { fill: var(--ink); font-weight: 600; }
+.chart .mut { fill: var(--ink-3); font-size: 10px; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .axis { stroke: var(--border-firm); stroke-width: 1; }
+.chart .bar { transition: opacity .12s; }
+.chart g.row:hover .bar { opacity: .82; }
+
+/* meter — used for the test-tier headroom, where a track/fill pair is the
+   honest form: each tier has a hard ceiling, so the empty space is the datum */
+.meters { display: flex; flex-direction: column; gap: 11px; }
+.meter { display: grid; grid-template-columns: 128px 1fr 86px; gap: 14px; align-items: center; font-size: 13px; }
+.meter .mname { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.meter .track { height: 15px; background: var(--surface-3); border-radius: 2px; position: relative; overflow: hidden; }
+.meter .fill { height: 100%; border-radius: 2px 0 0 2px; }
+.meter .mval { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.meter .mval b { color: var(--ink); font-weight: 600; }
+
+/* ── dependency / boundary rules ──────────────────────────────────────── */
+
+.rules { list-style: none; padding: 0; margin: 14px 0; display: flex; flex-direction: column; gap: 9px; }
+.rules li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 11px;
+  align-items: start;
+  font-size: 13.6px;
+  line-height: 1.55;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 11px 14px;
+}
+.rules .mark { font-family: var(--mono); font-weight: 600; font-size: 14px; line-height: 1.5; }
+.rules .yes .mark { color: var(--good); }
+.rules .no .mark { color: var(--crit); }
+
+ul.plain { padding-left: 19px; max-width: 68ch; }
+ul.plain li { margin-bottom: 6px; line-height: 1.55; }
+
+/* ── footer ───────────────────────────────────────────────────────────── */
+
+footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  margin-top: 40px;
+}
+.footer-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 28px 34px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.footer-in a { color: var(--ink-3); }
+
+@media (max-width: 620px) {
+  .masthead-in, .switchbar-in, main, .footer-in { padding-left: 17px; padding-right: 17px; }
+  .meter { grid-template-columns: 96px 1fr 74px; gap: 9px; }
+  .switch-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-in">
+    <div class="crumb">
+      <span class="wordmark">Po<span class="c">Redo</span><span class="m">Image</span></span>
+      <span class="sep">/</span>
+      <span>Documentation portal</span>
+    </div>
+    <h1>PoRedoImage Docs Portal</h1>
+    <p class="standfirst">
+      A photo goes in; a regenerated image, a meme, a rapped roast with a backing track, or an
+      eight-second video comes out. Four reports cover how that happens, what it costs, who is
+      allowed to ask for it, and where it quietly degrades.
+    </p>
+    <div class="masthead-meta">
+      <span><b>Stack</b> .NET 10 &middot; Blazor WASM &middot; Minimal APIs</span>
+      <span><b>Topology</b> BFF + WASM SPA + MAUI Android head</span>
+      <span><b>Slices</b> 10 vertical</span>
+      <span><b>Generated</b> 2026-09-07 &middot; <code>d8b65be</code></span>
+    </div>
+  </div>
+</header>
+
+<nav class="switchbar" aria-label="Detail level">
+  <div class="switchbar-in">
+    <span class="switch-label">Detail</span>
+    <div class="switch" role="group" aria-label="Choose how much detail to show">
+      <button type="button" data-level="1" aria-pressed="false"><span class="n">1</span> Simple</button>
+      <button type="button" data-level="2" aria-pressed="true"><span class="n">2</span> Standard</button>
+      <button type="button" data-level="3" aria-pressed="false"><span class="n">3</span> All details</button>
+    </div>
+    <span class="switch-hint" id="switch-hint"></span>
+  </div>
+</nav>
+
+<main>
+
+<!-- ══════════════════════ TIER 1 ══════════════════════ -->
+<section data-tier="1">
+  <div class="sec-head">
+    <span class="tier-chip tier-1">Tier 1 &middot; Executive</span>
+    <h2>The thirty-second version</h2>
+  </div>
+  <p class="sec-sub">
+    Everything an incoming engineer needs before opening a file. Every figure below is read
+    out of the repository, not estimated.
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>Where it stands today</th><th>Anchored in</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Scope</b></td>
+          <td>Five user-facing features — image regeneration, meme generation, bulk board
+              generation, rap roast with music, image&#8209;to&#8209;video — plus a gallery, a
+              diagnostics page and an Android head.</td>
+          <td><code>Features/</code>, <code>Client/Pages/</code></td>
+        </tr>
+        <tr>
+          <td><b>Latency budgets</b></td>
+          <td>Not contractual SLAs. Timeouts are the real contract: <b>2&nbsp;min</b> per attempt
+              and <b>5&nbsp;min</b> total on generative calls, <b>15&nbsp;min</b> on the Veo video
+              client, <b>4&nbsp;min</b> on the host's own loopback client.</td>
+          <td><code>InfrastructureServiceExtensions.cs</code></td>
+        </tr>
+        <tr>
+          <td><b>Security</b></td>
+          <td>BFF invariant — the browser never holds a token. <code>HttpOnly</code> +
+              <code>SameSite=Strict</code> cookie, claims-only principal serialized to WASM.
+              Authorization is fail&#8209;closed by fallback policy.</td>
+          <td><code>AuthServiceExtensions.cs</code></td>
+        </tr>
+        <tr>
+          <td><b>Rate limiting</b></td>
+          <td>10 requests / 60&nbsp;s sliding window, 6 segments, queue depth 2, partitioned by
+              user id and falling back to remote IP. Rejects with <code>429</code>.</td>
+          <td><code>Program.cs</code></td>
+        </tr>
+        <tr>
+          <td><b>Cost</b></td>
+          <td>One video render is <b>$0.40</b> — 400&times; a vision call and ten times an image
+              generation. It dominates the per-action cost profile and is why the Lite tier is
+              the default.</td>
+          <td><code>AiPricingOptions.cs</code></td>
+        </tr>
+        <tr>
+          <td><b>Data at rest</b></td>
+          <td>Azure Blob + Table, <code>Standard_LRS</code>. A lifecycle policy tiers blobs to
+              cool at 7 days and deletes at 30.</td>
+          <td><code>infra/main.bicep</code></td>
+        </tr>
+        <tr>
+          <td><b>CI gate</b></td>
+          <td>One workflow. Builds the whole solution, runs the Unit and Architecture tiers only —
+              Integration and both E2E tiers stay local by design.</td>
+          <td><code>.github/workflows/deploy.yml</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>What this app actually is</h3>
+  <p class="wide" style="max-width:70ch">
+    PoRedoImage is a photo studio where every tool is a different AI model. You give it a picture;
+    it looks at the picture, writes down what it sees, and then hands that description to whichever
+    model makes the thing you asked for. The browser does the whole interface — a Blazor
+    WebAssembly SPA that owns every interactive page and the only dependency-injection container in
+    the solution. The ASP.NET host behind it is a <em>Backend&#8209;for&#8209;Frontend</em>, not a
+    page server: it renders exactly one host document and then exists to hold the credentials the
+    browser must never see. Prerendering is switched off deliberately, because a server render pass
+    could not resolve the services that live only in the client's container.
+  </p>
+  <p class="wide" style="max-width:70ch">
+    The interesting part is what happens when a model says no. Nearly every AI call site here
+    catches its own failure and substitutes something canned — a tag list instead of a caption,
+    heuristic lyrics instead of written ones, a softened rewrite after a safety refusal. That is
+    what makes the system feel robust and also what makes it hard to debug: a dead provider
+    degrades several features at once while <code>/health</code> still reports green. The codebase's
+    answer is a rule rather than a patch. Every fallback path must set a user&#8209;facing reason —
+    <code>DescriptionFallbackReason</code>, <code>LyricsFallbackReason</code>,
+    <code>RefusalReason</code> — because silent degradation reads to the person holding the phone
+    as "the AI ignored my photo."
+  </p>
+
+  <h3>At a glance</h3>
+  <div class="grid g4">
+    <div class="card">
+      <span class="k">Architecture</span>
+      <span class="v">BFF + WASM</span>
+      <p class="d">Two web projects. <code>.Client</code> ships to the browser and owns every
+         interactive page; <code>.Web</code> hosts the API and holds the secrets. Server code is
+         vertical&#8209;slice, not layered.</p>
+    </div>
+    <div class="card">
+      <span class="k">External integrations</span>
+      <span class="v">6 providers</span>
+      <p class="d">Azure Computer Vision, Azure OpenAI, Google Gemini/Imagen, Google Veo, Google
+         Lyria, and optional local Ollama. Browser and on&#8209;device models run outside the
+         server entirely.</p>
+    </div>
+    <div class="card">
+      <span class="k">Auth strategy</span>
+      <span class="v">Cookie BFF</span>
+      <p class="d">Three startup&#8209;resolved modes: fake&#8209;auth headers for tests,
+         cookie&#8209;only when no client id is configured, Entra&nbsp;OIDC&nbsp;+&nbsp;cookie
+         otherwise. Production without a client id throws.</p>
+    </div>
+    <div class="card">
+      <span class="k">Enforced budget</span>
+      <span class="v">5&nbsp;min</span>
+      <p class="d">Total request timeout on the generative client — the real ceiling, since three
+         attempts at two minutes each would otherwise reach six.</p>
+    </div>
+  </div>
+
+  <h3>Reports</h3>
+  <p class="sec-sub">Each carries the same three&#8209;level detail switcher as this page.</p>
+  <div class="grid g2">
+    <a class="navcard" href="AI_SERVICES_REPORT.html">
+      <span class="t">AI Services</span>
+      <span class="f">AI_SERVICES_REPORT.html</span>
+      <p class="d">Every provider, what a call costs, how the router picks one, and the retry /
+         circuit&#8209;breaker behaviour behind it. Includes the fallback catalogue — the paths
+         that return something plausible when a model fails.</p>
+      <span class="tags">
+        <span class="pill info dot">6 providers</span>
+        <span class="pill warn dot">3 silent-degradation paths</span>
+        <span class="pill ok dot">costs verified</span>
+      </span>
+    </a>
+    <a class="navcard" href="ROLES_PERMISSIONS_MATRIX.html">
+      <span class="t">Roles &amp; Permissions</span>
+      <span class="f">ROLES_PERMISSIONS_MATRIX.html</span>
+      <p class="d">The fail&#8209;closed authorization model, the antiforgery filter that replaces
+         the middleware, and an endpoint&#8209;by&#8209;endpoint matrix of who may call what —
+         with the RFC&nbsp;9457 payloads returned when they may not.</p>
+      <span class="tags">
+        <span class="pill ok dot">fail-closed default</span>
+        <span class="pill info dot">27 routes mapped</span>
+        <span class="pill crit dot">1 escape hatch</span>
+      </span>
+    </a>
+    <a class="navcard" href="USER_WORKFLOW.html">
+      <span class="t">User Workflows</span>
+      <span class="f">USER_WORKFLOW.html</span>
+      <p class="d">Five journeys as swimlane flowcharts and sequence diagrams, from the file
+         picker through validation, orchestration and the external call, to the typed response the
+         page renders.</p>
+      <span class="tags">
+        <span class="pill info dot">5 journeys</span>
+        <span class="pill ok dot">validators listed</span>
+        <span class="pill warn dot">1 polling loop</span>
+      </span>
+    </a>
+    <a class="navcard" href="VISUAL_ARCHITECTURE_DASHBOARD.html">
+      <span class="t">Architecture Dashboard</span>
+      <span class="f">VISUAL_ARCHITECTURE_DASHBOARD.html</span>
+      <p class="d">System topology, the C4 container and component views, the storage ERD, and the
+         dependency rules the architecture test tier actually enforces at build time.</p>
+      <span class="tags">
+        <span class="pill info dot">C4 L2 + L3</span>
+        <span class="pill ok dot">ERD</span>
+        <span class="pill ok dot">26 arch rules</span>
+      </span>
+    </a>
+  </div>
+</section>
+
+<!-- ══════════════════════ TIER 2 ══════════════════════ -->
+<section data-tier="2">
+  <div class="sec-head">
+    <span class="tier-chip tier-2">Tier 2 &middot; Architectural</span>
+    <h2>How a request moves through the system</h2>
+  </div>
+  <p class="sec-sub">
+    The container view first, then the middleware order that every API call passes through. Order
+    matters more than it looks: antiforgery runs after authentication so a rejected token surfaces
+    on an identified request.
+  </p>
+
+  <div class="dia">
+    <pre class="mermaid">
+flowchart LR
+  subgraph client["Browser"]
+    SPA["PoRedoImage.Client<br/>Blazor WASM SPA<br/><i>every interactive page</i>"]
+    LOCAL["LocalAi<br/><i>WebGPU, WASM fallback</i>"]
+  end
+  subgraph phone["Android"]
+    MAUI["PoRedoImage.Mobile<br/><i>HTTP only, no keys</i>"]
+  end
+  subgraph host["App Service &mdash; poredoimage-web"]
+    BFF["PoRedoImage.Web<br/>BFF / Minimal APIs"]
+    APP["Application<br/><i>orchestrators</i>"]
+    INF["Infrastructure<br/><i>provider clients</i>"]
+  end
+  subgraph azure["Azure"]
+    KV["Key Vault<br/>kv-poshared"]
+    ST["Storage<br/>Blob + Table"]
+    CV["Computer Vision"]
+    AOAI["Azure OpenAI"]
+  end
+  subgraph google["Google"]
+    GEM["Gemini / Imagen"]
+    VEO["Veo 3.1 Lite"]
+    LYR["Lyria"]
+  end
+
+  SPA -- "cookie + X-CSRF-TOKEN" --> BFF
+  MAUI -- "HTTP" --> BFF
+  SPA -.-> LOCAL
+  BFF --> APP --> INF
+  BFF --> ST
+  BFF -. "secrets at boot" .-> KV
+  INF --> CV
+  INF --> AOAI
+  INF --> GEM
+  INF --> VEO
+  INF --> LYR
+    </pre>
+  </div>
+  <p class="caption">
+    <b>C4 level 2.</b> The dotted edge from the SPA to <code>LocalAi</code> leaves the diagram —
+    browser&#8209;local inference never reaches the server, and a failure there surfaces verbatim
+    rather than falling back to a metered provider.
+  </p>
+
+  <h3>Middleware order</h3>
+  <div class="dia">
+    <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant RC as RequestContext
+  participant UC as UserContext
+  participant AU as Authn / Authz
+  participant RL as RateLimiter
+  participant AF as Antiforgery filter
+  participant EP as Slice handler
+  B->>RC: POST /api/... (cookie, X-CSRF-TOKEN)
+  RC->>RC: resolve X-Correlation-ID / X-Session-ID, push to LogContext
+  RC->>UC: forward
+  UC->>UC: push UserId (or "anonymous")
+  UC->>AU: forward
+  AU->>AU: cookie → claims principal; FallbackPolicy denies if anonymous
+  AU->>RL: forward
+  RL->>RL: sliding window, partitioned by user id
+  RL->>AF: forward
+  AF->>AF: validate token — only on POST/PUT/PATCH/DELETE in tagged groups
+  AF->>EP: invoke
+  EP-->>B: 200 + echoed X-Correlation-ID
+    </pre>
+  </div>
+
+  <div class="note inv">
+    <span class="lede">Invariant</span>
+    <p><code>app.UseAntiforgery()</code> alone protects nothing on this API. It validates only what
+    it recognises as a form post, so a JSON <code>POST</code> sails straight through regardless of
+    endpoint metadata. Enforcement is the <code>AntiforgeryValidationFilter</code>, applied at the
+    <b>group</b> level so a newly added <code>POST</code> inside an existing group is covered by
+    default rather than by memory.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════ TIER 3 ══════════════════════ -->
+<section data-tier="3">
+  <div class="sec-head">
+    <span class="tier-chip tier-3">Tier 3 &middot; Implementation</span>
+    <h2>System specifications</h2>
+  </div>
+  <p class="sec-sub">
+    Route prefixes, wire envelopes and the telemetry keys that make a request traceable end to end.
+  </p>
+
+  <h3>Global route prefixes</h3>
+  <div class="tw">
+    <table>
+      <thead>
+        <tr><th>Prefix</th><th>Slice</th><th>Default access</th><th>Antiforgery</th><th>Idempotency</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code class="route">/api/images</code></td><td>ImageAnalysis</td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/api/rap-roast</code></td><td>RapRoast</td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/api/bulk-generate</code></td><td>BulkGenerate</td><td><span class="pill">split</span></td><td>prompts group</td><td>prompts group</td></tr>
+        <tr><td><code class="route">/api/user-images</code></td><td>UserImages</td><td><span class="pill ok">authenticated</span></td><td>group</td><td>group</td></tr>
+        <tr><td><code class="route">/api/meme-templates</code></td><td>MemeTemplates</td><td><span class="pill ok">authenticated</span></td><td>group</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/api/video</code></td><td>VideoGenerate</td><td><span class="pill ok">authenticated</span></td><td>group</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/api/diag</code></td><td>Diagnostics</td><td><span class="pill ok">policy</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/api/pricing</code></td><td>Pricing</td><td><span class="pill ok">authenticated</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/api/antiforgery/token</code></td><td>Shared</td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/health</code>, <code class="route">/alive</code></td><td>host</td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><code class="route">/openapi</code>, <code class="route">/scalar</code></td><td>host</td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">
+    Anonymous access is always an explicit <code>.AllowAnonymous()</code>. The
+    <code>AuthorizationOptions.FallbackPolicy</code> is <code>RequireAuthenticatedUser</code>, so
+    anything not listed here is authenticated by default.
+  </p>
+
+  <h3>Error envelope &mdash; RFC 9457</h3>
+  <p>
+    Failures use ASP.NET Core's problem-details writer. The client deserializes the subset it
+    actually reads into <code>ProblemDetailsDto</code>; the wire object carries more.
+  </p>
+<pre><i>// wire — application/problem+json</i>
+{
+  "<b>type</b>":     "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "<b>title</b>":    <em>"Video Generation Declined"</em>,
+  "<b>status</b>":   <u>422</u>,
+  "<b>detail</b>":   <em>"The image was rejected by the provider's safety filter."</em>,
+  "<b>traceId</b>":  <em>"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"</em>
+}
+
+<i>// PoRedoImage.Shared/DTOs/ProblemDetailsDto.cs — what the client binds</i>
+public sealed class <b>ProblemDetailsDto</b>
+{
+    public string? Title  { get; set; }
+    public string? Detail { get; set; }
+    public int?    Status { get; set; }
+    public string? Type   { get; set; }
+}</pre>
+
+  <h3>Distributed tracing conventions</h3>
+  <div class="tw">
+    <table>
+      <thead>
+        <tr><th>Key</th><th>Direction</th><th>Set by</th><th>Behaviour</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>X-Correlation-ID</code></td>
+          <td>in &amp; out</td>
+          <td><code>CorrelationHeaderHandler</code> (client) &rarr; <code>RequestContextMiddleware</code></td>
+          <td>Echoed on the response and re&#8209;stamped onto outbound provider calls by
+              <code>OutboundCorrelationHandler</code>, so one id spans browser &rarr; BFF &rarr;
+              Gemini. Absent &rarr; fresh GUID.</td>
+        </tr>
+        <tr>
+          <td><code>X-Session-ID</code></td>
+          <td>in &amp; out</td>
+          <td><code>ClientRequestContext</code></td>
+          <td>Stable for the life of the SPA session. Falls back to
+              <code>HttpContext.TraceIdentifier</code> for non&#8209;WASM callers.</td>
+        </tr>
+        <tr>
+          <td><code>Idempotency-Key</code></td>
+          <td>in</td>
+          <td>caller, optional</td>
+          <td>Must parse as a UUID or the request is rejected <code>400</code>. A repeat inside the
+              24&nbsp;h TTL replays the cached 2xx body.</td>
+        </tr>
+        <tr>
+          <td><code>Idempotent-Replay</code></td>
+          <td>out</td>
+          <td><code>IdempotencyKeyFilter</code></td>
+          <td><code>"true"</code> when the body came from cache rather than a fresh execution.</td>
+        </tr>
+        <tr>
+          <td><code>X-CSRF-TOKEN</code></td>
+          <td>in</td>
+          <td><code>AntiforgeryTokenHandler</code></td>
+          <td>The client cannot read the <code>HttpOnly</code> cookie, so it echoes the token in
+              this header. One retry on <code>400</code> is normal after sign&#8209;in.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Serilog log-context properties</h4>
+  <p>
+    Pushed once per request and present on every entry written inside it, so a single filter
+    reconstructs a user's whole session.
+  </p>
+<pre><i>// Features/Diagnostics/RequestContextMiddleware.cs + UserContextMiddleware.cs</i>
+LogContext.PushProperty(<em>"CorrelationId"</em>, correlationId);
+LogContext.PushProperty(<em>"SessionId"</em>,     sessionId);
+LogContext.PushProperty(<em>"UserId"</em>,        ResolveUserId(context.User));  <i>// "anonymous" when unauthenticated</i>
+
+<i>// Serilog global enrichment — appsettings.json</i>
+"Properties": { "Application": <em>"PoRedoImage"</em> }</pre>
+
+  <h4>Health payload</h4>
+  <p>
+    Deliberately an anonymous projection rather than a shared DTO: the post&#8209;deploy smoke test
+    greps this exact shape, and the browser never deserializes it. Per&#8209;entry status is a
+    string, not an enum ordinal, so the failing check name is greppable without parsing numbers.
+  </p>
+<pre><i>// GET /health — five "ready"-tagged checks</i>
+{
+  "status":   <em>"Degraded"</em>,
+  "duration": <u>412.7</u>,
+  "entries": [
+    { "key": <em>"key-vault"</em>,       "status": <em>"Healthy"</em>,   "duration": <u>31.2</u>,  "description": null, "error": null },
+    { "key": <em>"computer-vision"</em>, "status": <em>"Healthy"</em>,   "duration": <u>88.0</u>,  "description": null, "error": null },
+    { "key": <em>"openai"</em>,          "status": <em>"Healthy"</em>,   "duration": <u>102.5</u>, "description": null, "error": null },
+    { "key": <em>"table-storage"</em>,   "status": <em>"Healthy"</em>,   "duration": <u>44.9</u>,  "description": null, "error": null },
+    { "key": <em>"imagen3"</em>,         "status": <em>"Unhealthy"</em>, "duration": <u>146.1</u>, "description": null, "error": <em>"..."</em> }
+  ]
+}
+
+<i>// GET /alive — liveness only; Predicate = _ =&gt; false runs no checks at all</i></pre>
+
+  <div class="note deg">
+    <span class="lede">Read this before trusting /health</span>
+    <p>A green <code>/health</code> does <b>not</b> mean the AI features work. The five checks probe
+    connectivity; the call sites catch failures and substitute canned output. Azure Computer
+    Vision's <code>Caption</code> and <code>DenseCaptions</code> are region&#8209;unavailable on the
+    configured resource, so <code>AzureVisionService</code> falls back to joined tags on
+    <em>every single call</em> while its health check reports healthy.</p>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="footer-in">
+    <span>PoRedoImage &mdash; engineering reference</span>
+    <span>Generated 2026-09-07 from commit <code>d8b65be</code></span>
+    <span>Source of truth: <code>CLAUDE.md</code> at the repo root</span>
+    <span><a href="index.html">Portal index</a></span>
+  </div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>
+/* Detail switcher — cumulative. Level 1 = Tier 1, 2 = Tier 1+2, 3 = everything.
+   Buttons carry data-level; content sections carry data-tier. */
+(function () {
+  var KEY = 'poredo-docs-detail-level';
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-level]'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('[data-tier]'));
+
+  function apply(level) {
+    sections.forEach(function (s) {
+      s.hidden = parseInt(s.getAttribute('data-tier'), 10) > level;
+    });
+    buttons.forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-level') === String(level) ? 'true' : 'false');
+    });
+    var hint = document.getElementById('switch-hint');
+    if (hint) {
+      var shown = sections.filter(function (s) { return !s.hidden; }).length;
+      hint.innerHTML = 'Showing <b>' + shown + '</b> of ' + sections.length + ' sections';
+    }
+    try { localStorage.setItem(KEY, String(level)); } catch (e) { /* private mode */ }
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      apply(parseInt(b.getAttribute('data-level'), 10));
+    });
+  });
+
+  var start = 2;
+  try {
+    var saved = parseInt(localStorage.getItem(KEY), 10);
+    if (saved === 1 || saved === 2 || saved === 3) { start = saved; }
+  } catch (e) { /* private mode */ }
+
+  /* Mermaid renders at its container's measured width, so every diagram must be
+     laid out while visible. Render first, filter second — otherwise a Tier 3
+     diagram that starts hidden comes back at zero width when it is revealed. */
+  function ready() { apply(start); }
+
+  if (window.mermaid) {
+    var dark = matchMedia('(prefers-color-scheme: dark)').matches
+      && document.documentElement.getAttribute('data-theme') !== 'light'
+      || document.documentElement.getAttribute('data-theme') === 'dark';
+    var css = getComputedStyle(document.documentElement);
+    var t = function (n) { return css.getPropertyValue(n).trim(); };
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+      themeVariables: {
+        darkMode: dark,
+        background: t('--surface'),
+        primaryColor: t('--surface-2'),
+        primaryTextColor: t('--ink'),
+        primaryBorderColor: t('--border-firm'),
+        secondaryColor: t('--surface-3'),
+        tertiaryColor: t('--surface-3'),
+        lineColor: t('--ink-3'),
+        textColor: t('--ink-2'),
+        mainBkg: t('--surface-2'),
+        nodeBorder: t('--border-firm'),
+        clusterBkg: 'transparent',
+        clusterBorder: t('--border'),
+        actorBkg: t('--surface-2'),
+        actorBorder: t('--border-firm'),
+        actorTextColor: t('--ink'),
+        actorLineColor: t('--ink-3'),
+        signalColor: t('--ink-2'),
+        signalTextColor: t('--ink-2'),
+        labelBoxBkgColor: t('--surface-3'),
+        labelBoxBorderColor: t('--border-firm'),
+        labelTextColor: t('--ink'),
+        loopTextColor: t('--ink-2'),
+        noteBkgColor: t('--accent-soft'),
+        noteBorderColor: t('--accent-line'),
+        noteTextColor: t('--ink'),
+        altBackground: t('--surface-2'),
+        sequenceNumberColor: t('--surface'),
+        attributeBackgroundColorOdd: t('--surface'),
+        attributeBackgroundColorEven: t('--surface-2')
+      }
+    });
+    window.mermaid.run({ querySelector: '.mermaid' }).then(ready, ready);
+  } else {
+    ready();
+  }
+})();
+</script>
+</body>
+</html>

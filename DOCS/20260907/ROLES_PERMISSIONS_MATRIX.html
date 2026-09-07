@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roles & Permissions Matrix</title>
+<meta name="description" content="PoRedoImage engineering reference — generated from the repository on 2026-09-07.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   PoRedoImage documentation system
+   Palette grounded in the prepress primaries the app itself works in (C·M·Y·K).
+   Categorical steps validated for CVD separation in both modes.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* neutrals — a "Key" grey pulled slightly cyan, never a flat mid-grey */
+  --ground:      #EEF2F3;
+  --surface:     #FFFFFF;
+  --surface-2:   #F7FAFB;
+  --surface-3:   #E7EDEF;
+  --border:      #D6DFE2;
+  --border-firm: #B9C6CB;
+  --ink:         #0E1417;
+  --ink-2:       #3D4A50;
+  --ink-3:       #68787F;
+
+  /* brand: the M of CMY */
+  --accent:      #A3175E;
+  --accent-soft: #FBEBF3;
+  --accent-line: #E8B9D1;
+
+  /* categorical — fixed order, never cycled. C · M · Y · indigo · green */
+  --cat-1: #A3175E;
+  --cat-2: #12A0B8;
+  --cat-3: #946800;
+  --cat-4: #4453B5;
+  --cat-5: #2F7F4A;
+
+  /* status — reserved, never reused as a series colour */
+  --good:      #2F7F4A;
+  --good-bg:   #E6F2EA;
+  --warn:      #946800;
+  --warn-bg:   #F8F0DC;
+  --crit:      #B3261E;
+  --crit-bg:   #FBE9E7;
+  --info-bg:   #E4F4F7;
+
+  --grid:      #E2E9EB;
+
+  --radius:    3px;
+  --shadow:    0 1px 2px rgba(14, 20, 23, .06), 0 4px 14px rgba(14, 20, 23, .05);
+
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Familjen Grotesk", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0C1113;
+    --surface:     #141C1F;
+    --surface-2:   #1A2427;
+    --surface-3:   #202C30;
+    --border:      #263539;
+    --border-firm: #3A4C52;
+    --ink:         #E9EFF1;
+    --ink-2:       #A6B6BC;
+    --ink-3:       #74858C;
+
+    --accent:      #DE3F86;
+    --accent-soft: #2A1420;
+    --accent-line: #5B2843;
+
+    --cat-1: #DE3F86;
+    --cat-2: #0F9FB8;
+    --cat-3: #B3820C;
+    --cat-4: #7480DE;
+    --cat-5: #35A566;
+
+    --good:      #35A566;
+    --good-bg:   #10251A;
+    --warn:      #B3820C;
+    --warn-bg:   #291F08;
+    --crit:      #E4695F;
+    --crit-bg:   #2C1412;
+    --info-bg:   #0D242A;
+
+    --grid:      #223034;
+    --shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #0C1113;
+  --surface:     #141C1F;
+  --surface-2:   #1A2427;
+  --surface-3:   #202C30;
+  --border:      #263539;
+  --border-firm: #3A4C52;
+  --ink:         #E9EFF1;
+  --ink-2:       #A6B6BC;
+  --ink-3:       #74858C;
+
+  --accent:      #DE3F86;
+  --accent-soft: #2A1420;
+  --accent-line: #5B2843;
+
+  --cat-1: #DE3F86;
+  --cat-2: #0F9FB8;
+  --cat-3: #B3820C;
+  --cat-4: #7480DE;
+  --cat-5: #35A566;
+
+  --good:      #35A566;
+  --good-bg:   #10251A;
+  --warn:      #B3820C;
+  --warn-bg:   #291F08;
+  --crit:      #E4695F;
+  --crit-bg:   #2C1412;
+  --info-bg:   #0D242A;
+
+  --grid:      #223034;
+  --shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── masthead ─────────────────────────────────────────────────────────── */
+
+.masthead {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.masthead-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 30px 28px 26px;
+}
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+}
+.crumb a { color: var(--ink-3); text-decoration: none; border-bottom: 1px solid var(--border-firm); }
+.crumb a:hover { color: var(--accent); border-color: var(--accent); }
+.crumb .sep { color: var(--border-firm); }
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.wordmark .c { color: var(--cat-2); }
+.wordmark .m { color: var(--cat-1); }
+.wordmark .y { color: var(--cat-3); }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.4vw, 45px);
+  line-height: 1.06;
+  letter-spacing: -.022em;
+  margin: 0 0 12px;
+  text-wrap: balance;
+}
+.standfirst {
+  max-width: 65ch;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0;
+}
+.masthead-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 20px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.masthead-meta b { color: var(--ink-2); font-weight: 500; }
+
+/* ── detail switcher (sticky) ─────────────────────────────────────────── */
+
+.switchbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+}
+.switchbar-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.switch-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.switch {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-firm);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.switch button {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.switch button:last-child { border-right: 0; }
+.switch button .n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  border: 1px solid var(--border-firm);
+  border-radius: 2px;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.switch button:hover { background: var(--surface-3); color: var(--ink); }
+.switch button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+.switch button[aria-pressed="true"] .n { color: #fff; border-color: rgba(255,255,255,.55); }
+.switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.switch-hint {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-left: auto;
+}
+.switch-hint b { color: var(--ink-2); font-weight: 500; }
+
+/* ── layout ───────────────────────────────────────────────────────────── */
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 8px 28px 90px;
+}
+
+section[data-tier] {
+  padding: 34px 0 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 22px;
+}
+section[data-tier]:first-of-type { border-top: 0; margin-top: 0; }
+section[hidden] { display: none !important; }
+
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.tier-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+  border: 1px solid;
+}
+.tier-1 { color: var(--cat-2); border-color: var(--cat-2); background: var(--info-bg); }
+.tier-2 { color: var(--cat-4); border-color: var(--cat-4); background: transparent; }
+.tier-3 { color: var(--cat-3); border-color: var(--cat-3); background: transparent; }
+
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -.016em;
+  margin: 0;
+  text-wrap: balance;
+}
+h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18.5px;
+  letter-spacing: -.01em;
+  margin: 30px 0 10px;
+}
+h4 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  margin: 22px 0 8px;
+  color: var(--ink-2);
+}
+.sec-sub {
+  max-width: 68ch;
+  color: var(--ink-2);
+  margin: 4px 0 22px;
+  font-size: 15px;
+}
+p { max-width: 68ch; }
+p.wide { max-width: none; }
+a { color: var(--accent); }
+
+/* ── cards ────────────────────────────────────────────────────────────── */
+
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 17px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.card .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.card .v {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.card .d { font-size: 13.2px; color: var(--ink-2); line-height: 1.5; margin: 0; max-width: none; }
+
+/* nav matrix cards — the only cards that lift, because they are the one
+   interactive object on the portal page */
+a.navcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 19px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color .13s, transform .13s, box-shadow .13s;
+}
+a.navcard:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--border-firm); border-left-color: var(--accent); }
+a.navcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a.navcard .t { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -.01em; }
+a.navcard .f { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+a.navcard .d { font-size: 13.4px; color: var(--ink-2); line-height: 1.5; margin: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--border-firm);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.pill.ok    { color: var(--good); border-color: var(--good); background: var(--good-bg); }
+.pill.warn  { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
+.pill.crit  { color: var(--crit); border-color: var(--crit); background: var(--crit-bg); }
+.pill.info  { color: var(--cat-2); border-color: var(--cat-2); background: var(--info-bg); }
+.pill.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── tables ───────────────────────────────────────────────────────────── */
+
+.tw { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 14px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 13.2px; min-width: 560px; }
+thead th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border-firm);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+tbody td { padding: 9px 13px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--surface-2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); white-space: nowrap; }
+table code { font-size: 12px; }
+
+code {
+  font-family: var(--mono);
+  font-size: 12.6px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  padding: 1px 4px;
+  color: var(--ink);
+  word-break: break-word;
+}
+.route { color: var(--accent); }
+.verb {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  margin-right: 6px;
+}
+.verb.get { color: var(--cat-2); }
+.verb.post { color: var(--cat-5); }
+.verb.del { color: var(--crit); }
+
+pre {
+  font-family: var(--mono);
+  font-size: 12.4px;
+  line-height: 1.62;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-firm);
+  border-radius: var(--radius);
+  padding: 15px 17px;
+  overflow-x: auto;
+  margin: 12px 0;
+  color: var(--ink);
+  tab-size: 2;
+}
+pre b   { color: var(--accent); font-weight: 600; }
+pre i   { color: var(--ink-3); font-style: normal; }
+pre u   { color: var(--cat-2); text-decoration: none; }
+pre em  { color: var(--cat-3); font-style: normal; }
+
+.caption {
+  font-size: 12.4px;
+  color: var(--ink-3);
+  margin: 7px 0 0;
+  max-width: 72ch;
+}
+.caption b { color: var(--ink-2); font-weight: 500; }
+
+/* ── callouts ─────────────────────────────────────────────────────────── */
+
+.note {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 13px 16px;
+  margin: 16px 0;
+  font-size: 13.6px;
+  line-height: 1.56;
+}
+.note p { margin: 0; max-width: none; }
+.note p + p { margin-top: 8px; }
+.note .lede {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-3);
+}
+.note.trap  { border-left-color: var(--crit); background: var(--crit-bg); }
+.note.trap .lede { color: var(--crit); }
+.note.deg   { border-left-color: var(--warn); background: var(--warn-bg); }
+.note.deg .lede { color: var(--warn); }
+.note.inv   { border-left-color: var(--cat-2); background: var(--info-bg); }
+.note.inv .lede { color: var(--cat-2); }
+
+/* ── mermaid ──────────────────────────────────────────────────────────── */
+
+.dia {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 14px;
+  margin: 14px 0;
+  overflow-x: auto;
+}
+.dia .mermaid { display: flex; justify-content: center; min-width: 500px; }
+.dia svg { max-width: 100%; height: auto; }
+
+/* ── charts ───────────────────────────────────────────────────────────── */
+
+figure { margin: 16px 0; }
+figure .fig-t {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15.5px;
+  letter-spacing: -.005em;
+  margin-bottom: 2px;
+}
+figure .fig-s { font-size: 12.8px; color: var(--ink-3); margin-bottom: 12px; }
+.chart-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 20px 14px;
+  overflow-x: auto;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 12.4px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+
+.chart svg { display: block; width: 100%; height: auto; }
+.chart text { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }
+.chart .lbl { fill: var(--ink-2); }
+.chart .val { fill: var(--ink); font-weight: 600; }
+.chart .mut { fill: var(--ink-3); font-size: 10px; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .axis { stroke: var(--border-firm); stroke-width: 1; }
+.chart .bar { transition: opacity .12s; }
+.chart g.row:hover .bar { opacity: .82; }
+
+/* meter — used for the test-tier headroom, where a track/fill pair is the
+   honest form: each tier has a hard ceiling, so the empty space is the datum */
+.meters { display: flex; flex-direction: column; gap: 11px; }
+.meter { display: grid; grid-template-columns: 128px 1fr 86px; gap: 14px; align-items: center; font-size: 13px; }
+.meter .mname { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.meter .track { height: 15px; background: var(--surface-3); border-radius: 2px; position: relative; overflow: hidden; }
+.meter .fill { height: 100%; border-radius: 2px 0 0 2px; }
+.meter .mval { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.meter .mval b { color: var(--ink); font-weight: 600; }
+
+/* ── dependency / boundary rules ──────────────────────────────────────── */
+
+.rules { list-style: none; padding: 0; margin: 14px 0; display: flex; flex-direction: column; gap: 9px; }
+.rules li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 11px;
+  align-items: start;
+  font-size: 13.6px;
+  line-height: 1.55;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 11px 14px;
+}
+.rules .mark { font-family: var(--mono); font-weight: 600; font-size: 14px; line-height: 1.5; }
+.rules .yes .mark { color: var(--good); }
+.rules .no .mark { color: var(--crit); }
+
+ul.plain { padding-left: 19px; max-width: 68ch; }
+ul.plain li { margin-bottom: 6px; line-height: 1.55; }
+
+/* ── footer ───────────────────────────────────────────────────────────── */
+
+footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  margin-top: 40px;
+}
+.footer-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 28px 34px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.footer-in a { color: var(--ink-3); }
+
+@media (max-width: 620px) {
+  .masthead-in, .switchbar-in, main, .footer-in { padding-left: 17px; padding-right: 17px; }
+  .meter { grid-template-columns: 96px 1fr 74px; gap: 9px; }
+  .switch-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-in">
+    <div class="crumb">
+      <a href="index.html"><span class="wordmark">Po<span class="c">Redo</span><span class="m">Image</span></span></a>
+      <span class="sep">/</span>
+      <span>Roles &amp; permissions</span>
+    </div>
+    <h1>Roles &amp; Permissions Matrix</h1>
+    <p class="standfirst">
+      Authorization here is fail&#8209;closed by default and has exactly one hand&#8209;written
+      escape hatch. This report maps every endpoint to the identity it demands, the antiforgery
+      filter that actually enforces writes, and the RFC&nbsp;9457 payloads returned on refusal.
+    </p>
+    <div class="masthead-meta">
+      <span><b>Default</b> RequireAuthenticatedUser (fallback policy)</span>
+      <span><b>Named policies</b> 1 &mdash; DiagnosticsAccess</span>
+      <span><b>Auth modes</b> 3, resolved at startup</span>
+      <span><b>Generated</b> 2026-09-07</span>
+    </div>
+  </div>
+</header>
+
+<nav class="switchbar" aria-label="Detail level">
+  <div class="switchbar-in">
+    <span class="switch-label">Detail</span>
+    <div class="switch" role="group" aria-label="Choose how much detail to show">
+      <button type="button" data-level="1" aria-pressed="false"><span class="n">1</span> Simple</button>
+      <button type="button" data-level="2" aria-pressed="true"><span class="n">2</span> Standard</button>
+      <button type="button" data-level="3" aria-pressed="false"><span class="n">3</span> All details</button>
+    </div>
+    <span class="switch-hint" id="switch-hint"></span>
+  </div>
+</nav>
+
+<main>
+
+<!-- ══════════════════════ TIER 1 ══════════════════════ -->
+<section data-tier="1">
+  <div class="sec-head">
+    <span class="tier-chip tier-1">Tier 1 &middot; Executive</span>
+    <h2>The security posture in one screen</h2>
+  </div>
+  <p class="sec-sub">
+    There is no role hierarchy in this application. There is one binary &mdash; authenticated or
+    not &mdash; plus a single email allow&#8209;list guarding diagnostics in production.
+  </p>
+
+  <div class="grid g4">
+    <div class="card">
+      <span class="k">Tokens in the browser</span>
+      <span class="v" style="color:var(--good)">Zero</span>
+      <p class="d">The BFF invariant. The server holds the session; WASM receives a
+         claims&#8209;only principal. <code>AddOidcAuthentication()</code> is forbidden on the
+         client.</p>
+    </div>
+    <div class="card">
+      <span class="k">Authorization default</span>
+      <span class="v">Fail-closed</span>
+      <p class="d">A new endpoint is authenticated unless it explicitly calls
+         <code>.AllowAnonymous()</code>. Forgetting to secure something is not a possible
+         mistake here.</p>
+    </div>
+    <div class="card">
+      <span class="k">Named roles</span>
+      <span class="v">0</span>
+      <p class="d">No role claims are required anywhere in production code.
+         <code>X-Fake-Roles</code> exists only for the Test environment's header&#8209;driven
+         handler.</p>
+    </div>
+    <div class="card">
+      <span class="k">Escape hatches</span>
+      <span class="v" style="color:var(--warn)">1</span>
+      <p class="d">A middleware that stamps <code>AllowAnonymous</code> onto
+         <code>/_framework</code> endpoints. Removing it produces a blank page &mdash; see
+         Tier&nbsp;2.</p>
+    </div>
+  </div>
+
+  <h3>Principals</h3>
+  <div class="tw">
+    <table>
+      <thead>
+        <tr><th>Principal</th><th>How it is established</th><th>Can reach</th><th>Environment</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill">Anonymous</span></td>
+          <td>No cookie, or a rejected one</td>
+          <td>The SPA shell, the login page, the three AI endpoints marked anonymous, health, OpenAPI</td>
+          <td>all</td>
+        </tr>
+        <tr>
+          <td><span class="pill ok dot">Authenticated user</span></td>
+          <td>Entra&nbsp;OIDC sign&#8209;in, or the cookie&#8209;only local path</td>
+          <td>Everything except <code>/api/diag</code> in production</td>
+          <td>all</td>
+        </tr>
+        <tr>
+          <td><span class="pill info dot">Diagnostics admin</span></td>
+          <td>Authenticated <b>and</b> the identity's email is on <code>Diagnostics:AdminEmails</code></td>
+          <td>Adds <code>GET /api/diag</code></td>
+          <td>Production only &mdash; elsewhere any authenticated user qualifies</td>
+        </tr>
+        <tr>
+          <td><span class="pill warn dot">Fake user</span></td>
+          <td><code>X-Fake-User</code> / <code>X-Fake-Roles</code> request headers</td>
+          <td>Whatever the headers assert</td>
+          <td><b>Test / Dev only</b> &mdash; the handler throws if constructed in Production</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note inv">
+    <span class="lede">Fail-closed, stated precisely</span>
+    <p><code>AuthorizationOptions.FallbackPolicy = RequireAuthenticatedUser</code>. Client&#8209;side
+    <code>[Authorize]</code> attributes are <b>UI&#8209;only and enforce nothing</b> &mdash; they
+    hide a nav link, they do not protect data. Every real guarantee in this table is
+    server&#8209;side.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════ TIER 2 ══════════════════════ -->
+<section data-tier="2">
+  <div class="sec-head">
+    <span class="tier-chip tier-2">Tier 2 &middot; Architectural</span>
+    <h2>How identity gets from Entra to a WASM component</h2>
+  </div>
+  <p class="sec-sub">
+    The whole point of the flow below is what is <em>absent</em> from it: no access token, no
+    refresh token, and nothing readable by JavaScript ever crosses into the browser.
+  </p>
+
+  <div class="dia">
+    <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant W as WASM SPA
+  participant S as BFF (.Web)
+  participant E as Microsoft Entra
+
+  U->>W: open a protected page
+  W->>S: GET /challenge-microsoft?returnUrl=/gallery
+  S->>E: OIDC challenge
+  E-->>U: sign-in + consent
+  E->>S: POST /signin-oidc (code)
+  S->>E: exchange code, read userinfo
+  S-->>U: 302 → returnUrl<br/>Set-Cookie: HttpOnly, SameSite=Strict, Secure
+  U->>S: GET /gallery (cookie)
+  S->>W: host document + serialized claims-only principal
+  Note over W: AddAuthenticationStateDeserialization()<br/>claims only — never a token
+  W->>S: GET /api/antiforgery/token
+  S-->>W: token (cookie half stays HttpOnly)
+  W->>S: POST /api/user-images/original<br/>cookie + X-CSRF-TOKEN
+    </pre>
+  </div>
+
+  <h3>Three auth modes, resolved once at startup</h3>
+  <div class="dia">
+    <pre class="mermaid">
+flowchart TD
+  A["AddPoRedoImageAuth(config, env)"] --> B{"Auth:EnableFakeAuth<br/>and non-Production?"}
+  B -- yes --> F["FakeAuthHandler<br/><i>X-Fake-User / X-Fake-Roles</i>"]
+  B -- no --> C{"AzureAd:ClientId set?"}
+  C -- yes --> D["Entra OIDC + cookie<br/><i>cookie is default + challenge scheme</i>"]
+  C -- "no, non-Production" --> E["Cookie-only<br/><i>/dev-login issues the cookie</i>"]
+  C -- "no, Production" --> X["throw at startup"]
+  style X stroke-width:2px
+    </pre>
+  </div>
+  <p class="caption">
+    Production without a client id <b>throws by design</b> rather than silently degrading to
+    cookie&#8209;only &mdash; a degraded auth mode that boots successfully is worse than a host that
+    refuses to start.
+  </p>
+
+  <h3>Antiforgery is a filter, not the middleware</h3>
+  <p>
+    <code>app.UseAntiforgery()</code> alone does nothing for this API. It validates only what it
+    recognises as a form post, so a JSON <code>POST</code> passes straight through regardless of
+    <code>IAntiforgeryMetadata</code>. Real enforcement is
+    <code>AntiforgeryValidationFilter</code>, applied at the <b>group</b> level.
+  </p>
+  <ul class="rules">
+    <li class="yes"><span class="mark">✓</span><span>Apply <code>.RequireAntiforgeryValidation()</code> to the <b>MapGroup</b>, so a <code>POST</code> added to an existing group later is protected by default rather than by memory.</span></li>
+    <li class="no"><span class="mark">✗</span><span>Do <b>not</b> also set <code>RequiresValidation = true</code>. The middleware then marks the request unvalidated, the filter's own guard trips, and correct tokens are rejected.</span></li>
+    <li class="yes"><span class="mark">✓</span><span>The client echoes the token in <code>X-CSRF-TOKEN</code> because it cannot read the <code>HttpOnly</code> cookie half.</span></li>
+    <li class="yes"><span class="mark">✓</span><span>Tokens are identity&#8209;bound. One issued while anonymous stops validating after sign&#8209;in; <code>AntiforgeryTokenHandler</code>'s single retry&#8209;on&#8209;400 exists for exactly that and is <b>normal</b> on a first authenticated write.</span></li>
+    <li class="no"><span class="mark">✗</span><span>The filter validates only <code>POST</code>, <code>PUT</code>, <code>PATCH</code> and <code>DELETE</code>. A <code>GET</code> inside a protected group is untouched.</span></li>
+  </ul>
+
+  <div class="note trap">
+    <span class="lede">The one escape hatch — do not remove it</span>
+    <p>The Blazor boot manifest under <code>/_framework</code> is <b>runtime&#8209;generated</b>, not
+    a static asset, so <code>MapStaticAssets().AllowAnonymous()</code> misses it. The fail&#8209;closed
+    fallback policy then 302s it to <code>/login</code>; the browser follows the redirect, receives
+    login HTML where it expected a JS module, fails the subresource&#8209;integrity check, and the
+    app never boots &mdash; a blank page with no error. A middleware therefore stamps
+    <code>AllowAnonymous</code> onto any <code>/_framework</code> endpoint lacking an explicit
+    opt&#8209;out. Every endpoint without that prefix stays fail&#8209;closed.</p>
+  </div>
+
+  <div class="note deg">
+    <span class="lede">Cookie hardening has an environment seam</span>
+    <p>The check gating cookie security is <code>IsDevOrTest()</code>, <b>not</b>
+    <code>IsDevelopment()</code>. Integration and E2E run over plain HTTP, and
+    <code>CookieSecurePolicy.Always</code> would make the browser silently <em>discard</em> the auth
+    cookie: <code>/dev-login</code> still answers 302 with a <code>Set-Cookie</code>, the log looks
+    clean, and every subsequent request is anonymous.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════ TIER 3 ══════════════════════ -->
+<section data-tier="3">
+  <div class="sec-head">
+    <span class="tier-chip tier-3">Tier 3 &middot; Implementation</span>
+    <h2>Endpoint-level authorization bindings</h2>
+  </div>
+  <p class="sec-sub">
+    Every mapped route, with the authorization it carries and the filters that run before its
+    handler. <span class="pill ok">fallback</span> means the endpoint declares nothing and is
+    therefore authenticated by the fail&#8209;closed default.
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>Route</th><th>Authorization</th><th>Antiforgery</th>
+          <th>Rate limit</th><th>Other filters</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="verb get">GET</span><code class="route">/dev-login</code></td><td><span class="pill">anonymous</span> <i>Dev/Test map only</i></td><td>&mdash;</td><td>&mdash;</td><td>handler 404s outside Dev/Test</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/challenge-microsoft</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>relative-only <code>returnUrl</code> guard</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/logout</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/antiforgery/token</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/images/analyze</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td><code>ai-endpoints</code></td><td><code>ValidationFilter&lt;ImageAnalysisRequest&gt;</code></td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/rap-roast</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td><code>ai-endpoints</code></td><td><code>ValidationFilter&lt;RapRoastRequest&gt;</code></td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/bulk-generate/describe</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td><code>ai-endpoints</code></td><td>&mdash;</td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/bulk-generate/batch</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td><code>ai-endpoints</code></td><td>&mdash;</td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/bulk-generate/reroll</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td><code>ai-endpoints</code></td><td>&mdash;</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/bulk-generate/prompts</code></td><td><span class="pill ok dot">authenticated</span></td><td>group</td><td>&mdash;</td><td><code>IdempotencyKeyFilter</code></td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/bulk-generate/prompts</code></td><td><span class="pill ok dot">authenticated</span></td><td><span class="pill ok">enforced</span></td><td>&mdash;</td><td><code>IdempotencyKeyFilter</code></td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/user-images</code></td><td><span class="pill ok dot">authenticated</span></td><td>group</td><td>&mdash;</td><td><code>IdempotencyKeyFilter</code></td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/user-images/original</code></td><td><span class="pill ok dot">authenticated</span></td><td><span class="pill ok">enforced</span></td><td>&mdash;</td><td><code>IdempotencyKeyFilter</code></td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/user-images/result</code></td><td><span class="pill ok dot">authenticated</span></td><td><span class="pill ok">enforced</span></td><td>&mdash;</td><td><code>IdempotencyKeyFilter</code></td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/user-images/{id}</code></td><td><span class="pill ok dot">authenticated</span></td><td>group</td><td>&mdash;</td><td>partition-scoped to caller</td></tr>
+        <tr><td><span class="verb del">DELETE</span><code class="route">/api/user-images/{id}</code></td><td><span class="pill ok dot">authenticated</span></td><td><span class="pill ok">enforced</span></td><td>&mdash;</td><td>partition-scoped to caller</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/meme-templates</code></td><td><span class="pill ok dot">authenticated</span></td><td>group</td><td>&mdash;</td><td><code>HybridCache</code> read</td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/meme-templates/render</code></td><td><span class="pill ok dot">authenticated</span></td><td><span class="pill ok">enforced</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="verb post">POST</span><code class="route">/api/video/generate</code></td><td><span class="pill ok dot">authenticated</span></td><td><span class="pill ok">enforced</span></td><td>&mdash;</td><td>503 when <code>Google:ApiKey</code> missing</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/video/status?op=</code></td><td><span class="pill ok dot">authenticated</span></td><td>group</td><td>&mdash;</td><td>operation-handle shape guard</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/diag</code></td><td><span class="pill info dot">DiagnosticsAccess</span></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/diag/mock-status</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/pricing</code></td><td><span class="pill ok">fallback</span></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/health</code>, <code class="route">/alive</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/openapi</code>, <code class="route">/scalar</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>public by explicit opt-out</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/api/{**rest}</code></td><td><span class="pill">anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>JSON 404 &mdash; outranks the SPA catch-all</td></tr>
+        <tr><td><span class="verb get">GET</span><code class="route">/_framework/*</code></td><td><span class="pill warn dot">stamped anonymous</span></td><td>&mdash;</td><td>&mdash;</td><td>the escape hatch</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note deg">
+    <span class="lede">Worth knowing about the anonymous AI endpoints</span>
+    <p>Five AI endpoints are deliberately anonymous so an unauthenticated visitor can try the app.
+    They are the ones that spend money, so the rate limiter is their only cost control: with no
+    <code>NameIdentifier</code> claim it partitions by <b>remote IP</b>, then by the literal string
+    <code>"anonymous"</code> if even that is unavailable. <code>/api/bulk-generate/batch</code>
+    reaches this path while fanning out up to four concurrent image generations per call.</p>
+  </div>
+
+  <h3>Policy definitions</h3>
+<pre><i>// Features/Shared/AuthorizationPolicies.cs — the name lives here so neither slice
+// depends on the other. The behaviour lives in AuthServiceExtensions.</i>
+public const string <b>Diagnostics</b> = <em>"DiagnosticsAccess"</em>;
+
+<i>// AuthServiceExtensions.cs</i>
+options.FallbackPolicy = new AuthorizationPolicyBuilder()
+    .RequireAuthenticatedUser()
+    .Build();                                  <i>// ← the fail-closed default</i>
+
+options.AddPolicy(<b>DiagnosticsPolicy</b>, policy =&gt; policy.RequireAssertion(ctx =&gt;
+{
+    <i>// Non-Production: any authenticated user may read diagnostics.</i>
+    <i>// Production: the identity's email must be on the allow-list.</i>
+    <i>// An EMPTY list denies everyone — fail-closed, not fail-open.</i>
+    var admins = (configuration[ConfigKeys.<b>DiagnosticsAdminEmails</b>] ?? string.Empty)
+        .Split(<em>','</em>, StringSplitOptions.RemoveEmptyEntries | TrimEntries);
+
+    return ctx.User.Claims.Any(c =&gt;
+        (c.Type is ClaimTypes.Email or ClaimTypes.Name or <em>"email"</em> or <em>"preferred_username"</em>)
+        &amp;&amp; admins.Contains(c.Value, StringComparer.OrdinalIgnoreCase));
+}));</pre>
+
+  <h4>Cookie hardening</h4>
+<pre><i>// §4.2 BFF cookie hardening — HardenCookie(options, environment)</i>
+options.Cookie.<b>HttpOnly</b>     = true;                 <i>// never readable by WASM or JS</i>
+options.Cookie.<b>SameSite</b>     = SameSiteMode.Strict;  <i>// not sent on cross-site navigations</i>
+options.Cookie.<b>SecurePolicy</b> = environment.IsDevOrTest()
+    ? CookieSecurePolicy.SameAsRequest                <i>// HTTP test tiers</i>
+    : CookieSecurePolicy.Always;
+
+<i>// The OIDC nonce and correlation cookies keep their own SameSite=None; Secure
+// defaults, so the handshake still completes under a Strict session cookie.</i></pre>
+
+  <h3>Refusal payloads</h3>
+  <p>
+    Both refusals come from the framework's problem&#8209;details writer. The distinction matters
+    for the client: <code>401</code> means "sign in and retry", <code>403</code> means "signing in
+    again will not help".
+  </p>
+<pre><i>// 401 — no cookie, or a rejected one. Browser navigations to a PAGE get a 302 to
+// /login instead; only API calls see this body.</i>
+HTTP/1.1 <u>401</u> Unauthorized
+Content-Type: application/problem+json
+{
+  "type":   <em>"https://tools.ietf.org/html/rfc9110#section-15.5.2"</em>,
+  "title":  <em>"Unauthorized"</em>,
+  "status": <u>401</u>,
+  "traceId": <em>"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"</em>
+}
+
+<i>// 403 — authenticated, but the DiagnosticsAccess assertion failed. In Production an
+// empty Diagnostics:AdminEmails yields this for EVERY caller, by design.</i>
+HTTP/1.1 <u>403</u> Forbidden
+Content-Type: application/problem+json
+{
+  "type":   <em>"https://tools.ietf.org/html/rfc9110#section-15.5.4"</em>,
+  "title":  <em>"Forbidden"</em>,
+  "status": <u>403</u>,
+  "traceId": <em>"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"</em>
+}
+
+<i>// 400 — antiforgery. The client's AntiforgeryTokenHandler retries ONCE with a fresh
+// token; a first authenticated write after sign-in normally takes this path.</i>
+HTTP/1.1 <u>400</u> Bad Request
+
+<i>// 429 — rate limiter. 10 requests per 60 s sliding window (6 segments), queue depth 2,
+// partitioned by NameIdentifier → remote IP → "anonymous".</i>
+HTTP/1.1 <u>429</u> Too Many Requests</pre>
+
+  <h4>Test-environment identity</h4>
+<pre><i>// FakeAuthHandler — Test/Dev only; the constructor THROWS in Production.
+// Integration and both E2E tiers run under ASPNETCORE_ENVIRONMENT=Test.</i>
+GET /api/user-images
+<b>X-Fake-User</b>:  alice@example.com
+<b>X-Fake-Roles</b>: admin,tester      <i>// no production code path requires a role claim</i></pre>
+</section>
+
+</main>
+<footer>
+  <div class="footer-in">
+    <span>PoRedoImage &mdash; engineering reference</span>
+    <span>Generated 2026-09-07 from commit <code>d8b65be</code></span>
+    <span>Source of truth: <code>CLAUDE.md</code> at the repo root</span>
+    <span><a href="index.html">Portal index</a></span>
+  </div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>
+/* Detail switcher — cumulative. Level 1 = Tier 1, 2 = Tier 1+2, 3 = everything.
+   Buttons carry data-level; content sections carry data-tier. */
+(function () {
+  var KEY = 'poredo-docs-detail-level';
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-level]'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('[data-tier]'));
+
+  function apply(level) {
+    sections.forEach(function (s) {
+      s.hidden = parseInt(s.getAttribute('data-tier'), 10) > level;
+    });
+    buttons.forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-level') === String(level) ? 'true' : 'false');
+    });
+    var hint = document.getElementById('switch-hint');
+    if (hint) {
+      var shown = sections.filter(function (s) { return !s.hidden; }).length;
+      hint.innerHTML = 'Showing <b>' + shown + '</b> of ' + sections.length + ' sections';
+    }
+    try { localStorage.setItem(KEY, String(level)); } catch (e) { /* private mode */ }
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      apply(parseInt(b.getAttribute('data-level'), 10));
+    });
+  });
+
+  var start = 2;
+  try {
+    var saved = parseInt(localStorage.getItem(KEY), 10);
+    if (saved === 1 || saved === 2 || saved === 3) { start = saved; }
+  } catch (e) { /* private mode */ }
+
+  /* Mermaid renders at its container's measured width, so every diagram must be
+     laid out while visible. Render first, filter second — otherwise a Tier 3
+     diagram that starts hidden comes back at zero width when it is revealed. */
+  function ready() { apply(start); }
+
+  if (window.mermaid) {
+    var dark = matchMedia('(prefers-color-scheme: dark)').matches
+      && document.documentElement.getAttribute('data-theme') !== 'light'
+      || document.documentElement.getAttribute('data-theme') === 'dark';
+    var css = getComputedStyle(document.documentElement);
+    var t = function (n) { return css.getPropertyValue(n).trim(); };
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+      themeVariables: {
+        darkMode: dark,
+        background: t('--surface'),
+        primaryColor: t('--surface-2'),
+        primaryTextColor: t('--ink'),
+        primaryBorderColor: t('--border-firm'),
+        secondaryColor: t('--surface-3'),
+        tertiaryColor: t('--surface-3'),
+        lineColor: t('--ink-3'),
+        textColor: t('--ink-2'),
+        mainBkg: t('--surface-2'),
+        nodeBorder: t('--border-firm'),
+        clusterBkg: 'transparent',
+        clusterBorder: t('--border'),
+        actorBkg: t('--surface-2'),
+        actorBorder: t('--border-firm'),
+        actorTextColor: t('--ink'),
+        actorLineColor: t('--ink-3'),
+        signalColor: t('--ink-2'),
+        signalTextColor: t('--ink-2'),
+        labelBoxBkgColor: t('--surface-3'),
+        labelBoxBorderColor: t('--border-firm'),
+        labelTextColor: t('--ink'),
+        loopTextColor: t('--ink-2'),
+        noteBkgColor: t('--accent-soft'),
+        noteBorderColor: t('--accent-line'),
+        noteTextColor: t('--ink'),
+        altBackground: t('--surface-2'),
+        sequenceNumberColor: t('--surface'),
+        attributeBackgroundColorOdd: t('--surface'),
+        attributeBackgroundColorEven: t('--surface-2')
+      }
+    });
+    window.mermaid.run({ querySelector: '.mermaid' }).then(ready, ready);
+  } else {
+    ready();
+  }
+})();
+</script>
+</body>
+</html>
