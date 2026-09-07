@@ -272,15 +272,26 @@ jobs:
           PRINCIPAL=$(az webapp show -g ${{ env.AZURE_RESOURCE_GROUP }} -n ${{ env.AZURE_WEBAPP_NAME }} --query identity.principalId -o tsv)
           echo "App managed identity: $PRINCIPAL"
 
-          # Two different failures, told apart: can this pipeline read the vault at all?
+          # Two different failures, told apart — and only ONE of them is a reason to stop.
+          #
+          # Not being able to READ the vault is not evidence that anything is wrong; it means this
+          # check cannot run. Failing the deploy on that is failing closed on a diagnostic, and it
+          # blocked every deploy for as long as the CI SP lacked read on PoShared while the app's
+          # access policy was present and correct the whole time.
+          #
+          # The real gate is the post-deploy smoke test: an unresolvable @Microsoft.KeyVault(...)
+          # reference stops the container from starting, so /health never reaches 200 and the deploy
+          # fails there with the App Service log attached. That proves the thing this step only
+          # predicts. So: warn, and let the deploy proceed to a check that can actually observe it.
           if ! VAULT_JSON=$(az keyvault show -n kv-poshared -g PoShared -o json 2>&1); then
-            echo "::error::This pipeline cannot READ kv-poshared, so it cannot verify the app's access."
-            echo "::error::That is a CI service-principal permission gap, NOT a missing app policy."
-            echo "::error::az reported:"
-            echo "$VAULT_JSON" | head -5
-            echo "::error::Grant the CI SP 'Reader' on the PoShared resource group:"
-            echo "::error::  az role assignment create --role Reader --assignee <CI_SP_APP_ID> --scope /subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared"
-            exit 1
+            echo "::warning::Cannot READ kv-poshared, so the pre-deploy access check is being SKIPPED."
+            echo "::warning::This is a CI service-principal permission gap, NOT a missing app policy."
+            echo "$VAULT_JSON" | head -3
+            echo "::warning::To restore the pre-deploy check, grant the CI SP (vars.AZURE_CLIENT_ID)"
+            echo "::warning::'Reader' on the PoShared resource group:"
+            echo "::warning::  az role assignment create --role Reader --assignee ${{ vars.AZURE_CLIENT_ID }} --scope /subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/PoShared"
+            echo "::warning::Proceeding — the post-deploy health check verifies secret resolution for real."
+            exit 0
           fi
 
           PERMS=$(printf '%s' "$VAULT_JSON" | python3 -c "import sys,json;p='$PRINCIPAL'.lower();d=json.load(sys.stdin);print(' '.join(sorted({x for a in d['properties']['accessPolicies'] if a['objectId'].lower()==p for x in (a['permissions'].get('secrets') or [])})))")
