@@ -1,0 +1,17 @@
+<step title="Incoming Request" date="2026-08-24T19:55:57.996" instance="e7fed3" url="/api/publish?async=true&amp;deployer=GITHUB_ONE_DEPLOY&amp;type=zip&amp;message=%7B%22type%22%3A%22deployment%22%2C%22sha%22%3A%220f636963c75faa267413ac96d8e8a61bce600aa4%22%2C%22repoName%22%3A%22punkouter26%2FPoRedoImage%22%2C%22actor%22%3A%22punkouter26%22%2C%22slotName%22%3A%22production%22%2C%22commitMessage%22%3A%22...%22%7D" method="POST" type="request" pid="851,1,14" Host="poredoimage-web.scm.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_1c6056e71a1755dc55ac6c806bd6263b89403595bdd060b35f21e3390d4c985a_v3.0.8" Authorization="Bea..." Content-Type="application/octet-stream" Cookie="ARRAffinity=e7fed35217a4ac5350927a43ba147acb49aa999b0e41626236eb0b351893129c; ARRAffinitySameSite=e7fed35217a4ac5350927a43ba147acb49aa999b0e41626236eb0b351893129c" Transfer-Encoding="chunked" X-ARR-LOG-ID="0d14cb7a-9eb8-40b3-96a2-8723c33571ca" CLIENT-IP="40.116.73.176:29824" X-SITE-DEPLOYMENT-ID="poredoimage-web" WAS-DEFAULT-HOSTNAME="poredoimage-web.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?async=true&amp;deployer=GITHUB_ONE_DEPLOY&amp;type=zip&amp;message=%7B%22type%22%3A%22deployment%22%2C%22sha%22%3A%220f636963c75faa267413ac96d8e8a61bce600aa4%22%2C%22repoName%22%3A%22punkouter26%2FPoRedoImage%22%2C%22actor%22%3A%22punkouter26%22%2C%22slotName%22%3A%22production%22%2C%22commitMessage%22%3A%22...%22%7D" X-Client-IP="40.116.73.176" X-Client-Port="29824" >
+  <step title="OneDeploy" date="2026-08-24T19:55:58.039" >
+    <step title="None repository commit" date="2026-08-24T19:55:58.056" >
+      <step title="Commit id: be407c87-5982-4283-b089-9251f57db29a" date="2026-08-24T19:55:58.061" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 5ms -->
+    </step><!-- duration: 15ms -->
+    <step title="Starting PushDeployAsync" date="2026-08-24T19:55:58.075" /><!-- duration: 5ms -->
+    <step title="Writing artifact to /tmp/zipdeploy/4e68f4e2-9041-48b7-bf35-4567868df847.zip" date="2026-08-24T19:55:58.095" >
+      <step title="Writing multipart request body to /tmp/zipdeploy/4e68f4e2-9041-48b7-bf35-4567868df847.zip" date="2026-08-24T19:55:58.100" /><!-- duration: 5ms -->
+      <step title="Writing zip file to /tmp/zipdeploy/4e68f4e2-9041-48b7-bf35-4567868df847.zip" date="2026-08-24T19:55:58.110" /><!-- duration: 729ms -->
+    </step><!-- duration: 753ms -->
+    <step title="Start deployment in the background" date="2026-08-24T19:55:58.864" >
+      <step title="Acquiring Deployment Lock" date="2026-08-24T19:55:58.876" /><!-- duration: 4ms -->
+      <step title="Acquired Deployment Lock" date="2026-08-24T19:55:58.932" /><!-- duration: 5ms -->
+    </step><!-- duration: 151ms -->
+  </step><!-- duration: 984ms -->
+  <step title="Outgoing response" date="2026-08-24T19:55:59.031" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 6ms -->
+</step><!-- duration: 1047ms -->

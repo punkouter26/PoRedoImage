@@ -1,0 +1,8 @@
+<step title="Incoming Request" date="2026-09-07T17:45:09.979" instance="eb29e0" url="/api/deployments/latest?deployer=OneDeploy&amp;time=2026-09-07_17-44-57Z" method="GET" type="request" pid="851,1,67" Host="poredoimage-web.scm.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_1c6056e71a1755dc55ac6c806bd6263b89403595bdd060b35f21e3390d4c985a_v3.0.8" Authorization="Bea..." Content-Type="application/json; charset=utf-8" Cookie="ARRAffinity=eb29e038db1dfe94e64ea0cae36cd79f8ad9a8c3a7a5dd9f089252d285612fc6; ARRAffinitySameSite=eb29e038db1dfe94e64ea0cae36cd79f8ad9a8c3a7a5dd9f089252d285612fc6" Content-Length="0" X-ARR-LOG-ID="ede87213-cebb-4104-a909-cc45c858c8c6" CLIENT-IP="20.169.99.193:55304" X-SITE-DEPLOYMENT-ID="poredoimage-web" WAS-DEFAULT-HOSTNAME="poredoimage-web.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/latest?deployer=OneDeploy&amp;time=2026-09-07_17-44-57Z" X-Client-IP="20.169.99.193" X-Client-Port="55304" >
+  <step title="DeploymentService.GetResult" date="2026-09-07T17:45:10.000" >
+    <step title="DeploymentService.GetLatestDeployment" date="2026-09-07T17:45:10.008" >
+      <step title="DeploymentManager.GetResults" date="2026-09-07T17:45:10.017" /><!-- duration: 762ms -->
+    </step><!-- duration: 783ms -->
+  </step><!-- duration: 820ms -->
+  <step title="Outgoing response" date="2026-09-07T17:45:10.828" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 11ms -->
+</step><!-- duration: 867ms -->

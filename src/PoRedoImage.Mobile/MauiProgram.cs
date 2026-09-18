@@ -25,10 +25,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<IRenderMonitorService, AndroidRenderMonitor>();
         builder.Services.AddSingleton<ISharedImageInbox, Platforms.Android.AndroidSharedImageInbox>();
         builder.Services.AddSingleton<IBiometricGuard, Platforms.Android.BiometricGuard>();
+        builder.Services.AddSingleton<IAudioPlayerService, Platforms.Android.AndroidAudioPlayer>();
 #else
         builder.Services.AddSingleton<IRenderMonitorService, NullRenderMonitorService>();
         builder.Services.AddSingleton<ISharedImageInbox, NullSharedImageInbox>();
         builder.Services.AddSingleton<IBiometricGuard, NullBiometricGuard>();
+        builder.Services.AddSingleton<IAudioPlayerService, NullAudioPlayer>();
 #endif
 
         // ── On-Device AI ──────────────────────────────────────

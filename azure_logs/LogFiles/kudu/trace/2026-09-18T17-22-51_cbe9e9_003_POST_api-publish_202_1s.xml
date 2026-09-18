@@ -1,0 +1,17 @@
+<step title="Incoming Request" date="2026-09-18T17:22:51.473" instance="cbe9e9" url="/api/publish?async=true&amp;deployer=GITHUB_ONE_DEPLOY&amp;type=zip&amp;message=%7B%22type%22%3A%22deployment%22%2C%22sha%22%3A%224b32006996a8e0118863ceafe92499c80ab35963%22%2C%22repoName%22%3A%22punkouter26%2FPoRedoImage%22%2C%22actor%22%3A%22punkouter26%22%2C%22slotName%22%3A%22production%22%2C%22commitMessage%22%3A%22feat(mobile)%3A%20add%20MediaStore%20scoped%20storage%20with%20EXIF%20%26%20NNAPI%20NPU%20acceleration%2C%20optimize%20CI%20to%20unit%20tests%20only%22%7D" method="POST" type="request" pid="731,1,5" Host="poredoimage-web.scm.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_1c6056e71a1755dc55ac6c806bd6263b89403595bdd060b35f21e3390d4c985a_v3.0.8" Authorization="Bea..." Content-Type="application/octet-stream" Cookie="ARRAffinity=cbe9e9718f0d822410f26ed3f330ac773a82055728017e0ba3ca3b7f294aae71; ARRAffinitySameSite=cbe9e9718f0d822410f26ed3f330ac773a82055728017e0ba3ca3b7f294aae71" Transfer-Encoding="chunked" X-ARR-LOG-ID="51293461-4249-4c07-920b-95232dca6cbc" CLIENT-IP="135.119.38.213:59904" X-SITE-DEPLOYMENT-ID="poredoimage-web" WAS-DEFAULT-HOSTNAME="poredoimage-web.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?async=true&amp;deployer=GITHUB_ONE_DEPLOY&amp;type=zip&amp;message=%7B%22type%22%3A%22deployment%22%2C%22sha%22%3A%224b32006996a8e0118863ceafe92499c80ab35963%22%2C%22repoName%22%3A%22punkouter26%2FPoRedoImage%22%2C%22actor%22%3A%22punkouter26%22%2C%22slotName%22%3A%22production%22%2C%22commitMessage%22%3A%22feat(mobile)%3A%20add%20MediaStore%20scoped%20storage%20with%20EXIF%20%26%20NNAPI%20NPU%20acceleration%2C%20optimize%20CI%20to%20unit%20tests%20only%22%7D" X-Client-IP="135.119.38.213" X-Client-Port="59904" >
+  <step title="OneDeploy" date="2026-09-18T17:22:51.529" >
+    <step title="None repository commit" date="2026-09-18T17:22:51.539" >
+      <step title="Commit id: c03d095a-10df-44f4-ace8-9bd8942d732d" date="2026-09-18T17:22:51.543" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 3ms -->
+    </step><!-- duration: 11ms -->
+    <step title="Starting PushDeployAsync" date="2026-09-18T17:22:51.554" /><!-- duration: 4ms -->
+    <step title="Writing artifact to /tmp/zipdeploy/71d3d966-bb5d-44e0-b8ce-43a870cf63d0.zip" date="2026-09-18T17:22:51.574" >
+      <step title="Writing multipart request body to /tmp/zipdeploy/71d3d966-bb5d-44e0-b8ce-43a870cf63d0.zip" date="2026-09-18T17:22:51.582" /><!-- duration: 4ms -->
+      <step title="Writing zip file to /tmp/zipdeploy/71d3d966-bb5d-44e0-b8ce-43a870cf63d0.zip" date="2026-09-18T17:22:51.591" /><!-- duration: 704ms -->
+    </step><!-- duration: 729ms -->
+    <step title="Start deployment in the background" date="2026-09-18T17:22:52.314" >
+      <step title="Acquiring Deployment Lock" date="2026-09-18T17:22:52.330" /><!-- duration: 4ms -->
+      <step title="Acquired Deployment Lock" date="2026-09-18T17:22:52.378" /><!-- duration: 3ms -->
+    </step><!-- duration: 141ms -->
+  </step><!-- duration: 933ms -->
+  <step title="Outgoing response" date="2026-09-18T17:22:52.471" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 4ms -->
+</step><!-- duration: 1006ms -->

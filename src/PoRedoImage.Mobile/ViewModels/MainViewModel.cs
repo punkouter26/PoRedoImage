@@ -31,9 +31,48 @@ public partial class MainViewModel : ObservableObject
     private readonly IRenderMonitorService _renderMonitor;
     private readonly IImageOptimizationService _optimizer;
     private readonly ISharedImageInbox _sharedInbox;
+    private readonly IAudioPlayerService _audioPlayer;
 
     [ObservableProperty]
-    private ImageCaptureResult? _capturedImage;
+    private ResultMode _activeAction = ResultMode.None;
+
+    public bool IsMemeSelected => ActiveAction == ResultMode.Meme;
+    public bool IsRegenerateSelected => ActiveAction == ResultMode.Regenerate;
+    public bool IsRapRoastSelected => ActiveAction == ResultMode.RapRoast;
+    public bool IsDescribeSelected => ActiveAction == ResultMode.Describe;
+    public bool IsBulkSelected => ActiveAction == ResultMode.Bulk;
+    public bool IsVideoSelected => ActiveAction == ResultMode.Video;
+
+    partial void OnActiveActionChanged(ResultMode value)
+    {
+        OnPropertyChanged(nameof(IsMemeSelected));
+        OnPropertyChanged(nameof(IsRegenerateSelected));
+        OnPropertyChanged(nameof(IsRapRoastSelected));
+        OnPropertyChanged(nameof(IsDescribeSelected));
+        OnPropertyChanged(nameof(IsBulkSelected));
+        OnPropertyChanged(nameof(IsVideoSelected));
+        OnPropertyChanged(nameof(ActiveActionTitle));
+    }
+
+    public string ActiveActionTitle => ActiveAction switch
+    {
+        ResultMode.Meme => "Make Meme",
+        ResultMode.Regenerate => "Reimagine Art",
+        ResultMode.RapRoast => "Rap Roast",
+        ResultMode.Describe => "Describe Scene",
+        ResultMode.Bulk => "Bulk ×10 Styles",
+        ResultMode.Video => "Veo Video Clip",
+        _ => "Studio Processing"
+    };
+
+    [ObservableProperty]
+    private bool _isRoastAudioPlaying;
+
+    [ObservableProperty]
+    private bool _hasRoastAudio;
+
+    [ObservableProperty]
+    private string _roastAudioStatus = "Beat Ready";
 
     [ObservableProperty]
     private Microsoft.Maui.Controls.ImageSource? _photoImageSource;
@@ -141,7 +180,8 @@ public partial class MainViewModel : ObservableObject
         IOnDeviceCaptionService onDeviceCaptions,
         IRenderMonitorService renderMonitor,
         IImageOptimizationService optimizer,
-        ISharedImageInbox sharedInbox)
+        ISharedImageInbox sharedInbox,
+        IAudioPlayerService audioPlayer)
     {
         _cameraService = cameraService;
         _apiClient = apiClient;
@@ -151,7 +191,35 @@ public partial class MainViewModel : ObservableObject
         _renderMonitor = renderMonitor;
         _optimizer = optimizer;
         _sharedInbox = sharedInbox;
+        _audioPlayer = audioPlayer;
         _selectedStyle = _settings.SelectedStyle;
+
+        _audioPlayer.PlaybackStarted += (s, e) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                IsRoastAudioPlaying = true;
+                RoastAudioStatus = "Playing Beat 🎵";
+            });
+        };
+
+        _audioPlayer.PlaybackEnded += (s, e) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                IsRoastAudioPlaying = false;
+                RoastAudioStatus = HasRoastAudio ? "Beat Ready · Tap to Play" : "Beat Ended";
+            });
+        };
+
+        _audioPlayer.PlaybackError += (s, msg) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                IsRoastAudioPlaying = false;
+                RoastAudioStatus = $"Playback Error: {msg}";
+            });
+        };
     }
 
     /// <summary>
