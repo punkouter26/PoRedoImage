@@ -15,9 +15,20 @@ public class MobileSettingsService : IMobileSettingsService
     private const string BiometricLockKey = "poredo_biometric_lock";
     private const string HwAccelerationKey = "poredo_use_hw_acceleration";
 
+    public const string AzureProductionUrl = "https://poredoimage-web.azurewebsites.net";
+
     public string ServerUrl
     {
-        get => Preferences.Default.Get(ServerUrlKey, GetDefaultServerUrl());
+        get
+        {
+            var url = Preferences.Default.Get(ServerUrlKey, string.Empty);
+            if (string.IsNullOrWhiteSpace(url) || (url.Contains("localhost") && DeviceInfo.Current.DeviceType != DeviceType.Virtual))
+            {
+                url = GetDefaultServerUrl();
+                Preferences.Default.Set(ServerUrlKey, url);
+            }
+            return url;
+        }
         set => Preferences.Default.Set(ServerUrlKey, value?.Trim().TrimEnd('/') ?? GetDefaultServerUrl());
     }
 
@@ -96,7 +107,8 @@ public class MobileSettingsService : IMobileSettingsService
         if (DeviceInfo.Current.Platform == DevicePlatform.Android && DeviceInfo.Current.DeviceType == DeviceType.Virtual)
             return "http://10.0.2.2:4000";
 
-        return "http://localhost:4000";
+        // Default to live Azure backend for mobile devices on the go
+        return AzureProductionUrl;
     }
 }
 
