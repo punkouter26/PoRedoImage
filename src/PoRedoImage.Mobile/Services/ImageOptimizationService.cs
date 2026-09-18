@@ -1,7 +1,7 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
-using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Mobile.Models;
 using ImageSharpImage = SixLabors.ImageSharp.Image;
 using ImageSharpResizeMode = SixLabors.ImageSharp.Processing.ResizeMode;
 using ImageSharpSize = SixLabors.ImageSharp.Size;

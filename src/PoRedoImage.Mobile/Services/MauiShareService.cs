@@ -17,6 +17,18 @@ public class MauiShareService : IShareService
         });
     }
 
+    public async Task ShareFileAsync(byte[] fileBytes, string fileName, string title = "PoRedo Clip")
+    {
+        var tempPath = Path.Combine(FileSystem.CacheDirectory, fileName);
+        await File.WriteAllBytesAsync(tempPath, fileBytes);
+
+        await Share.Default.RequestAsync(new ShareFileRequest
+        {
+            Title = title,
+            File = new ShareFile(tempPath, "video/mp4")
+        });
+    }
+
     public async Task ShareTextAsync(string text, string title = "PoRedo Roast")
     {
         await Share.Default.RequestAsync(new ShareTextRequest

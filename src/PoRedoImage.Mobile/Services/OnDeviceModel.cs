@@ -35,4 +35,46 @@ public static class OnDeviceModelCatalog
         ProviderId: AiProviderIds.DeviceQwen25,
         DisplayName: "Qwen2.5 0.5B Instruct (int4)",
         ApproxBytes: 833_849_001L);
+
+    /// <summary>
+    /// Same family, more parameters — noticeably better captions on ambiguous photos at the cost
+    /// of roughly double the load time on a phone CPU. Side-loaded the same way.
+    /// </summary>
+    public static OnDeviceModel Qwen25Large { get; } = new(
+        Id: "qwen2.5-1.5b-instruct",
+        ProviderId: AiProviderIds.DeviceQwen25,
+        DisplayName: "Qwen2.5 1.5B Instruct (int4)",
+        ApproxBytes: 1_862_000_000L);
+
+    /// <summary>
+    /// Phi-3 mini — stronger instruction following; a good fit when captions keep drifting into
+    /// answering the photo instead of captioning it.
+    /// </summary>
+    public static OnDeviceModel Phi3Mini { get; } = new(
+        Id: "phi-3-mini-4k-instruct",
+        ProviderId: AiProviderIds.DeviceQwen25,
+        DisplayName: "Phi-3 mini 4K Instruct (int4)",
+        ApproxBytes: 2_341_000_000L);
+
+    /// <summary>
+    /// Llama 3.2 3B — the biggest option catalogued here. Better prose, slowest generation on
+    /// mid-range hardware; users opt in deliberately.
+    /// </summary>
+    public static OnDeviceModel Llama32Three { get; } = new(
+        Id: "llama-3.2-3b-instruct",
+        ProviderId: AiProviderIds.DeviceQwen25,
+        DisplayName: "Llama 3.2 3B Instruct (int4)",
+        ApproxBytes: 2_190_000_000L);
+
+    /// <summary>
+    /// Every model the caption service can execute, in the order Settings lists them. All carry
+    /// the same provider id: selection is by side-loaded weights, not by provider routing.
+    /// </summary>
+    public static IReadOnlyList<OnDeviceModel> All { get; } =
+    [
+        Qwen25MemeCaption,
+        Qwen25Large,
+        Phi3Mini,
+        Llama32Three,
+    ];
 }

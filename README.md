@@ -22,11 +22,14 @@ The core user promise: *upload a photo, choose a transformation, get a gallery-w
 5. **Zero-friction Auth** — Development environment uses a one-click cookie login; production uses Microsoft Entra ID OIDC with no additional friction for M365 users.
 6. **Observable & Reliable** — Every AI call is traced via OpenTelemetry and logged via Serilog to Application Insights; a `/health` endpoint verifies all dependencies at runtime.
 
-### Non-Goals (v1)
-- Native mobile app (responsive web only)
-- Video processing
+### Non-Goals
 - Real-time collaborative editing
 - Custom model fine-tuning UI
+- Prompt-engineering UX (the app picks prompts so users don't have to)
+
+> Former v1 non-goals **video processing** and a **native mobile app** both shipped in 2026 —
+> the Video tab (Veo) and the MAUI Android head in `PoRedoImage.Mobile.slnx` are first-class
+> features now.
 
 ### User Personas
 | Persona | Core Need | Primary Flow |
@@ -76,6 +79,8 @@ flowchart LR
 | Image Regeneration | Gemini `gemini-2.5-flash-image` with reference bytes |
 | Meme Generation | SkiaSharp text overlay on analysed image |
 | Bulk Generate | 10 art-style variations via parallel Gemini calls, streamed live |
+| Rap Roast | AI-written roast verse performed over a generated beat (Lyria) |
+| Video Generate | Photo + prompt in, 8-second Veo 3.1 Lite clip with sound out |
 | Auth | Dev: `/dev-login` cookie · Prod: Microsoft Entra ID OIDC |
 | Diagnostics | `/diag` masked config · `/health` · `/scalar/v1` API docs |
 
@@ -94,7 +99,7 @@ flowchart LR
 | Secrets | Azure Key Vault `kv-poshared` (Access Policy + 30 min rotation) |
 | Observability | OpenTelemetry + Serilog → Application Insights |
 | Infrastructure | Azure Bicep + GitHub Actions OIDC |
-| Testing | xUnit · Testcontainers · C# Playwright (Unit · Integration · E2EAPI · E2EUI) — not run in CI |
+| Testing | xUnit · Testcontainers · C# Playwright — all five tiers (Unit · Integration · E2E ApiSmoke · E2E UI · Architecture) run in CI and gate the deploy |
 
 ---
 

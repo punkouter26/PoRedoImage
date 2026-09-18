@@ -40,7 +40,22 @@ public class AppShell : Shell
             }
         };
 
+        var galleryTab = new Tab
+        {
+            Title = "Gallery",
+            Items =
+            {
+                new ShellContent
+                {
+                    Title = "My Gallery",
+                    Route = "GalleryPage",
+                    ContentTemplate = new DataTemplate(() => services.GetRequiredService<GalleryPage>())
+                }
+            }
+        };
+
         tabBar.Items.Add(snapTab);
+        tabBar.Items.Add(galleryTab);
         tabBar.Items.Add(settingsTab);
 
         Items.Add(tabBar);

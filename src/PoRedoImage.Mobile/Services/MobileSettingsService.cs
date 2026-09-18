@@ -11,6 +11,8 @@ public class MobileSettingsService : IMobileSettingsService
     private const string AutoSaveKey = "poredo_auto_save";
     private const string DefaultModeKey = "poredo_default_mode";
     private const string OnDeviceCaptionsKey = "poredo_on_device_captions";
+    private const string SelectedModelKey = "poredo_selected_model";
+    private const string BiometricLockKey = "poredo_biometric_lock";
 
     public string ServerUrl
     {
@@ -55,6 +57,18 @@ public class MobileSettingsService : IMobileSettingsService
     {
         get => Preferences.Default.Get(OnDeviceCaptionsKey, false);
         set => Preferences.Default.Set(OnDeviceCaptionsKey, value);
+    }
+
+    public string SelectedModelId
+    {
+        get => Preferences.Default.Get(SelectedModelKey, "qwen2.5-0.5b-instruct");
+        set => Preferences.Default.Set(SelectedModelKey, value);
+    }
+
+    public bool LockGalleryWithBiometrics
+    {
+        get => Preferences.Default.Get(BiometricLockKey, false);
+        set => Preferences.Default.Set(BiometricLockKey, value);
     }
 
     public Uri GetBaseUri()

@@ -1,4 +1,4 @@
-using PoRedoImage.Shared.DTOs;
+using PoRedoImage.Mobile.Models;
 
 namespace PoRedoImage.Mobile.Services;
 

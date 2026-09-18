@@ -15,6 +15,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- AndroidX binding assemblies lag the generation MAUI actually resolves (CameraX 1.4.2.1
+         declares constraints against lifecycle/fragment/activity pins one generation behind the
+         coherent set the restore picks). The resolved set is self-consistent; only the stale
+         constraint metadata trips NU1608. Scoped to this MAUI head, deliberately. -->
+    <NoWarn>$(NoWarn);NU1608;CA1416</NoWarn>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 
     <!-- Display name -->
@@ -44,6 +49,7 @@
     <PackageReference Include="Microsoft.Maui.Controls" />
     <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" />
     <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="Xamarin.AndroidX.Biometric" />
   </ItemGroup>
 
 </Project>

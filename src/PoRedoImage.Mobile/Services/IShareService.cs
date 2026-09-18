@@ -11,6 +11,11 @@ public interface IShareService
     Task ShareImageAsync(byte[] imageBytes, string fileName, string title = "PoRedo Image");
 
     /// <summary>
+    /// Opens the native system share sheet with any binary file (used for rendered Veo clips).
+    /// </summary>
+    Task ShareFileAsync(byte[] fileBytes, string fileName, string title = "PoRedo Clip");
+
+    /// <summary>
     /// Opens the native system share sheet with text (e.g. rap roast lyrics).
     /// </summary>
     Task ShareTextAsync(string text, string title = "PoRedo Roast");

@@ -34,6 +34,12 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _onDeviceModelStatus = string.Empty;
 
+    [ObservableProperty]
+    private string _selectedModel;
+
+    [ObservableProperty]
+    private bool _lockGalleryWithBiometrics;
+
     public string[] AvailableStyles { get; } =
     [
         "Cyberpunk",
@@ -58,8 +64,14 @@ public partial class SettingsViewModel : ObservableObject
         _autoSaveToGallery = _settings.AutoSaveToGallery;
         _useOnDeviceCaptions = _settings.UseOnDeviceCaptions;
         _onDeviceModelName = _onDeviceCaptions.Model.DisplayName;
+        _selectedModel = _onDeviceCaptions.Model.DisplayName;
+        _lockGalleryWithBiometrics = _settings.LockGalleryWithBiometrics;
         RefreshOnDeviceModel();
     }
+
+    /// <summary>Display names of every catalogued on-device model, biggest last.</summary>
+    public string[] AvailableModels { get; } =
+        OnDeviceModelCatalog.All.Select(m => m.DisplayName).ToArray();
 
     /// <summary>
     /// Re-checks the filesystem for the model. Bound to a button rather than run once at startup so
@@ -108,6 +120,13 @@ public partial class SettingsViewModel : ObservableObject
         _settings.SelectedStyle = SelectedStyle;
         _settings.AutoSaveToGallery = AutoSaveToGallery;
         _settings.UseOnDeviceCaptions = UseOnDeviceCaptions;
+        _settings.LockGalleryWithBiometrics = LockGalleryWithBiometrics;
+
+        // Map the picked display name back to the catalog id the caption service resolves by.
+        var match = OnDeviceModelCatalog.All.FirstOrDefault(m => m.DisplayName == SelectedModel);
+        if (match is not null)
+            _settings.SelectedModelId = match.Id;
+
         RefreshOnDeviceModel();
     }
 }

@@ -127,6 +127,15 @@
                                     BorderWidth="1"
                                     HeightRequest="44"
                                     Padding="16,8" />
+
+                            <Button Text="🎯 Pro shot"
+                                    Clicked="OnProShotClicked"
+                                    BackgroundColor="{StaticResource BgCardHover}"
+                                    TextColor="{StaticResource TextPrimary}"
+                                    BorderColor="{StaticResource BorderLight}"
+                                    BorderWidth="1"
+                                    HeightRequest="44"
+                                    Padding="16,8" />
                         </HorizontalStackLayout>
                     </VerticalStackLayout>
 
@@ -180,8 +189,8 @@
                        TextColor="{StaticResource TextSecondary}"
                        CharacterSpacing="1" />
 
-                <!-- Grid of 4 actions -->
-                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*" RowSpacing="10" ColumnSpacing="10">
+                <!-- Grid of 6 actions -->
+                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,*" RowSpacing="10" ColumnSpacing="10">
 
                     <!-- Tile 1: Meme -->
                     <Border Grid.Row="0" Grid.Column="0"
@@ -243,10 +252,63 @@
                         <VerticalStackLayout Spacing="6">
                             <Label Text="🔍" FontSize="24" />
                             <Label Text="Describe" FontSize="14" FontAttributes="Bold" />
-                            <Label Text="GPT-4o breakdown" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+                            <Label Text="Vision breakdown" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Tile 5: Bulk ×10 -->
+                    <Border Grid.Row="2" Grid.Column="0"
+                            BackgroundColor="{StaticResource BgCard}"
+                            Stroke="{StaticResource AccentPurple}"
+                            StrokeShape="RoundRectangle 12"
+                            Padding="12">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ProcessBulkCommand}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="🎨" FontSize="24" />
+                            <Label Text="Bulk ×10" FontSize="14" FontAttributes="Bold" />
+                            <Label Text="Ten art styles at once" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Tile 6: Video -->
+                    <Border Grid.Row="2" Grid.Column="1"
+                            BackgroundColor="{StaticResource BgCard}"
+                            Stroke="{StaticResource AccentPink}"
+                            StrokeShape="RoundRectangle 12"
+                            Padding="12">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ProcessVideoCommand}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="🎬" FontSize="24" />
+                            <Label Text="Video" FontSize="14" FontAttributes="Bold" />
+                            <Label Text="8s Veo clip · ~$0.40" FontSize="11" TextColor="{StaticResource TextSecondary}" />
                         </VerticalStackLayout>
                     </Border>
                 </Grid>
+
+                <!-- Video prompt: what should happen in the clip -->
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="VIDEO PROMPT"
+                           FontSize="10"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource TextSecondary}"
+                           CharacterSpacing="1" />
+                    <Border BackgroundColor="#0F172A"
+                            Stroke="{StaticResource BorderLight}"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="10,4">
+                        <Editor Text="{Binding VideoPrompt}"
+                                Placeholder="Describe what should happen in the clip…"
+                                AutoSize="TextChanges"
+                                MaxLength="1200"
+                                FontSize="12"
+                                TextColor="{StaticResource TextPrimary}"
+                                PlaceholderColor="{StaticResource TextSecondary}" />
+                    </Border>
+                </VerticalStackLayout>
             </VerticalStackLayout>
 
             <!-- ── Live Processing Stage ────────────────────────────── -->
@@ -300,6 +362,66 @@
                                VerticalOptions="Fill" />
                     </Frame>
 
+                    <!-- Bulk board: slots fill in live as the stream lands -->
+                    <VerticalStackLayout Spacing="6" IsVisible="{Binding IsBulkResult}">
+                        <Label Text="{Binding BulkSummary}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource AccentPurple}" />
+                        <CollectionView ItemsSource="{Binding BulkItems}"
+                                        SelectionMode="None"
+                                        HeightRequest="170">
+                            <CollectionView.ItemsLayout>
+                                <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:BulkItemViewModel">
+                                    <Border WidthRequest="120"
+                                            BackgroundColor="#0F172A"
+                                            Stroke="{StaticResource BorderLight}"
+                                            StrokeShape="RoundRectangle 8"
+                                            Padding="4">
+                                        <Grid RowDefinitions="*,Auto" RowSpacing="2">
+                                            <Image Grid.Row="0"
+                                                   Source="{Binding Image}"
+                                                   Aspect="AspectFill"
+                                                   IsVisible="{Binding IsFilled}" />
+                                            <Label Grid.Row="0"
+                                                   Text="{Binding StatusText}"
+                                                   FontSize="10"
+                                                   TextColor="{StaticResource TextSecondary}"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center"
+                                                   LineBreakMode="WordWrap"
+                                                   IsVisible="{Binding IsFilled, Converter={StaticResource InverseBoolConverter}}" />
+                                            <Label Grid.Row="1"
+                                                   Text="{Binding Label}"
+                                                   FontSize="9"
+                                                   FontAttributes="Bold"
+                                                   TextColor="{StaticResource TextSecondary}"
+                                                   HorizontalOptions="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+
+                    <!-- Video result actions -->
+                    <HorizontalStackLayout Spacing="8" IsVisible="{Binding IsVideoResult}">
+                        <Button Text="▶️ Open Clip"
+                                Command="{Binding OpenVideoClipCommand}"
+                                IsVisible="{Binding VideoReady}"
+                                BackgroundColor="{StaticResource AccentPink}"
+                                TextColor="White"
+                                FontSize="12"
+                                Padding="12,6" />
+                        <Label Text="8s · with sound · saved locally when shared"
+                               FontSize="10"
+                               TextColor="{StaticResource TextSecondary}"
+                               VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
                     <!-- Text / Lyrics Result -->
                     <Border BackgroundColor="#0F172A"
                             Stroke="{StaticResource BorderLight}"
@@ -347,6 +469,23 @@
                                 FontSize="12"
                                 Padding="8" />
                     </Grid>
+
+                    <!-- Persistent PoRedo gallery — syncs with the web app -->
+                    <Button Text="☁️ Save to PoRedo Gallery"
+                            Command="{Binding SaveToGalleryCommand}"
+                            BackgroundColor="{StaticResource AccentPurple}"
+                            TextColor="White"
+                            FontSize="13"
+                            FontAttributes="Bold"
+                            Padding="8"
+                            HeightRequest="42"
+                            CornerRadius="10" />
+
+                    <Label Text="{Binding GalleryStatus}"
+                           FontSize="11"
+                           TextColor="{StaticResource AccentEmerald}"
+                           LineBreakMode="WordWrap"
+                           IsVisible="{Binding HasGalleryStatus}" />
                 </VerticalStackLayout>
             </Border>
 

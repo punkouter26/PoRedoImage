@@ -18,6 +18,18 @@ public interface IMobileSettingsService
     bool UseOnDeviceCaptions { get; set; }
 
     /// <summary>
+    /// Which catalogued on-device model to load. Defaults to the smallest; bigger ones must be
+    /// side-loaded first or the caption service reports them missing.
+    /// </summary>
+    string SelectedModelId { get; set; }
+
+    /// <summary>
+    /// Gate the gallery behind device biometrics. Only takes effect when the device has
+    /// enrolled hardware credentials — the lock never strands a user without them.
+    /// </summary>
+    bool LockGalleryWithBiometrics { get; set; }
+
+    /// <summary>
     /// Returns the resolved API base URI with trailing slash guaranteed.
     /// </summary>
     Uri GetBaseUri();

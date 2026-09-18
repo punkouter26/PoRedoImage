@@ -49,6 +49,7 @@ public sealed class QwenCaptionService : IOnDeviceCaptionService, IDisposable
     private const int MaxAttempts = 3;
 
     private readonly IOnDeviceModelStore _store;
+    private readonly IMobileSettingsService _settings;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private OrtModel? _model;
@@ -56,12 +57,25 @@ public sealed class QwenCaptionService : IOnDeviceCaptionService, IDisposable
     private string? _loadedFrom;
     private bool _disposed;
 
-    public QwenCaptionService(IOnDeviceModelStore store)
+    public QwenCaptionService(IOnDeviceModelStore store, IMobileSettingsService settings)
     {
         _store = store;
+        _settings = settings;
     }
 
-    public OnDeviceModel Model => OnDeviceModelCatalog.Qwen25MemeCaption;
+    /// <summary>
+    /// The model the user picked in Settings — the catalog default (smallest) until they choose
+    /// a bigger one. Falls back to the default when the stored id names something uncatalogued.
+    /// </summary>
+    public OnDeviceModel Model
+    {
+        get
+        {
+            var selected = _settings.SelectedModelId;
+            return OnDeviceModelCatalog.All.FirstOrDefault(m => m.Id == selected)
+                ?? OnDeviceModelCatalog.Qwen25MemeCaption;
+        }
+    }
 
     public OnDeviceModelStatus Probe() => _store.Probe(Model);
 
