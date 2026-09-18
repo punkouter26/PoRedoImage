@@ -13,6 +13,7 @@ public class MobileSettingsService : IMobileSettingsService
     private const string OnDeviceCaptionsKey = "poredo_on_device_captions";
     private const string SelectedModelKey = "poredo_selected_model";
     private const string BiometricLockKey = "poredo_biometric_lock";
+    private const string HwAccelerationKey = "poredo_use_hw_acceleration";
 
     public string ServerUrl
     {
@@ -57,6 +58,12 @@ public class MobileSettingsService : IMobileSettingsService
     {
         get => Preferences.Default.Get(OnDeviceCaptionsKey, false);
         set => Preferences.Default.Set(OnDeviceCaptionsKey, value);
+    }
+
+    public bool UseHardwareAcceleration
+    {
+        get => Preferences.Default.Get(HwAccelerationKey, true);
+        set => Preferences.Default.Set(HwAccelerationKey, value);
     }
 
     public string SelectedModelId

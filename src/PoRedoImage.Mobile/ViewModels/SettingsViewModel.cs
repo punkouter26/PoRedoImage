@@ -29,6 +29,9 @@ public partial class SettingsViewModel : ObservableObject
     private bool _useOnDeviceCaptions;
 
     [ObservableProperty]
+    private bool _useHardwareAcceleration;
+
+    [ObservableProperty]
     private string _onDeviceModelName = string.Empty;
 
     [ObservableProperty]
@@ -63,6 +66,7 @@ public partial class SettingsViewModel : ObservableObject
         _selectedStyle = _settings.SelectedStyle;
         _autoSaveToGallery = _settings.AutoSaveToGallery;
         _useOnDeviceCaptions = _settings.UseOnDeviceCaptions;
+        _useHardwareAcceleration = _settings.UseHardwareAcceleration;
         _onDeviceModelName = _onDeviceCaptions.Model.DisplayName;
         _selectedModel = _onDeviceCaptions.Model.DisplayName;
         _lockGalleryWithBiometrics = _settings.LockGalleryWithBiometrics;
@@ -81,7 +85,10 @@ public partial class SettingsViewModel : ObservableObject
     public void RefreshOnDeviceModel()
     {
         var status = _onDeviceCaptions.Probe();
-        OnDeviceModelStatus = status.IsAvailable ? $"✅ {status.Detail}" : $"⚠️ {status.Detail}";
+        var hwNote = _settings.UseHardwareAcceleration ? "NNAPI (NPU/GPU)" : "CPU";
+        OnDeviceModelStatus = status.IsAvailable
+            ? $"✅ {status.Detail} (Mode: {hwNote})"
+            : $"⚠️ {status.Detail}";
     }
 
     [RelayCommand]
@@ -120,6 +127,7 @@ public partial class SettingsViewModel : ObservableObject
         _settings.SelectedStyle = SelectedStyle;
         _settings.AutoSaveToGallery = AutoSaveToGallery;
         _settings.UseOnDeviceCaptions = UseOnDeviceCaptions;
+        _settings.UseHardwareAcceleration = UseHardwareAcceleration;
         _settings.LockGalleryWithBiometrics = LockGalleryWithBiometrics;
 
         // Map the picked display name back to the catalog id the caption service resolves by.

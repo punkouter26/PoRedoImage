@@ -155,6 +155,22 @@
                            FontSize="11"
                            TextColor="{StaticResource TextSecondary}" />
 
+                    <!-- Hardware NPU/GPU acceleration toggle -->
+                    <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="NPU/GPU Hardware Acceleration (NNAPI)"
+                                   FontSize="13"
+                                   FontAttributes="Bold" />
+                            <Label Text="Uses Android NNAPI for faster local inference on the device NPU. Falls back to CPU if unsupported."
+                                   FontSize="11"
+                                   TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding UseHardwareAcceleration}"
+                                OnColor="{StaticResource AccentEmerald}" />
+                    </Grid>
+
                     <Button Text="🔄 Re-check Model"
                             Command="{Binding RefreshOnDeviceModelCommand}"
                             BackgroundColor="{StaticResource BgCardHover}"

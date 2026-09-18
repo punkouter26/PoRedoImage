@@ -38,13 +38,23 @@ public class MauiShareService : IShareService
         });
     }
 
-    public async Task<string?> SaveToDeviceAsync(byte[] imageBytes, string fileName)
+    public async Task<string?> SaveToDeviceAsync(
+        byte[] mediaBytes,
+        string fileName,
+        string contentType = "image/jpeg",
+        Models.MediaMetadata? metadata = null)
     {
         try
         {
+#if ANDROID
+            var savedPath = await Platforms.Android.AndroidMediaStore.SaveMediaAsync(
+                mediaBytes, fileName, contentType, metadata);
+            if (savedPath is not null)
+                return savedPath;
+#endif
             var folder = FileSystem.AppDataDirectory;
             var targetPath = Path.Combine(folder, fileName);
-            await File.WriteAllBytesAsync(targetPath, imageBytes);
+            await File.WriteAllBytesAsync(targetPath, mediaBytes);
             return targetPath;
         }
         catch

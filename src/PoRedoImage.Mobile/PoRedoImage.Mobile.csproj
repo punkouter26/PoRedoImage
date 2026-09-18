@@ -19,7 +19,7 @@
          declares constraints against lifecycle/fragment/activity pins one generation behind the
          coherent set the restore picks). The resolved set is self-consistent; only the stale
          constraint metadata trips NU1608. Scoped to this MAUI head, deliberately. -->
-    <NoWarn>$(NoWarn);NU1608;CA1416</NoWarn>
+    <NoWarn>$(NoWarn);NU1608;CA1416;XA0141</NoWarn>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 
     <!-- Display name -->

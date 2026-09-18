@@ -45,15 +45,18 @@ public partial class GalleryViewModel : ObservableObject
     private readonly IMobileApiClient _apiClient;
     private readonly IBiometricGuard _biometric;
     private readonly IMobileSettingsService _settings;
+    private readonly IShareService _shareService;
 
     public GalleryViewModel(
         IMobileApiClient apiClient,
         IBiometricGuard biometric,
-        IMobileSettingsService settings)
+        IMobileSettingsService settings,
+        IShareService shareService)
     {
         _apiClient = apiClient;
         _biometric = biometric;
         _settings = settings;
+        _shareService = shareService;
     }
 
     public ObservableCollection<GalleryItemViewModel> Items { get; } = [];
@@ -190,6 +193,33 @@ public partial class GalleryViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusText = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task SaveToDeviceAsync(GalleryItemViewModel? item)
+    {
+        var target = item ?? Selected;
+        if (target is null) return;
+
+        try
+        {
+            StatusText = $"Exporting {target.FileName} to device Photos…";
+            var bytes = await _apiClient.GetGalleryImageBytesAsync(target.Dto.Id);
+            var meta = new Models.MediaMetadata(
+                Title: target.FileName,
+                PromptOrDescription: $"PoRedo {target.KindLabel} from gallery",
+                ModelOrStyle: target.KindLabel,
+                CreatedAt: target.Dto.CreatedAt);
+
+            var path = await _shareService.SaveToDeviceAsync(bytes, target.FileName, target.Dto.ContentType, meta);
+            StatusText = path != null
+                ? $"Saved to Photos ({path})!"
+                : "Saved to device!";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Save failed: {ex.Message}";
         }
     }
 

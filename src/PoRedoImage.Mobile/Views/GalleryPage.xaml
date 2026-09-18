@@ -173,13 +173,21 @@
                        Source="{Binding Selected.Image}"
                        Aspect="AspectFit" />
 
-                <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                     <Label Grid.Column="0"
                            Text="{Binding Selected.SizeLabel}"
                            FontSize="11"
                            TextColor="{StaticResource TextSecondary}"
                            VerticalOptions="Center" />
                     <Button Grid.Column="1"
+                            Text="💾 Save to Photos"
+                            Command="{Binding SaveToDeviceCommand}"
+                            CommandParameter="{Binding Selected}"
+                            BackgroundColor="{StaticResource BgCardHover}"
+                            TextColor="{StaticResource TextPrimary}"
+                            FontSize="12"
+                            Padding="12,6" />
+                    <Button Grid.Column="2"
                             Text="🗑 Delete"
                             Command="{Binding DeleteCommand}"
                             CommandParameter="{Binding Selected}"

@@ -55,7 +55,11 @@ public sealed class QwenCaptionService : IOnDeviceCaptionService, IDisposable
     private OrtModel? _model;
     private Tokenizer? _tokenizer;
     private string? _loadedFrom;
+    private bool? _lastLoadedWithHwAccel;
+    private string _executionProvider = "CPU";
     private bool _disposed;
+
+    public string ExecutionProvider => _executionProvider;
 
     public QwenCaptionService(IOnDeviceModelStore store, IMobileSettingsService settings)
     {
@@ -133,8 +137,10 @@ public sealed class QwenCaptionService : IOnDeviceCaptionService, IDisposable
     /// </summary>
     private void EnsureLoaded(string directory, IProgress<string>? stage)
     {
+        var hwAccel = _settings.UseHardwareAcceleration;
         if (_model is not null && _tokenizer is not null &&
-            string.Equals(_loadedFrom, directory, StringComparison.Ordinal))
+            string.Equals(_loadedFrom, directory, StringComparison.Ordinal) &&
+            _lastLoadedWithHwAccel == hwAccel)
         {
             return;
         }
@@ -142,11 +148,38 @@ public sealed class QwenCaptionService : IOnDeviceCaptionService, IDisposable
         ReleaseSession();
         stage?.Report($"Loading {Model.DisplayName}…");
 
+        // First attempt: NNAPI hardware acceleration if requested
+        if (hwAccel)
+        {
+            try
+            {
+                using var config = new Config(directory);
+                config.ClearProviders();
+                config.AppendProvider("nnapi");
+                config.AppendProvider("cpu");
+
+                _model = new OrtModel(config);
+                _tokenizer = new Tokenizer(_model);
+                _loadedFrom = directory;
+                _lastLoadedWithHwAccel = true;
+                _executionProvider = "NNAPI (NPU/GPU)";
+                return;
+            }
+            catch (Exception)
+            {
+                // Device NPU driver or quantized operator unsupported in NNAPI — fall back cleanly to CPU
+                ReleaseSession();
+            }
+        }
+
+        // Standard CPU execution
         try
         {
             _model = new OrtModel(directory);
             _tokenizer = new Tokenizer(_model);
             _loadedFrom = directory;
+            _lastLoadedWithHwAccel = false;
+            _executionProvider = "CPU";
         }
         catch (Exception ex)
         {
@@ -367,6 +400,7 @@ public sealed class QwenCaptionService : IOnDeviceCaptionService, IDisposable
         _model?.Dispose();
         _model = null;
         _loadedFrom = null;
+        _lastLoadedWithHwAccel = null;
     }
 
     public void Dispose()

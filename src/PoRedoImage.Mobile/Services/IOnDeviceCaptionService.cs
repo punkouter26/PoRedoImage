@@ -8,6 +8,9 @@ public interface IOnDeviceCaptionService
     /// <summary>The model this service runs.</summary>
     OnDeviceModel Model { get; }
 
+    /// <summary>The hardware execution provider currently in use (e.g. NNAPI NPU vs CPU).</summary>
+    string ExecutionProvider { get; }
+
     /// <summary>
     /// Whether the weights are present. Re-probed on each call, so pushing the model with adb takes
     /// effect without reinstalling or restarting the app.

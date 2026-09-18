@@ -390,7 +390,7 @@ public partial class MainViewModel : ObservableObject
         _lastResultKind = UserImageKind.Meme;
         ResultContentType = "image/jpeg";
         CaptionSourceNote =
-            $"Caption written on this phone by {_onDeviceCaptions.Model.DisplayName}. " +
+            $"Caption written on this phone by {_onDeviceCaptions.Model.DisplayName} ({_onDeviceCaptions.ExecutionProvider}). " +
             "The scene description still came from the server's vision model.";
     }
 
@@ -773,13 +773,28 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public async Task SaveResultAsync()
     {
-        if (ResultImageBytes != null)
+        var meta = new MediaMetadata(
+            Title: ResultTitle,
+            PromptOrDescription: !string.IsNullOrWhiteSpace(ResultText) ? ResultText : PhotoSummary,
+            ModelOrStyle: CurrentResultMode == ResultMode.Regenerate ? SelectedStyle : CurrentResultMode.ToString(),
+            CreatedAt: DateTimeOffset.UtcNow);
+
+        if (IsVideoResult && _videoClipBytes != null && _videoClipBytes.Length > 0)
         {
-            var fileName = $"poredo_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
-            var path = await _shareService.SaveToDeviceAsync(ResultImageBytes, fileName);
+            var fileName = $"poredo_{DateTime.UtcNow:yyyyMMdd_HHmmss}.mp4";
+            var path = await _shareService.SaveToDeviceAsync(_videoClipBytes, fileName, _videoContentType, meta);
             if (path != null)
             {
-                ProcessingStage = "Saved to device!";
+                ProcessingStage = $"Saved video to {path}!";
+            }
+        }
+        else if (ResultImageBytes != null && ResultImageBytes.Length > 0)
+        {
+            var fileName = $"poredo_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
+            var path = await _shareService.SaveToDeviceAsync(ResultImageBytes, fileName, ResultContentType, meta);
+            if (path != null)
+            {
+                ProcessingStage = $"Saved image to {path}!";
             }
         }
     }
@@ -813,6 +828,11 @@ public partial class MainViewModel : ObservableObject
             await action();
             ProcessingProgress = 1.0;
             ProcessingStage = "Done!";
+
+            if (_settings.AutoSaveToGallery)
+            {
+                await AutoSaveResultToDeviceAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -823,6 +843,41 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsProcessing = false;
+        }
+    }
+
+    private async Task AutoSaveResultToDeviceAsync()
+    {
+        try
+        {
+            var meta = new MediaMetadata(
+                Title: ResultTitle,
+                PromptOrDescription: !string.IsNullOrWhiteSpace(ResultText) ? ResultText : PhotoSummary,
+                ModelOrStyle: CurrentResultMode == ResultMode.Regenerate ? SelectedStyle : CurrentResultMode.ToString(),
+                CreatedAt: DateTimeOffset.UtcNow);
+
+            if (IsVideoResult && _videoClipBytes != null && _videoClipBytes.Length > 0)
+            {
+                var fileName = $"poredo_{DateTime.UtcNow:yyyyMMdd_HHmmss}.mp4";
+                var path = await _shareService.SaveToDeviceAsync(_videoClipBytes, fileName, _videoContentType, meta);
+                if (path != null)
+                {
+                    ProcessingStage = "Done! (Saved to device gallery)";
+                }
+            }
+            else if (ResultImageBytes != null && ResultImageBytes.Length > 0)
+            {
+                var fileName = $"poredo_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
+                var path = await _shareService.SaveToDeviceAsync(ResultImageBytes, fileName, ResultContentType, meta);
+                if (path != null)
+                {
+                    ProcessingStage = "Done! (Saved to device gallery)";
+                }
+            }
+        }
+        catch
+        {
+            // Auto-save is best-effort and must not fail the generation result
         }
     }
 

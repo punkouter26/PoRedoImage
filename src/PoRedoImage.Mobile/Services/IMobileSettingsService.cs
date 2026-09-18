@@ -18,6 +18,12 @@ public interface IMobileSettingsService
     bool UseOnDeviceCaptions { get; set; }
 
     /// <summary>
+    /// Use hardware acceleration (Android NNAPI for NPU/GPU) for on-device inference when available.
+    /// Falls back to CPU if unsupported.
+    /// </summary>
+    bool UseHardwareAcceleration { get; set; }
+
+    /// <summary>
     /// Which catalogued on-device model to load. Defaults to the smallest; bigger ones must be
     /// side-loaded first or the caption service reports them missing.
     /// </summary>

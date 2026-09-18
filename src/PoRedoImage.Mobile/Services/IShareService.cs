@@ -21,8 +21,13 @@ public interface IShareService
     Task ShareTextAsync(string text, string title = "PoRedo Roast");
 
     /// <summary>
-    /// Saves the image to the device's local photo cache or public storage folder.
+    /// Saves the media (image or video) to the device's public gallery (e.g. Pictures/PoRedoImage or Movies/PoRedoImage)
+    /// embedding EXIF metadata where applicable.
     /// </summary>
-    Task<string?> SaveToDeviceAsync(byte[] imageBytes, string fileName);
+    Task<string?> SaveToDeviceAsync(
+        byte[] mediaBytes,
+        string fileName,
+        string contentType = "image/jpeg",
+        Models.MediaMetadata? metadata = null);
 }
 
