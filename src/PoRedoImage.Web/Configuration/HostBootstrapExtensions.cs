@@ -184,10 +184,21 @@ public static class HostBootstrapExtensions
             .WithTracing(tracing => tracing
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation())
-            .WithMetrics(metrics => metrics
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddRuntimeInstrumentation());
+            .WithMetrics(metrics =>
+            {
+                metrics
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation();
+
+                // Cost cap: drop the noisy ASP.NET HTTP client/hosting pre-aggregated meters
+                // (~60% of this app's Log Analytics ingestion). Reversible via config.
+                if (!builder.Configuration.GetValue("ApplicationInsights:EnableAspNetCoreMeters", false))
+                {
+                    metrics.RemoveMeter("Microsoft.AspNetCore.Hosting");
+                    metrics.RemoveMeter("Microsoft.AspNetCore.HttpClient");
+                }
+            });
 
         if (string.IsNullOrWhiteSpace(appInsightsConnectionString))
         {
