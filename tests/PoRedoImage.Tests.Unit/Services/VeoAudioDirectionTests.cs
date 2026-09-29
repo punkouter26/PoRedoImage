@@ -40,17 +40,25 @@ public sealed class VeoAudioDirectionTests
     }
 
     /// <summary>
-    /// Regression: 066dac7 removed the per-request <c>x-goog-api-key</c> header and every render
-    /// came back "Method doesn't allow unregistered callers". Start AND poll must both carry it.
+    /// Round trip against Veo's real wire shapes, pinning three regressions at once:
+    /// 066dac7 dropped the <c>x-goog-api-key</c> header ("Method doesn't allow unregistered
+    /// callers"); the poll prefixed Veo's full <c>models/…/operations/…</c> handle with another
+    /// <c>operations/</c> and 404'd; and the parser looked for a <c>videos</c> array Veo never sends.
     /// </summary>
     [Fact]
-    public async Task Every_Veo_request_carries_the_api_key()
+    public async Task Veo_round_trip_polls_the_issued_handle_and_downloads_the_clip()
     {
-        var seen = new List<string?>();
+        const string handle = "models/veo-3.1-lite-generate-preview/operations/op1";
+        const string clipUri = "https://generativelanguage.googleapis.com/v1beta/files/f1:download?alt=media";
+        var seen = new List<(string Path, string? Key)>();
         var handler = new StubHandler(req =>
         {
-            seen.Add(req.Headers.TryGetValues("x-goog-api-key", out var v) ? v.Single() : null);
-            var body = req.Method == HttpMethod.Post ? """{"name":"operations/op1"}""" : """{"done":false}""";
+            seen.Add((req.RequestUri!.PathAndQuery, req.Headers.TryGetValues("x-goog-api-key", out var v) ? v.Single() : null));
+            var body = req.Method == HttpMethod.Post
+                ? "{\"name\":\"" + handle + "\"}"
+                : req.RequestUri!.AbsolutePath.EndsWith("/op1", StringComparison.Ordinal)
+                    ? """{"done":true,"response":{"generateVideoResponse":{"generatedSamples":[{"video":{"uri":"URI"}}]}}}""".Replace("URI", clipUri)
+                    : "clip";
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) };
         });
         var factory = new Mock<IHttpClientFactory>();
@@ -61,9 +69,12 @@ public sealed class VeoAudioDirectionTests
 
         var veo = new VeoVideoGenerationService(config, factory.Object, NullLogger<VeoVideoGenerationService>.Instance);
         var op = await veo.StartAsync([1, 2, 3], "image/png", "a slow zoom");
-        await veo.PollAsync(op);
+        var status = await veo.PollAsync(op);
 
-        Assert.Equal(["test-key", "test-key"], seen);
+        Assert.True(status.Done);
+        Assert.Equal("clip"u8.ToArray(), status.Video);
+        Assert.Equal($"/v1beta/{handle}", seen[1].Path);
+        Assert.All(seen, s => Assert.Equal("test-key", s.Key));
     }
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler

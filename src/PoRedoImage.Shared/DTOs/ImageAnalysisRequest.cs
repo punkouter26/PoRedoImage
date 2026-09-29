@@ -29,12 +29,6 @@ public class ImageAnalysisRequest
     public string? ModelId { get; set; }
 
     /// <summary>
-    /// Optional selected image-generation provider id (see <c>AiProviderIds</c>). Null falls back to
-    /// the provider named by the <c>ImageGen:Provider</c> flag.
-    /// </summary>
-    public string? ImageGenModelId { get; set; }
-
-    /// <summary>
     /// Description already produced by a browser-local vision model. When set, the server skips its
     /// own vision step and uses this instead.
     /// </summary>
@@ -72,4 +66,17 @@ public class ImageAnalysisRequest
     /// want. Ignored when null or whitespace.
     /// </remarks>
     public string? PrecomputedEnhancedPrompt { get; set; }
+
+    /// <summary>
+    /// A style the user picked (a style recipe, or a prompt staged by Remix), appended to the
+    /// regeneration prompt after the server has written it from the photo.
+    /// </summary>
+    /// <remarks>
+    /// This used to be folded into <see cref="PrecomputedDescription"/>, which tells the server the
+    /// photo was already analysed — so picking any style skipped the vision pass and the image was
+    /// regenerated from the style text alone. Capped like every other field that becomes billable
+    /// prompt tokens.
+    /// </remarks>
+    [StringLength(4000)]
+    public string? StyleDirective { get; set; }
 }

@@ -20,7 +20,7 @@ namespace PoRedoImage.Client.Pages;
 /// intake paths cannot drift between pages — Bulk used to carry its own copies, and they had
 /// already diverged (a pasted image skipped the downscale every other page applies).
 /// </summary>
-public abstract class FeaturePageBase : ComponentBase
+public abstract class FeaturePageBase : ComponentBase, IDisposable
 {
     [Inject] protected HttpClient Http { get; set; } = default!;
     [Inject] protected ImageSessionService SessionService { get; set; } = default!;
@@ -87,6 +87,7 @@ public abstract class FeaturePageBase : ComponentBase
     {
         if (SessionService.HasImage)
             imagePreviewUrl = SessionService.PreviewUrl;
+        SessionService.OnChange += OnSessionImageChanged;
         var auth = await AuthStateProvider.GetAuthenticationStateAsync();
         _userId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -125,6 +126,21 @@ public abstract class FeaturePageBase : ComponentBase
     }
 
     private bool _autoStarted;
+
+    /// <summary>
+    /// Picks up a photo that arrives after init. After a reload, ImageSessionPersistence restores
+    /// the session photo in its OnAfterRender — later than this page's init read — so without
+    /// this the panel stayed empty and the run button disabled until the user re-uploaded.
+    /// Only fills an empty panel: a photo this page already shows is never swapped under it.
+    /// </summary>
+    private void OnSessionImageChanged()
+    {
+        if (imagePreviewUrl is not null || !SessionService.HasImage) return;
+        imagePreviewUrl = SessionService.PreviewUrl;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public virtual void Dispose() => SessionService.OnChange -= OnSessionImageChanged;
 
     private string? _featureTitle;
     private BoardStatus _seenStatus;
@@ -215,7 +231,7 @@ public abstract class FeaturePageBase : ComponentBase
             _ = AutoSaveOriginalAsync(bytes, contentType, fileName);
     }
 
-    protected void HandleGalleryImage(MyImagesGallery.GalleryItem item)
+    protected void HandleGalleryImage()
     {
         selectedFile = null;
         imagePreviewUrl = SessionService.PreviewUrl;
@@ -279,8 +295,6 @@ public abstract class FeaturePageBase : ComponentBase
         ProcessingMode mode,
         CancellationToken ct = default)
     {
-        await AiSelection.EnsureInitializedAsync(ct);
-
         var request = new ImageAnalysisRequest
         {
             ImageData = imageData,
@@ -289,9 +303,6 @@ public abstract class FeaturePageBase : ComponentBase
             DescriptionLength = descriptionLength,
             Mode = mode,
             ModelId = AiSelection.Get(AiCapability.AnalyzeImage),
-            // Never a guess: null degrades to the server's own ImageGen:Provider fallback rather
-            // than stamping a provider id this client is not confident is actually configured.
-            ImageGenModelId = AiSelection.GetExplicit(AiCapability.GenerateImage),
         };
 
         if (!AiSelection.GetOption(AiCapability.AnalyzeImage).ExecutesInBrowser)
@@ -373,29 +384,137 @@ public abstract class FeaturePageBase : ComponentBase
     /// </remarks>
     protected async Task<bool> HandleAnalyzeErrorAsync(HttpResponseMessage response)
     {
-        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
-            errorMessage = "Your session has expired. Please sign in again.";
-            NotificationService.Notify(
-                NotificationSeverity.Warning,
-                "Session expired",
-                "Please sign in again to continue.",
-                duration: 4000);
-            NavigationManager.NavigateTo("/login", forceLoad: true);
-            return true;
-        }
+        if (RedirectIfUnauthorized(response)) return true;
 
         try
         {
             var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsDto>(SharedJsonOptions.Default);
             errorMessage = problem?.Detail ?? $"Request failed ({(int)response.StatusCode})";
         }
-        catch
+        catch (System.Text.Json.JsonException)
         {
-            errorMessage = $"Request failed ({(int)response.StatusCode}). Check that Azure services are configured.";
+            // Not a ProblemDetails body (a proxy error page, a 429 from the rate limiter). The status
+            // is all there is to report — this used to add "check that Azure services are
+            // configured", which was wrong for every one of those causes.
+            errorMessage = $"Request failed ({(int)response.StatusCode}). Please try again.";
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// A 401 means the BFF cookie is gone: say so and reload through /login (forceLoad, so the
+    /// cookie and the serialized auth state are re-established). Returns true when it redirected.
+    /// </summary>
+    protected bool RedirectIfUnauthorized(HttpResponseMessage response)
+    {
+        if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized) return false;
+
+        errorMessage = "Your session has expired. Please sign in again.";
+        NotificationService.Notify(NotificationSeverity.Warning, "Session expired",
+            "Please sign in again to continue.", duration: 4000);
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+        return true;
+    }
+
+    /// <summary>
+    /// Re-renders from any thread, tolerating a page the user already navigated away from — the
+    /// guard every long-running page used to spell out inline, fourteen times.
+    /// </summary>
+    protected async Task RefreshAsync()
+    {
+        try { await InvokeAsync(StateHasChanged); }
+        catch (ObjectDisposedException) { }
+    }
+
+    /// <summary>
+    /// One <c>api/images/analyze</c> run, end to end: builds the request (browser-local steps
+    /// included), posts it, decodes the multi-MB response, records its cost and maps every failure
+    /// onto <see cref="errorMessage"/>. Returns null when the run failed or redirected; the caller
+    /// handles the result and then calls <see cref="SucceedAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// Regeneration and Meme each carried their own ~90-line copy of this, and they had drifted
+    /// (different JSON options, different decode paths, broken indentation in one).
+    /// </remarks>
+    protected async Task<ImageAnalysisResponse?> AnalyzeAsync(
+        int descriptionLength, ProcessingMode mode, Action<ImageAnalysisRequest>? customize = null)
+    {
+        if (imagePreviewUrl is null) return null;
+
+        isProcessing = true;
+        errorMessage = null;
+        progressMessage = "Preparing image for analysis...";
+        await RefreshAsync();
+
+        try
+        {
+            // The local step gets its own, more generous budget: first-run browser-local inference
+            // includes a ~230 MB model download plus WASM/WebGPU load, which a budget shared with
+            // the HTTP call could exhaust on a slow connection.
+            using var localCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            var request = await TryBuildAnalysisRequestAsync(
+                imageData: ExtractBase64(imagePreviewUrl),
+                contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
+                fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
+                descriptionLength: descriptionLength,
+                mode: mode,
+                ct: localCts.Token);
+            if (request is null) return null;
+            customize?.Invoke(request);
+
+            progressMessage = "Analyzing image...";
+            await RefreshAsync();
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            var response = await Http.PostAsJsonAsync("api/images/analyze", request, SharedJsonOptions.Default, cts.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                await HandleAnalyzeErrorAsync(response);
+                return null;
+            }
+
+            progressMessage = "Decoding result…";
+            await RefreshAsync();
+            var result = await response.Content.ReadFromJsonAsync<ImageAnalysisResponse>(SharedJsonOptions.Default, cts.Token)
+                ?? throw new InvalidOperationException("No response received from API.");
+
+            // What the server actually ran: vision unless a browser model already looked, and one
+            // chat call (reproduction prompt or meme caption) unless the prompt came from on-device.
+            if (string.IsNullOrWhiteSpace(request.PrecomputedDescription)) Cost.RecordVision(1);
+            if (string.IsNullOrWhiteSpace(request.PrecomputedEnhancedPrompt)) Cost.RecordTextReasoning(1);
+            return result;
+        }
+        catch (OperationCanceledException ex)
+        {
+            Logger.LogError(ex, "Analyze request timed out after 3 minutes");
+            errorMessage = "That took too long and was cancelled. Please try again with a different image.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Analyze request failed");
+            errorMessage = $"Something went wrong: {ex.Message}";
+        }
+        finally
+        {
+            if (errorMessage is not null)
+            {
+                progressMessage = "Processing failed.";
+                isProcessing = false;
+                await RefreshAsync();
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Marks the run finished and tells the user, after the page has taken its result.</summary>
+    protected async Task SucceedAsync(string title, string detail)
+    {
+        progressMessage = "Done!";
+        isComplete = true;
+        isProcessing = false;
+        NotificationService.Notify(NotificationSeverity.Success, title, detail, duration: 4000);
+        await RefreshAsync();
     }
 
     /// <summary>

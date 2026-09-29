@@ -28,7 +28,7 @@ public static class FeatureCatalog
         new("/meme-generation", "Meme", "bi-chat-square-text",
             "AI writes a witty caption and overlays it on your image."),
         new("/bulk-generate", "Bulk Generate", "bi-grid-3x3",
-            "Generate up to 10 artistic variations at once via Gemini 2.0 Flash."),
+            "Generate up to 10 artistic variations at once via Gemini."),
         new("/rap-roast", "Rap Roast", "bi-mic",
             "AI writes a roast verse about your photo, then performs it over a beat."),
         new("/video", "Video", "bi-film",

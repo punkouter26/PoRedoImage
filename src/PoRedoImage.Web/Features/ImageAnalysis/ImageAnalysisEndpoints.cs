@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using PoRedoImage.Application.Features.ImageAnalysis;
+using PoRedoImage.Web.Features.ImageAnalysis;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
 using PoRedoImage.Web.Features.Shared;
@@ -11,7 +11,7 @@ namespace PoRedoImage.Web.Features.ImageAnalysis;
 
 /// <summary>
 /// Minimal API endpoints for image analysis feature.
-/// Thin slice: delegates all orchestration to IImageAnalysisOrchestrator (Application layer).
+/// Thin transport: delegates all orchestration to <see cref="ImageAnalysisOrchestrator"/>.
 /// Open/Closed Principle (SOLID-O): new processing modes are added in the orchestrator, not here.
 /// </summary>
 public static class ImageAnalysisEndpoints
@@ -34,7 +34,7 @@ public static class ImageAnalysisEndpoints
 
     private static async Task<IResult> AnalyzeImageAsync(
         [FromBody] ImageAnalysisRequest request,
-        IImageAnalysisOrchestrator orchestrator,
+        ImageAnalysisOrchestrator orchestrator,
         ILoggerFactory loggerFactory,
         CancellationToken ct)
     {
@@ -69,7 +69,7 @@ public static class ImageAnalysisEndpoints
                 detail: "The image-generation model declined this request. Please try a different image or prompt.",
                 statusCode: 422, title: "Generation Declined");
         }
-        catch (ClientResultException ex) when (IsContentFiltered(ex.Message))
+        catch (ClientResultException ex) when (AiFailure.IsContentFiltered(ex.Message))
         {
             logger.LogWarning(ex, "AI request blocked by content safety filters");
             return Results.Problem(
@@ -104,23 +104,6 @@ public static class ImageAnalysisEndpoints
             return Results.Problem(detail: "An error occurred while processing your image. Please try again.", statusCode: 500, title: "Processing Error");
         }
     }
-
-    /// <summary>
-    /// Whether an upstream chat/image failure is a content-safety refusal rather than a real fault.
-    /// </summary>
-    /// <remarks>
-    /// The two vendors report the same condition under different codes, and this endpoint talks to
-    /// both: <b>Azure</b> OpenAI returns <c>HTTP 400 (content_filter)</c> — the shape actually
-    /// observed when the meme-caption prompt is rejected — while <b>OpenAI.com</b> returns
-    /// <c>content_policy_violation</c>. Matching only the latter (the original guard clause) left
-    /// every Azure refusal falling through to the catch-all, so the caller saw an opaque HTTP 500
-    /// "An error occurred while processing your image" and had no idea a different photo would work.
-    /// Matched on the exception message because neither SDK surfaces the code as a typed member.
-    /// </remarks>
-    internal static bool IsContentFiltered(string? message) =>
-        message is not null
-        && (message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("content_policy_violation", StringComparison.OrdinalIgnoreCase));
 }
 
 

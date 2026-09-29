@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
@@ -42,6 +43,9 @@ public partial class RapRoast : FeaturePageBase
     private ElementReference _audioRef;
     private ElementReference _lyricsRef;
     private IReadOnlyList<RoastLine> _lines = [];
+
+    /// <summary>Bars streamed ahead of the track; shown under the progress bar, then replaced by the result.</summary>
+    private IReadOnlyList<RoastLine> _previewLines = [];
 
     /// <summary>True once the JS driver confirmed the track carries a usable duration.</summary>
     private bool _karaokeLive;
@@ -123,24 +127,19 @@ public partial class RapRoast : FeaturePageBase
                 ExplicitLanguage = _explicitLanguage,
             };
 
-            var response = await Http.PostAsJsonAsync("/api/rap-roast", request, SharedJsonOptions.Default);
+            // NDJSON so the bars arrive as soon as they are written (see RapRoastEndpoints); the
+            // browser must be told to stream or it buffers the body until the track is done.
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/rap-roast")
+            {
+                Content = JsonContent.Create(request, options: SharedJsonOptions.Default),
+            };
+            httpRequest.Headers.Accept.ParseAdd("application/x-ndjson");
+            httpRequest.SetBrowserResponseStreamingEnabled(true);
+            using var response = await Http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
 
             if (!response.IsSuccessStatusCode)
             {
-                // 401 = BFF session cookie missing/expired. Send to /login instead of the
-                // generic "roast pipeline failed" message. See ImageRegeneration.razor for
-                // the matching fix.
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    errorMessage = "Your session has expired. Please sign in again.";
-                    NotificationService.Notify(
-                        NotificationSeverity.Warning,
-                        "Session expired",
-                        "Please sign in again to continue.",
-                        duration: 4000);
-                    NavigationManager.NavigateTo("/login", forceLoad: true);
-                    return;
-                }
+                if (RedirectIfUnauthorized(response)) return;
 
                 errorMessage = response.StatusCode switch
                 {
@@ -154,11 +153,28 @@ public partial class RapRoast : FeaturePageBase
                 return;
             }
 
-            progressMessage = "Cutting the track…";
-            StateHasChanged();
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
+            while (await reader.ReadLineAsync() is { } line)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var item = System.Text.Json.JsonSerializer.Deserialize<RapRoastResponse>(line, SharedJsonOptions.Default);
+                if (item is null) continue;
+                if (item.TotalMs > 0) { _result = item; break; }
 
-            _result = await response.Content.ReadFromJsonAsync<RapRoastResponse>(SharedJsonOptions.Default);
-            isComplete = _result is not null;
+                // Partial: the bars are written, the music provider is still working.
+                _previewLines = RoastScript.Parse(item.Lyrics);
+                progressMessage = "Cutting the track…";
+                StateHasChanged();
+            }
+            _previewLines = [];
+
+            if (_result is null)
+            {
+                errorMessage = "The bars were written but the track never arrived. Please try again.";
+                return;
+            }
+            isComplete = true;
             if (isComplete)
             {
                 // Tally before anything can clear _result, so the running rate survives a
@@ -170,9 +186,12 @@ public partial class RapRoast : FeaturePageBase
                     _sessionRoasts++;
                 }
 
+                // What actually ran: one vision call, the scene read (when it succeeded), one lyric
+                // call per attempt, and a track only when one came back.
+                var lyricCalls = _result?.FilterReport?.Attempts.Count(a => a.Gate == "Lyric model") ?? 1;
                 Cost.RecordVision(1);
-                Cost.RecordTextReasoning(1);
-                if (!string.IsNullOrEmpty(_result?.AudioData) || _result?.AudioRefused == false)
+                Cost.RecordTextReasoning(lyricCalls + (_result?.DescriptionIsDetailed == true ? 1 : 0));
+                if (!string.IsNullOrEmpty(_result?.AudioData))
                     Cost.RecordMusic(1);
             }
             _lines = RoastScript.Parse(_result?.Lyrics);
@@ -354,7 +373,7 @@ public partial class RapRoast : FeaturePageBase
     {
         try
         {
-            return await JS.InvokeAsync<T>(identifier, args);
+            return await Js.InvokeAsync<T>(identifier, args);
         }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or TaskCanceledException)
         {
@@ -367,7 +386,7 @@ public partial class RapRoast : FeaturePageBase
     {
         try
         {
-            await JS.InvokeVoidAsync(identifier, args);
+            await Js.InvokeVoidAsync(identifier, args);
         }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or TaskCanceledException)
         {
@@ -375,8 +394,9 @@ public partial class RapRoast : FeaturePageBase
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         _ = SafeInvokeVoidAsync("poRoast.detach");
         _selfRef?.Dispose();
         _selfRef = null;

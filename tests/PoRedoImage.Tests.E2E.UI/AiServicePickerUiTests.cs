@@ -69,6 +69,6 @@ public sealed class AiServicePickerUiTests : IClassFixture<PlaywrightBrowserFixt
         await Assertions.Expect(fixedSummary).ToBeVisibleAsync();
 
         // Pins that the default provider is genuinely marked selected on first render
-        await Assertions.Expect(page.Locator("#ai-picker-AnalyzeImage")).ToHaveValueAsync(AiProviderIds.AzureComputerVision);
+        await Assertions.Expect(page.Locator("#ai-picker-AnalyzeImage")).ToHaveValueAsync(AiProviderIds.GeminiVision);
     }
 }

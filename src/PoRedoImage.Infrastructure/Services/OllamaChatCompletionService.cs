@@ -11,7 +11,7 @@ namespace PoRedoImage.Infrastructure.Services;
 
 /// <summary>
 /// Free-form reasoning against a local Ollama model, for the callers that were previously
-/// Azure-OpenAI-or-nothing: the Style Director agents, the Rap Roast scene describer, and the roast
+/// Azure-OpenAI-or-nothing: the reproduction prompt, the Rap Roast scene describer, and the roast
 /// lyric writer.
 /// </summary>
 /// <remarks>
@@ -41,6 +41,9 @@ public sealed class OllamaChatCompletionService(
 {
     private string? Model => configuration[ConfigKeys.OllamaChatModel];
 
+    private static readonly JsonSerializerOptions OmitNulls =
+        new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+
     /// <summary>
     /// Configured when a chat model is named. The endpoint has its own default in the named
     /// HttpClient, so naming a model is the deliberate act that turns this on.
@@ -55,7 +58,7 @@ public sealed class OllamaChatCompletionService(
         Justification = "The outbound body is an anonymous type shaped to the local daemon's contract, "
                       + "which System.Text.Json source generation cannot describe. Mirrors OllamaVisionService.")]
     public async Task<ChatCompletionResult> CompleteAsync(
-        string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+        string systemPrompt, string userPrompt, byte[]? image = null, string? jsonSchema = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
         ArgumentException.ThrowIfNullOrWhiteSpace(userPrompt);
@@ -71,6 +74,10 @@ public sealed class OllamaChatCompletionService(
 
         string content;
         int tokens = 0;
+
+        // Both Ollama APIs accept a JSON schema. Null fields are dropped from the body, so a call
+        // with no schema is byte-for-byte the request it always was.
+        JsonElement? schema = jsonSchema is null ? null : JsonDocument.Parse(jsonSchema).RootElement;
 
         if (IsOpenAiFormat)
         {
@@ -95,9 +102,14 @@ public sealed class OllamaChatCompletionService(
                     new { role = "system", content = systemPrompt },
                     userMessage,
                 },
+                response_format = schema is null ? null : new
+                {
+                    type = "json_schema",
+                    json_schema = new { name = "result", schema, strict = true },
+                },
             };
 
-            using var response = await client.PostAsJsonAsync("/v1/chat/completions", payload, ct);
+            using var response = await client.PostAsJsonAsync("/v1/chat/completions", payload, OmitNulls, ct);
             response.EnsureSuccessStatusCode();
 
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -128,9 +140,10 @@ public sealed class OllamaChatCompletionService(
                     new { role = "system", content = systemPrompt },
                     userMessage,
                 },
+                format = schema,
             };
 
-            using var response = await client.PostAsJsonAsync("/api/chat", payload, ct);
+            using var response = await client.PostAsJsonAsync("/api/chat", payload, OmitNulls, ct);
             response.EnsureSuccessStatusCode();
 
             using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -152,106 +165,5 @@ public sealed class OllamaChatCompletionService(
             elapsed, model, tokens, image is not null);
 
         return new ChatCompletionResult(content, tokens, elapsed);
-    }
-
-    [UnconditionalSuppressMessage("Trimming", "IL2026",
-        Justification = "Anonymous types for local streaming API payload.")]
-    public async IAsyncEnumerable<string> StreamCompleteAsync(
-        string systemPrompt,
-        string userPrompt,
-        byte[]? image = null,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
-        ArgumentException.ThrowIfNullOrWhiteSpace(userPrompt);
-
-        var model = Model;
-        if (string.IsNullOrWhiteSpace(model))
-            throw new InvalidOperationException("Ollama chat completion is not configured.");
-
-        var client = httpClientFactory.CreateClient("Ollama");
-
-        if (IsOpenAiFormat)
-        {
-            var payload = new
-            {
-                model,
-                stream = true,
-                messages = new object[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userPrompt }
-                }
-            };
-
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions")
-            {
-                Content = JsonContent.Create(payload)
-            };
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-
-            using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            using var reader = new StreamReader(stream);
-
-            while (await reader.ReadLineAsync(ct).ConfigureAwait(false) is { } line)
-            {
-                if (ct.IsCancellationRequested) break;
-                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: ", StringComparison.Ordinal)) continue;
-                var json = line[6..].Trim();
-                if (json == "[DONE]") break;
-
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
-                {
-                    var delta = choices[0].GetProperty("delta");
-                    if (delta.TryGetProperty("content", out var c) && c.GetString() is { Length: > 0 } str)
-                    {
-                        yield return str;
-                    }
-                }
-            }
-        }
-        else
-        {
-            object userMessage = image is null
-                ? new { role = "user", content = userPrompt }
-                : new { role = "user", content = userPrompt, images = new[] { Convert.ToBase64String(image) } };
-
-            var payload = new
-            {
-                model,
-                stream = true,
-                messages = new object[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    userMessage,
-                },
-            };
-
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
-            {
-                Content = JsonContent.Create(payload)
-            };
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            using var reader = new StreamReader(stream);
-
-            while (await reader.ReadLineAsync(ct).ConfigureAwait(false) is { } line)
-            {
-                if (ct.IsCancellationRequested) break;
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                using var doc = JsonDocument.Parse(line);
-                if (doc.RootElement.TryGetProperty("message", out var msg)
-                    && msg.TryGetProperty("content", out var c)
-                    && c.GetString() is { Length: > 0 } str)
-                {
-                    yield return str;
-                }
-            }
-        }
     }
 }

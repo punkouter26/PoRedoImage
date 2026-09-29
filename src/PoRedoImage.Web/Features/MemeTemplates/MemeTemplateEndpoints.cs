@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Hybrid;
-using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
 using PoRedoImage.Web.Features.Shared;
@@ -23,7 +23,7 @@ public static class MemeTemplateEndpoints
             .RequireAuthorization()
             .RequireAntiforgeryValidation();
 
-        group.MapGet("/", async (IMemeTemplateService templates, HybridCache cache, CancellationToken ct) =>
+        group.MapGet("/", async (MemeTemplateService templates, HybridCache cache, CancellationToken ct) =>
         {
             // The catalog is immutable for the process lifetime, so cache the DTO projection rather
             // than re-projecting/serializing on every request. HybridCache gives L1 (+ L2 if a
@@ -41,7 +41,7 @@ public static class MemeTemplateEndpoints
         // Render endpoint — runs locally, no AI cost, no auth required.
         group.MapPost("/render", async (
             MemeTemplateRenderRequest request,
-            IMemeTemplateService templates,
+            MemeTemplateService templates,
             ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {

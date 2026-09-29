@@ -608,11 +608,7 @@ public partial class MainViewModel : ObservableObject
         if (CapturedImage == null) return;
         await ExecuteProcessingAsync("Bulk Art Studio", async () =>
         {
-            ProcessingStage = "Describing the subject…";
             ProcessingProgress = 0.15;
-
-            var description = await _apiClient.DescribeImageAsync(CapturedImage);
-            var safeDescription = SanitizeDescription(description);
 
             BulkItems.Clear();
             for (var i = 0; i < BulkPrompts.All.Length; i++)
@@ -621,8 +617,11 @@ public partial class MainViewModel : ObservableObject
             IsBulkResult = true;
             _lastResultKind = UserImageKind.BulkVariation;
 
+            // The batch is image-to-image — Gemini already has the photo — so <PERSON> points at it
+            // rather than at a described noun phrase. The describe call this replaced cost a round
+            // trip before the first variation, and an empty description left prompts with no subject.
             var prompts = BulkPrompts.All
-                .Select(p => p.Replace(BulkPrompts.PersonToken, safeDescription, StringComparison.Ordinal))
+                .Select(p => p.Replace(BulkPrompts.PersonToken, "the person in the reference photo", StringComparison.Ordinal))
                 .ToArray();
 
             ProcessingStage = "Generating 10 variations…";
@@ -795,15 +794,6 @@ public partial class MainViewModel : ObservableObject
                 : $"Saved original + {saved} result{(saved == 1 ? "" : "s")} to your PoRedo gallery ✓";
             HasGalleryStatus = true;
         });
-    }
-
-    /// <summary>Trims/collapses the vision description so it substitutes cleanly into prompts.</summary>
-    private static string SanitizeDescription(string description)
-    {
-        var trimmed = description.Trim().ReplaceLineEndings(" ");
-        if (trimmed.Length > 400)
-            trimmed = trimmed[..400].TrimEnd() + "…";
-        return trimmed.Replace("\"", "'", StringComparison.Ordinal);
     }
 
     private void ResetTransientResultState()

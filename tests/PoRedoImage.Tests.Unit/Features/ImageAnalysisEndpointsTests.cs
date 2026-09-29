@@ -34,6 +34,6 @@ public class ImageAnalysisEndpointsTests
     [InlineData("", false)]
     public void IsContentFiltered_ClassifiesUpstreamRefusals(string message, bool expected)
     {
-        Assert.Equal(expected, ImageAnalysisEndpoints.IsContentFiltered(message));
+        Assert.Equal(expected, PoRedoImage.Web.Features.Shared.AiFailure.IsContentFiltered(message));
     }
 }

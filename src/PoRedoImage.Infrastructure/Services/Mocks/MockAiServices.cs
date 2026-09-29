@@ -33,7 +33,7 @@ public sealed class MockGenerativeAiService : IGenerativeAiService, IMockable
         => Task.FromResult(($"[MOCK] {description}", 0, 1L));
 
     public Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)>
-        GenerateMemeCaptionAsync(IReadOnlyList<string> tags, CancellationToken ct = default)
+        GenerateMemeCaptionAsync(string description, IReadOnlyList<string> tags, CancellationToken ct = default)
         => Task.FromResult(("MOCK TOP TEXT", "MOCK BOTTOM TEXT", 0, 1L));
 
     public Task<string> DescribePersonAsync(byte[] imageData, CancellationToken ct = default)
@@ -42,7 +42,7 @@ public sealed class MockGenerativeAiService : IGenerativeAiService, IMockable
 
 /// <summary>
 /// Canned chat completion — never calls a live provider. Reports <see cref="IsConfigured"/> == false so
-/// the Style Director agents deterministically fall back to their heuristic path (zero network, stable
+/// every caller deterministically falls back to its heuristic path (zero network, stable
 /// output for the automated-test tier).
 /// </summary>
 public sealed class MockChatCompletionService : IChatCompletionService, IMockable
@@ -52,15 +52,10 @@ public sealed class MockChatCompletionService : IChatCompletionService, IMockabl
     public bool IsConfigured => false;
 
     public Task<ChatCompletionResult> CompleteAsync(
-        string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+        string systemPrompt, string userPrompt, byte[]? image = null, string? jsonSchema = null, CancellationToken ct = default)
         => throw new InvalidOperationException(
             "MockChatCompletionService.CompleteAsync should never be called — IsConfigured is false so "
             + "callers must use their heuristic fallback. Reaching here indicates a missing IsConfigured guard.");
-
-    public IAsyncEnumerable<string> StreamCompleteAsync(
-        string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
-        => throw new InvalidOperationException(
-            "MockChatCompletionService.StreamCompleteAsync should never be called — IsConfigured is false.");
 }
 
 /// <summary>Canned image generation — returns a tiny PNG and never calls Google Gemini/Imagen.</summary>
@@ -75,7 +70,7 @@ public sealed class MockImagen3Service : IImageGenerationService, IMockable
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
 
     public Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
-        GenerateAsync(string prompt, CancellationToken ct = default)
+        GenerateAsync(string prompt, byte[]? matchAspectOf = null, CancellationToken ct = default)
         => Task.FromResult((PixelPng, "image/png", 1L));
 
     public Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
@@ -110,26 +105,6 @@ public sealed class MockLyriaMusicService : IMusicGenerationService, IMockable
     public Task<MusicGenerationResult> GenerateAsync(
         string lyrics, string stylePrompt, CancellationToken ct = default)
         => Task.FromResult(new MusicGenerationResult(SilentMp3, "audio/mpeg", 1L));
-}
-
-/// <summary>
-/// Music service that always reports a safety refusal. Not registered by default — it exists so the
-/// orchestrator's soften-and-retry path can be exercised without a network call.
-/// </summary>
-public sealed class AlwaysRefusingMusicService : IMusicGenerationService, IMockable
-{
-    public string MockReason => "Lyria music-gen (always refuses)";
-
-    public bool IsConfigured => true;
-
-    public int AttemptCount { get; private set; }
-
-    public Task<MusicGenerationResult> GenerateAsync(
-        string lyrics, string stylePrompt, CancellationToken ct = default)
-    {
-        AttemptCount++;
-        return Task.FromResult(MusicGenerationResult.FromRefusal(1L, "Blocked by safety filters."));
-    }
 }
 
 /// <summary>

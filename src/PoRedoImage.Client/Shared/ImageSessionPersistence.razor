@@ -15,8 +15,16 @@
     protected override void OnInitialized() => SessionService.OnChange += OnSessionChanged;
     public void Dispose()              => SessionService.OnChange -= OnSessionChanged;
 
+    // Nothing is written until the restore below has run. A feature page's init raises OnChange
+    // (RecordFeatureVisit) before this component's first render; persisting then saw "no image"
+    // and cleared the stored photo, so F5 on any feature page lost it for good.
+    private bool _restoreAttempted;
+
     // No StateHasChanged: this component has no markup, so a re-render would paint nothing.
-    private void OnSessionChanged() => _ = PersistSessionAsync();
+    private void OnSessionChanged()
+    {
+        if (_restoreAttempted) _ = PersistSessionAsync();
+    }
 
     private async Task PersistSessionAsync()
     {
@@ -33,7 +41,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || SessionService.HasImage) return;
+        if (!firstRender) return;
+        if (SessionService.HasImage) { _restoreAttempted = true; await PersistSessionAsync(); return; }
         try
         {
             // Restore active image from sessionStorage after a full-page navigation (new circuit)
@@ -45,6 +54,7 @@
             }
         }
         catch { /* non-critical */ }
+        _restoreAttempted = true;
     }
 
     private sealed record ImageSessionState(string? DataUrl, string? FileName, string? ContentType);

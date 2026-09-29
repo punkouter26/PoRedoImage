@@ -34,12 +34,7 @@ public sealed class SessionCostService(HttpClient http, ILogger<SessionCostServi
     public int TotalOperations => ImageCount + VisionCount + TextReasoningCount + MusicCount + VideoCount;
 
     /// <summary>Estimated spend this session across all AI services, in <see cref="AiPricingDto.Currency"/>.</summary>
-    public decimal EstimatedTotal =>
-        (ImageCount * (Pricing?.ImageToImageUsd ?? 0.039m)) +
-        (VisionCount * (Pricing?.VisionAnalysisUsd ?? 0.001m)) +
-        (TextReasoningCount * (Pricing?.TextReasoningUsd ?? 0.0015m)) +
-        (MusicCount * (Pricing?.MusicGenerationUsd ?? 0.040m)) +
-        (VideoCount * (Pricing?.VideoGenerationUsd ?? 0.40m));
+    public decimal EstimatedTotal => GetBreakdown().Sum(i => i.SubtotalUsd);
 
     public event Action? OnChange;
 
@@ -113,43 +108,22 @@ public sealed class SessionCostService(HttpClient http, ILogger<SessionCostServi
         OnChange?.Invoke();
     }
 
-    /// <summary>Returns itemized list of non-zero AI services used this session.</summary>
+    /// <summary>
+    /// Itemized non-zero services this session. Unit prices come only from <c>/api/pricing</c>; until
+    /// it loads they read 0 rather than a hardcoded copy that could disagree with the server.
+    /// </summary>
     public IReadOnlyList<CostBreakdownItem> GetBreakdown()
     {
-        var list = new List<CostBreakdownItem>();
         var p = Pricing;
-
-        if (ImageCount > 0)
-        {
-            var unit = p?.ImageToImageUsd ?? 0.039m;
-            list.Add(new("Image Generation", "bi-palette2", ImageCount, unit, ImageCount * unit));
-        }
-
-        if (VisionCount > 0)
-        {
-            var unit = p?.VisionAnalysisUsd ?? 0.001m;
-            list.Add(new("Vision Analysis", "bi-eye", VisionCount, unit, VisionCount * unit));
-        }
-
-        if (TextReasoningCount > 0)
-        {
-            var unit = p?.TextReasoningUsd ?? 0.0015m;
-            list.Add(new("Text & Reasoning", "bi-chat-quote", TextReasoningCount, unit, TextReasoningCount * unit));
-        }
-
-        if (MusicCount > 0)
-        {
-            var unit = p?.MusicGenerationUsd ?? 0.040m;
-            list.Add(new("Lyria Music", "bi-music-note-beamed", MusicCount, unit, MusicCount * unit));
-        }
-
-        if (VideoCount > 0)
-        {
-            var unit = p?.VideoGenerationUsd ?? 0.40m;
-            list.Add(new("Veo Video", "bi-film", VideoCount, unit, VideoCount * unit));
-        }
-
-        return list;
+        (string Name, string Icon, int Count, decimal Unit)[] rows =
+        [
+            ("Image Generation", "bi-palette2", ImageCount, p?.ImageGenerationUsd ?? 0),
+            ("Vision Analysis", "bi-eye", VisionCount, p?.VisionAnalysisUsd ?? 0),
+            ("Text & Reasoning", "bi-chat-quote", TextReasoningCount, p?.TextReasoningUsd ?? 0),
+            ("Lyria Music", "bi-music-note-beamed", MusicCount, p?.MusicGenerationUsd ?? 0),
+            ("Veo Video", "bi-film", VideoCount, p?.VideoGenerationUsd ?? 0),
+        ];
+        return [.. rows.Where(r => r.Count > 0).Select(r => new CostBreakdownItem(r.Name, r.Icon, r.Count, r.Unit, r.Count * r.Unit))];
     }
 
     /// <summary>Formats an amount for display, respecting the configured currency.</summary>

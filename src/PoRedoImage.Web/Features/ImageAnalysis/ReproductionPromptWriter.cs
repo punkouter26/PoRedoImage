@@ -1,8 +1,9 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Web.Features.Shared;
 
-namespace PoRedoImage.Application.Features.ImageAnalysis;
+namespace PoRedoImage.Web.Features.ImageAnalysis;
 
 /// <summary>
 /// Writes the prompt the image generator reproduces a photograph from.
@@ -71,15 +72,9 @@ public sealed class ReproductionPromptWriter(
     /// prose. These are dense clauses with no connective tissue, and for reproduction every extra
     /// clause is another fact the generator does not have to invent.
     /// </param>
-    public async Task<ReproductionPrompt> WriteAsync(
-        byte[] image,
-        string visionDescription,
-        IReadOnlyList<string> tags,
-        int targetLength,
-        CancellationToken ct = default)
+    public async Task<ReproductionPrompt> WriteAsync(byte[] image, int targetLength, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        ArgumentNullException.ThrowIfNull(tags);
 
         if (!chat.IsConfigured)
         {
@@ -96,7 +91,10 @@ public sealed class ReproductionPromptWriter(
 
         try
         {
-            var result = await chat.CompleteAsync(SystemPrompt, BuildUserPrompt(visionDescription, tags, budget), image, ct);
+            var result = await chat.CompleteAsync(
+                SystemPrompt,
+                $"Use at most {budget} words. Spend them on visual facts, not on grammar.\n\nStudy the image and write the reproduction prompt.",
+                image, ct: ct);
             sw.Stop();
 
             var text = result.Content.Trim();
@@ -124,26 +122,6 @@ public sealed class ReproductionPromptWriter(
         }
     }
 
-    private static string BuildUserPrompt(string visionDescription, IReadOnlyList<string> tags, int budget)
-    {
-        var parts = new List<string>
-        {
-            $"Use at most {budget} words. Spend them on visual facts, not on grammar.",
-        };
-
-        // Corroboration only, and labelled as such. Both of these are usually tag-derived — handing
-        // them over unqualified invites the model to pad the prompt back out with the same keyword
-        // list this class exists to replace.
-        if (tags.Count > 0)
-            parts.Add($"Detected labels, for corroboration only — do not simply repeat them: {string.Join(", ", tags)}.");
-
-        if (!string.IsNullOrWhiteSpace(visionDescription))
-            parts.Add($"A coarse automatic caption, which may be wrong — trust your own reading of the image over it: \"{visionDescription}\".");
-
-        parts.Add("Study the image and write the reproduction prompt.");
-        return string.Join("\n\n", parts);
-    }
-
     /// <summary>
     /// Turns a failed vision call into something the user can act on: a throttled call succeeds on
     /// retry, a misconfigured or filtered one never will.
@@ -158,30 +136,14 @@ public sealed class ReproductionPromptWriter(
         const string consequence =
             "so the new image was drawn from image labels rather than from a detailed read of your photo";
 
-        var message = ex.Message;
-
-        if (message.Contains("429", StringComparison.Ordinal)
-            || message.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("rate_limit", StringComparison.OrdinalIgnoreCase))
+        return AiFailure.Classify(ex) switch
         {
-            return $"The vision model was rate-limited, {consequence}. Wait a moment and try again.";
-        }
-
-        if (message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("content filter", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"The vision model declined to describe this image, {consequence}.";
-        }
-
-        if (message.Contains("401", StringComparison.Ordinal)
-            || message.Contains("403", StringComparison.Ordinal)
-            || message.Contains("DeploymentNotFound", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"The vision model rejected the request (credentials or deployment name), {consequence}. "
-                + "Check OpenAI:Key and OpenAI:ChatCompletionsDeployment.";
-        }
-
-        return $"The vision model call failed, {consequence}. Trying again usually fixes it.";
+            AiFailureKind.RateLimited => $"The vision model was rate-limited, {consequence}. Wait a moment and try again.",
+            AiFailureKind.ContentFiltered => $"The vision model declined to describe this image, {consequence}.",
+            AiFailureKind.Misconfigured => $"The vision model rejected the request (credentials or deployment name), {consequence}. "
+                + "Check OpenAI:Key and OpenAI:ChatCompletionsDeployment.",
+            _ => $"The vision model call failed, {consequence}. Trying again usually fixes it.",
+        };
     }
 
     private static int CountWords(string text) =>

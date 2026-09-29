@@ -4,24 +4,18 @@ using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.Configuration;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Features.RapRoast;
+namespace PoRedoImage.Web.Features.RapRoast;
 
 /// <summary>
 /// Orchestrates photo → description → roast lyrics → performed track.
 /// </summary>
-public interface IRapRoastOrchestrator
-{
-    Task<RapRoastResponse> ProcessAsync(RapRoastRequest request, CancellationToken ct = default);
-}
-
-/// <inheritdoc />
 public sealed class RapRoastOrchestrator(
     IVisionServiceRouter visionRouter,
     SceneDescriber sceneDescriber,
     RoastLyricsWriter lyricsWriter,
     IMusicGenerationService musicService,
     ISceneDetailProvider sceneDetails,
-    ILogger<RapRoastOrchestrator> logger) : IRapRoastOrchestrator
+    ILogger<RapRoastOrchestrator> logger)
 {
     /// <summary>
     /// Hard cap on calls to the music provider per request. The refusal path retries exactly once
@@ -29,7 +23,12 @@ public sealed class RapRoastOrchestrator(
     /// </summary>
     internal const int MaxMusicAttempts = 2;
 
-    public async Task<RapRoastResponse> ProcessAsync(RapRoastRequest request, CancellationToken ct = default)
+    /// <param name="onLyrics">
+    /// Called with the partial response (scene + lyrics, no audio) each time bars are written, so
+    /// a streaming caller can show them during the 30–90s the music provider takes.
+    /// </param>
+    public async Task<RapRoastResponse> ProcessAsync(
+        RapRoastRequest request, Func<RapRoastResponse, Task>? onLyrics = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -119,6 +118,12 @@ public sealed class RapRoastOrchestrator(
             var softened = attempt > 1;
             lyrics = await lyricsWriter.WriteAsync(
                 description, tags, request.Style, request.Intensity, softened, request.ExplicitLanguage, ct);
+
+            if (onLyrics is not null)
+            {
+                response.Lyrics = lyrics.Text;
+                await onLyrics(response);
+            }
 
             attempts.Add(new FilterAttemptDto
             {

@@ -1,6 +1,8 @@
-using PoRedoImage.Application.Features.RapRoast;
+using System.Text.Json;
+using PoRedoImage.Web.Features.RapRoast;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
+using PoRedoImage.Shared.Json;
 using PoRedoImage.Web.Features.Shared;
 
 namespace PoRedoImage.Web.Features.RapRoast;
@@ -25,7 +27,8 @@ public static class RapRoastEndpoints
 
         group.MapPost("/", async (
             RapRoastRequest request,
-            IRapRoastOrchestrator orchestrator,
+            HttpContext http,
+            RapRoastOrchestrator orchestrator,
             ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
@@ -46,9 +49,29 @@ public static class RapRoastEndpoints
                 return Results.Problem(detail: ex.Message, statusCode: 400, title: "Invalid Image");
             }
 
+            // A client that asks for NDJSON gets the bars the moment they are written, then the
+            // finished response — the music step takes 30–90s and there is no reason to hide the
+            // lyrics for all of it. Partial lines have TotalMs == 0; the last line is the result.
+            // Anyone else (the mobile app) gets the single JSON body it always did.
+            var streaming = http.Request.Headers.Accept.ToString()
+                .Contains("application/x-ndjson", StringComparison.OrdinalIgnoreCase);
+
+            async Task WriteLineAsync(RapRoastResponse r)
+            {
+                if (!http.Response.HasStarted)
+                {
+                    http.Response.ContentType = "application/x-ndjson";
+                    http.Response.Headers["Cache-Control"] = "no-cache, no-store";
+                    http.Response.Headers["X-Accel-Buffering"] = "no";
+                }
+                await JsonSerializer.SerializeAsync(http.Response.Body, r, SharedJsonContext.Default.RapRoastResponse, ct);
+                await http.Response.Body.WriteAsync("\n"u8.ToArray(), ct);
+                await http.Response.Body.FlushAsync(ct);
+            }
+
             try
             {
-                var result = await orchestrator.ProcessAsync(request, ct);
+                var result = await orchestrator.ProcessAsync(request, streaming ? WriteLineAsync : null, ct);
 
                 logger.LogInformation(
                     "Rap roast complete in {Elapsed}ms. AudioRefused={Refused}, Softened={Softened}",
@@ -56,7 +79,16 @@ public static class RapRoastEndpoints
 
                 // A refusal is a 200: the lyrics are a legitimate result and the DTO carries the
                 // AudioRefused flag for the client to render its explanatory state.
-                return Results.Ok(result);
+                if (!streaming) return Results.Ok(result);
+                await WriteLineAsync(result);
+                return Results.Empty;
+            }
+            catch (Exception ex) when (http.Response.HasStarted)
+            {
+                // Status is already 200 and the bars are on screen; ending the stream without a
+                // final line is how the client learns the track never arrived.
+                logger.LogError(ex, "Rap roast pipeline failed after the lyrics were streamed");
+                return Results.Empty;
             }
             catch (Exception ex)
             {

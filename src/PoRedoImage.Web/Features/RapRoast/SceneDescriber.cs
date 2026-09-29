@@ -3,9 +3,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Application.Configuration;
 using PoRedoImage.Domain.Interfaces;
+using PoRedoImage.Web.Features.Shared;
 using PoRedoImage.Shared.Configuration;
 
-namespace PoRedoImage.Application.Features.RapRoast;
+namespace PoRedoImage.Web.Features.RapRoast;
 
 /// <summary>
 /// Produces the scene description the roast is written from, combining machine-extracted facts with
@@ -44,6 +45,18 @@ public sealed class SceneDescriber(
         + "Be specific and literal — name things precisely. Report only what is visible; do not "
         + "invent. Do NOT describe or infer race, ethnicity, skin tone, body size or weight, age, "
         + "disability, or attractiveness, and never include them in any field. Do not write jokes.";
+
+    /// <summary>Strict structured-output schema matching <see cref="SceneSnapshot.Parse"/>.</summary>
+    private const string SceneSchema = """
+        {"type":"object","additionalProperties":false,
+         "required":["outfit","pose","expression","setting","props","text_in_image","most_incongruous_detail"],
+         "properties":{
+           "outfit":{"type":"array","items":{"type":"string"}},
+           "pose":{"type":"string"},"expression":{"type":"string"},"setting":{"type":"string"},
+           "props":{"type":"array","items":{"type":"string"}},
+           "text_in_image":{"type":"array","items":{"type":"string"}},
+           "most_incongruous_detail":{"type":"string"}}}
+        """;
 
     /// <summary>
     /// Describes the image. Falls back through progressively simpler sources and only returns
@@ -141,34 +154,17 @@ public sealed class SceneDescriber(
     /// </summary>
     private static string DescribeFailure(Exception ex)
     {
-        var message = ex.Message;
-
-        if (message.Contains("429", StringComparison.Ordinal)
-            || message.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("rate_limit", StringComparison.OrdinalIgnoreCase))
+        return AiFailure.Classify(ex) switch
         {
-            return "The vision model was rate-limited, so the bars are working from image labels "
-                + "alone. Wait a moment and roast the photo again.";
-        }
-
-        if (message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("content filter", StringComparison.OrdinalIgnoreCase))
-        {
-            return "The vision model declined to describe this image, so the bars are working from "
-                + "image labels alone.";
-        }
-
-        if (message.Contains("401", StringComparison.Ordinal)
-            || message.Contains("403", StringComparison.Ordinal)
-            || message.Contains("DeploymentNotFound", StringComparison.OrdinalIgnoreCase))
-        {
-            return "The vision model rejected the request (credentials or deployment name), so the "
-                + "bars are working from image labels alone. Check OpenAI:Key and "
-                + "OpenAI:ChatCompletionsDeployment.";
-        }
-
-        return "The vision model call failed, so the bars are working from image labels alone. "
-            + "Roasting the photo again usually fixes it.";
+            AiFailureKind.RateLimited => "The vision model was rate-limited, so the bars are working from image labels "
+                + "alone. Wait a moment and roast the photo again.",
+            AiFailureKind.ContentFiltered => "The vision model declined to describe this image, so the bars are working from "
+                + "image labels alone.",
+            AiFailureKind.Misconfigured => "The vision model rejected the request (credentials or deployment name), so the "
+                + "bars are working from image labels alone. Check OpenAI:Key and OpenAI:ChatCompletionsDeployment.",
+            _ => "The vision model call failed, so the bars are working from image labels alone. "
+                + "Roasting the photo again usually fixes it.",
+        };
     }
 
     /// <summary>
@@ -201,7 +197,7 @@ public sealed class SceneDescriber(
         try
         {
             var user = BuildUserPrompt(tags, details);
-            var result = await chat.CompleteAsync(SystemPrompt, user, image, ct);
+            var result = await chat.CompleteAsync(SystemPrompt, user, image, SceneSchema, ct);
 
             var snapshot = SceneSnapshot.Parse(result.Content);
 

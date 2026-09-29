@@ -48,7 +48,7 @@ public partial class Gallery
         _loadError = null;
         try
         {
-            var res = await Http.GetFromJsonAsync<List<UserImageDto>>("/api/user-images");
+            var res = await Http.GetFromJsonAsync<List<UserImageDto>>("/api/user-images", SharedJsonOptions.Default);
             _images = res?.OrderByDescending(x => x.CreatedAt).ToList() ?? new List<UserImageDto>();
             _selectedIds.Clear();
             _visibleCount = PageSize;
@@ -111,24 +111,14 @@ public partial class Gallery
 
     private async Task OpenLightboxAsync(UserImageDto item)
     {
-        var galleryItem = new MyImagesGallery.GalleryItem(
-            item.Id,
-            item.FileName,
-            item.ContentType,
-            item.Kind,
-            item.CreatedAt,
-            item.SizeBytes,
-            item.ImageUrl,
-            item.Tags ?? Array.Empty<string>());
-
         // Snapshot the card first so the dialog's image morphs out of it (fx.js).
         await JS.InvokeVoidAsync("poFx.heroFrom", item.ImageUrl);
         var choice = await DialogService.OpenAsync<GalleryLightbox>(
             item.FileName,
             new Dictionary<string, object>
             {
-                ["Item"] = galleryItem,
-                ["IconClass"] = KindIcon(item.Kind)
+                ["Item"] = item,
+                ["IconClass"] = UserImageDisplay.Icon(item.Kind)
             },
             new DialogOptions
             {
@@ -139,7 +129,7 @@ public partial class Gallery
 
         if (choice is GalleryLightbox.LightboxResult.Use)
         {
-            UseAsInput(item);
+            await UseAsInput(item);
         }
         else if (choice is GalleryLightbox.LightboxResult.Download)
         {
@@ -147,9 +137,19 @@ public partial class Gallery
         }
     }
 
-    private void UseAsInput(UserImageDto item)
+    private async Task UseAsInput(UserImageDto item)
     {
-        SessionService.SetImage(item.ImageUrl, item.ContentType, item.FileName);
+        // ImageUrl is an API path, not a data URI, so SetImage cannot parse bytes out of it —
+        // passing it alone left the session empty while the toast claimed success.
+        byte[] bytes;
+        try { bytes = await Http.GetByteArrayAsync(item.ImageUrl); }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Couldn't load image",
+                $"{item.FileName} could not be downloaded. Try again in a moment.", duration: 5000);
+            return;
+        }
+        SessionService.SetImage(null, item.ContentType, item.FileName, bytes);
         NotificationService.Notify(NotificationSeverity.Info, "Session Image Set",
             $"Loaded {item.FileName} as active session image.", duration: 3000);
         Nav.NavigateTo("/");
@@ -249,10 +249,18 @@ public partial class Gallery
                     deleted++;
                 }
             }
-            catch { /* proceed with batch */ }
+            catch (HttpRequestException ex)
+            {
+                // One failure must not stop the batch, but it must not vanish either.
+                Logger.LogWarning(ex, "Batch delete failed for {Id}", id);
+            }
         }
         _batchWorking = false;
-        NotificationService.Notify(NotificationSeverity.Info, "Batch Delete", $"Deleted {deleted} image(s).", duration: 3000);
+        var failed = toDelete.Count - deleted;
+        NotificationService.Notify(
+            failed == 0 ? NotificationSeverity.Info : NotificationSeverity.Warning, "Batch Delete",
+            failed == 0 ? $"Deleted {deleted} image(s)." : $"Deleted {deleted} image(s); {failed} could not be deleted — try again.",
+            duration: failed == 0 ? 3000 : 5000);
     }
 
     private async Task DownloadSelectedZipAsync()
@@ -264,7 +272,12 @@ public partial class Gallery
             var selectedItems = _images.Where(x => _selectedIds.Contains(x.Id)).ToList();
             var files = selectedItems.Select(x => new { name = x.FileName, url = x.ImageUrl }).ToArray();
             var count = await JS.InvokeAsync<int>("poUx.downloadZip", files, $"poredoimage-gallery-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
-            NotificationService.Notify(NotificationSeverity.Success, "ZIP Ready", $"Archived {count} image(s). Check downloads.", duration: 3500);
+            // A short count is not a silent truncation — same rule as the Bulk board's ZIP.
+            if (count == files.Length)
+                NotificationService.Notify(NotificationSeverity.Success, "ZIP Ready", $"Archived {count} image(s). Check downloads.", duration: 3500);
+            else
+                NotificationService.Notify(NotificationSeverity.Warning, "ZIP Incomplete",
+                    $"{count} of {files.Length} images packed — the rest could not be read.", duration: 5000);
         }
         catch (Exception ex)
         {
@@ -277,11 +290,6 @@ public partial class Gallery
         }
     }
 
-    /// <summary>
-    /// The kinds offered as filter chips, in board order. Listed explicitly rather than from
-    /// <c>Enum.GetValues</c> so a new <see cref="UserImageKind"/> added for internal bookkeeping
-    /// does not silently grow the filter bar.
-    /// </summary>
     /// <summary>
     /// Opens a Radzen tooltip on an icon-only button. <c>TooltipService</c> comes free with
     /// <c>AddRadzenComponents()</c> and had no callers in the app before this; a native
@@ -297,6 +305,11 @@ public partial class Gallery
             CssClass = "flap-tooltip",
         });
 
+    /// <summary>
+    /// The kinds offered as filter chips, in board order. Listed explicitly rather than from
+    /// <c>Enum.GetValues</c> so a new <see cref="UserImageKind"/> added for internal bookkeeping
+    /// does not silently grow the filter bar.
+    /// </summary>
     private static readonly UserImageKind[] FilterKinds =
     [
         UserImageKind.Original,
@@ -314,14 +327,6 @@ public partial class Gallery
         _ => kind.ToString(),
     };
 
-    private static string KindIcon(UserImageKind kind) => kind switch
-    {
-        UserImageKind.Original => "bi-camera",
-        UserImageKind.Regeneration => "bi-palette2",
-        UserImageKind.Meme => "bi-chat-square-text",
-        UserImageKind.BulkVariation => "bi-grid-3x3",
-        _ => "bi-image"
-    };
 
     /// <summary>
     /// Right-click menu for a gallery card, offering the same four actions as the button row.
@@ -343,7 +348,7 @@ public partial class Gallery
             switch (args.Value as string)
             {
                 case "view": await OpenLightboxAsync(img); break;
-                case "input": UseAsInput(img); break;
+                case "input": await UseAsInput(img); break;
                 case "copy": await CopyToClipboardAsync(img.ImageUrl); break;
                 // Routes through the same confirm as the button — a right-click must not be a
                 // faster way to destroy something.
@@ -370,11 +375,4 @@ public partial class Gallery
         UserImageKind.BulkVariation => "bg-warning text-dark",
         _ => "bg-secondary"
     };
-
-    private static string FormatSize(long bytes)
-    {
-        if (bytes < 1024) return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{(bytes / 1024.0):F1} KB";
-        return $"{(bytes / (1024.0 * 1024.0)):F1} MB";
-    }
 }

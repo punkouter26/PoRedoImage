@@ -6,7 +6,7 @@ public interface IGenerativeAiService
         EnhanceDescriptionAsync(string description, IReadOnlyList<string> tags, int targetLength, CancellationToken ct = default);
 
     Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)>
-        GenerateMemeCaptionAsync(IReadOnlyList<string> tags, CancellationToken ct = default);
+        GenerateMemeCaptionAsync(string description, IReadOnlyList<string> tags, CancellationToken ct = default);
 
     Task<string> DescribePersonAsync(byte[] imageData, CancellationToken ct = default);
 }

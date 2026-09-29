@@ -42,7 +42,7 @@ public sealed class UserContextMiddleware
         if (user?.Identity?.IsAuthenticated != true)
             return AnonymousUserId;
 
-        var id = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var id = user.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!string.IsNullOrWhiteSpace(id))
             return id;
 

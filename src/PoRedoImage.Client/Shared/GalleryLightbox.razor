@@ -24,7 +24,7 @@
             <i class="bi @IconClass me-2" aria-hidden="true"></i>@Item.FileName
         </span>
         <span class="gallery-lightbox__sub">
-            @Item.Kind · @FormatSize(Item.SizeBytes) · @Item.CreatedAt.ToLocalTime().ToString("g")
+            @Item.Kind · @UserImageDisplay.FormatSize(Item.SizeBytes) · @Item.CreatedAt.ToLocalTime().ToString("g")
         </span>
     </div>
 
@@ -44,11 +44,8 @@
 
     [Inject] private DialogService Dialog { get; set; } = default!;
 
-    [Parameter, EditorRequired] public MyImagesGallery.GalleryItem Item { get; set; } = default!;
+    [Parameter, EditorRequired] public UserImageDto Item { get; set; } = default!;
 
     /// <summary>Bootstrap-icon class for the kind badge, passed in so the mapping stays in one place.</summary>
     [Parameter, EditorRequired] public string IconClass { get; set; } = "bi-image";
-
-    private static string FormatSize(long bytes) =>
-        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:0.#} MB" : $"{bytes / 1024.0:0} KB";
 }

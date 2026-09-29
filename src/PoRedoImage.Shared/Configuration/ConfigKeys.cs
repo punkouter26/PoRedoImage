@@ -84,6 +84,8 @@ public static class ConfigKeys
 
     // ── Azure OpenAI ────────────────────────────────────────────────────
     public const string OpenAiChatCompletionsDeployment = "OpenAI:ChatCompletionsDeployment";
+    /// <summary>The one default for <see cref="OpenAiChatCompletionsDeployment"/>; every reader uses it.</summary>
+    public const string OpenAiChatCompletionsDeploymentDefault = "gpt-5.4-nano";
     public const string OpenAiEndpoint = "OpenAI:Endpoint";
     public const string OpenAiKey = "OpenAI:Key";
 
@@ -98,13 +100,6 @@ public static class ConfigKeys
     public const string VisionSecondOpinion = "Vision:SecondOpinion";
 
     // ── Feature flags ───────────────────────────────────────────────────
-    /// <summary>
-    /// Historic image-generation provider switch. Google Gemini/Imagen is now the only provider, so
-    /// nothing reads this: the key is kept only so an existing App Service setting or Key Vault
-    /// reference does not fail configuration binding after the HuggingFace removal (2026-08).
-    /// </summary>
-    public const string ImageGenProvider = "ImageGen:Provider";
-
     public const string MocksUseMockAi = "Mocks:UseMockAi";
     public const string AuthEnableFakeAuth = "Auth:EnableFakeAuth";
 }

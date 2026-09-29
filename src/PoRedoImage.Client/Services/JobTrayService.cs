@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.JSInterop;
 using PoRedoImage.Client.Shared;
@@ -175,6 +176,17 @@ public sealed class JobTrayService(
                     }
                     return;
                 }
+            }
+            catch (Exception ex) when (
+                ex is TaskCanceledException
+                   or HttpRequestException { StatusCode: null or HttpStatusCode.TooManyRequests or >= HttpStatusCode.InternalServerError }
+                && DateTimeOffset.UtcNow - job.StartedAt <= VideoTimeout)
+            {
+                // A network blip or a 5xx used to fail the ~$0.40 render on the spot. Keep polling
+                // until the timeout; only a definite answer (or running out of time) ends the job.
+                logger.LogWarning(ex, "Video status poll failed for {Operation}; retrying", job.Id);
+                await Task.Delay(PollInterval);
+                continue;
             }
             catch (Exception ex)
             {

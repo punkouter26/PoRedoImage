@@ -2,15 +2,15 @@
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Features.ImageAnalysis;
+namespace PoRedoImage.Web.Features.ImageAnalysis;
 
 public sealed class ImageAnalysisOrchestrator(
     IVisionServiceRouter visionRouter,
     IGenerativeAiService aiService,
     IMemeGeneratorService memeService,
-    IImageGenerationRouter imageGenRouter,
+    IImageGenerationService imageGenService,
     ReproductionPromptWriter reproductionPromptWriter,
-    ILogger<ImageAnalysisOrchestrator> logger) : IImageAnalysisOrchestrator
+    ILogger<ImageAnalysisOrchestrator> logger)
 {
     public async Task<ImageAnalysisResponse> ProcessAsync(ImageAnalysisRequest request, CancellationToken ct = default)
     {
@@ -28,6 +28,15 @@ public sealed class ImageAnalysisOrchestrator(
         IReadOnlyList<string> tags;
         double confidence;
         string? visionFallbackReason = null;
+
+        // The reproduction prompt reads the pixels itself and never needed the vision step's
+        // tag-join, so it starts NOW and runs alongside vision rather than after it. Regeneration
+        // used to pay vision + prompt back to back; it now pays whichever is slower.
+        var reproTask = request.Mode == ProcessingMode.ImageRegeneration
+            && string.IsNullOrWhiteSpace(request.PrecomputedDescription)
+            && string.IsNullOrWhiteSpace(request.PrecomputedEnhancedPrompt)
+                ? reproductionPromptWriter.WriteAsync(imageBytes, request.DescriptionLength, ct)
+                : null;
 
         if (!string.IsNullOrWhiteSpace(request.PrecomputedDescription))
         {
@@ -57,7 +66,7 @@ public sealed class ImageAnalysisOrchestrator(
         if (request.Mode == ProcessingMode.MemeGeneration)
         {
             // Meme branch: generate caption + overlay
-            var (top, bottom, memeTokens, memeMs) = await aiService.GenerateMemeCaptionAsync(tags, ct);
+            var (top, bottom, memeTokens, memeMs) = await aiService.GenerateMemeCaptionAsync(description, tags, ct);
             metrics.DescriptionGenerationTimeMs = memeMs;
             metrics.DescriptionTokensUsed = memeTokens;
 
@@ -106,14 +115,17 @@ public sealed class ImageAnalysisOrchestrator(
             }
             else
             {
-                var repro = await reproductionPromptWriter.WriteAsync(
-                    imageBytes, description, tags, request.DescriptionLength, ct);
+                var repro = await reproTask!;
 
                 if (repro.Text is not null)
                 {
                     metrics.DescriptionGenerationTimeMs = repro.ElapsedMs;
                     metrics.DescriptionTokensUsed = repro.TokensUsed;
                     enhanced = repro.Text;
+                    // The prompt came from a real look at the pixels, so a tag-only vision step no
+                    // longer shapes the result — reporting it would warn about a degradation that
+                    // did not happen (it fired on every regen, since Computer Vision never captions here).
+                    visionFallbackReason = null;
                 }
                 else
                 {
@@ -128,13 +140,14 @@ public sealed class ImageAnalysisOrchestrator(
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(request.StyleDirective))
+                enhanced = $"{enhanced}\n\nRender the whole scene in this style: {request.StyleDirective}";
+
             response.Description = enhanced;
 
             // The vision step may already have reported its own degradation. Both matter and they
             // have different causes, so neither is allowed to overwrite the other.
             response.DescriptionFallbackReason = JoinReasons(visionFallbackReason, promptFallbackReason);
-
-            var imageGenService = imageGenRouter.Resolve(request.ImageGenModelId);
 
             if (!imageGenService.IsConfigured)
             {
@@ -142,7 +155,7 @@ public sealed class ImageAnalysisOrchestrator(
                     "Image generation is not configured. Set the Gemini API key (Google:ApiKey) via Key Vault or appsettings.");
             }
 
-            var (imgData, imgType, regenMs) = await imageGenService.GenerateAsync(enhanced, ct);
+            var (imgData, imgType, regenMs) = await imageGenService.GenerateAsync(enhanced, imageBytes, ct);
 
             metrics.ImageRegenerationTimeMs = regenMs;
             response.RegeneratedImageData = Convert.ToBase64String(imgData);

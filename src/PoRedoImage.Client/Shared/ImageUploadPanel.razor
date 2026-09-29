@@ -217,12 +217,13 @@
     private string? _cameraError;
     private string _facing = "user";
     private bool _canFlip;
+    private int _intakeId;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || !OnImageIntake.HasDelegate) return;
         _selfRef = DotNetObjectReference.Create(this);
-        try { await JSRuntime.InvokeVoidAsync("poUx.registerIntake", _selfRef); }
+        try { _intakeId = await JSRuntime.InvokeAsync<int>("poUx.registerIntake", _selfRef); }
         catch (JSException) { /* helpers script unavailable — <InputFile> still works */ }
 
         // Hide the button rather than let it fail on click. A browser with no getUserMedia, or
@@ -352,7 +353,7 @@
         await StopCameraAsync();
 
         if (_selfRef is null) return;
-        try { await JSRuntime.InvokeVoidAsync("poUx.unregisterIntake"); }
+        try { await JSRuntime.InvokeVoidAsync("poUx.unregisterIntake", _intakeId); }
         catch (JSDisconnectedException) { /* page tearing down */ }
         catch (JSException) { }
         _selfRef.Dispose();

@@ -7,7 +7,7 @@
  * One attempt only — the fallback chain belongs to C#.
  */
 
-import * as webllm from 'https://esm.run/@mlc-ai/web-llm';
+import * as webllm from 'https://esm.run/@mlc-ai/web-llm@0.2.85';
 
 let engine = null;
 let cachedModel = null;

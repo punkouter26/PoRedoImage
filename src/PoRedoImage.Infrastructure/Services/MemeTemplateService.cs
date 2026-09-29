@@ -11,7 +11,7 @@ using SixLabors.ImageSharp.Processing;
 namespace PoRedoImage.Infrastructure.Services;
 
 /// <summary>
-/// Default <see cref="IMemeTemplateService"/> implementation. Ships a curated catalog of
+/// The meme-template catalog and renderer. Ships a curated catalog of
 /// 20 classic meme formats. Renders text into pre-defined zones using ImageSharp — no
 /// network calls, no AI cost; pure local image manipulation.
 /// </summary>
@@ -19,7 +19,7 @@ namespace PoRedoImage.Infrastructure.Services;
 /// Idea #17 — Meme Template Library. Each template encodes text-zone coordinates as
 /// normalized 0..1 ratios so the same layout works on any input photo dimensions.
 /// </remarks>
-public sealed class MemeTemplateService : IMemeTemplateService
+public sealed class MemeTemplateService
 {
     private readonly ILogger<MemeTemplateService> _logger;
     private readonly IReadOnlyList<MemeTemplate> _templates;

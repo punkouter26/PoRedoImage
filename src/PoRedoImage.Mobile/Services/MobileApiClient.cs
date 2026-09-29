@@ -196,7 +196,7 @@ public class MobileApiClient : IMobileApiClient
         ImageCaptureResult image, IReadOnlyList<string> prompts,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var request = new BulkBatchRequest(image.Base64Data, image.ContentType, prompts.ToArray(), null);
+        var request = new BulkBatchRequest(image.Base64Data, image.ContentType, prompts.ToArray());
         var client = GetOrCreateClient();
         using var response = await client.PostAsJsonAsync(
             "api/bulk-generate/batch", request, SharedJsonOptions.Default, ct);

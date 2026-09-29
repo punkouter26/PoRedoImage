@@ -8,7 +8,7 @@ namespace PoRedoImage.Domain.Interfaces;
 public interface IImageGenerationService
 {
     Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
-        GenerateAsync(string prompt, CancellationToken ct = default);
+        GenerateAsync(string prompt, byte[]? matchAspectOf = null, CancellationToken ct = default);
 
     Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
         GenerateImageAsync(string prompt, byte[] imageBytes, CancellationToken ct = default);

@@ -81,9 +81,6 @@
     {
         if (firstRender)
         {
-            // Hide GUEST login button in production per Rule 6 (UI Hardening)
-            await JS.InvokeVoidAsync("poRedoImageGuest.hideGuestButtonInProduction");
-
             // Auto-restore GUEST session from LocalStorage if available
             var storedGuestId = await JS.InvokeAsync<string>("poRedoImageGuest.loadGuestId");
             if (!string.IsNullOrEmpty(storedGuestId))

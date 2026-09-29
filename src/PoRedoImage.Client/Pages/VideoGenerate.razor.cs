@@ -18,7 +18,7 @@ namespace PoRedoImage.Client.Pages;
 /// the loop lived here, leaving the page cancelled it and threw the render away. The page now
 /// only mirrors the tray's job, and re-attaches to it when the user comes back.
 /// </remarks>
-public partial class VideoGenerate : IDisposable
+public partial class VideoGenerate
 {
     [Inject] private JobTrayService Jobs { get; set; } = default!;
 
@@ -133,15 +133,15 @@ public partial class VideoGenerate : IDisposable
     private async Task DownloadVideoAsync()
     {
         if (string.IsNullOrEmpty(_videoUrl)) return;
-        try
-        {
-            await Js.InvokeVoidAsync("poVideo.downloadFromDataUri", _videoUrl, "poredoimage.mp4");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Video download failed");
-        }
+        // downloadImage fetches any URL (data: included) into a blob and returns false on failure.
+        if (!await Js.InvokeAsync<bool>("downloadImage", _videoUrl, "poredoimage.mp4"))
+            NotificationService.Notify(NotificationSeverity.Error, "Download failed",
+                "The clip couldn't be saved. Try again, or right-click the video and choose Save.");
     }
 
-    public void Dispose() => Jobs.OnChange -= OnJobsChanged;
+    public override void Dispose()
+    {
+        base.Dispose();
+        Jobs.OnChange -= OnJobsChanged;
+    }
 }

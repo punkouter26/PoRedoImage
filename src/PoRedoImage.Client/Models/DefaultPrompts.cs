@@ -2,8 +2,8 @@ namespace PoRedoImage.Client.Models;
 
 /// <summary>
 /// Default Category 1 art-style transformation prompts for Bulk Generate.
-/// Each prompt contains &lt;PERSON&gt; as a placeholder replaced at generation time
-/// with the AI's description of the subject in the uploaded image.
+/// Each prompt contains &lt;PERSON&gt; as a placeholder that, at generation time, is pointed at
+/// the person in the uploaded photo (the batch is image-to-image, so Gemini sees them directly).
 /// </summary>
 /// <remarks>
 /// These lean comedic: the joke is always the collision between a wildly overblown medium and a
@@ -13,7 +13,7 @@ namespace PoRedoImage.Client.Models;
 /// </remarks>
 public static class DefaultPrompts
 {
-    /// <summary>Token that gets substituted with the Computer Vision description of the uploaded image.</summary>
+    /// <summary>Placeholder for the photo's subject; see <c>BulkGenerate.StartGeneration</c>.</summary>
     public const string PersonToken = "<PERSON>";
 
     public static readonly string[] All =

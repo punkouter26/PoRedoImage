@@ -1,4 +1,4 @@
-using PoRedoImage.Application.Features.RapRoast;
+using PoRedoImage.Web.Features.RapRoast;
 using PoRedoImage.Domain.Interfaces;
 
 namespace PoRedoImage.Tests.Integration.Contracts;

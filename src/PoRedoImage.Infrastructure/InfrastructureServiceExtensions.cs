@@ -4,10 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Http.Resilience;
 using PoRedoImage.Application.Configuration;
-using PoRedoImage.Application.Features.BulkGenerate;
-using PoRedoImage.Application.Features.ImageAnalysis;
-using PoRedoImage.Application.Features.RapRoast;
-using PoRedoImage.Application.Features.UserImages;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Repositories;
 using PoRedoImage.Infrastructure.Services;
@@ -58,8 +54,6 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<MockImagen3Service>();
             services.AddSingleton<IImageGenerationService>(sp => sp.GetRequiredService<MockImagen3Service>());
             services.AddSingleton<IMockable>(sp => sp.GetRequiredService<MockImagen3Service>());
-            services.AddSingleton<IImageGenerationRouter>(sp =>
-                new SingleImageGenerationRouter(sp.GetRequiredService<IImageGenerationService>()));
 
             // Chat completion (Rap Roast scene describer + lyric writer): the mock reports
             // IsConfigured=false so callers take their deterministic path — zero network, stable output.
@@ -80,6 +74,13 @@ public static class InfrastructureServiceExtensions
         }
         else
         {
+            // One bounded cache for every AI memo (vision, enhance, describe-person, chat-vision).
+            // Separate from the app's IMemoryCache because a SizeLimit there would make every
+            // unsized Set elsewhere (sign-in dedupe, idempotency) throw. Entries are Size=1 and a
+            // few KB of text each, so this caps the AI memo at a few MB on the F1 plan.
+            // ponytail: count-bounded, not byte-bounded; size by bytes if entries ever carry images.
+            var aiCache = new MemoryCache(new MemoryCacheOptions { SizeLimit = 2_000 });
+
             // Vision backends: Azure Computer Vision (default/cloud) + Ollama (local image-to-text) + Gemini Vision.
             // The router picks per-request based on the selected model id.
             services.AddSingleton<AzureVisionService>();
@@ -93,7 +94,7 @@ public static class InfrastructureServiceExtensions
             // that says nothing about which model produced the answer.
             services.AddSingleton<IVisionService>(sp => new CachingVisionService(
                 sp.GetRequiredService<AzureVisionService>(),
-                sp.GetRequiredService<IMemoryCache>(),
+                aiCache,
                 sp.GetRequiredService<ILogger<CachingVisionService>>(),
                 "vision:azure-cv"));
 
@@ -101,14 +102,14 @@ public static class InfrastructureServiceExtensions
                 sp.GetRequiredService<AzureVisionService>(),
                 sp.GetRequiredService<OllamaVisionService>(),
                 sp.GetRequiredService<OpenAiVisionService>(),
-                sp.GetRequiredService<IMemoryCache>(),
+                aiCache,
                 sp.GetRequiredService<ILoggerFactory>(),
                 sp.GetRequiredService<GeminiVisionService>()));
 
             services.AddSingleton<AzureOpenAiService>();
             services.AddSingleton<IGenerativeAiService>(sp => new CachingGenerativeAiService(
                 sp.GetRequiredService<AzureOpenAiService>(),
-                sp.GetRequiredService<IMemoryCache>(),
+                aiCache,
                 sp.GetRequiredService<ILogger<CachingGenerativeAiService>>()));
 
             // Image generation: Google Gemini/Imagen, the only provider.
@@ -116,8 +117,6 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IImageGenerationService>(sp =>
                 sp.GetRequiredService<GeminiImagen3Service>());
 
-            services.AddSingleton<IImageGenerationRouter>(sp =>
-                new ImageGenerationRouter(sp.GetRequiredService<GeminiImagen3Service>()));
 
             // Chat + vision powering the Rap Roast scene describer and its lyric writer.
             // Azure OpenAI is the only backend: one deployment serves both text
@@ -132,13 +131,15 @@ public static class InfrastructureServiceExtensions
             // deployment stops paying Azure for a mood word and three style directions. Resolved
             // once at startup: this is a deployment decision, not a per-request one.
             if (!string.IsNullOrWhiteSpace(configuration?[ConfigKeys.OllamaChatModel]))
-            {
-                services.AddSingleton<IChatCompletionService, OllamaChatCompletionService>();
-            }
+                services.AddSingleton<OllamaChatCompletionService>();
             else
-            {
-                services.AddSingleton<IChatCompletionService, AzureOpenAiChatCompletionService>();
-            }
+                services.AddSingleton<AzureOpenAiChatCompletionService>();
+            services.AddSingleton<IChatCompletionService>(sp => new CachingChatCompletionService(
+                string.IsNullOrWhiteSpace(configuration?[ConfigKeys.OllamaChatModel])
+                    ? sp.GetRequiredService<AzureOpenAiChatCompletionService>()
+                    : sp.GetRequiredService<OllamaChatCompletionService>(),
+                aiCache,
+                sp.GetRequiredService<ILogger<CachingChatCompletionService>>()));
 
             // Image-to-video for the Video slice: Google Veo 3.1 Lite at 720p. The most expensive
             // call in the app per invocation ($0.40 per 8-second clip), which is why the Lite tier
@@ -156,28 +157,13 @@ public static class InfrastructureServiceExtensions
 
         // Scoped services
         services.AddScoped<IMemeGeneratorService, ImageSharpMemeGeneratorService>();
-        services.AddSingleton<IMemeTemplateService, MemeTemplateService>();
+        services.AddSingleton<MemeTemplateService>();
 
         // Repository: Singleton — TableClient is thread-safe; avoids redundant CreateIfNotExists calls per-request
         services.AddSingleton<IBulkPromptRepository, AzureTableBulkPromptRepository>();
 
         // User image gallery: Singleton — BlobContainerClient + TableClient are both thread-safe
         services.AddSingleton<IUserImageRepository, AzureBlobUserImageRepository>();
-        services.AddScoped<IUserImageService, UserImageService>();
-
-        // Application layer orchestrator + the vision pass that writes its image-generation prompt
-        // (Transient so the scoped logger flows correctly, matching SceneDescriber below).
-        services.AddTransient<ReproductionPromptWriter>();
-        services.AddScoped<IImageAnalysisOrchestrator, ImageAnalysisOrchestrator>();
-
-        // Bulk board fan-out (concurrency cap, per-slot failure policy, re-roll seeding)
-        services.AddScoped<IBulkGenerationService, BulkGenerationService>();
-
-        // Rap Roast slice: lyric writer + orchestrator (Transient so scoped logger flows correctly,
-        // matching the Style Director agent registrations below).
-        services.AddTransient<SceneDescriber>();
-        services.AddTransient<RoastLyricsWriter>();
-        services.AddScoped<IRapRoastOrchestrator, RapRoastOrchestrator>();
 
         // Defense-in-depth budget guardrail: an HTTP-pipeline interceptor that blocks any outbound AI
         // call when Mocks:UseMockAi=true. Registered on the AI named clients below. In mock mode the
@@ -244,5 +230,12 @@ public static class InfrastructureServiceExtensions
         options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);
         options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(4);
         options.Retry.MaxRetryAttempts = 2;
+
+        // Every call on this client is a billed generation POST. A 429 or 5xx means nothing was
+        // produced, so retrying is free; an attempt that TIMED OUT may still finish — and bill —
+        // upstream, so retrying it risks paying for the same image twice.
+        options.Retry.ShouldHandle = args => ValueTask.FromResult(
+            args.Outcome.Exception is not Polly.Timeout.TimeoutRejectedException
+            && HttpClientResiliencePredicates.IsTransient(args.Outcome));
     }
 }

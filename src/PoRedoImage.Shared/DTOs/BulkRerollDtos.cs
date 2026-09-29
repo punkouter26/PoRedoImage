@@ -9,8 +9,7 @@ public record BulkRerollRequest(
     string ImageData,
     string ContentType,
     string SeedPrompt,
-    int Count = 3,
-    string? ImageGenModelId = null);
+    int Count = 3);
 
 /// <summary>
 /// A single re-rolled variation result.

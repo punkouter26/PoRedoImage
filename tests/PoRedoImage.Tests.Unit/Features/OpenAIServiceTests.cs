@@ -89,6 +89,6 @@ public class AzureOpenAiServiceTests
     {
         var service = new AzureOpenAiService(BuildConfig(), _loggerMock.Object);
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            service.GenerateMemeCaptionAsync(null!));
+            service.GenerateMemeCaptionAsync("desc", null!));
     }
 }

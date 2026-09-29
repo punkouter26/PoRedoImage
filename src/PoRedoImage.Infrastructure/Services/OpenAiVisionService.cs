@@ -45,6 +45,11 @@ public sealed class OpenAiVisionService(
 
     private const string UserPrompt = "Analyze this image now.";
 
+    private const string Schema = """
+        {"type":"object","additionalProperties":false,"required":["description","tags"],
+         "properties":{"description":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}}}}
+        """;
+
     public async Task<(string Description, IReadOnlyList<string> Tags, double ConfidenceScore, long ElapsedMs, string? FallbackReason)>
         AnalyzeAsync(byte[] imageData, CancellationToken ct = default)
     {
@@ -58,7 +63,7 @@ public sealed class OpenAiVisionService(
                 + "unless managed identity is in use) via Key Vault, or select Azure Computer Vision.");
 
         var start = Stopwatch.GetTimestamp();
-        var result = await chat.CompleteAsync(SystemPrompt, UserPrompt, imageData, ct);
+        var result = await chat.CompleteAsync(SystemPrompt, UserPrompt, imageData, Schema, ct);
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
 
         var (description, tags) = Parse(result.Content);
@@ -85,16 +90,8 @@ public sealed class OpenAiVisionService(
 
     private static (string Description, IReadOnlyList<string> Tags) Parse(string content)
     {
+        // Structured output (Schema) means there are no markdown fences to strip.
         var text = content.Trim();
-
-        // Some deployments still fence their JSON despite the instruction.
-        if (text.StartsWith("```", StringComparison.Ordinal))
-        {
-            var firstNewline = text.IndexOf('\n');
-            if (firstNewline >= 0) text = text[(firstNewline + 1)..];
-            if (text.EndsWith("```", StringComparison.Ordinal)) text = text[..^3];
-            text = text.Trim();
-        }
 
         try
         {

@@ -42,18 +42,19 @@ public partial class BulkGenerate
 
     private sealed record BulkSavedState(BulkGenerateImageResult[] Results);
 
-    // Hoisted out of OnAfterRenderAsync so the JsonSerializerOptions graph (with its metadata
-    // caches) is built once instead of per restore.
-    private static readonly System.Text.Json.JsonSerializerOptions RestoreJsonOpts = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
+    /// <summary>
+    /// Persists the board to localStorage so it survives leaving the page or a reload. Fire and
+    /// forget: losing a save costs a restore, never the batch.
+    /// </summary>
+    private void SaveBoardState() =>
+        _ = Js.InvokeVoidAsync("bulkStateManager.save",
+            System.Text.Json.JsonSerializer.Serialize(new BulkSavedState([.. _results]), SharedJsonOptions.Default)).AsTask();
 
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
 
-        // A prompt handed over from Style Director lands in slot 1, so the run the user just
+        // A prompt staged by a result's Remix lands in slot 1, so the run the user just
         // asked for is the first one generated. Taken once: coming back to this page later
         // must not silently re-seed a prompt they have since edited or cleared.
         var staged = SessionService.TakeStagedPrompt();
@@ -63,7 +64,7 @@ public partial class BulkGenerate
             NotificationService.Notify(
                 NotificationSeverity.Success,
                 "Prompt Loaded",
-                "Style Director's prompt is in slot 1. Upload or keep your photo, then Generate.",
+                "Your staged prompt is in slot 1. Upload or keep your photo, then Generate.",
                 duration: 5000);
         }
 
@@ -86,7 +87,7 @@ public partial class BulkGenerate
                 var savedJson = await Js.InvokeAsync<string?>("bulkStateManager.load");
                 if (!string.IsNullOrEmpty(savedJson))
                 {
-                    var state = System.Text.Json.JsonSerializer.Deserialize<BulkSavedState>(savedJson, RestoreJsonOpts);
+                    var state = System.Text.Json.JsonSerializer.Deserialize<BulkSavedState>(savedJson, SharedJsonOptions.Default);
                     if (state?.Results?.Length > 0)
                     {
                         _results = [.. state.Results];
@@ -96,7 +97,11 @@ public partial class BulkGenerate
                     }
                 }
             }
-            catch { /* non-critical — ignore restore errors */ }
+            catch (Exception ex)
+            {
+                // Non-critical: a corrupt or outdated save just means nothing is restored.
+                Logger.LogDebug(ex, "Bulk board restore skipped");
+            }
         }
     }
 
@@ -139,26 +144,6 @@ public partial class BulkGenerate
 
         try
         {
-            // Use GPT-4o vision via API to get a detailed physical description of the person
-            var descResp = await Http.PostAsJsonAsync("/api/bulk-generate/describe",
-                new BulkDescribeRequest(Convert.ToBase64String(imageBytes), imageContentType), SharedJsonOptions.Default);
-            descResp.EnsureSuccessStatusCode();
-            var descResult = await descResp.Content.ReadFromJsonAsync<BulkDescribeResponse>(SharedJsonOptions.Default);
-            Cost.RecordVision(1);
-            var description = descResult?.Description ?? string.Empty;
-
-            if (string.IsNullOrEmpty(description))
-            {
-                Logger.LogWarning("Bulk Generate: person description unavailable — proceeding without <PERSON> substitution");
-                NotificationService.Notify(NotificationSeverity.Warning, "Limited Mode",
-                    "Person description is unavailable — generating with original prompts (AI key may need updating).",
-                    duration: 7000);
-            }
-            else
-            {
-                Logger.LogInformation("Bulk Generate: Vision description acquired: {Description}", description);
-            }
-
             // ── One request, streamed ────────────────────────────────────────────
             // This was a `for` loop of one-at-a-time POSTs, each re-uploading the whole source
             // image: ten sequential round-trips for a batch of ten, and roughly 53MB of base64
@@ -168,11 +153,12 @@ public partial class BulkGenerate
             //
             // Slots complete OUT OF ORDER under concurrency, which is why each line carries its
             // index rather than relying on arrival sequence.
-            var safeDescription = SanitizeDescription(description);
+            //
+            // The batch is image-to-image — Gemini already has the photo — so <PERSON> points at it
+            // rather than at a vision model's noun phrase. That used to cost a /describe round trip
+            // before the first card could start, and when it failed the literal token went to Gemini.
             var finalPrompts = activePrompts
-                .Select(p => string.IsNullOrEmpty(safeDescription)
-                    ? p.prompt
-                    : p.prompt.Replace(DefaultPrompts.PersonToken, safeDescription, StringComparison.Ordinal))
+                .Select(p => p.prompt.Replace(DefaultPrompts.PersonToken, "the person in the reference photo", StringComparison.Ordinal))
                 .ToArray();
 
             foreach (var slot in _results) slot.Status = BulkGenerateStatus.Processing;
@@ -184,8 +170,7 @@ public partial class BulkGenerate
                     new BulkBatchRequest(
                         Convert.ToBase64String(imageBytes),
                         imageContentType,
-                        finalPrompts,
-                        AiSelection.Get(AiCapability.GenerateImage)),
+                        finalPrompts),
                     options: SharedJsonOptions.Default),
             };
 
@@ -242,18 +227,8 @@ public partial class BulkGenerate
 
                 StateHasChanged();
                 Jobs.Update(trayJob, $"{_results.Count(r => r.Status != BulkGenerateStatus.Processing)} of {_results.Count} finished");
-                // Persist results to localStorage so they survive leaving the page or a reload
-                _ = Js.InvokeVoidAsync("bulkStateManager.save",
-                    System.Text.Json.JsonSerializer.Serialize(new BulkSavedState(_results.ToArray()), RestoreJsonOpts)).AsTask();
+                SaveBoardState();
             }
-            // Any slot the server never reported is a slot that did not land — mark it rather than
-            // leaving it spinning forever.
-            foreach (var slot in _results.Where(r => r.Status == BulkGenerateStatus.Processing))
-            {
-                slot.Status = BulkGenerateStatus.Failed;
-                slot.ErrorMessage = "No result was returned for this variation.";
-            }
-
             if (!_cts.Token.IsCancellationRequested)
             {
                 if (_completedCount > 0)
@@ -278,13 +253,24 @@ public partial class BulkGenerate
         }
         finally
         {
+            // Any slot the server never reported did not land — mark it rather than leave it
+            // spinning forever. In finally so Cancel and a dropped stream are covered too; those
+            // spinning slots were also persisted, so a later visit restored them still spinning.
+            var unreported = _results.Where(r => r.Status == BulkGenerateStatus.Processing).ToList();
+            foreach (var slot in unreported)
+            {
+                slot.Status = BulkGenerateStatus.Failed;
+                slot.ErrorMessage = trayFailure ?? "No result was returned for this variation.";
+            }
+            if (unreported.Count > 0) SaveBoardState();
+
             Jobs.Complete(trayJob,
                 success: trayFailure is null && _completedCount > 0,
                 trayFailure ?? $"{_completedCount} of {activePrompts.Count} variations done — saved to your gallery.");
             _isGenerating = false;
             _cts?.Dispose();
             _cts = null;
-            try { StateHasChanged(); } catch (ObjectDisposedException) { }
+            await RefreshAsync();
         }
     }
 
@@ -440,8 +426,7 @@ public partial class BulkGenerate
                     ImageData: Convert.ToBase64String(imageBytes),
                     ContentType: imageContentType,
                     SeedPrompt: source.Prompt ?? string.Empty,
-                    Count: 3,
-                    ImageGenModelId: AiSelection.Get(AiCapability.GenerateImage)), SharedJsonOptions.Default);
+                    Count: 3), SharedJsonOptions.Default);
 
             if (!resp.IsSuccessStatusCode)
             {
@@ -473,7 +458,10 @@ public partial class BulkGenerate
         }
         finally
         {
-            try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+            // Every exit clears the slot's "Re-rolling…" state; before, only success did, so a
+            // failed re-roll left the button disabled for good.
+            _bulkGallery?.EndReroll(index);
+            await RefreshAsync();
         }
     }
 
@@ -498,32 +486,6 @@ public partial class BulkGenerate
         NotificationService.Notify(NotificationSeverity.Success, "Variation Replaced",
             $"Slot #{sourceIndex + 1} now shows the re-rolled image.", duration: 3500);
 
-        try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-    }
-
-    /// <summary>
-    /// BOMB-3 mitigation: caps the GPT-4o vision description to 200 chars and strips
-    /// HTML/markdown so it can be safely substituted into a prompt template without
-    /// token-quota drain or reflected-XSS risk (Po2Logic audit).
-    /// </summary>
-    private static string? SanitizeDescription(string? description)
-    {
-        if (string.IsNullOrEmpty(description)) return null;
-        // 1. Length cap (200 chars — ~50 tokens, plenty for "young woman with brown hair, blue eyes")
-        const int MaxLen = 200;
-        var trimmed = description.Length > MaxLen ? description[..MaxLen] : description;
-        // 2. Collapse newlines (descriptions are noun-phrase only — newlines are suspicious)
-        trimmed = trimmed.Replace('\n', ' ').Replace('\r', ' ');
-        // 3. Strip angle brackets and HTML tags — defense-in-depth even though we trust GPT-4o
-        var span = trimmed.AsSpan();
-        var buf = new System.Text.StringBuilder(span.Length);
-        var inTag = false;
-        foreach (var ch in span)
-        {
-            if (ch == '<') { inTag = true; continue; }
-            if (ch == '>') { inTag = false; continue; }
-            if (!inTag) buf.Append(ch);
-        }
-        return buf.ToString().Trim();
+        await RefreshAsync();
     }
 }

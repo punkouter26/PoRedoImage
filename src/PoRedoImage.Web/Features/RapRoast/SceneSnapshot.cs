@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace PoRedoImage.Application.Features.RapRoast;
+namespace PoRedoImage.Web.Features.RapRoast;
 
 /// <summary>
 /// A structured read of a photo — named slots rather than a paragraph.

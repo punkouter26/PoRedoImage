@@ -183,7 +183,7 @@
                              @oncontextmenu:preventDefault="true">
                             <img src="@img.ImageUrl" alt="@img.FileName" class="gallery-card__img" loading="lazy" />
                             <span class="badge gallery-card__kind @KindBadgeClass(img.Kind)">
-                                <i class="bi @KindIcon(img.Kind) me-1"></i>@img.Kind
+                                <i class="bi @UserImageDisplay.Icon(img.Kind) me-1"></i>@img.Kind
                             </span>
                             <div class="gallery-card__select">
                                 <RadzenCheckBox TValue="bool"
@@ -235,7 +235,7 @@
                                date/size row was a second line on every card for facts nobody
                                scans a grid for. *@
                             <div class="small text-white text-truncate fw-semibold"
-                                 title="@($"{img.FileName} · {img.CreatedAt.ToLocalTime():MMM d, yyyy} · {FormatSize(img.SizeBytes)}")">
+                                 title="@($"{img.FileName} · {img.CreatedAt.ToLocalTime():MMM d, yyyy} · {UserImageDisplay.FormatSize(img.SizeBytes)}")">
                                 @img.FileName
                             </div>
 

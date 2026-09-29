@@ -269,18 +269,15 @@
         StateHasChanged();
     }
 
-    public void EndReroll(int index, IReadOnlyList<BulkRerollVariation> variations)
+    /// <summary>Ends the slot's re-roll; <paramref name="variations"/> is null when it failed.</summary>
+    public void EndReroll(int index, IReadOnlyList<BulkRerollVariation>? variations = null)
     {
-        _rerollingIndices.Remove(index);
-        _rerollVariations = variations.ToList();
-        _rerollSourceIndex = index;
-        StateHasChanged();
-    }
-
-    public void ClearRerollPanel()
-    {
-        _rerollVariations = [];
-        _rerollSourceIndex = -1;
+        if (!_rerollingIndices.Remove(index)) return;
+        if (variations is not null)
+        {
+            _rerollVariations = variations.ToList();
+            _rerollSourceIndex = index;
+        }
         StateHasChanged();
     }
 

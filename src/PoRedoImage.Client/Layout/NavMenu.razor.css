@@ -2,12 +2,17 @@
    rendered by NavLink inside this component and this scoped sheet cannot reach them without
    ::deep. Only the rail's own layout, and the phone tab bar, belong here. */
 
+/* `safe center` + overflow-x: if the rail ever runs short again (a longer cost figure, another
+   status chip), the links scroll inside their own track instead of spilling over the brand or
+   the status cell. Plain `center` would push the first link off the left edge, unreachable. */
 .app-nav__links {
     display: flex;
     align-items: center;
     gap: 0.125rem;
     min-width: 0;
-    justify-content: center;
+    justify-content: safe center;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
 .app-nav__links ::deep .app-nav__link-icon { display: none; }

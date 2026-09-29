@@ -11,8 +11,8 @@ using PoRedoImage.Shared.Configuration;
 namespace PoRedoImage.Infrastructure.Services;
 
 /// <summary>
-/// Azure OpenAI implementation of <see cref="IChatCompletionService"/> — the reasoning backend for
-/// the Style Director agents, the Rap Roast scene describer, and the roast lyric writer.
+/// Azure OpenAI implementation of <see cref="IChatCompletionService"/> — the backend for the
+/// reproduction prompt, the Rap Roast scene describer, the roast lyric writer and OpenAI vision.
 /// </summary>
 /// <remarks>
 /// Adapter pattern (GoF) over the same <c>Azure.AI.OpenAI</c> chat surface
@@ -67,7 +67,7 @@ public sealed class AzureOpenAiChatCompletionService : IChatCompletionService
             return;
         }
 
-        var deployment = configuration[ConfigKeys.OpenAiChatCompletionsDeployment] ?? "gpt-4o";
+        var deployment = configuration[ConfigKeys.OpenAiChatCompletionsDeployment] ?? ConfigKeys.OpenAiChatCompletionsDeploymentDefault;
         var apiKey = configuration[ConfigKeys.OpenAiKey];
 
         // Explicit resilience (§3), same settings as AzureOpenAiService: the SDK pipeline retries
@@ -94,7 +94,7 @@ public sealed class AzureOpenAiChatCompletionService : IChatCompletionService
     }
 
     public async Task<ChatCompletionResult> CompleteAsync(
-        string systemPrompt, string userPrompt, byte[]? image = null, CancellationToken ct = default)
+        string systemPrompt, string userPrompt, byte[]? image = null, string? jsonSchema = null, CancellationToken ct = default)
     {
         if (_chatClient is null)
             throw new InvalidOperationException(
@@ -123,7 +123,12 @@ public sealed class AzureOpenAiChatCompletionService : IChatCompletionService
         // temperature outright, and Azure.AI.OpenAI 2.1.0 still emits the legacy max_tokens field
         // that those deployments refuse in favour of max_completion_tokens. Sending neither keeps
         // one code path compatible across GPT-4o- and GPT-5-class deployments.
-        var response = await _chatClient.CompleteChatAsync(messages, cancellationToken: ct);
+        var options = jsonSchema is null ? null : new ChatCompletionOptions
+        {
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                "result", BinaryData.FromString(jsonSchema), jsonSchemaIsStrict: true),
+        };
+        var response = await _chatClient.CompleteChatAsync(messages, options, ct);
 
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
 
@@ -139,51 +144,18 @@ public sealed class AzureOpenAiChatCompletionService : IChatCompletionService
         }
 
         var content = response.Value.Content[0].Text.Trim();
-        var tokens = response.Value.Usage?.TotalTokenCount ?? 0;
+        var usage = response.Value.Usage;
+        var tokens = usage?.TotalTokenCount ?? 0;
 
+        // Split, because the three are billed at different rates and an image-bearing prompt is
+        // dominated by input tokens — a single total hid where the money went.
         _logger.LogInformation(
-            "Azure OpenAI chat completion finished in {Elapsed}ms. Tokens={Tokens}, Image={HasImage}",
-            elapsed, tokens, image is not null);
+            "Azure OpenAI chat completion finished in {Elapsed}ms. Input={InputTokens}, Output={OutputTokens}, "
+            + "Reasoning={ReasoningTokens}, Image={HasImage}, Schema={HasSchema}",
+            elapsed, usage?.InputTokenCount ?? 0, usage?.OutputTokenCount ?? 0,
+            usage?.OutputTokenDetails?.ReasoningTokenCount ?? 0, image is not null, jsonSchema is not null);
 
         return new ChatCompletionResult(content, tokens, elapsed);
-    }
-
-    public async IAsyncEnumerable<string> StreamCompleteAsync(
-        string systemPrompt,
-        string userPrompt,
-        byte[]? image = null,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-    {
-        if (_chatClient is null)
-            throw new InvalidOperationException(
-                "Azure OpenAI chat completion is not configured. Set OpenAI:Endpoint (and OpenAI:Key, "
-                + "unless managed identity is in use) via Key Vault.");
-
-        ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
-        ArgumentException.ThrowIfNullOrWhiteSpace(userPrompt);
-
-        var currentKey = _configuration[ConfigKeys.OpenAiKey];
-        if (!string.IsNullOrWhiteSpace(currentKey)) _keyCredential?.Update(currentKey);
-
-        var userMessage = image is null
-            ? new UserChatMessage(userPrompt)
-            : new UserChatMessage(
-                ChatMessageContentPart.CreateImagePart(new Uri(ToDataUrl(image))),
-                ChatMessageContentPart.CreateTextPart(userPrompt));
-
-        var messages = new List<ChatMessage> { new SystemChatMessage(systemPrompt), userMessage };
-
-        var updates = _chatClient.CompleteChatStreamingAsync(messages, cancellationToken: ct);
-        await foreach (var update in updates.WithCancellation(ct))
-        {
-            foreach (var part in update.ContentUpdate)
-            {
-                if (!string.IsNullOrEmpty(part.Text))
-                {
-                    yield return part.Text;
-                }
-            }
-        }
     }
 
     /// <summary>

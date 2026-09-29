@@ -26,7 +26,7 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
     /// Default model id when <c>Google:VeoModel</c> is unset. Lite tier at 720p — the cheapest
     /// Veo variant ($0.05/sec vs $0.40 for Standard).
     /// </summary>
-    public const string DefaultModel = "veo-3.1-generate-preview-lite";
+    public const string DefaultModel = "veo-3.1-lite-generate-preview";
 
     /// <summary>
     /// Veo exposes no audio parameter, so the prompt is the only lever for whether the render
@@ -165,10 +165,10 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
             return VideoGenerationStatus.Failed("Video generation is not configured.");
         }
 
-        // The handle came from the provider, so it lands on the wire as a path segment. Pass it
-        // through Uri.EscapeDataString to be safe against future shape changes.
-        var url = operationName.StartsWith("operations/", StringComparison.Ordinal)
-            ? $"{operationName}"
+        // Veo issues full resource paths ("models/veo-…/operations/<id>"), which are already the
+        // poll URL. Only a bare id gets the prefix — prefixing a full path 404s every poll.
+        var url = operationName.Contains("operations/", StringComparison.Ordinal)
+            ? operationName
             : $"operations/{operationName}";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -259,36 +259,26 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
         return (prompt ?? string.Empty).TrimEnd() + AudioDirective;
     }
 
-    private static bool TryExtractVideoUri(JsonElement root, out string uri)
+    /// <summary>
+    /// Reads the clip URI from a finished operation. The shape, as Veo actually returns it:
+    /// <c>{ "response": { "generateVideoResponse": { "generatedSamples": [ { "video": { "uri": "…" } } ] } } }</c>.
+    /// The previous parser looked for <c>response.videos[0].uri</c>, which Veo never sends, so
+    /// every completed render reported "completed the job without delivering a clip".
+    /// </summary>
+    internal static bool TryExtractVideoUri(JsonElement root, out string uri)
     {
         uri = string.Empty;
-
-        // Google's long-running response shapes the result either as
-        //   { "response": { "videos": [ { "uri": "..." } ] } }
-        // or, after the operation is done, as
-        //   { "videos": [ { "uri": "..." } ] }
-        // depending on the model. Walk both.
-        JsonElement container = root;
-        if (root.TryGetProperty("response", out var responseEl)
-            && responseEl.ValueKind == JsonValueKind.Object)
+        if (root.TryGetProperty("response", out var response)
+            && response.TryGetProperty("generateVideoResponse", out var generated)
+            && generated.TryGetProperty("generatedSamples", out var samples)
+            && samples.ValueKind == JsonValueKind.Array
+            && samples.GetArrayLength() > 0
+            && samples[0].TryGetProperty("video", out var video)
+            && video.TryGetProperty("uri", out var uriEl)
+            && uriEl.ValueKind == JsonValueKind.String)
         {
-            container = responseEl;
+            uri = uriEl.GetString() ?? string.Empty;
         }
-
-        if (!container.TryGetProperty("videos", out var videosEl)
-            || videosEl.ValueKind != JsonValueKind.Array
-            || videosEl.GetArrayLength() == 0)
-        {
-            return false;
-        }
-
-        var first = videosEl[0];
-        if (!first.TryGetProperty("uri", out var uriEl) || uriEl.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        uri = uriEl.GetString() ?? string.Empty;
         return !string.IsNullOrWhiteSpace(uri);
     }
 

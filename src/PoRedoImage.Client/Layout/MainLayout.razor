@@ -38,7 +38,9 @@
                 <SessionCostChip />
                 @if (!Env.IsProduction())
                 {
-                    <span class="app-nav__env-badge" title="Running in @Env.Environment mode">@Env.Environment.ToUpperInvariant()</span>
+                    @* "Dev", not "DEVELOPMENT": the rail is capped at --rail-max, and the long form
+                       was the ~65px that pushed the status cell over the links. *@
+                    <span class="app-nav__env-badge" title="Running in @Env.Environment mode">@(Env.IsDevelopment() ? "Dev" : Env.Environment)</span>
                 }
             </div>
             <LoginDisplay />

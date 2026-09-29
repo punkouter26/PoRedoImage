@@ -27,9 +27,10 @@ There is **no `DOCS/` directory**. It was tracked once and deleted deliberately,
 `.codescene/`, `CODE-HEALTH-SCORECARD.md` and the `SCRIPTS/generate-scorecard.ps1` that produced
 it. Don't cite `DOCS/` or `docs/` as a source of truth — nothing in the repo generates them.
 
-Several code comments cite ADRs by number (ADR-019, ADR-025, ADR-031) and section numbers (§1
-Trimming, §2 Security, Po2Logic R3/F7). No such documents exist in this repo — the reasoning lives
-in the comment itself, not in a linked file.
+About 60 code comments cite documents that are not in this repo: ADRs by number (ADR-013 through
+ADR-031), `SPEC.md §15`, `NET_RULES §4–6`, `PoNetCaching §7`, section numbers (§1 Trimming, §2
+Security) and Po2Logic R3/F7. None of them exist here — the reasoning lives in the comment itself, not
+in a linked file. Don't go looking for them, and don't add new citations of that kind.
 
 ## Commands
 
@@ -174,12 +175,12 @@ authenticated write.
 
 ### AI providers, and how they fail
 
-`IImageGenerationService` has one real implementation: `GeminiImagen3Service`.
-`IImageGenerationRouter.Resolve(...)` maps every id — recognized, unrecognized, or null — to Gemini;
-the indirection is kept as the slot where a second provider returns. `ImageGen:Provider` is vestigial.
+`IImageGenerationService` has one real implementation, `GeminiImagen3Service`, injected directly.
+The `IImageGenerationRouter` that mapped every id to it, the `ImageGenModelId` request fields and the
+`ImageGen:Provider` key were removed in 2026-09 — a second provider brings its own router back.
 HuggingFace was removed in 2026-08 and must not return without an explicit decision.
 
-The router also had a **fast tier** (`remote:gemini-imagen3-fast`, offered in the picker at
+The image service also had a **fast tier** (`remote:gemini-imagen3-fast`, offered in the picker at
 "~$0.020/image" against the standard "~$0.039"). It never ran: the second `GeminiImagen3Service` was
 constructed only when `Google:Imagen3FastModel` was set, and that key was set nowhere — not
 appsettings, not `infra/main.bicep`, not Key Vault — so the null guard always fell through to the
@@ -189,8 +190,15 @@ or not at all; a priced choice that silently resolves to the other option is the
 as a silent fallback.
 
 `IChatCompletionService` resolves **once at startup**, not per request: `OllamaChatCompletionService`
-when `Ollama:ChatModel` is set, `AzureOpenAiChatCompletionService` otherwise. A single Azure
-deployment serves both reasoning and image-to-text.
+when `Ollama:ChatModel` is set, `AzureOpenAiChatCompletionService` otherwise, either way wrapped in
+`CachingChatCompletionService` (image-bearing calls memoised by prompt + image hash). A single Azure
+deployment serves both reasoning and image-to-text. Pass `jsonSchema` for JSON output — it is strict
+structured output on both backends; don't go back to asking for JSON in the prompt.
+
+Google model ids get retired under you: `gemini-2.5-flash` started 404ing ("no longer available to new
+users") and silently broke the Gemini Vision pick. Prefer the `-latest` aliases for anything that is
+not priced per model. `gpt-5.4-nano` spends **zero** reasoning tokens by default (measured 2026-09), so
+setting a reasoning effort only adds latency.
 
 `IVisionServiceRouter` *is* per-request, and matches on the id **namespace**, never a model-name
 prefix: `ollama:*` → `OllamaVisionService`, `remote:azure-openai-vision` → `OpenAiVisionService`,
@@ -231,6 +239,11 @@ plain net10.0 (`NETSDK1005`). The csproj clears it with an empty `<TargetFramewo
 dotnet build src/PoRedoImage.Mobile -f net10.0-android -r android-arm64 -t:Install "-p:AdbTarget=-s <serial>"  # phone
 dotnet build src/PoRedoImage.Mobile -f net10.0-android -r android-x64   -t:Install "-p:AdbTarget=-s emulator-5554"  # emulator
 ```
+
+`.vscode/settings.json` points C# Dev Kit at `PoRedoImage.slnx`, not the Mobile one: loading
+`PoRedoImage.Mobile.slnx` on a machine without the Android SDK fails every design-time build with
+`XA5300` (and `NU1012`), which surfaces as a red Problems panel unrelated to the web app. Open the
+Mobile solution explicitly once the SDK is installed.
 
 Pick the RID to match the device: physical phones are `arm64-v8a`, the emulator images here are
 `x86_64`. Installing the wrong one fails with Android's misleading *"not enough storage space"*.
@@ -304,11 +317,12 @@ Approximate headroom, so you know which tier can absorb a new test.
 Test **methods**, not test cases — a `[Theory]` counts once however many `InlineData` rows it has,
 which is why these numbers are far below what a `dotnet test` run reports. Counted 2026-09-28; the
 per-tier ceiling tests recompute them every CI run, so refresh this table when they drift.
+Counted 2026-09-29 after the router, streaming-API and validator-test consolidation.
 
 | Tier | Methods | Ceiling |
 |---|---|---|
-| Unit | 91 | 100 |
-| Integration | 45 | 50 |
+| Unit | 84 | 100 |
+| Integration | 39 | 50 |
 | E2E.ApiSmoke | 15 | 25 |
 | E2E.UI | 11 | 25 |
 | Architecture | 2 | 10 |

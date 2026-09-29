@@ -1,28 +1,6 @@
 // imageProcessing — client-side image processing helpers (resize, preview URL helpers).
 window.imageProcessing = (function () {
     return {
-        // Returns a data URL for a File/Blob scaled to maxDimension pixels on the longest side.
-        resizeToDataUrl: function (file, maxDimension) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    const img = new Image();
-                    img.onload = function () {
-                        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
-                        const canvas = document.createElement('canvas');
-                        canvas.width = Math.round(img.width * scale);
-                        canvas.height = Math.round(img.height * scale);
-                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.9));
-                    };
-                    img.onerror = reject;
-                    img.src = e.target.result;
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        },
-
         // Downscales a data URL so its longest edge is at most maxEdge, preserving the source
         // format. Returns the ORIGINAL string unchanged when the image is already small enough or
         // when anything goes wrong — a failed optimisation must never become a failed upload.

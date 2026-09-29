@@ -101,7 +101,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
     }
 
     public async Task<(byte[] ImageData, string ContentType, long ElapsedMs)>
-        GenerateAsync(string prompt, CancellationToken ct = default)
+        GenerateAsync(string prompt, byte[]? matchAspectOf = null, CancellationToken ct = default)
     {
         if (!IsConfigured)
             throw new InvalidOperationException("Gemini image generation is not configured. Set Google:ApiKey in Key Vault.");
@@ -112,7 +112,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         var start = Stopwatch.GetTimestamp();
 
         var (imageData, contentType) = _model.StartsWith("gemini-", StringComparison.OrdinalIgnoreCase)
-            ? await GenerateWithGeminiAsync(prompt, null, seed: 0, ct)
+            ? await GenerateWithGeminiAsync(prompt, null, seed: 0, ct, AspectRatioOf(matchAspectOf))
             : await GenerateWithImagenAsync(prompt, ct);
 
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
@@ -120,8 +120,32 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         return (imageData, contentType, elapsed);
     }
 
+    private static readonly System.Text.Json.JsonSerializerOptions OmitNulls =
+        new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+
+    /// <summary>The ratios Gemini image output accepts, as (label, width/height).</summary>
+    private static readonly (string Label, double Value)[] SupportedRatios =
+        [("1:1", 1.0), ("2:3", 2 / 3.0), ("3:2", 1.5), ("3:4", 0.75), ("4:3", 4 / 3.0),
+         ("4:5", 0.8), ("5:4", 1.25), ("9:16", 9 / 16.0), ("16:9", 16 / 9.0), ("21:9", 21 / 9.0)];
+
+    /// <summary>Nearest supported ratio to the source image's, or null when it cannot be read.</summary>
+    internal static string? AspectRatioOf(byte[]? image)
+    {
+        if (image is null) return null;
+        try
+        {
+            var info = SixLabors.ImageSharp.Image.Identify(image);
+            var ratio = (double)info.Width / info.Height;
+            return SupportedRatios.MinBy(r => Math.Abs(Math.Log(r.Value / ratio))).Label;
+        }
+        catch (SixLabors.ImageSharp.ImageFormatException)
+        {
+            return null;
+        }
+    }
+
     private async Task<(byte[] ImageData, string ContentType)> GenerateWithGeminiAsync(
-        string prompt, byte[]? referenceImageBytes, int seed, CancellationToken ct)
+        string prompt, byte[]? referenceImageBytes, int seed, CancellationToken ct, string? aspectRatio = null)
     {
         var parts = new List<object>();
 
@@ -170,7 +194,10 @@ public sealed class GeminiImagen3Service : IImageGenerationService
             {
                 // Lock output to IMAGE only — Gemini cannot fall back to a text-only reply.
                 responseModalities = new[] { "image" },
-                temperature = 1.0
+                temperature = 1.0,
+                // Text-to-image defaults to square. A reproduction of a 4:3 photo drawn at 1:1 has
+                // to crop or pad everything the framing clauses described, so match the source.
+                imageConfig = aspectRatio is null ? null : new { aspectRatio },
             }
         };
 
@@ -188,7 +215,7 @@ public sealed class GeminiImagen3Service : IImageGenerationService
         // assembly is server-side only and is never trimmed, so the reflective writer is safe here.
         // Scoped to the single statement so the analyzer (Directory.Build.props) stays live elsewhere.
         #pragma warning disable IL2026
-        request.Content = JsonContent.Create(body);
+        request.Content = JsonContent.Create(body, options: OmitNulls);
         #pragma warning restore IL2026
         using var response = await client.SendAsync(request, ct);
 

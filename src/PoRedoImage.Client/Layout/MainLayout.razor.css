@@ -50,10 +50,14 @@
 }
 
 /* 1fr | auto | 1fr: the links own the centre track, so nothing arriving in the end cell after
-   first paint (cost chip, signed-in name, jobs tray) can move them. */
+   first paint (cost chip, signed-in name, jobs tray) can move them — while there is room.
+   The side tracks never shrink below their content: a plain 1fr let the end cell (jobs tray +
+   cost + env badge + sign-out) get narrower than what it holds, and its flex-end content then
+   spilled LEFT over the links ("JOBS 1" printed on top of VIDEO). When the row runs short the
+   links now give up exact centring instead of being painted over. */
 .app-nav {
     display: grid;
-    grid-template-columns: 1fr minmax(0, auto) 1fr;
+    grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
     align-items: center;
     padding: 0 1.25rem;
     height: 60px;
@@ -144,8 +148,10 @@
 
 /* ── Narrow widths ────────────────────────────────────────────────────────
    Below md the feature links leave the rail for the bottom tab bar (NavMenu.razor.css), so the
-   rail is just brand + status. Between md and lg the links stay, and the wordmark yields. */
-@media (max-width: 1023.98px) {
+   rail is just brand + status. Between md and ~1100px the links stay, and the wordmark yields —
+   up to 1100 rather than lg (1024) because with the jobs tray and cost meter showing, 1024–1100
+   was still ~40px short and clipped GALLERY. */
+@media (max-width: 1099.98px) {
     .app-nav__brand ::deep .flapstrip { display: none; }
 }
 

@@ -18,7 +18,8 @@ window.poUx = (function () {
     const ALLOWED = ['image/jpeg', 'image/png'];
 
     // ── Image intake ────────────────────────────────────────────────────────
-    let intake = null;   // { ref, onPaste, onDragOver, onDragLeave, onDrop }
+    let intake = null;   // { id, ref, onPaste, onDragOver, onDragLeave, onDrop }
+    let intakeSeq = 0;
     let dragDepth = 0;   // dragenter/dragleave fire per child element; count to avoid flicker
 
     // ── Camera ──────────────────────────────────────────────────────────────
@@ -160,12 +161,16 @@ window.poUx = (function () {
             window.addEventListener('dragover', onDragOver);
             window.addEventListener('dragleave', onDragLeave);
             window.addEventListener('drop', onDrop);
-            intake = { ref: ref, onPaste: onPaste, onDragOver: onDragOver, onDragLeave: onDragLeave, onDrop: onDrop };
+            intake = { id: ++intakeSeq, ref: ref, onPaste: onPaste, onDragOver: onDragOver, onDragLeave: onDragLeave, onDrop: onDrop };
             consumeSharedImage();
+            return intake.id;
         },
 
-        unregisterIntake: function () {
-            if (!intake) return;
+        // `id` is what registerIntake returned. A disposing panel's unregister lands after the
+        // next page's panel has already registered, so an unguarded call wiped the live
+        // registration and paste/drop/camera died after every client-side navigation.
+        unregisterIntake: function (id) {
+            if (!intake || (id !== undefined && intake.id !== id)) return;
             window.removeEventListener('paste', intake.onPaste);
             window.removeEventListener('dragover', intake.onDragOver);
             window.removeEventListener('dragleave', intake.onDragLeave);

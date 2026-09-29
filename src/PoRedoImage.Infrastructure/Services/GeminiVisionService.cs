@@ -31,7 +31,10 @@ public sealed class GeminiVisionService : IVisionService
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
-        _model = configuration[ConfigKeys.GoogleVisionModel] ?? "gemini-2.5-flash";
+        // The "-latest" alias, not a pinned version: gemini-2.5-flash was retired for new keys
+        // ("no longer available to new users") and every Gemini Vision pick 404'd until this
+        // changed. Flash-Lite because a caption + tags is its job at ~1.7s and the lowest rate.
+        _model = configuration[ConfigKeys.GoogleVisionModel] ?? "gemini-flash-lite-latest";
 
         if (ConfigValue.Bool(configuration, ConfigKeys.MocksUseMockAi))
         {
@@ -164,8 +167,9 @@ public sealed class GeminiVisionService : IVisionService
             }
             return (string.IsNullOrWhiteSpace(desc) ? "No description available." : desc, tags);
         }
-        catch
+        catch (JsonException)
         {
+            // The model answered in prose despite responseMimeType — keep it as the description.
             return (text.Trim(), Array.Empty<string>());
         }
     }

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoRedoImage.Web.Configuration;
 
@@ -21,135 +20,55 @@ namespace PoRedoImage.Tests.Integration.Contracts;
 ///   - All fields present + Mocks off: Success in any environment.
 ///
 /// Lives in the Integration tier (not Unit) because it pins the options-binding CONTRACT
-/// that gates host startup — see the "Contractual Integration Testing" audit item.
+/// that gates host startup. One theory, one row per rule — these were eight methods of the same
+/// shape, eight of the tier's fifty.
 /// </summary>
 public class OpenAiOptionsValidatorTests
 {
-    private static OpenAiOptionsValidator MakeValidator(
-        string envName,
-        bool useMockAi = false)
-    {
-        var env = new HostingEnvironment { EnvironmentName = envName };
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Mocks:UseMockAi"] = useMockAi ? "true" : "false"
-            })
-            .Build();
-        return new OpenAiOptionsValidator(env, config, NullLogger<OpenAiOptionsValidator>.Instance);
-    }
+    private const string Prod = "Production", Dev = "Development", Test = PoEnvironments.Test;
 
-    private static OpenAiOptionsValidator MakeProductionValidator() =>
-        MakeValidator(Microsoft.Extensions.Hosting.Environments.Production);
-
-    private static OpenAiOptionsValidator MakeDevelopmentValidator(bool useMockAi = false) =>
-        MakeValidator(Microsoft.Extensions.Hosting.Environments.Development, useMockAi);
-
-    private static OpenAiOptionsValidator MakeTestValidator(bool useMockAi = false) =>
-        MakeValidator(PoRedoImage.Web.Configuration.PoEnvironments.Test, useMockAi);
-
-    [Fact]
-    public void AllFieldsPresent_Production_Succeeds()
-    {
-        var v = MakeProductionValidator();
-        var result = v.Validate(null, new OpenAiOptions { Endpoint = "https://x.openai.azure.com/", Key = "k", ChatCompletionsDeployment = "gpt-4o" });
-        Assert.True(result.Succeeded);
-    }
-
+    /// <param name="blank">Which field to leave empty: none, endpoint, key, deployment, or all.</param>
+    /// <param name="expectedFailure">A fragment every failing case must report; null when it succeeds.</param>
     [Theory]
-    [InlineData("endpoint", "OpenAI:Endpoint")]
-    [InlineData("key", "OpenAI:Key")]
-    [InlineData("deployment", "ChatCompletionsDeployment")]
-    public void MissingField_Production_Fails(string blankedField, string expectedFailureFragment)
+    [InlineData(Prod, false, "none", null)]
+    [InlineData(Prod, false, "endpoint", "OpenAI:Endpoint")]
+    [InlineData(Prod, false, "key", "OpenAI:Key")]
+    [InlineData(Prod, false, "deployment", "ChatCompletionsDeployment")]
+    [InlineData(Dev, false, "none", null)]
+    // Dev also fails fast when real services are wired; otherwise the first AI call 401s.
+    [InlineData(Dev, false, "all", "OpenAI:Endpoint")]
+    [InlineData(Dev, false, "key", "OpenAI:Key")]
+    // Mock mode is Test-only: the flag in Development must NOT short-circuit the validator.
+    [InlineData(Dev, true, "all", "OpenAI:Endpoint")]
+    // The Test env honours the flag — real services aren't wired, so missing keys are fine...
+    [InlineData(Test, true, "all", null)]
+    // ...but only when the flag is on.
+    [InlineData(Test, false, "all", "OpenAI:Endpoint")]
+    public void Validator_enforces_the_key_policy_per_environment(
+        string env, bool useMockAi, string blank, string? expectedFailure)
     {
-        var v = MakeProductionValidator();
-        var options = new OpenAiOptions
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Mocks:UseMockAi"] = useMockAi ? "true" : "false" })
+            .Build();
+        var validator = new OpenAiOptionsValidator(
+            new HostingEnvironment { EnvironmentName = env }, config, NullLogger<OpenAiOptionsValidator>.Instance);
+
+        var result = validator.Validate(null, new OpenAiOptions
         {
-            Endpoint = blankedField == "endpoint" ? "" : "https://x.openai.azure.com/",
-            Key = blankedField == "key" ? "" : "k",
-            ChatCompletionsDeployment = blankedField == "deployment" ? "" : "gpt-4o",
-        };
-
-        var result = v.Validate(null, options);
-
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains(expectedFailureFragment));
-    }
-
-    // ── Dev-policy contract: real AI in dev means real keys; no silent degradation. ──
-
-    [Fact]
-    public void MissingFields_Development_MocksOff_Fails()
-    {
-        // Dev previously passed with warnings; the new contract is that Dev also fails fast
-        // when real services are wired (Mocks:UseMockAi=false). Otherwise the first AI call
-        // returns 401 and the user has no clear signal that the keys are missing.
-        var v = MakeDevelopmentValidator(useMockAi: false);
-        var result = v.Validate(null, new OpenAiOptions());
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Endpoint"));
-        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Key"));
-    }
-
-    [Fact]
-    public void MissingKey_Development_MocksOff_Fails()
-    {
-        var v = MakeDevelopmentValidator(useMockAi: false);
-        var result = v.Validate(null, new OpenAiOptions
-        {
-            Endpoint = "https://x.openai.azure.com/",
-            Key = "",
-            ChatCompletionsDeployment = "gpt-4o"
+            Endpoint = blank is "endpoint" or "all" ? "" : "https://x.openai.azure.com/",
+            Key = blank is "key" or "all" ? "" : "k",
+            ChatCompletionsDeployment = blank is "deployment" or "all" ? "" : "gpt-5.4-nano",
         });
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Key"));
-    }
 
-    [Fact]
-    public void MissingFields_Development_MocksOn_StillFails_BecauseGateIgnoresFlag()
-    {
-        // Mock mode is Test-only. Setting Mocks:UseMockAi=true in Development must NOT
-        // short-circuit the validator — the gate ignores the flag, real services are wired,
-        // and the missing keys must therefore be reported. This is what stops "I set the flag
-        // once to debug something and forgot, and now my dev loop is silently mocked".
-        var v = MakeDevelopmentValidator(useMockAi: true);
-        var result = v.Validate(null, new OpenAiOptions());
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Endpoint"));
-    }
-
-    [Fact]
-    public void MissingFields_Test_MocksOn_Succeeds()
-    {
-        // The Test environment IS where the mock flag is honored: real services aren't wired,
-        // the bound options are never consumed, and the validator must NOT block startup.
-        var v = MakeTestValidator(useMockAi: true);
-        var result = v.Validate(null, new OpenAiOptions());
-        Assert.True(result.Succeeded);
-    }
-
-    [Fact]
-    public void MissingFields_Test_MocksOff_Fails()
-    {
-        // Even in Test, if the flag is off the validator runs normally. The Test env doesn't
-        // get a free pass on missing fields when the operator said "use real services".
-        var v = MakeTestValidator(useMockAi: false);
-        var result = v.Validate(null, new OpenAiOptions());
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("OpenAI:Endpoint"));
-    }
-
-    [Fact]
-    public void AllFieldsPresent_Development_MocksOff_Succeeds()
-    {
-        var v = MakeDevelopmentValidator(useMockAi: false);
-        var result = v.Validate(null, new OpenAiOptions
+        if (expectedFailure is null)
         {
-            Endpoint = "https://x.openai.azure.com/",
-            Key = "k",
-            ChatCompletionsDeployment = "gpt-4o"
-        });
-        Assert.True(result.Succeeded);
+            Assert.True(result.Succeeded);
+        }
+        else
+        {
+            Assert.True(result.Failed);
+            Assert.Contains(result.Failures, f => f.Contains(expectedFailure));
+        }
     }
 }
 

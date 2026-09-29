@@ -12,7 +12,7 @@
    payload. Those used to sit in a separate cost row under the header that repeated the
    provider label a second time and the footer's session total a third. *@
 <FeatureShell Title="Bulk Generate"
-              ModelBadge="@(Cost.Pricing is { } pricing ? $"{pricing.ImageProviderLabel} · ≈{Cost.Format(pricing.ImageToImageUsd)}/image" : null)">
+              ModelBadge="@(Cost.Pricing is { } pricing ? $"{pricing.ImageLabel} · ≈{Cost.Format(pricing.ImageGenerationUsd)}/image" : null)">
 
     <Aside>
     @if (!_isGenerating)

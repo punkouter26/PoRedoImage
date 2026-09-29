@@ -1,10 +1,8 @@
 @page "/rap-roast"
 @attribute [Authorize]
 @inherits FeaturePageBase
-@implements IDisposable
 @using System.Net.Http.Json
 @using PoRedoImage.Client.Services
-@inject IJSRuntime JS
 
 <PageTitle>Rap Roast — PoRedoImage</PageTitle>
 
@@ -93,6 +91,20 @@
     @if (isProcessing)
     {
         <ProcessingProgressBar Message="@progressMessage" />
+
+        @* The bars land 30–90s before the track does — read them while the beat renders. *@
+        @if (_previewLines.Count > 0)
+        {
+            <section class="roast-lyrics roast-lyrics--preview" aria-label="Roast lyrics, track still rendering">
+                <h2 class="roast-lyrics__heading">The bars (track rendering…)</h2>
+                <ol class="roast-script">
+                    @foreach (var line in _previewLines)
+                    {
+                        <li class="@(line.IsSection ? "roast-script__section" : "roast-script__row")">@line.Text</li>
+                    }
+                </ol>
+            </section>
+        }
     }
 
     @if (isComplete && _result is not null)

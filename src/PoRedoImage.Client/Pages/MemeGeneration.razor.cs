@@ -35,14 +35,6 @@ public partial class MemeGeneration : FeaturePageBase
     private string? _selectedTemplateId;
     private List<string> _zoneTexts = [];
 
-    // Hoisted: the analyze response can carry a 700+ KB base64 meme, and rebuilding the
-    // JsonSerializerOptions graph on every call would force fresh metadata caches.
-    private static readonly System.Text.Json.JsonSerializerOptions AnalyzeJsonOpts = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        MaxDepth = 64,
-    };
-
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
@@ -108,102 +100,20 @@ public partial class MemeGeneration : FeaturePageBase
     {
         if (imagePreviewUrl == null) return;
 
-        // ── Idea #17 — Template branch (no AI, runs locally) ──────
+        // Template branch: no AI, renders locally.
         if (_useTemplate)
         {
             await ProcessTemplateAsync();
             return;
         }
 
-        try
-        {
-            isProcessing = true;
-            errorMessage = null;
-            progressMessage = "Preparing image for analysis...";
-            StateHasChanged();
+        analysisResult = await AnalyzeAsync(350, ProcessingMode.MemeGeneration);
+        if (analysisResult is null) return;
 
-            var base64Data = ExtractBase64(imagePreviewUrl);
+        if (_userId is not null && !string.IsNullOrEmpty(analysisResult.MemeImageData))
+            _ = AutoSaveMemeAsync(analysisResult.MemeImageData, "image/png");
 
-            // The local step (§ai-service-pickers finding #3) gets its own, more generous budget:
-            // first-run browser-local inference includes a ~230 MB model download plus WASM/WebGPU
-            // load, which a 3-minute budget shared with the HTTP call could exhaust on a slow
-            // connection. The 3-minute HTTP CTS below is created only once the request is built, so
-            // it covers just the round trip it was originally scoped to.
-            using var localCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-            var request = await TryBuildAnalysisRequestAsync(
-                imageData: base64Data,
-                contentType: selectedFile?.ContentType ?? SessionService.ContentType ?? "image/jpeg",
-                fileName: selectedFile?.Name ?? SessionService.FileName ?? "image.jpg",
-                descriptionLength: 350,
-                mode: ProcessingMode.MemeGeneration,
-                ct: localCts.Token);
-            if (request is null) return;
-
-            progressMessage = "Analyzing image...";
-            StateHasChanged();
-
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-            try
-            {
-                var httpResponse = await Http.PostAsJsonAsync("api/images/analyze", request, SharedJsonOptions.Default, cts.Token);
-
-                if (!httpResponse.IsSuccessStatusCode)
-                {
-                    if (await HandleAnalyzeErrorAsync(httpResponse)) return;
-                }
-                else
-                {
-                    // The response can carry a 700+ KB base64 meme + an optional regenerated image,
-                    // which approaches Blazor WASM's default deserialization budget. Bump the limit and
-                    // explicitly use System.Text.Json to keep behaviour deterministic across hosts.
-                    // ReadAsStringAsync first so we can show progress and avoid a stuck-progress state
-                    // when deserialization of a multi-MB payload takes a noticeable moment on the WASM side.
-                    progressMessage = "Decoding meme…";
-                    try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-                    var rawJson = await httpResponse.Content.ReadAsStringAsync(cts.Token);
-                    progressMessage = "Rendering result…";
-                    try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-                    analysisResult = System.Text.Json.JsonSerializer.Deserialize<ImageAnalysisResponse>(rawJson, AnalyzeJsonOpts);
-                    if (analysisResult == null)
-                        throw new InvalidOperationException("No response received from API.");
-
-                    Cost.RecordVision(1);
-                    Cost.RecordTextReasoning(1);
-
-                    if (_userId is not null && !string.IsNullOrEmpty(analysisResult.MemeImageData))
-                        _ = AutoSaveMemeAsync(analysisResult.MemeImageData, "image/png");
-                }
-            }
-            catch (OperationCanceledException ex)
-            {
-                Logger.LogError(ex, "Request timed out after 3 minutes");
-                errorMessage = "Meme generation timed out. Please try again with a different image.";
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error calling API");
-                errorMessage = $"Error generating meme: {ex.Message}";
-            }
-            finally
-            {
-                progressMessage = string.IsNullOrEmpty(errorMessage) ? "Meme generated!" : "Generation failed.";
-                isProcessing = false;
-                isComplete = string.IsNullOrEmpty(errorMessage);
-                if (string.IsNullOrEmpty(errorMessage))
-                    NotificationService.Notify(NotificationSeverity.Success, "Meme Ready!", "Your meme has been generated.", duration: 4000);
-                // Force a re-render on the UI thread so the spinner can't get stuck if the
-                // deserialization of the 13MB-base64 response left the circuit waiting.
-                try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-                try { StateHasChanged(); } catch (ObjectDisposedException) { }
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error generating meme: {ex.Message}";
-            isProcessing = false;
-            Logger.LogError(ex, "Error generating meme");
-            try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
-        }
+        await SucceedAsync("Meme Ready!", "Your meme has been generated.");
     }
 
     /// <summary>
@@ -286,7 +196,7 @@ public partial class MemeGeneration : FeaturePageBase
             progressMessage = string.IsNullOrEmpty(errorMessage) ? "Done!" : "Failed.";
             isProcessing = false;
             isComplete = string.IsNullOrEmpty(errorMessage);
-            try { StateHasChanged(); } catch (ObjectDisposedException) { }
+            await RefreshAsync();
         }
     }
 
@@ -294,7 +204,7 @@ public partial class MemeGeneration : FeaturePageBase
     {
         var url = MemeImageUrl;
         if (url == null) return;
-        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", url, "meme-" + (selectedFile?.Name ?? "image.png"));
+        var ok = await Js.InvokeAsync<bool>("downloadImage", url, "meme-" + (selectedFile?.Name ?? "image.png"));
         if (!ok) errorMessage = "There was a problem downloading the meme image.";
         else Logger.LogInformation("Meme image download initiated");
     }

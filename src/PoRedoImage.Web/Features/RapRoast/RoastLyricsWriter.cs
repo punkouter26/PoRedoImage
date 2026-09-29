@@ -3,15 +3,14 @@ using Microsoft.Extensions.Logging;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Features.RapRoast;
+namespace PoRedoImage.Web.Features.RapRoast;
 
 /// <summary>
 /// Writes the roast bars from an image description.
 /// </summary>
 /// <remarks>
 /// Backed by <see cref="IChatCompletionService"/> (Azure OpenAI) with a deterministic heuristic
-/// fallback, mirroring the Style Director agents — so the feature still works when no chat provider
-/// is configured, which is the normal local-development state.
+/// fallback — so the feature still works when no chat provider is configured.
 /// </remarks>
 public sealed class RoastLyricsWriter(IChatCompletionService chat, ILogger<RoastLyricsWriter> logger)
 {
@@ -237,7 +236,7 @@ public sealed class RoastLyricsWriter(IChatCompletionService chat, ILogger<Roast
             + $"{toneDirection}\n"
             + "Write the roast verse and chorus now.";
 
-        var result = await chat.CompleteAsync(SystemPrompt(effectiveExplicit, style), user, image: null, ct);
+        var result = await chat.CompleteAsync(SystemPrompt(effectiveExplicit, style), user, ct: ct);
 
         logger.LogInformation(
             "Roast lyrics written by model in {Elapsed}ms. Tokens={Tokens}, Intensity={Intensity}, "

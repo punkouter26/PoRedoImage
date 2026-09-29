@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using PoRedoImage.Application.Features.RapRoast;
+using PoRedoImage.Web.Features.RapRoast;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Shared.DTOs;
@@ -44,7 +44,7 @@ public class RapRoastTests
         // conflating the two would show "100% filtered" on a machine with no chat model configured.
         Assert.False(result.FilterRejected);
         chat.Verify(c => c.CompleteAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()),
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -57,8 +57,8 @@ public class RapRoastTests
         var chat = new Mock<IChatCompletionService>();
         chat.SetupGet(c => c.IsConfigured).Returns(true);
         chat.Setup(c => c.CompleteAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, byte[]?, CancellationToken>((sys, user, _, _) =>
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, byte[]?, string?, CancellationToken>((sys, user, _, _, _) =>
             {
                 capturedSystem = sys;
                 userPrompts.Add(user);
@@ -107,7 +107,7 @@ public class RapRoastTests
         var chat = new Mock<IChatCompletionService>();
         chat.SetupGet(c => c.IsConfigured).Returns(true);
         chat.Setup(c => c.CompleteAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ChatCompletionResult("```\n[Verse]\nbars here\n[Chorus]\nhook\n```", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
@@ -126,8 +126,8 @@ public class RapRoastTests
         var chat = new Mock<IChatCompletionService>();
         chat.SetupGet(c => c.IsConfigured).Returns(true);
         chat.Setup(c => c.CompleteAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, byte[]?, CancellationToken>((_, user, _, _) => userPrompts.Add(user))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, byte[]?, string?, CancellationToken>((_, user, _, _, _) => userPrompts.Add(user))
             .ReturnsAsync(new ChatCompletionResult("[Verse]\nbars\n[Chorus]\nhook", 10, 5));
 
         var writer = new RoastLyricsWriter(chat.Object, NullLogger<RoastLyricsWriter>.Instance);
@@ -168,8 +168,8 @@ public class RapRoastTests
         var chat = new Mock<IChatCompletionService>();
         chat.SetupGet(c => c.IsConfigured).Returns(true);
         chat.Setup(c => c.CompleteAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, byte[]?, CancellationToken>((sys, user, _, _) =>
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, byte[]?, string?, CancellationToken>((sys, user, _, _, _) =>
             {
                 systemPrompts.Add(sys);
                 userPrompts.Add(user);

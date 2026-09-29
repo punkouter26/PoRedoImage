@@ -53,8 +53,8 @@ public sealed class CachingGenerativeAiService(
 
     /// <summary>Deliberately uncached — see the class remarks.</summary>
     public Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)> GenerateMemeCaptionAsync(
-        IReadOnlyList<string> tags, CancellationToken ct = default)
-        => inner.GenerateMemeCaptionAsync(tags, ct);
+        string description, IReadOnlyList<string> tags, CancellationToken ct = default)
+        => inner.GenerateMemeCaptionAsync(description, tags, ct);
 
     public async Task<string> DescribePersonAsync(byte[] imageData, CancellationToken ct = default)
     {

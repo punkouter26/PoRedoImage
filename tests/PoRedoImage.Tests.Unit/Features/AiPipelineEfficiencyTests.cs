@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using PoRedoImage.Application.Features.BulkGenerate;
-using PoRedoImage.Application.Features.RapRoast;
+using PoRedoImage.Web.Features.BulkGenerate;
+using PoRedoImage.Web.Features.RapRoast;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Infrastructure.Services;
 using PoRedoImage.Shared.DTOs;
@@ -98,8 +98,13 @@ public class AiPipelineEfficiencyTests
         combined.Verify(c => c.GetDetailsAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// Rate limits are retried by the GeminiApi resilience handler, once. This service used to
+    /// retry them again on top (up to nine calls per slot), so a failure must now surface as the
+    /// slot's error after exactly one call from here.
+    /// </summary>
     [Fact]
-    public async Task Bulk_generation_retries_on_rate_limit_and_succeeds()
+    public async Task Bulk_slot_failure_is_reported_without_a_second_retry_layer()
     {
         var generator = new Mock<IImageGenerationService>();
         var attempts = 0;
@@ -107,50 +112,19 @@ public class AiPipelineEfficiencyTests
             .Returns(() =>
             {
                 attempts++;
-                if (attempts == 1)
-                {
-                    throw new HttpRequestException("429 Too Many Requests (RESOURCE_EXHAUSTED)");
-                }
-                return Task.FromResult((Png, "image/png", 100L));
+                throw new HttpRequestException("429 Too Many Requests (RESOURCE_EXHAUSTED)");
             });
 
-        var router = new Mock<IImageGenerationRouter>();
-        router.Setup(r => r.Resolve(It.IsAny<string?>())).Returns(generator.Object);
-
-        var sut = new BulkGenerationService(router.Object, NullLogger<BulkGenerationService>.Instance);
+        var sut = new BulkGenerationService(generator.Object, NullLogger<BulkGenerationService>.Instance);
         var results = new List<BulkBatchItem>();
-        await foreach (var item in sut.GenerateBatchAsync(["test prompt"], Png, null))
+        await foreach (var item in sut.GenerateBatchAsync(["test prompt"], Png))
         {
             results.Add(item);
         }
 
         Assert.Single(results);
-        Assert.NotNull(results[0].ImageData);
-        Assert.Null(results[0].Error);
-        Assert.Equal(2, attempts);
-    }
-
-    [Fact]
-    public async Task Chat_completion_streaming_yields_expected_tokens()
-    {
-        var chat = new Mock<IChatCompletionService>();
-        static async IAsyncEnumerable<string> ProduceTokens()
-        {
-            await Task.Yield();
-            yield return "Hello";
-            yield return " ";
-            yield return "world";
-        }
-
-        chat.Setup(c => c.StreamCompleteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]?>(), It.IsAny<CancellationToken>()))
-            .Returns(ProduceTokens());
-
-        var tokens = new List<string>();
-        await foreach (var token in chat.Object.StreamCompleteAsync("sys", "user"))
-        {
-            tokens.Add(token);
-        }
-
-        Assert.Equal(["Hello", " ", "world"], tokens);
+        Assert.Null(results[0].ImageData);
+        Assert.NotNull(results[0].Error);
+        Assert.Equal(1, attempts);
     }
 }

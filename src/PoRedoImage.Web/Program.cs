@@ -189,35 +189,24 @@ try
         .AddCheck<BulkPromptStorageHealthCheck>("table-storage", tags: ["ready"])
         .AddCheck<Imagen3HealthCheck>("imagen3", tags: ["ready"]);
 
-    // ─── HTTP client (resilient, server-side) ───────────────────────────
-    // The BFF host's own HttpClient (server-side health checks + any SSR component) points back at
-    // the app's base address and runs through the standard resilience pipeline — retry + circuit-
-    // breaker + timeout — so transient upstream blips don't surface to the browser as 500s.
-    builder.Services.AddHttpClient("BffApi", (sp, client) =>
-        {
-            var nav = sp.GetRequiredService<NavigationManager>();
-            client.BaseAddress = new Uri(nav.BaseUri);
-            client.Timeout = TimeSpan.FromMinutes(4);
-        })
-        .AddStandardResilienceHandler(options =>
-        {
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(4);
-            options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(2);
-            // Circuit-breaker sampling window must be >= 2x the attempt timeout.
-            options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(4);
-            options.Retry.MaxRetryAttempts = 2;
-        });
-
-    // Components inject a plain HttpClient; hand them the resilient named client.
-    builder.Services.AddScoped(sp =>
-        sp.GetRequiredService<IHttpClientFactory>().CreateClient("BffApi"));
-
     // ─── Feature services (Onion Architecture — Infrastructure layer wires all services) ──
     // DI registration follows Dependency Inversion Principle (SOLID-D). The mock-mode decision
     // is resolved here (Test env only — see MockAiGate) and passed in, because the
     // Infrastructure assembly deliberately has no ASP.NET types in scope.
     var useMockAi = MockAiGate.IsEnabled(builder.Configuration, builder.Environment);
     builder.Services.AddPoRedoImageInfrastructure(builder.Configuration, useMockAi);
+
+    // ─── Feature slices ──────────────────────────────────────────────────
+    // The orchestration each slice owns lives beside its endpoints (VSA), and is registered here as
+    // concrete types: each has exactly one implementation and no test substitutes it, so an
+    // interface per class bought nothing. Transient/scoped so the scoped logger flows correctly.
+    builder.Services.AddTransient<ReproductionPromptWriter>();
+    builder.Services.AddScoped<ImageAnalysisOrchestrator>();
+    builder.Services.AddScoped<BulkGenerationService>();
+    builder.Services.AddTransient<SceneDescriber>();
+    builder.Services.AddTransient<RoastLyricsWriter>();
+    builder.Services.AddScoped<RapRoastOrchestrator>();
+    builder.Services.AddScoped<UserImageService>();
 
     // ─── Correlation on the outbound leg (§3) ──────────────────────────
     // RequestContextMiddleware handles browser → BFF. This closes the chain for BFF → downstream

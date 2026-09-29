@@ -7,7 +7,7 @@ using PoRedoImage.Shared.Imaging;
 using PoRedoImage.Shared.Json;
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Web.Features.Shared;
-using PoRedoImage.Application.Features.BulkGenerate;
+using PoRedoImage.Web.Features.BulkGenerate;
 
 namespace PoRedoImage.Web.Features.BulkGenerate;
 
@@ -31,7 +31,7 @@ public static class BulkGenerateEndpoints
 
         authGroup.MapGet("/prompts", async (HttpContext context, IBulkPromptRepository storage) =>
         {
-            var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId is null) return Results.Unauthorized();
 
             var stored = await storage.GetByRowKeyAsync(userId);
@@ -45,7 +45,7 @@ public static class BulkGenerateEndpoints
 
         authGroup.MapPost("/prompts", async (HttpContext context, SavePromptsRequest request, IBulkPromptRepository storage) =>
         {
-            var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId is null) return Results.Unauthorized();
 
             if (request.Prompts is null || request.Prompts.Length != 10)
@@ -68,10 +68,10 @@ public static class BulkGenerateEndpoints
             .AllowAnonymous()
             .RequireRateLimiting("ai-endpoints");
 
-        // Describe the primary person in the uploaded image using GPT-4o vision.
-        // Called once per generation batch; result is reused across all variation prompts.
-        // Falls back gracefully to an empty description if the AI service is unavailable,
-        // so Gemini image-to-image can still run using the raw <PERSON> token.
+        // Describe the primary person in the uploaded image. The mobile app's Describe and Bulk
+        // flows call this; the web Bulk page no longer does (its batch is image-to-image, so the
+        // prompts point at the photo instead). An empty description is the mobile client's cue to
+        // run without substitution.
         aiGroup.MapPost("/describe", async (BulkDescribeRequest request, IGenerativeAiService describeService, ILoggerFactory loggerFactory) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
@@ -111,7 +111,7 @@ public static class BulkGenerateEndpoints
         aiGroup.MapPost("/batch", async (
             BulkBatchRequest request,
             HttpContext http,
-            IBulkGenerationService bulk,
+            BulkGenerationService bulk,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
@@ -125,8 +125,8 @@ public static class BulkGenerateEndpoints
             try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
             catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-            if (!bulk.IsConfigured(request.ImageGenModelId))
-                return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
+            if (!bulk.IsConfigured)
+                return Results.Problem("Image generation is not configured.", statusCode: 503);
 
             http.Response.ContentType = "application/x-ndjson";
             // Proxies that buffer would defeat the entire point of streaming these.
@@ -138,7 +138,7 @@ public static class BulkGenerateEndpoints
                 // Enumerated sequentially, so the writes cannot interleave — the old write lock
                 // existed only because the fan-out wrote to the body directly.
                 await foreach (var item in bulk.GenerateBatchAsync(
-                    request.Prompts, imageBytes.Bytes.ToArray(), request.ImageGenModelId, ct))
+                    request.Prompts, imageBytes.Bytes.ToArray(), ct))
                 {
                     // Source-generated JsonTypeInfo, not the reflective overload: the solution-wide
                     // trim analyzer rejects the latter (IL2026), and this endpoint writes to the
@@ -165,7 +165,7 @@ public static class BulkGenerateEndpoints
         // Idea #11 — One-Tap Re-roll x3: spawn N parallel variations from a winning prompt.
         aiGroup.MapPost("/reroll", async (
             BulkRerollRequest request,
-            IBulkGenerationService bulk,
+            BulkGenerationService bulk,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.ImageData))
@@ -179,11 +179,11 @@ public static class BulkGenerateEndpoints
             try { imageBytes = ImageBytes.FromBase64(request.ImageData, request.ContentType); }
             catch (ImageValidationException ex) { return Results.BadRequest(ex.Message); }
 
-            if (!bulk.IsConfigured(request.ImageGenModelId))
-                return Results.Problem("Image generation is not configured for the selected provider.", statusCode: 503);
+            if (!bulk.IsConfigured)
+                return Results.Problem("Image generation is not configured.", statusCode: 503);
 
             var response = await bulk.RerollAsync(
-                request.SeedPrompt, imageBytes.Bytes.ToArray(), request.Count, request.ImageGenModelId, ct);
+                request.SeedPrompt, imageBytes.Bytes.ToArray(), request.Count, ct);
 
             return Results.Ok(response);
         })

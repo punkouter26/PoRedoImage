@@ -79,7 +79,7 @@ public sealed class OpenAIHealthCheck : IHealthCheck
 
             if (statusCode == 404)
                 return HealthCheckResult.Degraded(
-                    $"OpenAI models route returned HTTP 404 for endpoint '{endpoint}'. The endpoint or api-version is wrong — description generation and Style Director reasoning will fall back to heuristics.");
+                    $"OpenAI models route returned HTTP 404 for endpoint '{endpoint}'. The endpoint or api-version is wrong — description, meme captions and roast lyrics will fall back to heuristics.");
 
             if (statusCode == 429)
                 return HealthCheckResult.Degraded(

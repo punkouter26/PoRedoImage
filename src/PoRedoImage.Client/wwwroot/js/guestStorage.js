@@ -1,6 +1,6 @@
 // GUEST LocalStorage persistence — Rule 6
-// Persists GUEST identity across browser refreshes and E2E tests.
-// In production, the GUEST login button is hidden/disabled via programmatic check.
+// Persists GUEST identity across browser refreshes and E2E tests. The GUEST button itself is only
+// rendered in Development (Login.razor), so there is nothing to hide here.
 window.poRedoImageGuest = {
     _key: 'PoRedoImage_GuestSession',
 
@@ -25,24 +25,6 @@ window.poRedoImageGuest = {
             localStorage.removeItem(this._key);
         } catch (e) {
             console.warn('Guest session clear failed:', e);
-        }
-    },
-
-    // Returns true if running in Azure Production (not localhost)
-    isProduction() {
-        return window.location.hostname !== 'localhost' 
-            && window.location.hostname !== '127.0.0.1'
-            && !window.location.hostname.includes('.local');
-    },
-
-    // Hide GUEST login button in production — called on login page load
-    hideGuestButtonInProduction() {
-        if (this.isProduction()) {
-            const guestBtn = document.querySelector('.btn-anon-signin');
-            if (guestBtn) {
-                guestBtn.style.display = 'none';
-                guestBtn.setAttribute('disabled', 'disabled');
-            }
         }
     },
 

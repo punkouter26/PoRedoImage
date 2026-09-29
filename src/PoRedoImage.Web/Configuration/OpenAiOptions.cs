@@ -27,7 +27,7 @@ public sealed class OpenAiOptions
     public string Key { get; init; } = string.Empty;
 
     [Required]
-    public string ChatCompletionsDeployment { get; init; } = "gpt-5.4-nano";
+    public string ChatCompletionsDeployment { get; init; } = ConfigKeys.OpenAiChatCompletionsDeploymentDefault;
 }
 
 /// <summary>

@@ -40,7 +40,7 @@ public sealed class ImageSessionService
     public string? LastFinalPrompt { get; private set; }
 
     /// <summary>
-    /// A prompt handed from one feature page to another (Style Director's "Use in Bulk Generate"),
+    /// A prompt handed from one feature page to another (a result's Remix → Regeneration or Bulk),
     /// staged but not yet submitted. Consumed once via <see cref="TakeStagedPrompt"/> so that
     /// returning to the receiving page later does not silently re-apply a stale seed.
     /// Distinct from <see cref="LastFinalPrompt"/>, which records what was already submitted.
@@ -62,7 +62,7 @@ public sealed class ImageSessionService
             if (commaIdx >= 0)
             {
                 try { bytes = Convert.FromBase64String(previewUrl[(commaIdx + 1)..]); }
-                catch { /* previewUrl is not a data-URI — bytes remain null */ }
+                catch (FormatException) { /* previewUrl is not a data-URI — bytes remain null */ }
             }
         }
 

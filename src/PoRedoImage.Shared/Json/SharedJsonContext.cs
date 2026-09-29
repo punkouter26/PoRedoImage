@@ -28,8 +28,6 @@ namespace PoRedoImage.Shared.Json;
 [JsonSerializable(typeof(ProcessingMetricsDto))]
 [JsonSerializable(typeof(BulkDescribeRequest))]
 [JsonSerializable(typeof(BulkDescribeResponse))]
-[JsonSerializable(typeof(BulkVariationRequest))]
-[JsonSerializable(typeof(BulkVariationResponse))]
 [JsonSerializable(typeof(BulkGenerateImageResult))]
 [JsonSerializable(typeof(BulkBatchRequest))]
 [JsonSerializable(typeof(BulkBatchItem))]

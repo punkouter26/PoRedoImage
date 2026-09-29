@@ -20,8 +20,6 @@ public enum BulkGenerateStatus
 public record BulkDescribeRequest(string ImageData, string ContentType);
 public record BulkDescribeResponse(string Description);
 
-public record BulkVariationRequest(string ImageData, string ContentType, string Prompt, string? ImageGenModelId = null);
-public record BulkVariationResponse(string ImageData, string ContentType);
 
 /// <summary>Save the caller's 10 bulk-generation prompts. Shared so the WASM client and BFF agree on shape.</summary>
 public record SavePromptsRequest(string[] Prompts);
@@ -47,8 +45,7 @@ public record SavePromptsRequest(string[] Prompts);
 public record BulkBatchRequest(
     string ImageData,
     string ContentType,
-    string[] Prompts,
-    string? ImageGenModelId = null);
+    string[] Prompts);
 
 /// <summary>One slot's outcome, emitted as a single NDJSON line the moment that slot finishes.</summary>
 /// <param name="Index">Which prompt this answers — slots complete out of order under concurrency.</param>

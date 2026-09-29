@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Features.ImageAnalysis;
+namespace PoRedoImage.Web.Features.ImageAnalysis;
 
 /// <summary>
 /// Source-generated logging (§4) for the image-analysis hot path. <c>[LoggerMessage]</c>

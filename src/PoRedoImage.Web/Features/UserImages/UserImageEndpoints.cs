@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using PoRedoImage.Application.Features.UserImages;
+using PoRedoImage.Web.Features.UserImages;
 using PoRedoImage.Domain.Entities;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Imaging;
@@ -48,11 +48,11 @@ public static class UserImageEndpoints
 
     private static async Task<IResult> ListImagesAsync(
         HttpContext context,
-        IUserImageService service,
-        ILogger<IUserImageService> logger,
+        UserImageService service,
+        ILogger<UserImageService> logger,
         CancellationToken ct)
     {
-        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Results.Unauthorized();
 
         try
@@ -73,10 +73,10 @@ public static class UserImageEndpoints
     private static async Task<IResult> SaveOriginalAsync(
         HttpContext context,
         SaveOriginalRequest request,
-        IUserImageService service,
+        UserImageService service,
         CancellationToken ct)
     {
-        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Results.Unauthorized();
 
         if (string.IsNullOrWhiteSpace(request.ImageData))
@@ -103,10 +103,10 @@ public static class UserImageEndpoints
     private static async Task<IResult> SaveResultAsync(
         HttpContext context,
         SaveResultRequest request,
-        IUserImageService service,
+        UserImageService service,
         CancellationToken ct)
     {
-        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Results.Unauthorized();
 
         if (string.IsNullOrWhiteSpace(request.ImageData))
@@ -133,10 +133,10 @@ public static class UserImageEndpoints
     private static async Task<IResult> GetImageAsync(
         string id,
         HttpContext context,
-        IUserImageService service,
+        UserImageService service,
         CancellationToken ct)
     {
-        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Results.Unauthorized();
 
         // UserImageId.TryParse is the single definition of a well-formed id — stricter than the
@@ -153,10 +153,10 @@ public static class UserImageEndpoints
     private static async Task<IResult> DeleteImageAsync(
         string id,
         HttpContext context,
-        IUserImageService service,
+        UserImageService service,
         CancellationToken ct)
     {
-        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Results.Unauthorized();
 
         if (!UserImageId.TryParse(id, out var imageId))

@@ -52,7 +52,7 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         }
 
         // Chat/text only — image generation is handled exclusively by Gemini (IImageGenerationService).
-        var chatDeployment = configuration[ConfigKeys.OpenAiChatCompletionsDeployment] ?? "gpt-4o";
+        var chatDeployment = configuration[ConfigKeys.OpenAiChatCompletionsDeployment] ?? ConfigKeys.OpenAiChatCompletionsDeploymentDefault;
         var apiKey = configuration[ConfigKeys.OpenAiKey];
 
         var (client, cred) = BuildClientWithCredential(endpoint, apiKey);
@@ -163,8 +163,23 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         + "No slurs, no profanity, no sexual content, no insults directed at a person. "
         + "If the elements describe children, keep it wholesome.";
 
+    /// <summary>
+    /// Strict JSON schema for the caption. Structured output guarantees the shape, so there is no
+    /// fence-stripping or "model wrapped it in markdown" recovery to maintain.
+    /// </summary>
+    private static readonly ChatCompletionOptions MemeCaptionOptions = new()
+    {
+        ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+            "meme_caption",
+            BinaryData.FromString("""
+                {"type":"object","properties":{"topText":{"type":"string"},"bottomText":{"type":"string"}},
+                 "required":["topText","bottomText"],"additionalProperties":false}
+                """),
+            jsonSchemaIsStrict: true),
+    };
+
     public async Task<(string TopText, string BottomText, int TokensUsed, long ElapsedMs)>
-        GenerateMemeCaptionAsync(IReadOnlyList<string> tags, CancellationToken ct = default)
+        GenerateMemeCaptionAsync(string description, IReadOnlyList<string> tags, CancellationToken ct = default)
     {
         if (_configurationError is not null) throw new InvalidOperationException(_configurationError);
         ArgumentNullException.ThrowIfNull(tags);
@@ -174,44 +189,28 @@ public sealed class AzureOpenAiService : IGenerativeAiService
         var start = Stopwatch.GetTimestamp();
 
         var systemInstruction =
-            "You are a meme caption generator. "
-            + "Respond in JSON format: {\"topText\": \"TOP CAPTION\", \"bottomText\": \"BOTTOM CAPTION\"}. "
-            + "Keep captions short (3-7 words each). Make it humorous and relatable."
+            "You are a meme caption generator. Write a top and a bottom caption, 3-7 words each. "
+            + "The joke lands on the most specific, surprising thing in the scene — not on a generic "
+            + "label — so use the description's details. Make it humorous and relatable."
             + MemeGuardrail;
 
-        var userPrompt = $"Create a funny meme caption for an image with these elements: {string.Join(", ", tags)}";
-
-        var options = new ChatCompletionOptions
-        {
-            ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat()
-        };
+        // The description carries the specifics a joke needs ("a man in a Santa hat eating cereal
+        // at a laundromat"); tags alone ("person, indoor, food") only ever produced generic captions.
+        var userPrompt = string.IsNullOrWhiteSpace(description)
+            ? $"Scene elements: {string.Join(", ", tags)}"
+            : $"Scene: {description}\nElements: {string.Join(", ", tags)}";
 
         var response = await _chatClient.CompleteChatAsync(
             [new SystemChatMessage(systemInstruction), new UserChatMessage(userPrompt)],
-            options,
+            MemeCaptionOptions,
             cancellationToken: ct);
 
         if (response.Value.Content.Count == 0)
             throw new InvalidOperationException("OpenAI returned an empty response for meme caption.");
-        var content = response.Value.Content[0].Text.Trim();
         var tokens = response.Value.Usage.TotalTokenCount;
         var elapsed = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
 
-        string cleaned;
-        if (content.Contains("```"))
-        {
-            var start2 = content.IndexOf('{');
-            var end2 = content.LastIndexOf('}');
-            cleaned = start2 >= 0 && end2 > start2
-                ? content[start2..(end2 + 1)]
-                : content;
-        }
-        else
-        {
-            cleaned = content;
-        }
-
-        using var json = System.Text.Json.JsonDocument.Parse(cleaned);
+        using var json = System.Text.Json.JsonDocument.Parse(response.Value.Content[0].Text);
         var top = json.RootElement.GetProperty("topText").GetString() ?? "";
         var bottom = json.RootElement.GetProperty("bottomText").GetString() ?? "";
 

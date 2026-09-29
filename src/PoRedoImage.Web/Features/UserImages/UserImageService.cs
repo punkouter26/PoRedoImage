@@ -3,11 +3,11 @@ using PoRedoImage.Domain.Entities;
 using PoRedoImage.Domain.Interfaces;
 using PoRedoImage.Shared.DTOs;
 
-namespace PoRedoImage.Application.Features.UserImages;
+namespace PoRedoImage.Web.Features.UserImages;
 
 public sealed class UserImageService(
     IUserImageRepository repository,
-    ILogger<UserImageService> logger) : IUserImageService
+    ILogger<UserImageService> logger)
 {
     public async Task<SaveImageResponse> SaveOriginalAsync(string userId, byte[] bytes, string contentType, string fileName, IReadOnlyList<string>? tags = null, CancellationToken ct = default)
     {

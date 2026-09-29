@@ -34,9 +34,12 @@ public static class AiServiceCatalog
     {
         [AiCapability.AnalyzeImage] =
         [
-            new(AiProviderIds.AzureComputerVision, "Azure Computer Vision", CategoryRemote, "Fastest, uses your API quota"),
+            // Gemini first, because first is the default: it returns a real sentence in ~1.7s,
+            // whereas Computer Vision's Caption is region-unavailable here and it answers with tags
+            // only — which is what meme captions were being written from.
+            new(AiProviderIds.GeminiVision, "Google Gemini Vision", CategoryRemote, "Real captions, ~2s, ~$0.0003"),
+            new(AiProviderIds.AzureComputerVision, "Azure Computer Vision", CategoryRemote, "Tags only in this region"),
             new(AiProviderIds.AzureOpenAiVision, "Azure OpenAI vision", CategoryRemote, "Best descriptions, one call"),
-            new(AiProviderIds.GeminiVision, "Google Gemini Vision", CategoryRemote, "Multimodal flash, ~$0.0003"),
             BrowserOption(AiProviderIds.BrowserFlorence2, LocalCapability.Vision),
             new(AiProviderIds.OllamaVision, "Ollama", CategoryOllama, "Local service", DevOnly: true),
         ],
@@ -44,7 +47,7 @@ public static class AiServiceCatalog
         // One entry, and that is the honest count. There used to be a second, "Gemini Imagen 3 Fast
         // — Google fast tier, ~$0.020/image". It never ran: the fast tier is constructed only when
         // Google:Imagen3FastModel is configured, and that key was set nowhere — not appsettings, not
-        // infra/main.bicep, not Key Vault — so ImageGenerationRouter always fell through to the
+        // infra/main.bicep, not Key Vault — so the image router always fell through to the
         // standard service. Picking it billed the standard ~$0.039 rate while the label promised
         // half that. A priced choice that silently resolves to the other option is worse than no
         // choice, so it is gone until the fast model is actually configured.
