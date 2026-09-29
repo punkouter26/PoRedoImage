@@ -26,8 +26,23 @@
             <FlapText Text="PoRedoImage" />
         </a>
         <NavMenu />
-        <JobTray />
-        <LoginDisplay />
+        @* One end cell for everything right of the links. The rail is a 1fr | auto | 1fr grid,
+           so the links stay centred however wide this cell grows — the cost chip and the
+           signed-in name render after first paint, and when they were flex siblings of the
+           links their arrival slid the whole nav sideways (a measured layout shift). *@
+        <div class="app-nav__end">
+            @* Session status sits together on the rail: running jobs, what the session has
+               spent, and which environment this is. *@
+            <div class="app-nav__status">
+                <JobTray />
+                <SessionCostChip />
+                @if (!Env.IsProduction())
+                {
+                    <span class="app-nav__env-badge" title="Running in @Env.Environment mode">@Env.Environment.ToUpperInvariant()</span>
+                }
+            </div>
+            <LoginDisplay />
+        </div>
     </div>
 </header>
 <ImageSessionPersistence />
@@ -58,19 +73,6 @@
     </article>
 </main>
 
-
-<footer class="app-footer">
-    <div class="app-footer__inner container-fluid">
-        <span class="app-footer__center">PoRedoImage &copy; @DateTime.UtcNow.Year</span>
-        <SessionCostChip />
-        <span class="app-footer__env">
-            @if (!Env.IsProduction())
-            {
-                <span class="app-footer__env-badge" title="Running in Development mode — Key Vault and real auth are bypassed">@Env.Environment.ToUpperInvariant()</span>
-            }
-        </span>
-    </div>
-</footer>
 
 @* Radzen hosts. Notification was already here; Dialog is what gives the gallery lightbox a
    focus trap, an Escape handler and focus restore — see Shared/GalleryLightbox.razor for why

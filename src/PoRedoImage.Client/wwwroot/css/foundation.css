@@ -30,6 +30,37 @@
    is acceptable for a stylesheet only two screens actually need. */
 @import url("../_content/Radzen.Blazor/css/default.css") layer(vendor);
 
+/* Radzen's icon font, cut down. Radzen draws its icons (grid sort arrows, checkbox tick,
+   dialog close, the Icon="…" on RadzenButton) from Material Symbols ligatures, and its
+   stylesheet made Chrome fetch the whole 3.1MB variable font on every page — including
+   pages with no Radzen icon on them. fonts/radzen-icons.woff2 is that font subset to the
+   ligatures Radzen can emit plus the names this app passes to Icon= (~96KB); rebuild it with
+   SCRIPTS/subset-radzen-icons.py after a Radzen upgrade or a new Icon name — a name missing
+   from it renders as the literal word ("arrow_upward").
+
+   It has its OWN family name, pointed at by Radzen's --rz-icon-font-family (see :root in the
+   tokens layer). Redeclaring "Material Symbols" instead does not work: Chrome keeps both
+   faces as one composite family and still downloads the original as a fallback. */
+@font-face {
+    font-family: "PoRedo Radzen Icons";
+    src: url("../fonts/radzen-icons.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 700;
+    font-display: block;
+}
+
+/* A metric-matched stand-in for Archivo Narrow while it downloads. Google Fonts serves it
+   with display=swap, so a first visit paints the flap caps in plain Arial — about 22% wider —
+   and a heading like IMAGE REGENERATION wrapped to two lines on a phone, then snapped back to
+   one when the real face arrived, dragging every control below it up 40px (a measured 0.22
+   layout shift). Scaled to Archivo Narrow's width, the fallback wraps where the real font
+   does. Archivo itself is within 1% of Arial and needs no stand-in. */
+@font-face {
+    font-family: "Archivo Narrow Fallback";
+    src: local("Arial"), local("Helvetica"), local("Roboto");
+    size-adjust: 82%;
+}
+
 /* ═══ Tokens ═════════════════════════════════════════════════════════════ */
 
 @layer tokens {
@@ -60,9 +91,13 @@
             rgba(255,255,255,0.055) 0 1px,
             rgba(0,0,0,0.05) 1px 2px,
             rgba(255,255,255,0.02) 2px 4px),
-        linear-gradient(180deg, #9DA3AB 0%, #6E747D 42%, #555A62 58%, #7C828A 100%);
+        linear-gradient(180deg, #C3C8CE 0%, #A4AAB2 42%, #8F959D 58%, #A8AEB5 100%);
     /* Ink on steel. Steel is a LIGHT surface, so every board grey is illegal on it —
-       this is the only text colour the rails may use (#14161a on #6E747D ≈ 5.6:1). */
+       this is the only text colour the rails may use. The gradient's darkest stop is what
+       text has to clear, and rail text sits right on it (vertically centred = the 42–58%
+       band). It used to bottom out at #555A62, where this ink measured 2.2:1; #8F959D gives
+       5.0:1 at the darkest point and more everywhere else. Do not darken the stops again
+       without re-measuring against the 58% stop. */
     --steel-ink:     #22252b;
 
     /* Row lamp — amber dot matrix, lit only while a row is WORKING. */
@@ -78,7 +113,7 @@
     --status-failed:  var(--cancel-red);
 
     /* ── Type families ──────────────────────────────────────────────────── */
-    --font-flap: 'Archivo Narrow', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+    --font-flap: 'Archivo Narrow', 'Archivo Narrow Fallback', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
     --font-ui:   'Archivo', 'Helvetica Neue', Arial, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -119,6 +154,8 @@
     --radius-full: 0;
     --frame: 6px;              /* steel frame thickness */
     --rail-max: 1280px;        /* the gantry's measure — header, footer, board */
+    --tabbar-h: 0px;           /* phone bottom nav; set below md in app.css */
+    --rz-icon-font-family: "PoRedo Radzen Icons";  /* the subset above; beats Radzen's vendor-layer value */
 
     /* ── Depth: neutral, offset, soft. No colored halos. ────────────────── */
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.55);
@@ -510,6 +547,9 @@ input, progress { accent-color: var(--amber); }
 
 .text-start  { text-align: left; }
 .text-center { text-align: center; }
+/* The reset caps <p> at 68ch, left-anchored, so a paragraph in a centred block sat off to
+   the left of its own heading. */
+.text-center p { margin-inline: auto; }
 .text-end    { text-align: right; }
 .text-uppercase { text-transform: uppercase; }
 .text-nowrap { white-space: nowrap; }

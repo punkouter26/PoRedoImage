@@ -2,31 +2,68 @@
 @attribute [Authorize]
 @inherits FeaturePageBase
 @inject IJSRuntime JSRuntime
+@using PoRedoImage.Client.Models
 
 <PageTitle>Image Regeneration — PoRedoImage</PageTitle>
 
-<FeatureShell IconClass="bi-palette2"
-              Title="Image Regeneration"
-              Description="Upload a photo and AI will create a brand-new artistic version using Gemini."
-              ModelBadge="Gemini">
-    <ChildContent>
+<FeatureShell Title="Image Regeneration" ModelBadge="Gemini">
 
     @if (!isProcessing && !isComplete)
     {
         <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
-        <StyleRecipeDrawer OnRecipeSelected="HandleRecipeSelected" CurrentRecipeId="@_activeRecipe?.Id" />
         <ImageUploadPanel
-            ShowDescriptionLength="true"
             ButtonLabel="Process Image"
             ButtonIcon="bi-cpu"
-            DescriptionLength="@descriptionLength"
             @bind-ImagePreviewUrl="@imagePreviewUrl"
             ErrorMessage="@errorMessage"
             CanProcess="@canProcessImage"
             OnFileChange="LoadFile"
             OnImageIntake="HandleImageIntake"
-            OnProcessClicked="ProcessImage"
-            OnDescriptionLengthChanged="@(l => descriptionLength = l)" />
+            OnProcessClicked="ProcessImage">
+            @* Style and detail side by side. The style used to be a collapsible card of 19
+               recipe tiles above the upload zone — a whole screen of browsing to make one pick,
+               and no way to un-pick once you had. A grouped select says the same thing in a
+               line, and "None" is its first option. *@
+            <div class="options-row">
+                <div>
+                    <label class="form-label" for="regen-style">Style</label>
+                    <select id="regen-style" class="form-control form-control-sm"
+                            value="@(_activeRecipe?.Id ?? "")" @onchange="OnRecipeChanged">
+                        <option value="">None — keep the photo's look</option>
+                        @foreach (var group in StyleRecipeCatalog.All.GroupBy(r => r.Category))
+                        {
+                            <optgroup label="@group.Key">
+                                @foreach (var recipe in group)
+                                {
+                                    <option value="@recipe.Id">@recipe.Title</option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                </div>
+                @* The sub-labels used to read "~200 / ~350 / ~500 words". They no longer do: the
+                   enhancement step produces a comma-separated visual specification, so a preset
+                   buys more distinct visual clauses, not more prose. role/aria-checked are explicit
+                   because RadzenSelectBar emits bare divs with no role or checked state. *@
+                <div>
+                    <span class="form-label" id="regen-detail">Prompt detail</span>
+                    <RadzenSelectBar TValue="int" @bind-Value="descriptionLength" Size="ButtonSize.Small"
+                                     role="radiogroup" aria-labelledby="regen-detail">
+                        <Items>
+                            @foreach (var (value, label) in DetailPresets)
+                            {
+                                <RadzenSelectBarItem Value="@value" Text="@label" role="radio"
+                                                     aria-checked="@((descriptionLength == value).ToString().ToLowerInvariant())" />
+                            }
+                        </Items>
+                    </RadzenSelectBar>
+                </div>
+            </div>
+            @if (_activeRecipe is not null)
+            {
+                <p class="options-hint"><i class="bi @_activeRecipe.Icon me-1" aria-hidden="true"></i>@_activeRecipe.Description</p>
+            }
+        </ImageUploadPanel>
     }
 
     @if (isProcessing)
@@ -41,7 +78,8 @@
                       DividerIcon="bi-arrows-expand-vertical"
                       OnDownloadOriginal="DownloadOriginal"
                       ResultImageUrl="@regeneratedImageUrl"
-                      ResultFileName="regenerated.png">
+                      ResultFileName="regenerated.png"
+                      ElapsedSeconds="@(analysisResult?.Metrics?.TotalProcessingTimeMs / 1000.0)">
             <RightSide>
                 @if (regeneratedImageUrl != null)
                 {
@@ -58,7 +96,7 @@
                 @if (regeneratedImageUrl != null)
                 {
                     <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="DownloadRegenerated">
-                        <i class="bi bi-download me-2"></i>Save &amp; Download Result
+                        <i class="bi bi-download me-1"></i>Download
                     </button>
                 }
             </PrimaryAction>
@@ -70,10 +108,6 @@
                             <span><i class="bi bi-text-left me-1"></i>AI Description</span>
                             <span class="description-accordion__meta">
                                 @(imageDescription.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length) words
-                                @if (analysisResult?.Metrics != null)
-                                {
-                                    <span class="description-accordion__time ms-2">@((analysisResult.Metrics.TotalProcessingTimeMs / 1000.0).ToString("F1"))s</span>
-                                }
                                 <i class="bi @(_descExpanded ? "bi-chevron-up" : "bi-chevron-down") ms-2"></i>
                             </span>
                         </button>
@@ -98,17 +132,6 @@
             </FooterContent>
         </ResultsPanel>
     }
-    </ChildContent>
-
-    <StickyAction>
-        @if (!isProcessing && !isComplete)
-        {
-            <button class="flap-btn flap-btn--primary mobile-sticky-cta__btn"
-                    @onclick="ProcessImage" disabled="@(!canProcessImage)">
-                <i class="bi bi-cpu me-1"></i>Process Image
-            </button>
-        }
-    </StickyAction>
 </FeatureShell>
 
 @code {
@@ -117,16 +140,15 @@
     private int descriptionLength = 350;
     private ImageAnalysisResponse? analysisResult;
     private bool _descExpanded;
-    private PoRedoImage.Client.Models.StyleRecipe? _activeRecipe;
+    private StyleRecipe? _activeRecipe;
 
-    private void HandleRecipeSelected(PoRedoImage.Client.Models.StyleRecipe recipe)
-    {
-        _activeRecipe = recipe;
-        NotificationService.Notify(NotificationSeverity.Info, "Recipe Applied",
-            $"{recipe.Title}: {recipe.Description}", duration: 3500);
-    }
+    private static readonly (int Value, string Label)[] DetailPresets =
+        [(200, "Quick"), (350, "Standard"), (500, "Detailed")];
 
-    protected override void OnGalleryImageSelected()
+    private void OnRecipeChanged(ChangeEventArgs e) =>
+        _activeRecipe = StyleRecipeCatalog.All.FirstOrDefault(r => r.Id == e.Value?.ToString());
+
+    protected override void OnImageChanged()
     {
         regeneratedImageUrl = null;
         analysisResult = null;
@@ -268,14 +290,6 @@
             Logger.LogError(ex, "Error processing image");
             try { await InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
         }
-    }
-
-    private async Task DownloadOriginal()
-    {
-        if (imagePreviewUrl == null) return;
-        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", imagePreviewUrl, selectedFile?.Name ?? "original.jpg");
-        if (!ok) errorMessage = "There was a problem downloading the image.";
-        else Logger.LogInformation("Original image download initiated");
     }
 
     private async Task DownloadRegenerated()

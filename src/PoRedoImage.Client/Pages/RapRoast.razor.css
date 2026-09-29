@@ -9,7 +9,10 @@
    a callout is the AI side-tab tell; the refusal now reads as a full amber-framed
    cell, which is also how every other state in this world announces itself. */
 
-.roast-disclaimer { margin-top: 0.75rem; font-size: var(--text-xs); color: var(--steel-dark); }
+.roast-disclaimer { margin-top: 0.6rem; font-size: var(--text-xs); color: var(--steel-dark); }
+.roast-disclaimer summary { cursor: pointer; color: var(--steel); width: fit-content; }
+.roast-disclaimer summary:hover { color: var(--amber); }
+.roast-disclaimer[open] summary { margin-bottom: 0.35rem; }
 
 /* Explicit toggle. A parental-advisory sticker rather than a switch, because that is the
    universally read symbol for exactly this setting — and it earns the row without adding
@@ -18,8 +21,8 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    margin-top: 0.75rem;
-    padding: 0.55rem 0.7rem;
+    margin-top: 0.6rem;
+    padding: 0.45rem 0.7rem;
     border: 1px solid var(--rule-strong);
     background: var(--flap-black);
     cursor: pointer;
@@ -196,6 +199,8 @@
     color: var(--steel-dark);
 }
 
+.roast-seen__filtered { color: var(--steel-dark); font-weight: 400; }
+
 .roast-seen__thin { margin-top: 0.5rem; font-size: var(--text-xs); color: var(--steel); }
 
 /* Structured scene slots. A definition list is the correct semantic — each label
@@ -341,23 +346,23 @@
 
 .roast-export {
     margin-top: 1rem;
-    padding: 0.85rem 1rem;
+    padding: 0.6rem 0.75rem;
     background: var(--flap-black);
     border: 1px solid var(--rule-strong);
 }
 
 .roast-export__label {
-    display: block;
     font-family: var(--font-flap);
     font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.16em;
     color: var(--steel-dark);
-    margin-bottom: 0.6rem;
 }
 
-.roast-export__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.roast-export__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+.roast-export__style { width: auto; min-width: 0; flex: 1 1 14rem; max-width: 20rem; }
 
 .roast-export__progress { margin-top: 0.75rem; }
 
@@ -385,4 +390,18 @@
 
 @media (prefers-reduced-motion: reduce) {
     .roast-export__bar::before { transition: none; }
+}
+
+/* ── Result: media beside the bars ──────────────────────────────────────────
+   Stacked below lg, in the order you use it: photo, track, exports, then the bars. */
+@media (min-width: 1024px) {
+    .roast-result {
+        display: grid;
+        grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+        column-gap: var(--space-4);
+        align-items: start;
+    }
+
+    /* The column's first block owns the top edge, so the two columns start level. */
+    .roast-result__script > :first-child { margin-top: 0; }
 }

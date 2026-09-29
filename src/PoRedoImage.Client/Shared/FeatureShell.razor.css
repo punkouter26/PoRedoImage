@@ -28,6 +28,13 @@
     max-width: 46rem;
 }
 
+/* From lg the focused pages are two columns themselves — the upload panel puts the photo
+   beside its options, Rap Roast puts the track beside the bars — so the measure is two
+   comfortable columns rather than one 46rem column with half the screen empty beside it. */
+@media (min-width: 1024px) {
+    .feature-shell--focused { max-width: 72rem; }
+}
+
 /* ── Split ────────────────────────────────────────────────────────────────
    The rail is sized to its contents (an upload panel and its controls), not to a
    fraction; the workspace takes the rest. minmax(0, 1fr) rather than 1fr because a
@@ -46,21 +53,19 @@
 .feature-shell__rail { min-width: 0; }
 .feature-shell__work { min-width: 0; }
 
-/* ── Board ────────────────────────────────────────────────────────────────
-   Full width. Nothing to constrain: the content is a grid of its own. */
-.feature-shell--board .feature-shell__body { max-width: none; }
+/* ── Header ───────────────────────────────────────────────────────────────
+   One line: title and the model badge. Wraps under the title on a phone. */
+.feature-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem var(--space-3);
+    margin-bottom: var(--space-3);
+}
 
 /* ── Vertical rhythm ─────────────────────────────────────────────────────── */
 .feature-shell { padding-block: var(--space-4) var(--space-5); }
 
 @media (max-width: 639.98px) {
     .feature-shell { padding-inline: var(--space-2); padding-block: var(--space-3) var(--space-4); }
-}
-
-/* Room for the fixed action rail, so the last control on the page is never parked
-   underneath it. Applied unconditionally on small screens rather than via a marker
-   class the way it used to be — a page that forgets the class gets an unreachable
-   control, and that is not a failure worth leaving available. */
-@media (max-width: 767.98px) {
-    .feature-shell:has(~ .mobile-sticky-cta) { padding-bottom: 5rem; }
 }

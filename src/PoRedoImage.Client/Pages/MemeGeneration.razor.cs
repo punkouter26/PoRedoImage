@@ -46,7 +46,7 @@ public partial class MemeGeneration : FeaturePageBase
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        // Eager-load the catalog so toggling the switch is instant.
+        // Eager-load the catalog so switching to Template is instant.
         _ = LoadTemplatesAsync();
     }
 
@@ -64,9 +64,9 @@ public partial class MemeGeneration : FeaturePageBase
         StateHasChanged();
     }
 
-    private void OnTemplateToggleChanged(ChangeEventArgs e)
+    private void SetMode(bool useTemplate)
     {
-        _useTemplate = e.Value is bool b && b;
+        _useTemplate = useTemplate;
         if (_useTemplate && _templates is null)
             _ = LoadTemplatesAsync();
     }
@@ -88,7 +88,7 @@ public partial class MemeGeneration : FeaturePageBase
         _zoneTexts[index] = value;
     }
 
-    protected override void OnGalleryImageSelected()
+    protected override void OnImageChanged()
     {
         analysisResult = null;
     }
@@ -288,14 +288,6 @@ public partial class MemeGeneration : FeaturePageBase
             isComplete = string.IsNullOrEmpty(errorMessage);
             try { StateHasChanged(); } catch (ObjectDisposedException) { }
         }
-    }
-
-    private async Task DownloadOriginal()
-    {
-        if (imagePreviewUrl == null) return;
-        var ok = await JSRuntime.InvokeAsync<bool>("downloadImage", imagePreviewUrl, selectedFile?.Name ?? "original.jpg");
-        if (!ok) errorMessage = "There was a problem downloading the image.";
-        else Logger.LogInformation("Original image download initiated");
     }
 
     private async Task DownloadMeme()

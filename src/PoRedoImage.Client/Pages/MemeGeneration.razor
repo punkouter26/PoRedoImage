@@ -5,53 +5,48 @@
 
 <PageTitle>Meme Generation — PoRedoImage</PageTitle>
 
-<FeatureShell IconClass="bi-emoji-laughing"
-              Title="Meme Generation"
-              Description="Upload a photo and AI will write a witty caption and overlay it on your image."
-              Steps="@(new[] {
-                  ("bi-upload", "Upload photo"),
-                  ("bi-cpu", "AI writes caption"),
-                  ("bi-image", "Download your meme")
-              })">
-    <ChildContent>
+<FeatureShell Title="Meme Generation">
 
     @if (!isProcessing && !isComplete)
     {
         <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
         <ImageUploadPanel
-            ShowDescriptionLength="false"
             ButtonLabel="@(_useTemplate ? "Render Template" : "Generate Meme")"
             ButtonIcon="@(_useTemplate ? "bi-grid-3x3-gap" : "bi-emoji-laughing")"
-            DescriptionLength="350"
             @bind-ImagePreviewUrl="@imagePreviewUrl"
             ErrorMessage="@errorMessage"
             CanProcess="@canProcessImage"
             OnFileChange="LoadFile"
             OnImageIntake="HandleImageIntake"
-            OnProcessClicked="ProcessImage" />
-
-        @* ── Idea #17 — Meme Template Library toggle ────────────── *@
-        <div class="meme-template-card mt-3 p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-grid-3x3-gap-fill"></i>
-                <strong>Template Library</strong>
-                <div class="form-check form-switch ms-auto">
-                    <input class="form-check-input" type="checkbox" id="tplToggle"
-                           checked="@_useTemplate" @onchange="OnTemplateToggleChanged" />
-                    <label class="form-check-label small" for="tplToggle">
-                        @(_useTemplate ? "On" : "Off")
+            OnProcessClicked="ProcessImage">
+            @* Who writes the caption: one two-way choice. It was an on/off switch in its own card
+               plus a paragraph explaining what "off" meant — and it sat BELOW the Generate button
+               it changes, so you were asked to submit before you were asked how. *@
+            <fieldset class="flap-fieldset mt-3">
+                <legend class="flap-fieldset__legend">Caption</legend>
+                <div class="flap-choices">
+                    <label class="flap-choice flap-choice--stack @(!_useTemplate ? "flap-choice--active" : null)">
+                        <input type="radio" name="meme-mode" checked="@(!_useTemplate)" @onchange="@(() => SetMode(false))" />
+                        <span class="flap-choice__name">AI writes it</span>
+                        <span class="flap-choice__meta">A witty caption from your photo</span>
+                    </label>
+                    <label class="flap-choice flap-choice--stack @(_useTemplate ? "flap-choice--active" : null)">
+                        <input type="radio" name="meme-mode" checked="@_useTemplate" @onchange="@(() => SetMode(true))" />
+                        <span class="flap-choice__name">Template</span>
+                        <span class="flap-choice__meta">Classic format, your words</span>
                     </label>
                 </div>
-            </div>
+            </fieldset>
+
             @if (_useTemplate)
             {
                 @if (_templates is null)
                 {
-                    <div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Loading templates…</div>
+                    <div class="text-muted small mt-2"><span class="spinner-border spinner-border-sm me-1"></span>Loading templates…</div>
                 }
                 else
                 {
-                    <div class="meme-template-grid" role="radiogroup" aria-label="Meme template">
+                    <div class="meme-template-grid mt-2" role="radiogroup" aria-label="Meme template">
                         @foreach (var t in _templates)
                         {
                             var isSelected = _selectedTemplateId == t.Id;
@@ -69,7 +64,7 @@
 
                     @if (_selectedTemplate is not null)
                     {
-                        <div class="meme-template-zones mt-3">
+                        <div class="meme-template-zones mt-2">
                             <p class="small text-muted mb-2">
                                 <i class="bi bi-info-circle me-1"></i>@_selectedTemplate.Description
                             </p>
@@ -91,15 +86,7 @@
                     }
                 }
             }
-            else
-            {
-                <p class="small text-muted mb-0">
-                    <i class="bi bi-lightbulb me-1"></i>
-                    AI will write a witty caption automatically. Toggle on to pick from
-                    20 classic formats instead.
-                </p>
-            }
-        </div>
+        </ImageUploadPanel>
     }
 
     @if (isProcessing)
@@ -114,7 +101,8 @@
                       DividerIcon="bi-emoji-laughing"
                       OnDownloadOriginal="DownloadOriginal"
                       ResultImageUrl="@MemeImageUrl"
-                      ResultFileName="meme.png">
+                      ResultFileName="meme.png"
+                      ElapsedSeconds="@(analysisResult?.Metrics?.TotalProcessingTimeMs / 1000.0)">
             <RightSide>
                 @if (MemeImageUrl is not null)
                 {
@@ -151,29 +139,10 @@
                 @if (!string.IsNullOrEmpty(analysisResult?.MemeImageData))
                 {
                     <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="DownloadMeme">
-                        <i class="bi bi-download me-2"></i>Save &amp; Download Meme
+                        <i class="bi bi-download me-1"></i>Download
                     </button>
                 }
             </PrimaryAction>
-            <AdditionalMoreOptions>
-                @if (analysisResult?.Metrics != null)
-                {
-                    <span class="flap-btn flap-btn--sm">
-                        <i class="bi bi-clock me-1"></i>@((analysisResult.Metrics.TotalProcessingTimeMs / 1000.0).ToString("F1"))s
-                    </span>
-                }
-            </AdditionalMoreOptions>
         </ResultsPanel>
     }
-    </ChildContent>
-
-    <StickyAction>
-        @if (!isProcessing && !isComplete)
-        {
-            <button class="flap-btn flap-btn--primary mobile-sticky-cta__btn"
-                    @onclick="ProcessImage" disabled="@(!canProcessImage)">
-                <i class="bi @(_useTemplate ? "bi-grid-3x3-gap" : "bi-emoji-laughing") me-1"></i>@(_useTemplate ? "Render Template" : "Generate Meme")
-            </button>
-        }
-    </StickyAction>
 </FeatureShell>

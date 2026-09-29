@@ -1,7 +1,8 @@
+@* The strip on each feature page is for PICKING a saved photo: tap to use, zoom to look.
+   Deleting (with undo) used to live here too, duplicating the Gallery page's delete with a
+   second, different confirm/undo flow. Managing images is the Gallery page's job. *@
 @inject HttpClient Http
 @inject ImageSessionService SessionService
-@inject NotificationService NotificationService
-@inject PoRedoImage.Client.Services.UserImageSaveService UserImageSave
 @inject IJSRuntime JSRuntime
 @inject DialogService DialogService
 @inject ILogger<MyImagesGallery> Logger
@@ -44,12 +45,6 @@ else if (_images.Count > 0)
                             aria-label="@($"View {item.FileName} full size")"
                             @onclick="@(() => OpenLightboxAsync(item))">
                         <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>
-                    </button>
-                    <button class="gallery-thumb__delete" title="Delete from My Images"
-                            aria-label="@($"Delete {item.FileName}")"
-                            disabled="@(_deletingId == item.Id)"
-                            @onclick="@(() => DeleteAsync(item))">
-                        <i class="bi @(_deletingId == item.Id ? "bi-hourglass" : "bi-x-lg")" aria-hidden="true"></i>
                     </button>
                 </div>
             }
@@ -94,22 +89,6 @@ else
     </div>
 }
 
-@* ── Undo strip. Real undo, not a cosmetic one: the bytes are read before the DELETE
-      goes out, so restoring re-saves the same image (under a new id). ───────────── *@
-@if (_undo is not null)
-{
-    <div class="gallery-undo" role="status">
-        <img class="gallery-undo__thumb" src="@_undo.PreviewUrl" alt="" />
-        <span class="gallery-undo__text">Deleted <strong>@_undo.FileName</strong></span>
-        <button class="flap-btn flap-btn--sm" @onclick="UndoDeleteAsync" disabled="@_restoring">
-            <i class="bi @(_restoring ? "bi-hourglass" : "bi-arrow-counterclockwise") me-1"></i>Undo
-        </button>
-        <button class="gallery-undo__dismiss" @onclick="@(() => _undo = null)" aria-label="Dismiss">
-            <i class="bi bi-x"></i>
-        </button>
-    </div>
-}
-
 @code {
     [Parameter] public EventCallback<GalleryItem> OnImageSelected { get; set; }
 
@@ -122,12 +101,6 @@ else
     /// and only one of them is reassuring.
     /// </summary>
     private string? _loadError;
-    private string? _deletingId;
-    private PendingUndo? _undo;
-    private bool _restoring;
-
-    /// <summary>A just-deleted image held in memory so <see cref="UndoDeleteAsync"/> can re-save it.</summary>
-    private sealed record PendingUndo(GalleryItem Item, byte[] Bytes, string FileName, string PreviewUrl);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -193,73 +166,6 @@ else
         }
     }
 
-    private async Task DeleteAsync(GalleryItem item)
-    {
-        if (_deletingId is not null) return;
-        _deletingId = item.Id;
-        StateHasChanged();
-        try
-        {
-            // Read the bytes BEFORE deleting — once the blob is gone the undo has nothing to
-            // restore from. A failed read only costs the undo affordance, not the delete.
-            byte[]? bytes = null;
-            try { bytes = await Http.GetByteArrayAsync(item.ImageUrl); }
-            catch (Exception ex) { Logger.LogDebug(ex, "Could not buffer {Id} for undo", item.Id); }
-
-            var response = await Http.DeleteAsync($"/api/user-images/{item.Id}");
-            if (!response.IsSuccessStatusCode)
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Delete failed",
-                    $"Server returned {(int)response.StatusCode}. The image is still in your gallery.",
-                    duration: 6000);
-                return;
-            }
-
-            _images.RemoveAll(i => i.Id == item.Id);
-            _undo = bytes is null
-                ? null
-                : new PendingUndo(item, bytes, item.FileName,
-                    $"data:{item.ContentType};base64,{Convert.ToBase64String(bytes)}");
-
-            if (_undo is null)
-                NotificationService.Notify(NotificationSeverity.Info, "Deleted",
-                    $"{item.FileName} was removed.", duration: 3000);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to delete gallery image {Id}", item.Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Delete failed", ex.Message, duration: 6000);
-        }
-        finally
-        {
-            _deletingId = null;
-            StateHasChanged();
-        }
-    }
-
-    private async Task UndoDeleteAsync()
-    {
-        if (_undo is null || _restoring) return;
-        _restoring = true;
-        try
-        {
-            // Restoring mints a new id — the original row and blob are already gone. Route
-            // originals and results to their own endpoints so the Kind badge survives.
-            var savedId = _undo.Item.Kind == UserImageKind.Original
-                ? await UserImageSave.SaveOriginalAsync(_undo.Bytes, _undo.Item.ContentType, _undo.FileName, _undo.Item.Tags)
-                : await UserImageSave.SaveResultAsync(_undo.Bytes, _undo.Item.ContentType, _undo.Item.Kind, _undo.Item.Tags);
-
-            if (savedId is null) return; // SaveXxxAsync already raised its own failure toast
-            _undo = null;
-            await LoadAsync();
-        }
-        finally
-        {
-            _restoring = false;
-            StateHasChanged();
-        }
-    }
-
     /// <summary>
     /// Opens the full-size view as a real modal and acts on what the viewer chose.
     /// </summary>
@@ -286,9 +192,6 @@ else
                 break;
         }
     }
-
-    private static string FormatSize(long bytes) =>
-        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:0.#} MB" : $"{bytes / 1024.0:0} KB";
 
     private static string KindClass(UserImageKind kind) => kind switch
     {

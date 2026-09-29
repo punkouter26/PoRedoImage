@@ -35,6 +35,20 @@ window.poUx = (function () {
     const CAPTURE_MAX_EDGE = 1920;
     const CAPTURE_QUALITY = 0.92;
 
+    // ── Menus ───────────────────────────────────────────────────────────────
+    // <details class="menu"> is the results toolbar's Send-to / Remix dropdown. Native details
+    // never closes on its own, so an outside click, Escape, or picking an item closes it here.
+    function closeMenus(except) {
+        document.querySelectorAll('details.menu[open]').forEach(function (d) {
+            if (d !== except) d.removeAttribute('open');
+        });
+    }
+    document.addEventListener('click', function (e) {
+        const menu = e.target.closest && e.target.closest('details.menu');
+        closeMenus(menu && !e.target.closest('.menu__item') ? menu : null);
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(null); });
+
     function extensionFor(type) {
         return type === 'image/png' ? 'png' : 'jpg';
     }

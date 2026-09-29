@@ -20,15 +20,11 @@ namespace PoRedoImage.Client.Pages;
 
 /// <summary>
 /// Code-behind for <c>BulkGenerate.razor</c>. The markup file keeps its directives and template;
-/// all logic lives here so neither half has to be read through the other.
+/// all logic lives here so neither half has to be read through the other. Upload, paste/drop,
+/// gallery pick and the original's auto-save come from <see cref="FeaturePageBase"/>.
 /// </summary>
 public partial class BulkGenerate
 {
-    private IBrowserFile? _selectedFile;
-    private byte[]? _imageBytes;
-    private string _imageContentType = "image/jpeg";
-    private string? _imagePreviewUrl;
-    private string? _uploadError;
     private string[] _prompts = DefaultPrompts.All.ToArray();
     private int _activePromptCount => _prompts.Count(p => !string.IsNullOrWhiteSpace(p));
     private List<BulkGenerateImageResult> _results = [];
@@ -36,8 +32,6 @@ public partial class BulkGenerate
     private bool _isGenerating;
     private bool _isSaving;
     private HashSet<int> _favorites = [];
-    private string? _userId;
-    private MyImagesGallery? _gallery;
     private BulkGallery? _bulkGallery;
     private CancellationTokenSource? _cts;
     private bool _zipping;
@@ -49,7 +43,7 @@ public partial class BulkGenerate
     private sealed record BulkSavedState(BulkGenerateImageResult[] Results);
 
     // Hoisted out of OnAfterRenderAsync so the JsonSerializerOptions graph (with its metadata
-    // caches) is built once instead of per circuit-restore attempt.
+    // caches) is built once instead of per restore.
     private static readonly System.Text.Json.JsonSerializerOptions RestoreJsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -57,12 +51,7 @@ public partial class BulkGenerate
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        _userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-
-        // Cross-page state: record this as the last visited feature route so
-        // the Active Image Bar can deep-link back here.
-        SessionService.RecordFeatureVisit("/bulk-generate");
+        await base.OnInitializedAsync();
 
         // A prompt handed over from Style Director lands in slot 1, so the run the user just
         // asked for is the first one generated. Taken once: coming back to this page later
@@ -82,34 +71,19 @@ public partial class BulkGenerate
         // so the page total and the session total can't disagree. Non-critical: a failure just
         // hides the pricing note.
         await Cost.EnsureLoadedAsync();
-
-        if (SessionService.HasImage && _imagePreviewUrl is null)
-        {
-            _imagePreviewUrl = SessionService.PreviewUrl;
-            if (SessionService.Bytes is not null)
-            {
-                _imageBytes = SessionService.Bytes;
-            }
-            else if (_imagePreviewUrl is not null)
-            {
-                try
-                {
-                    var idx = _imagePreviewUrl.IndexOf(',');
-                    if (idx >= 0) _imageBytes = Convert.FromBase64String(_imagePreviewUrl[(idx + 1)..]);
-                }
-                catch { /* bytes unavailable */ }
-            }
-        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Restore bulk generation results from localStorage after circuit reconnect or tab reopen
+        await base.OnAfterRenderAsync(firstRender);
+
+        // The component is rebuilt on every visit, so a batch that finished while the user was
+        // on another page (or before a reload) is restored from localStorage.
         if (firstRender && _results.Count == 0)
         {
             try
             {
-                var savedJson = await JSRuntime.InvokeAsync<string?>("bulkStateManager.load");
+                var savedJson = await Js.InvokeAsync<string?>("bulkStateManager.load");
                 if (!string.IsNullOrEmpty(savedJson))
                 {
                     var state = System.Text.Json.JsonSerializer.Deserialize<BulkSavedState>(savedJson, RestoreJsonOpts);
@@ -126,60 +100,20 @@ public partial class BulkGenerate
         }
     }
 
-    private async Task LoadFile(InputFileChangeEventArgs e)
+    /// <summary>A new photo means the board shows results for a photo that is no longer loaded.</summary>
+    protected override void OnImageChanged()
     {
-        _selectedFile = e.File;
-        _uploadError = null;
-        _imagePreviewUrl = null;
-        _imageBytes = null;
-        _results = [];
-        _completedCount = 0;
-
-        var (result, error) = await ImageLoadHelper.LoadAsync(_selectedFile);
-        if (error is not null) { _uploadError = error; _selectedFile = null; return; }
-
-        _imageBytes = result!.Bytes;
-        _imageContentType = result.ContentType;
-        _imagePreviewUrl = result.PreviewUrl;
-        SessionService.SetImage(result!.PreviewUrl, result.ContentType, _selectedFile!.Name, result.Bytes);
-        if (_userId is not null && result.Bytes is not null)
-            _ = AutoSaveOriginalAsync(result.Bytes, result.ContentType, _selectedFile!.Name);
-        StateHasChanged();
-    }
-
-    /// <summary>Clipboard paste / drop-anywhere intake — mirrors <see cref="LoadFile"/>.</summary>
-    private void HandleImageIntake(IntakeImage payload)
-    {
-        if (payload.Error is not null) { _uploadError = payload.Error; StateHasChanged(); return; }
-        var bytes = payload.Decode();
-        if (bytes is null) { _uploadError = "The pasted image could not be read."; StateHasChanged(); return; }
-
-        _selectedFile = null;
-        _uploadError = null;
         _results = [];
         _completedCount = 0;
         _favorites = [];
-        _imageBytes = bytes;
-        _imageContentType = payload.ContentType ?? "image/png";
-        _imagePreviewUrl = $"data:{_imageContentType};base64,{payload.Base64}";
-
-        var fileName = payload.FileName ?? "pasted-image.png";
-        SessionService.SetImage(_imagePreviewUrl, _imageContentType, fileName, bytes);
-        if (_userId is not null)
-            _ = AutoSaveOriginalAsync(bytes, _imageContentType, fileName);
-
-        NotificationService.Notify(NotificationSeverity.Success,
-            payload.Source == "drop" ? "Image dropped" : "Image pasted",
-            $"{fileName} is ready to generate from.", duration: 2500);
-        StateHasChanged();
     }
 
     private async Task StartGeneration()
     {
-        if (_imageBytes is null || _imagePreviewUrl is null) return;
+        if (ActiveImage() is not var (imageBytes, imageContentType)) return;
 
         // Clear any previously saved session state before starting a new batch
-        await JSRuntime.InvokeVoidAsync("bulkStateManager.clear");
+        await Js.InvokeVoidAsync("bulkStateManager.clear");
         _cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         _isGenerating = true;
         _completedCount = 0;
@@ -207,7 +141,7 @@ public partial class BulkGenerate
         {
             // Use GPT-4o vision via API to get a detailed physical description of the person
             var descResp = await Http.PostAsJsonAsync("/api/bulk-generate/describe",
-                new BulkDescribeRequest(Convert.ToBase64String(_imageBytes), _imageContentType), SharedJsonOptions.Default);
+                new BulkDescribeRequest(Convert.ToBase64String(imageBytes), imageContentType), SharedJsonOptions.Default);
             descResp.EnsureSuccessStatusCode();
             var descResult = await descResp.Content.ReadFromJsonAsync<BulkDescribeResponse>(SharedJsonOptions.Default);
             Cost.RecordVision(1);
@@ -248,8 +182,8 @@ public partial class BulkGenerate
             {
                 Content = JsonContent.Create(
                     new BulkBatchRequest(
-                        Convert.ToBase64String(_imageBytes),
-                        _imageContentType,
+                        Convert.ToBase64String(imageBytes),
+                        imageContentType,
                         finalPrompts,
                         AiSelection.Get(AiCapability.GenerateImage)),
                     options: SharedJsonOptions.Default),
@@ -293,7 +227,7 @@ public partial class BulkGenerate
                     slot.Status = BulkGenerateStatus.Failed;
                     slot.ErrorMessage = item.Error ?? "Generation failed for this variation.";
                     Logger.LogError("Bulk slot {Index} failed: {Error}", item.Index, slot.ErrorMessage);
-                    _ = Audio.FailureAsync();
+                    _ = Feedback.FailureAsync();
                 }
                 else
                 {
@@ -308,8 +242,8 @@ public partial class BulkGenerate
 
                 StateHasChanged();
                 Jobs.Update(trayJob, $"{_results.Count(r => r.Status != BulkGenerateStatus.Processing)} of {_results.Count} finished");
-                // Persist results to localStorage so they survive circuit disconnection
-                _ = JSRuntime.InvokeVoidAsync("bulkStateManager.save",
+                // Persist results to localStorage so they survive leaving the page or a reload
+                _ = Js.InvokeVoidAsync("bulkStateManager.save",
                     System.Text.Json.JsonSerializer.Serialize(new BulkSavedState(_results.ToArray()), RestoreJsonOpts)).AsTask();
             }
             // Any slot the server never reported is a slot that did not land — mark it rather than
@@ -328,7 +262,7 @@ public partial class BulkGenerate
                     NotificationService.Notify(NotificationSeverity.Error, "All Failed", "All generations failed. Check each card for details.", duration: 7000);
 
                 // Arrival chime when at least one variation completed, otherwise the failure cue.
-                _ = _completedCount > 0 ? Audio.SuccessAsync("Bulk Generate") : Audio.FailureAsync();
+                _ = _completedCount > 0 ? Feedback.SuccessAsync("Bulk Generate") : Feedback.FailureAsync();
             }
         }
         catch (OperationCanceledException)
@@ -357,29 +291,6 @@ public partial class BulkGenerate
     private void CancelGeneration()
     {
         _cts?.Cancel();
-    }
-
-    private void ApplyGalleryImage(MyImagesGallery.GalleryItem item)
-    {
-        _selectedFile = null;
-        _imagePreviewUrl = SessionService.PreviewUrl;
-        _imageBytes = SessionService.Bytes;
-        _imageContentType = item.ContentType;
-        _uploadError = null;
-        _results = [];
-        _completedCount = 0;
-        _favorites = [];
-        StateHasChanged();
-    }
-
-    private async Task AutoSaveOriginalAsync(byte[] bytes, string contentType, string fileName)
-    {
-        // Idempotent save with a Retry-toast on failure. The fire-and-forget at the call site
-        // keeps the upload UI snappy; the toast handles the (rare) failure case without silently
-        // dropping the image like the old Http.PostAsJsonAsync version did.
-        var savedId = await UserImageSave.SaveOriginalAsync(bytes, contentType, fileName, tags: null);
-        if (savedId is not null && _gallery is not null)
-            await InvokeAsync(_gallery.LoadAsync);
     }
 
     private async Task AutoSaveVariationAsync(string imageData, string contentType)
@@ -420,7 +331,7 @@ public partial class BulkGenerate
         _zipping = true;
         try
         {
-            var written = await JSRuntime.InvokeAsync<int>("poUx.downloadZip", entries, "poredoimage-variations.zip");
+            var written = await Js.InvokeAsync<int>("poUx.downloadZip", entries, "poredoimage-variations.zip");
             if (written == 0)
             {
                 NotificationService.Notify(NotificationSeverity.Error, "ZIP Failed",
@@ -507,7 +418,7 @@ public partial class BulkGenerate
     {
         var result = _results.ElementAtOrDefault(index);
         if (result?.ImageUrl is null) return;
-        await JSRuntime.InvokeAsync<bool>("downloadImage", result.ImageUrl, $"bulk-variation-{index + 1}.png");
+        await Js.InvokeAsync<bool>("downloadImage", result.ImageUrl, $"bulk-variation-{index + 1}.png");
     }
 
     // ─── Idea #11 — One-Tap Re-roll x3 ───────────────────────────────
@@ -518,7 +429,7 @@ public partial class BulkGenerate
     private async Task RerollAsync(int index)
     {
         var source = _results.ElementAtOrDefault(index);
-        if (source?.Status != BulkGenerateStatus.Complete || _imageBytes is null) return;
+        if (source?.Status != BulkGenerateStatus.Complete || ActiveImage() is not var (imageBytes, imageContentType)) return;
         if (_bulkGallery is null) return;
 
         _bulkGallery.BeginReroll(index);
@@ -526,8 +437,8 @@ public partial class BulkGenerate
         {
             var resp = await Http.PostAsJsonAsync("/api/bulk-generate/reroll",
                 new BulkRerollRequest(
-                    ImageData: Convert.ToBase64String(_imageBytes),
-                    ContentType: _imageContentType,
+                    ImageData: Convert.ToBase64String(imageBytes),
+                    ContentType: imageContentType,
                     SeedPrompt: source.Prompt ?? string.Empty,
                     Count: 3,
                     ImageGenModelId: AiSelection.Get(AiCapability.GenerateImage)), SharedJsonOptions.Default);

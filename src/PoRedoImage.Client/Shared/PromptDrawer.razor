@@ -3,10 +3,10 @@
 @implements IDisposable
 @inject PoRedoImage.Client.Services.PromptHistoryService History
 
-@* No wrapper class: .prompt-drawer__fab is position:fixed and the drawer positions
-   itself, so .prompt-drawer-wrapper never needed — or had — a rule. *@
+@* No wrapper class: the toggle sits in flow where the host puts it, and the drawer
+   positions itself. *@
 <div>
-    @* Floating toggle (FAB). Bootstrap icons — consistent with the rest of the app. *@
+    @* The toggle. Still named __fab for its styling hooks; it no longer floats. *@
     <button type="button"
             class="prompt-drawer__fab @(_isExpanded ? "prompt-drawer__fab--active" : "")"
             @onclick="ToggleDrawer"

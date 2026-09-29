@@ -1,155 +1,80 @@
 @page "/bulk-generate"
 @attribute [Authorize]
-@inject HttpClient Http
-@inject IJSRuntime JSRuntime
-@inject ILogger<BulkGenerate> Logger
-@inject AuthenticationStateProvider AuthStateProvider
-@inject ImageSessionService SessionService
-@inject NotificationService NotificationService
-@inject AudioFeedbackService Audio
-@inject PoRedoImage.Client.Models.AiSelectionState AiSelection
-@inject PoRedoImage.Client.Services.UserImageSaveService UserImageSave
-@inject PoRedoImage.Client.Services.SessionCostService Cost
+@inherits FeaturePageBase
 @inject PoRedoImage.Client.Services.JobTrayService Jobs
 
 <PageTitle>Bulk Generate — PoRedoImage</PageTitle>
 
-@* Split measure: a setup rail beside the ten-slot board. The rail used to be
-   `col-lg-4 col-xl-3` and the board `col-lg-8 col-xl-9` — a proportion nobody chose,
-   which at 1200px handed the rail 25% whether or not an upload panel fits in it. The
-   shell sizes the rail from its contents and gives the board everything else. *@
-@* ModelBadge comes from the server's live pricing payload — the same source the cost row
-   further down already used. It was hardcoded here as "Gemini 2.0 Flash (img2img)" while that
-   row rendered "Google Gemini 2.5 Flash Image": two different model names for one operation on
-   one screen. A literal cannot track a provider swap, so this page no longer holds one. *@
-<FeatureShell Measure="FeatureShell.FeatureMeasure.Split"
-              IconClass="bi-images"
-              Title="Bulk Generate"
-              Description="@("Upload a photo and generate 10 artistic variations. Use <PERSON> in prompts — AI replaces it with a description of your image.")"
-              ModelBadge="@Cost.Pricing?.ImageProviderLabel">
+@* Split measure: a setup rail beside the ten-slot board. The shell sizes the rail from its
+   contents and gives the board everything else.
+
+   ModelBadge carries the provider AND the per-image price from the server's live pricing
+   payload. Those used to sit in a separate cost row under the header that repeated the
+   provider label a second time and the footer's session total a third. *@
+<FeatureShell Title="Bulk Generate"
+              ModelBadge="@(Cost.Pricing is { } pricing ? $"{pricing.ImageProviderLabel} · ≈{Cost.Format(pricing.ImageToImageUsd)}/image" : null)">
 
     <Aside>
     @if (!_isGenerating)
     {
-        <MyImagesGallery @ref="_gallery" OnImageSelected="ApplyGalleryImage" />
+        <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
         <ImageUploadPanel
-            ShowDescriptionLength="false"
             ShowProcessButton="false"
-            ImagePreviewUrl="@_imagePreviewUrl"
-            ErrorMessage="@_uploadError"
-            CanProcess="false"
+            ImagePreviewUrl="@imagePreviewUrl"
+            ErrorMessage="@errorMessage"
             OnFileChange="LoadFile"
             OnImageIntake="HandleImageIntake" />
-    }
-    else
-    {
-        @if (_imagePreviewUrl is not null)
-        {
-            <div class="bulk-upload-preview mb-3">
-                <img src="@_imagePreviewUrl" alt="Source image" />
-            </div>
-        }
-    }
 
-    @if (!_isGenerating)
-    {
-        <button class="flap-btn flap-btn--primary flap-btn--block mt-3"
-                @onclick="StartGeneration"
-                disabled="@(string.IsNullOrEmpty(_imagePreviewUrl) || _activePromptCount == 0)">
-            <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString()) Variation@(_activePromptCount == 1 ? "" : "s")
-        </button>
-        @if (_completedResults.Count > 0)
-        {
-            <button class="flap-btn flap-btn--block mt-2" @onclick="DownloadAllAsZip" disabled="@_zipping">
-                <i class="bi @(_zipping ? "bi-hourglass-split" : "bi-file-earmark-zip") me-1"></i>
-                @(_zipping ? "Packing…" : $"Download All ({_completedResults.Count}) as ZIP")
+        <div class="cta-bar">
+            <button class="flap-btn flap-btn--primary flap-btn--block"
+                    @onclick="StartGeneration"
+                    disabled="@(string.IsNullOrEmpty(imagePreviewUrl) || _activePromptCount == 0)">
+                <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString()) Variation@(_activePromptCount == 1 ? "" : "s")
             </button>
-        }
-        @if (_favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
-        {
-            <button class="flap-btn flap-btn--block mt-2" @onclick="DownloadFavorites" disabled="@_zipping">
-                <i class="bi bi-heart-fill me-1"></i>Download Favorites (@_favorites.Count)
-            </button>
-        }
+            @if (_completedResults.Count > 0)
+            {
+                <button class="flap-btn flap-btn--block" @onclick="DownloadAllAsZip" disabled="@_zipping">
+                    <i class="bi @(_zipping ? "bi-hourglass-split" : "bi-file-earmark-zip") me-1"></i>
+                    @(_zipping ? "Packing…" : $"Download All ({_completedResults.Count}) as ZIP")
+                </button>
+            }
+            @if (_favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
+            {
+                <button class="flap-btn flap-btn--block" @onclick="DownloadFavorites" disabled="@_zipping">
+                    <i class="bi bi-heart-fill me-1"></i>Download Favorites (@_favorites.Count)
+                </button>
+            }
+        </div>
+
+        @* Under the button it configures. It was a fixed bottom-left FAB that sat on the board's
+           empty-state text on a phone. Outside .cta-bar on purpose: that bar is sticky with a
+           z-index on a phone, which would trap the drawer beneath the header. *@
+        <PromptDrawer
+            Prompts="@_prompts"
+            IsSaving="@_isSaving"
+            OnPromptsChanged="@(p => { _prompts = p; StateHasChanged(); })"
+            OnSaveRequested="SavePrompts"
+            OnLoadRequested="LoadPrompts" />
     }
-    else
+    else if (imagePreviewUrl is not null)
     {
-        <button class="flap-btn flap-btn--danger flap-btn--block mt-3" @onclick="CancelGeneration">
-            <i class="bi bi-stop-circle me-1"></i>Cancel
-        </button>
+        <div class="bulk-upload-preview mb-3">
+            <img src="@imagePreviewUrl" alt="Source image" />
+        </div>
     }
     </Aside>
 
     <ChildContent>
-    @if (Cost.Pricing is not null)
-    {
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-3 small text-secondary">
-            <span class="badge"><i class="bi bi-cpu me-1"></i>@Cost.Pricing.ImageProviderLabel</span>
-            <span><i class="bi bi-cash-coin me-1"></i>≈ @Cost.Format(Cost.Pricing.ImageToImageUsd) / image (estimate)</span>
-            @if (Cost.EstimatedTotal > 0)
-            {
-                <span class="ms-sm-auto fw-semibold text-body"><i class="bi bi-receipt me-1"></i>Session est: @Cost.Format(Cost.EstimatedTotal)</span>
-            }
-        </div>
-    }
-
     <BulkGallery
         @ref="_bulkGallery"
         Results="@_results"
         CompletedCount="@_completedCount"
         Favorites="@_favorites"
+        IsGenerating="@_isGenerating"
+        OnCancel="CancelGeneration"
         OnDownloadImage="DownloadImage"
         OnToggleFavorite="ToggleFavorite"
         OnReroll="RerollFromSlot"
         OnAcceptReroll="AcceptReroll" />
-    @* Prompt Drawer (Radzen Drawer) *@
-    <PromptDrawer
-        Prompts="@_prompts"
-        IsSaving="@_isSaving"
-        OnPromptsChanged="@(p => { _prompts = p; StateHasChanged(); })"
-        OnSaveRequested="SavePrompts"
-        OnLoadRequested="LoadPrompts" />
-
-    @* Sticky processing pill *@
-    @if (_isGenerating)
-    {
-        <div class="processing-pill">
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            <span>Generating @_completedCount / @(_results.Count)</span>
-            <button class="processing-pill__cancel"
-                    type="button"
-                    aria-label="Cancel generation"
-                    title="Cancel"
-                    @onclick="CancelGeneration">
-                <i class="bi bi-x" aria-hidden="true"></i>
-            </button>
-        </div>
-    }
-
-    @* Mobile sticky bottom CTA *@
     </ChildContent>
-
-    <StickyAction>
-        @if (!_isGenerating && !string.IsNullOrEmpty(_imagePreviewUrl) && _activePromptCount > 0)
-    {
-        <button class="flap-btn flap-btn--primary mobile-sticky-cta__btn"
-                @onclick="StartGeneration">
-            <i class="bi bi-collection-play me-1"></i>Generate @(_activePromptCount == 10 ? "All 10" : _activePromptCount.ToString())
-        </button>
-    }
-    @if (_isGenerating)
-    {
-        <button class="flap-btn mobile-sticky-cta__btn"
-                @onclick="CancelGeneration">
-            <i class="bi bi-stop-circle me-1"></i>Cancel
-        </button>
-    }
-    @if (!_isGenerating && _favorites.Count > 0 && _results.Any(r => r.Status == BulkGenerateStatus.Complete))
-    {
-        <button class="flap-btn mobile-sticky-cta__btn"
-                @onclick="DownloadFavorites">
-            <i class="bi bi-heart-fill me-1"></i>Save Favorites
-        </button>
-    }
-    </StickyAction>
 </FeatureShell>

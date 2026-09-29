@@ -5,7 +5,7 @@ namespace PoRedoImage.Tests.E2E.UI;
 
 /// <summary>
 /// The Gallery's Radzen controls, and specifically the guard on its destructive path: deleting is
-/// permanent here (this page has no undo bar, unlike the MyImagesGallery strip), so the confirm
+/// permanent here (this page has no undo bar, and it is the only place images can be deleted), so the confirm
 /// dialog is the safety net and is worth a test of its own.
 /// </summary>
 public sealed class GalleryUiTests : IClassFixture<PlaywrightBrowserFixture>

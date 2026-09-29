@@ -3,7 +3,7 @@
 @inject DialogService Dialog
 
 @*
-    The 2x2 pin comparison matrix, hosted by Radzen's DialogService from BulkGallery.
+    The 2x2 comparison matrix, hosted by Radzen's DialogService from BulkGallery.
 
     It used to be an inline `<div class="modal show d-block">` with a hand-written backdrop
     colour and z-index in a style attribute. Every structural class it relied on —
@@ -15,15 +15,15 @@
     Its sibling (BulkImageModal, the single-variation lightbox) had already moved to
     DialogService for exactly those reasons; this one never followed. It does now.
 
-    The grid keeps its OWN copy of the pinned items rather than reading the parent's set:
-    a Radzen dialog is a separate component instance, so a parent re-render does not reach
-    it, and unpinning would leave a tile on screen that is no longer pinned. Unpins are
-    applied here and mirrored to the parent through OnUnpin.
+    It compares FAVOURITES. There used to be a separate pin set for this grid beside the
+    favourite hearts — two marks on every slot meaning "I like this one". The grid keeps its
+    own copy of the items because a Radzen dialog is a separate component instance that a
+    parent re-render does not reach.
 *@
 <div class="compare-matrix">
     @if (_items.Count == 0)
     {
-        <p class="compare-matrix__empty">Nothing pinned. Pin up to four variations to compare them here.</p>
+        <p class="compare-matrix__empty">Nothing to compare. Favourite two to four variations to compare them here.</p>
     }
     else
     {
@@ -33,12 +33,6 @@
                 <figure class="compare-matrix__cell">
                     <figcaption class="compare-matrix__head">
                         <span class="badge">Variation #@(item.Index + 1)</span>
-                        <RadzenButton Icon="close"
-                                      Variant="Variant.Text"
-                                      ButtonStyle="ButtonStyle.Light"
-                                      Size="ButtonSize.ExtraSmall"
-                                      aria-label="@($"Unpin variation {item.Index + 1}")"
-                                      Click="@(() => Unpin(item.Index))" />
                     </figcaption>
 
                     <div class="compare-matrix__img-wrap">
@@ -54,12 +48,12 @@
                                       ButtonStyle="ButtonStyle.Light"
                                       Size="ButtonSize.Small"
                                       Click="@(() => OnDownload.InvokeAsync(item.Index))" />
-                        <RadzenButton Icon="@(Favorites.Contains(item.Index) ? "favorite" : "favorite_border")"
+                        <RadzenButton Icon="favorite"
                                       Variant="Variant.Text"
                                       ButtonStyle="ButtonStyle.Danger"
                                       Size="ButtonSize.Small"
-                                      aria-label="@(Favorites.Contains(item.Index) ? "Remove from favourites" : "Add to favourites")"
-                                      Click="@(() => OnToggleFavorite.InvokeAsync(item.Index))" />
+                                      aria-label="@($"Remove variation {item.Index + 1} from favourites")"
+                                      Click="@(() => Unfavourite(item.Index))" />
                     </div>
                 </figure>
             }
@@ -67,12 +61,6 @@
     }
 
     <div class="compare-matrix__footer">
-        <RadzenButton Text="Clear pinned"
-                      Variant="Variant.Outlined"
-                      ButtonStyle="ButtonStyle.Light"
-                      Size="ButtonSize.Small"
-                      Disabled="@(_items.Count == 0)"
-                      Click="ClearAll" />
         <RadzenButton Text="Close"
                       Variant="Variant.Filled"
                       ButtonStyle="ButtonStyle.Warning"
@@ -82,13 +70,8 @@
 </div>
 
 @code {
-    /// <summary>The pinned variations to show, already resolved and ordered by the caller.</summary>
+    /// <summary>The favourited variations to show (at most four), ordered by the caller.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<BulkGenerateImageResult> Items { get; set; } = [];
-
-    [Parameter] public IReadOnlySet<int> Favorites { get; set; } = new HashSet<int>();
-
-    /// <summary>Raised per unpinned index so the caller's pinned set stays in step with this grid.</summary>
-    [Parameter] public EventCallback<int> OnUnpin { get; set; }
 
     [Parameter] public EventCallback<int> OnToggleFavorite { get; set; }
     [Parameter] public EventCallback<int> OnDownload { get; set; }
@@ -97,23 +80,14 @@
 
     protected override void OnParametersSet() => _items = Items.ToList();
 
-    private async Task Unpin(int index)
+    /// <summary>
+    /// The grid IS the favourites, so un-favouriting drops the tile. An empty grid is not worth
+    /// a dialog, so the last one closes it.
+    /// </summary>
+    private async Task Unfavourite(int index)
     {
         _items.RemoveAll(i => i.Index == index);
-        await OnUnpin.InvokeAsync(index);
-
-        // An empty grid is not worth a dialog. Closing on the last unpin means the user does not
-        // have to dismiss a panel that has nothing left to compare.
+        await OnToggleFavorite.InvokeAsync(index);
         if (_items.Count == 0) Dialog.Close(true);
-    }
-
-    private async Task ClearAll()
-    {
-        foreach (var index in _items.Select(i => i.Index).ToList())
-        {
-            await OnUnpin.InvokeAsync(index);
-        }
-        _items.Clear();
-        Dialog.Close(true);
     }
 }

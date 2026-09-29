@@ -1,3 +1,4 @@
+@using PoRedoImage.Client.Models
 @* ── Shared compare + actions base for both result panels ─────────────── *@
 @inject ImageSessionService SessionService
 @inject NavigationManager Nav
@@ -28,72 +29,55 @@
     @CaptionContent
 }
 
-@* One action only: the save-and-download button each page supplies. Copy, Export, Share,
-   Cutout / BG and Try Again were removed at the user's request. *@
-<div class="results-actions mb-4 position-relative">
+@* ── One toolbar ─────────────────────────────────────────────────────
+   Everything you can do with a result, on one row. This was five stacked blocks — the
+   page's save button, an "Evolve & Remix" card, a "Use this result as input for" row and
+   a separate "Download Original" row — each with its own label and frame. Send-to and
+   Remix are menus now: they are choices of destination, not things to read.
+
+   <details> rather than a JS dropdown: it is keyboard-operable and announces its expanded
+   state natively, and closing on outside-click is the one thing it lacks (poUx handles it). *@
+<div class="results-actions mb-4">
     @PrimaryAction
-</div>
-
-@* ── Prompt Evolution & Iterative Remixing ───────────────────────── *@
-@if (ResultImageUrl is not null)
-{
-    <div class="card p-3 mb-4">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-            <span class="text-warning fw-semibold">
-                <i class="bi bi-diagram-3 me-2"></i>Evolve &amp; Remix Prompt
-            </span>
-            <span class="small text-muted">Branch iteration into new generation</span>
-        </div>
-        <p class="small text-muted mb-2">Select visual modifiers to append to the generation prompt, or branch into a new variation:</p>
-        <div class="d-flex gap-2 flex-wrap">
-            @foreach (var mod in new[] { 
-                ("Cinematic", "cinematic volumetric lighting, 8k, photorealistic"), 
-                ("Cyberpunk", "cyberpunk neon glow, futuristic night city backdrop"), 
-                ("Oil Painting", "expressive oil on canvas, textured impasto brushwork"), 
-                ("35mm Film", "vintage 35mm film photography, grain, warm analog color grading"), 
-                ("Watercolor", "delicate watercolor splash, fluid washes, artistic"), 
-                ("Moody Dark", "moody chiaroscuro, dramatic rim light, deep contrast") 
-            })
-            {
-                <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => RemixWithModifier(mod.Item1, mod.Item2))">
-                    <i class="bi bi-plus me-1 text-warning"></i>@mod.Item1
-                </button>
-            }
-        </div>
-    </div>
-}
-
-@* ── Chaining: the generated image becomes the next feature's input ───── *@
-@if (ResultImageUrl is not null)
-{
-    <div class="send-to mb-4">
-        <span class="send-to__label">
-            <i class="bi bi-arrow-right-circle me-1"></i>Use this result as input for
-        </span>
-        <div class="send-to__row">
-            @foreach (var feature in FeatureCatalog.Except(_currentRoute))
-            {
-                var target = feature;
-                <button type="button" class="flap-btn flap-btn--sm" @onclick="@(() => SendResultTo(target))"
-                        title="@target.Description">
-                    <i class="bi @target.Icon me-1"></i>@target.Title
-                </button>
-            }
-        </div>
-    </div>
-}
-
-@* The "More options" disclosure was removed: it hid two ordinary buttons behind a click for
-   no protective reason, and the secondary actions are cheap enough to just show. *@
-@* One wrapper, not two. .results-more / .results-more__panel were the disclosure's own
-   hooks and never had rules; the utilities below are what actually lay this row out. *@
-<div class="d-flex gap-2 flex-wrap mb-4">
     <button class="flap-btn flap-btn--sm" @onclick="OnDownloadOriginal">
-        <i class="bi bi-download me-1"></i>Download Original
+        <i class="bi bi-download me-1"></i>Original
     </button>
-    @if (AdditionalMoreOptions != null)
+
+    @if (ResultImageUrl is not null)
     {
-        @AdditionalMoreOptions
+        <details class="menu">
+            <summary class="flap-btn flap-btn--sm"><i class="bi bi-arrow-right-circle me-1" aria-hidden="true"></i>Send to<i class="bi bi-chevron-down" aria-hidden="true"></i></summary>
+            <div class="menu__list" role="group" aria-label="Use this result as input for">
+                @foreach (var feature in FeatureCatalog.Except(_currentRoute))
+                {
+                    var target = feature;
+                    <button type="button" class="menu__item" @onclick="@(() => SendResultTo(target))" title="@target.Description">
+                        <i class="bi @target.Icon me-2" aria-hidden="true"></i>@target.Title
+                    </button>
+                }
+            </div>
+        </details>
+
+        @* Remix = send this result back to Regeneration with a style appended. The styles are
+           the Style Recipe catalog, so the menu and the recipe picker cannot drift into two
+           different lists of "cinematic" the way the hard-coded modifiers here once did. *@
+        <details class="menu">
+            <summary class="flap-btn flap-btn--sm"><i class="bi bi-magic me-1" aria-hidden="true"></i>Remix<i class="bi bi-chevron-down" aria-hidden="true"></i></summary>
+            <div class="menu__list menu__list--scroll" role="group" aria-label="Remix in a style">
+                @foreach (var recipe in StyleRecipeCatalog.All)
+                {
+                    var r = recipe;
+                    <button type="button" class="menu__item" @onclick="@(() => Remix(r))" title="@r.Description">
+                        <i class="bi @r.Icon me-2" aria-hidden="true"></i>@r.Title
+                    </button>
+                }
+            </div>
+        </details>
+    }
+
+    @if (ElapsedSeconds is { } secs)
+    {
+        <span class="results-actions__meta" title="Total processing time"><i class="bi bi-clock me-1" aria-hidden="true"></i>@secs.ToString("F1")s</span>
     }
 </div>
 
@@ -120,26 +104,25 @@
     [Parameter] public RenderFragment? CaptionContent { get; set; }
     [Parameter, EditorRequired] public RenderFragment PrimaryAction { get; set; } = default!;
     [Parameter, EditorRequired] public EventCallback OnDownloadOriginal { get; set; }
-    [Parameter] public RenderFragment? AdditionalMoreOptions { get; set; }
+
+    /// <summary>End-to-end processing time, shown once at the end of the toolbar.</summary>
+    [Parameter] public double? ElapsedSeconds { get; set; }
     [Parameter] public RenderFragment? FooterContent { get; set; }
 
     private string _currentRoute = string.Empty;
 
     protected override void OnInitialized() => _currentRoute = new Uri(Nav.Uri).AbsolutePath;
 
-    private void RemixWithModifier(string label, string clause)
+    private void Remix(StyleRecipe recipe)
     {
         var existing = SessionService.LastFinalPrompt ?? "";
-        var newPrompt = string.IsNullOrWhiteSpace(existing) 
-            ? clause 
-            : $"{existing}, {clause}";
-        SessionService.StagePrompt(newPrompt);
+        SessionService.StagePrompt(string.IsNullOrWhiteSpace(existing)
+            ? recipe.PromptSnippet
+            : $"{existing}, {recipe.PromptSnippet}");
         if (ResultImageUrl != null)
-        {
             SessionService.SetImage(ResultImageUrl, ContentTypeOf(ResultImageUrl), ResultFileName);
-        }
-        NotificationService.Notify(NotificationSeverity.Info, $"Remix '{label}' Staged",
-            "Result image and evolved prompt set as session input. Opening Image Regeneration…", duration: 3000);
+        NotificationService.Notify(NotificationSeverity.Info, $"Remix: {recipe.Title}",
+            "Opening Regeneration with this result and the style staged.", duration: 3000);
         Nav.NavigateTo("/image-regeneration");
     }
 

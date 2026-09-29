@@ -1,3 +1,7 @@
+using System.Net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using PoRedoImage.Infrastructure.Services;
 using Xunit;
 
@@ -33,5 +37,38 @@ public sealed class VeoAudioDirectionTests
 
         // The caller's own words survive verbatim either way — the directive only ever appends.
         Assert.StartsWith(prompt.TrimEnd(), result, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Regression: 066dac7 removed the per-request <c>x-goog-api-key</c> header and every render
+    /// came back "Method doesn't allow unregistered callers". Start AND poll must both carry it.
+    /// </summary>
+    [Fact]
+    public async Task Every_Veo_request_carries_the_api_key()
+    {
+        var seen = new List<string?>();
+        var handler = new StubHandler(req =>
+        {
+            seen.Add(req.Headers.TryGetValues("x-goog-api-key", out var v) ? v.Single() : null);
+            var body = req.Method == HttpMethod.Post ? """{"name":"operations/op1"}""" : """{"done":false}""";
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) };
+        });
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient("Veo")).Returns(() => new HttpClient(handler));
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Google:ApiKey"] = "test-key" })
+            .Build();
+
+        var veo = new VeoVideoGenerationService(config, factory.Object, NullLogger<VeoVideoGenerationService>.Instance);
+        var op = await veo.StartAsync([1, 2, 3], "image/png", "a slow zoom");
+        await veo.PollAsync(op);
+
+        Assert.Equal(["test-key", "test-key"], seen);
+    }
+
+    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(respond(request));
     }
 }

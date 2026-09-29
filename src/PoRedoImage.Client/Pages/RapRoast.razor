@@ -8,106 +8,86 @@
 
 <PageTitle>Rap Roast — PoRedoImage</PageTitle>
 
-<FeatureShell IconClass="bi-mic-fill"
-              Title="Rap Roast"
-              Description="Upload a photo and AI writes a roast verse, then performs it over a beat."
-              Steps="@(new[] {
-                  ("bi-upload", "Upload photo"),
-                  ("bi-pencil", "AI writes the bars"),
-                  ("bi-music-note-beamed", "Hear the track")
-              })">
-    <ChildContent>
+<FeatureShell Title="Rap Roast">
 
     @if (!isProcessing && !isComplete)
     {
         <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
 
-        @* Upload WITHOUT its submit button: the button is rendered after the settings below,
-           because "Roast It" consumes the beat style and the intensity and used to sit above
-           both of them. You were asked to submit before you were asked to configure. *@
+        @* The settings render inside the panel, between the photo and "Roast It", because the
+           action consumes the beat style and the intensity and used to sit above both. *@
         <ImageUploadPanel
-            ShowDescriptionLength="false"
-            ShowProcessButton="false"
+            ButtonLabel="Roast It"
+            ButtonIcon="bi-mic-fill"
             ImagePreviewUrl="@imagePreviewUrl"
             ErrorMessage="@errorMessage"
             CanProcess="@canProcessImage"
             OnFileChange="LoadFile"
-            OnImageIntake="HandleImageIntake" />
+            OnImageIntake="HandleImageIntake"
+            OnProcessClicked="RoastAsync">
 
-        <fieldset class="flap-fieldset mt-3">
-            <legend class="flap-fieldset__legend">Delivery</legend>
-            <div class="flap-choices">
-                @foreach (var option in StyleOptions)
-                {
-                    <label class="flap-choice flap-choice--stack @(_style == option.Value ? "flap-choice--active" : "")">
-                        <input type="radio" name="rap-style" value="@option.Value"
-                               checked="@(_style == option.Value)"
-                               @onchange="@(() => _style = option.Value)" />
-                        <span class="flap-choice__name">@option.Label</span>
-                        <span class="flap-choice__meta">@option.Hint</span>
-                    </label>
-                }
-            </div>
-        </fieldset>
+            <fieldset class="flap-fieldset mt-3">
+                <legend class="flap-fieldset__legend">Delivery</legend>
+                <div class="flap-choices">
+                    @foreach (var option in StyleOptions)
+                    {
+                        <label class="flap-choice flap-choice--stack @(_style == option.Value ? "flap-choice--active" : "")">
+                            <input type="radio" name="rap-style" value="@option.Value"
+                                   checked="@(_style == option.Value)"
+                                   @onchange="@(() => _style = option.Value)" />
+                            <span class="flap-choice__name">@option.Label</span>
+                            <span class="flap-choice__meta">@option.Hint</span>
+                        </label>
+                    }
+                </div>
+            </fieldset>
 
-        @* ── Intensity dial ───────────────────────────────────────────────
-           A stepped dial rather than a slider: the levels are named tones the
-           ghostwriter is actually instructed in, not a continuum, and a slider would
-           promise a granularity the prompt cannot deliver. *@
-        <fieldset class="flap-fieldset mt-3">
-            <legend class="flap-fieldset__legend">How hard should it hit</legend>
-            <div class="flap-choices" role="radiogroup" aria-label="Roast intensity">
-                @foreach (var option in IntensityOptions)
-                {
-                    <label class="flap-choice flap-choice--lamp @(_intensity == option.Value ? "flap-choice--active" : "")">
-                        <input type="radio" name="roast-intensity" value="@option.Value"
-                               checked="@(_intensity == option.Value)"
-                               @onchange="@(() => _intensity = option.Value)" />
-                        <span class="flap-choice__lamp" aria-hidden="true"></span>
-                        <span class="flap-choice__name">@option.Label</span>
-                        <span class="flap-choice__meta">@option.Hint</span>
-                    </label>
-                }
-            </div>
-        </fieldset>
+            @* ── Intensity dial ───────────────────────────────────────────────
+               A stepped dial rather than a slider: the levels are named tones the
+               ghostwriter is actually instructed in, not a continuum, and a slider would
+               promise a granularity the prompt cannot deliver. *@
+            <fieldset class="flap-fieldset mt-3">
+                <legend class="flap-fieldset__legend">How hard should it hit</legend>
+                <div class="flap-choices" role="radiogroup" aria-label="Roast intensity">
+                    @foreach (var option in IntensityOptions)
+                    {
+                        <label class="flap-choice flap-choice--lamp @(_intensity == option.Value ? "flap-choice--active" : "")">
+                            <input type="radio" name="roast-intensity" value="@option.Value"
+                                   checked="@(_intensity == option.Value)"
+                                   @onchange="@(() => _intensity = option.Value)" />
+                            <span class="flap-choice__lamp" aria-hidden="true"></span>
+                            <span class="flap-choice__name">@option.Label</span>
+                            <span class="flap-choice__meta">@option.Hint</span>
+                        </label>
+                    }
+                </div>
+            </fieldset>
 
-        @* ── Language toggle ──────────────────────────────────────────────
-           Kept off the intensity dial on purpose. Language and target are separate
-           questions, and folding profanity into "Scorched" would have made asking for
-           a dirtier mouth the same request as asking for a crueller joke. *@
-        <label class="roast-explicit @(_explicitLanguage ? "roast-explicit--on" : "")">
-            <input type="checkbox" checked="@_explicitLanguage"
-                   @onchange="@(e => _explicitLanguage = (bool)(e.Value ?? false))" />
-            <span class="roast-explicit__badge" aria-hidden="true">E</span>
-            <span class="roast-explicit__text">
-                <span class="roast-explicit__name">Explicit language</span>
-                <span class="roast-explicit__meta">Uncensored, swears throughout. Lyria may refuse to sing it.</span>
-            </span>
-        </label>
+            @* ── Language toggle ──────────────────────────────────────────────
+               Kept off the intensity dial on purpose. Language and target are separate
+               questions, and folding profanity into "Scorched" would have made asking for
+               a dirtier mouth the same request as asking for a crueller joke. *@
+            <label class="roast-explicit @(_explicitLanguage ? "roast-explicit--on" : "")">
+                <input type="checkbox" checked="@_explicitLanguage"
+                       @onchange="@(e => _explicitLanguage = (bool)(e.Value ?? false))" />
+                <span class="roast-explicit__badge" aria-hidden="true">E</span>
+                <span class="roast-explicit__text">
+                    <span class="roast-explicit__name">Explicit language</span>
+                    <span class="roast-explicit__meta">Uncensored, swears throughout. Lyria may refuse to sing it.</span>
+                </span>
+            </label>
 
-        <p class="roast-disclaimer">
-            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-            Everything you chose is fair game — the fit, the pose, the room, the taste, the
-            decision to upload this one. Off limits at every setting: race, body size, age,
-            disability and the rest of who you are, and slurs. <strong>Scorched</strong> and
-            <strong>Explicit</strong> change how hard it hits and how it talks, never what it hits.
-            Best used on photos of yourself and friends.
-        </p>
-
-        @* The action, now downstream of everything it reads. Disabled until there is a photo —
-           and it says why, which the bare disabled button did not. *@
-        <div class="roast-cta">
-            <button class="flap-btn flap-btn--primary roast-cta__btn"
-                    disabled="@(!canProcessImage)"
-                    @onclick="RoastAsync">
-                <i class="bi bi-mic-fill me-2" aria-hidden="true"></i>Roast It
-            </button>
-            @if (!canProcessImage)
-            {
-                <p class="roast-cta__hint" role="status">Upload a photo above to enable this.</p>
-            }
-        </div>
-
+            @* One line until asked. The rules are the same at every setting, so they are worth
+               reading once, not scrolling past five lines of on every roast. *@
+            <details class="roast-disclaimer">
+                <summary><i class="bi bi-info-circle me-1" aria-hidden="true"></i>What's off-limits</summary>
+                Everything you chose is fair game — the fit, the pose, the room, the taste, the
+                decision to upload this one. Off limits at every setting: race, body size, age,
+                disability and the rest of who you are, and slurs. <strong>Scorched</strong> and
+                <strong>Explicit</strong> change how hard it hits and how it talks, never what it hits.
+                Best used on photos of yourself and friends.
+            </details>
+        </ImageUploadPanel>
     }
 
     @if (isProcessing)
@@ -117,6 +97,10 @@
 
     @if (isComplete && _result is not null)
     {
+        @* Two columns on a desktop — the photo, the track and the exports beside the bars —
+           instead of one 46rem column that ran 1,500px down a 900px screen. Stacks on a phone. *@
+        <div class="roast-result">
+        <div class="roast-result__media">
         @* The photo the roast is about — without it the bars have no referent, and you
            cannot tell whether the AI actually saw what it claims to have seen. *@
         @if (!string.IsNullOrEmpty(_roastedImageUrl))
@@ -175,6 +159,45 @@
             </div>
         }
 
+        @* ── Export ──────────────────────────────────────────────────────
+           The card needs nothing but a 2D canvas, so it is offered even when the track was
+           refused: a refusal still produced bars worth keeping. The video needs
+           MediaRecorder + captureStream and is hidden outright where they are missing,
+           rather than shown as a button that fails on click. *@
+        <div class="roast-export">
+            @* One row: the look, then the two exports. The look was two toggle buttons on a
+               row of their own above the buttons that read it. *@
+            <div class="roast-export__actions">
+                <span class="roast-export__label">
+                    <i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Take it with you
+                </span>
+                <select class="form-control form-control-sm roast-export__style" aria-label="Export style" @bind="_videoMode">
+                    <option value="memeRoast">Meme cut — zooms, shakes, stickers</option>
+                    <option value="standard">Classic stage — clean type</option>
+                </select>
+                <button class="flap-btn flap-btn--sm" @onclick="SaveCardAsync" disabled="@_exporting">
+                    <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-image") me-1" aria-hidden="true"></i>Save card
+                </button>
+                @if (_canRecord && !_result.AudioRefused)
+                {
+                    <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="ExportVideoAsync" disabled="@_exporting">
+                        <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-camera-video") me-1" aria-hidden="true"></i>Export video
+                    </button>
+                }
+            </div>
+            @if (_exportProgress >= 0)
+            {
+                <div class="roast-export__progress" role="status">
+                    <div class="roast-export__bar" style="--export: @_exportProgress%"></div>
+                    <span class="roast-export__pct">
+                        Recording @_exportProgress% — rendering video with beats and kinetic punchline zooms in real time.
+                    </span>
+                </div>
+            }
+        </div>
+        </div>
+
+        <div class="roast-result__script">
         @if (!string.IsNullOrWhiteSpace(_result.LyricsFallbackReason))
         {
             <p class="roast-softened small" role="status">
@@ -196,42 +219,6 @@
                 <i class="bi bi-emoji-smile me-1" aria-hidden="true"></i>
                 The first draft was too spicy for the music model, so this is the friendlier cut.
             </p>
-        }
-
-        @* ── Filter report ────────────────────────────────────────────────
-           Which safety gate bit, and how hard. Rendered even on a clean run: "0%
-           filtered" is the evidence that a tame verse was the model's own choice
-           rather than something a filter ate, which is the exact ambiguity that
-           made a working Explicit toggle look broken. *@
-        @if (_result.FilterReport.TotalAttempts > 0)
-        {
-            var report = _result.FilterReport;
-            <section class="roast-filters @(report.RejectedAttempts > 0 ? "roast-filters--hit" : "")"
-                     aria-label="Safety filter report">
-                <p class="roast-filters__headline">
-                    <span class="roast-filters__pct">@report.RejectedPercent%</span>
-                    filtered — @report.RejectedAttempts of @report.TotalAttempts provider
-                    @(report.TotalAttempts == 1 ? "call was" : "calls were") rejected
-                </p>
-                <ul class="roast-filters__list">
-                    @foreach (var a in report.Attempts)
-                    {
-                        <li class="roast-filters__row @(a.Rejected ? "is-rejected" : "is-passed")">
-                            <span class="roast-filters__gate">@a.Gate</span>
-                            <span class="roast-filters__provider">@a.Provider</span>
-                            <span class="roast-filters__try">try @a.Attempt</span>
-                            <span class="roast-filters__verdict">@(a.Rejected ? "rejected" : "passed")</span>
-                        </li>
-                    }
-                </ul>
-                @if (_sessionAttempts > _result.FilterReport.TotalAttempts)
-                {
-                    <p class="roast-filters__session">
-                        This page session: @_sessionRejected of @_sessionAttempts rejected
-                        (@SessionRejectedPercent%) across @_sessionRoasts roasts. Resets on reload.
-                    </p>
-                }
-            </section>
         }
 
         <section class="roast-lyrics" aria-label="Roast lyrics">
@@ -270,53 +257,14 @@
             }
         </section>
 
-        @* ── Export ──────────────────────────────────────────────────────
-           The card needs nothing but a 2D canvas, so it is offered even when the track was
-           refused: a refusal still produced bars worth keeping. The video needs
-           MediaRecorder + captureStream and is hidden outright where they are missing,
-           rather than shown as a button that fails on click. *@
-        <div class="roast-export">
-            <span class="roast-export__label">
-                <i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Take it with you
-            </span>
-
-            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                <span class="small text-muted">Video Style:</span>
-                <button type="button" class="flap-btn flap-btn--sm @(_videoMode == "memeRoast" ? "flap-btn--active" : "")"
-                        @onclick="@(() => _videoMode = "memeRoast")" title="Dynamic punchline zooms, camera shakes, meme stickers and big typography">
-                    <i class="bi bi-fire me-1 text-danger"></i>Meme Video Roast (Funny Cut)
-                </button>
-                <button type="button" class="flap-btn flap-btn--sm @(_videoMode == "standard" ? "flap-btn--active" : "")"
-                        @onclick="@(() => _videoMode = "standard")" title="Clean typography and stage frame">
-                    <i class="bi bi-tv me-1"></i>Classic Stage
-                </button>
-            </div>
-
-            <div class="roast-export__actions">
-                <button class="flap-btn flap-btn--sm" @onclick="SaveCardAsync" disabled="@_exporting">
-                    <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-image") me-1" aria-hidden="true"></i>Save card
-                </button>
-                @if (_canRecord && !_result.AudioRefused)
+        <details class="roast-seen" open="@(!_result.DescriptionIsDetailed || _result.FilterReport.RejectedAttempts > 0)">
+            <summary>
+                What the AI saw
+                @if (_result.FilterReport.TotalAttempts > 0)
                 {
-                    <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="ExportVideoAsync" disabled="@_exporting">
-                        <i class="bi @(_exporting ? "bi-hourglass-split" : "bi-camera-video") me-1" aria-hidden="true"></i>
-                        @(_videoMode == "memeRoast" ? "Export Meme Video Roast" : "Export Video")
-                    </button>
+                    <span class="roast-seen__filtered">· @_result.FilterReport.RejectedPercent% filtered</span>
                 }
-            </div>
-            @if (_exportProgress >= 0)
-            {
-                <div class="roast-export__progress" role="status">
-                    <div class="roast-export__bar" style="--export: @_exportProgress%"></div>
-                    <span class="roast-export__pct">
-                        Recording @_exportProgress% — rendering video with beats and kinetic punchline zooms in real time.
-                    </span>
-                </div>
-            }
-        </div>
-
-        <details class="roast-seen" open="@(!_result.DescriptionIsDetailed)">
-            <summary>What the AI saw</summary>
+            </summary>
 
             @if (_result.Scene is { } scene)
             {
@@ -381,7 +329,45 @@
                         ?? "The bars are working from image labels alone.")
                 </p>
             }
+            @* ── Filter report ────────────────────────────────────────────────
+               Which safety gate bit, and how hard. Rendered even on a clean run: "0%
+               filtered" is the evidence that a tame verse was the model's own choice
+               rather than something a filter ate, which is the exact ambiguity that
+               made a working Explicit toggle look broken. Lives inside "What the AI saw" now;
+               its headline percentage rides on the summary so a hit is still seen closed. *@
+            @if (_result.FilterReport.TotalAttempts > 0)
+            {
+                var report = _result.FilterReport;
+                <section class="roast-filters @(report.RejectedAttempts > 0 ? "roast-filters--hit" : "")"
+                         aria-label="Safety filter report">
+                    <p class="roast-filters__headline">
+                        <span class="roast-filters__pct">@report.RejectedPercent%</span>
+                        filtered — @report.RejectedAttempts of @report.TotalAttempts provider
+                        @(report.TotalAttempts == 1 ? "call was" : "calls were") rejected
+                    </p>
+                    <ul class="roast-filters__list">
+                        @foreach (var a in report.Attempts)
+                        {
+                            <li class="roast-filters__row @(a.Rejected ? "is-rejected" : "is-passed")">
+                                <span class="roast-filters__gate">@a.Gate</span>
+                                <span class="roast-filters__provider">@a.Provider</span>
+                                <span class="roast-filters__try">try @a.Attempt</span>
+                                <span class="roast-filters__verdict">@(a.Rejected ? "rejected" : "passed")</span>
+                            </li>
+                        }
+                    </ul>
+                    @if (_sessionAttempts > _result.FilterReport.TotalAttempts)
+                    {
+                        <p class="roast-filters__session">
+                            This page session: @_sessionRejected of @_sessionAttempts rejected
+                            (@SessionRejectedPercent%) across @_sessionRoasts roasts. Resets on reload.
+                        </p>
+                    }
+                </section>
+            }
         </details>
+        </div>
+        </div>
 
         <div class="d-flex gap-2 mt-3">
             <button class="flap-btn flap-btn--primary" @onclick="Reset">
@@ -389,15 +375,4 @@
             </button>
         </div>
     }
-    </ChildContent>
-
-    <StickyAction>
-        @if (!isProcessing && !isComplete)
-        {
-            <button class="flap-btn flap-btn--primary mobile-sticky-cta__btn"
-                    @onclick="RoastAsync" disabled="@(!canProcessImage)">
-                <i class="bi bi-mic-fill me-1"></i>Roast It
-            </button>
-        }
-    </StickyAction>
 </FeatureShell>

@@ -4,32 +4,30 @@
 
 <PageTitle>Video — PoRedoImage</PageTitle>
 
-<FeatureShell IconClass="bi-film"
-              Title="Video"
-              Description="Describe what should happen and Veo animates your photo into an 8-second clip with sound."
-              ModelBadge="Veo 3.1 Lite">
-    <ChildContent>
+<FeatureShell Title="Video" ModelBadge="Veo 3.1 Lite">
 
     @if (!isProcessing && !isComplete)
     {
         <MyImagesGallery @ref="_gallery" OnImageSelected="HandleGalleryImage" />
+        @* The prompt box had gone missing: Create stayed disabled until _prompt was non-empty,
+           and nothing on the page could set it, so no video could ever be started. The panel was
+           showing the image-regeneration "Prompt detail" preset in its place, which the video
+           request never sent. *@
         <ImageUploadPanel
-            ShowDescriptionLength="true"
             ButtonLabel="Create video"
             ButtonIcon="bi-film"
-            DescriptionLength="@descriptionLength"
             @bind-ImagePreviewUrl="@imagePreviewUrl"
             ErrorMessage="@errorMessage"
             CanProcess="@(canProcessImage && !string.IsNullOrWhiteSpace(_prompt))"
+            DisabledHint="@(canProcessImage ? "Describe what should happen to enable this." : "Add a photo and describe what should happen.")"
             OnFileChange="LoadFile"
             OnImageIntake="HandleImageIntake"
-            OnProcessClicked="CreateVideo"
-            OnDescriptionLengthChanged="@(l => descriptionLength = l)" />
-
-        <div class="video-prompt-help">
-            <i class="bi bi-info-circle" aria-hidden="true"></i>
-            <span>Describe motion and audio. Veo 3.1 Lite at 720p, ~$0.40 per 8-second clip.</span>
-        </div>
+            OnProcessClicked="CreateVideo">
+            <label class="form-label mt-3" for="video-prompt">What should happen</label>
+            <textarea id="video-prompt" class="form-control" rows="3" maxlength="1000" data-autosize
+                      placeholder="Describe motion and audio — e.g. slow zoom in, leaves blowing, soft piano. 720p, ~$0.40 per 8-second clip."
+                      @bind="_prompt" @bind:event="oninput"></textarea>
+        </ImageUploadPanel>
     }
 
     @if (isProcessing)
@@ -46,7 +44,7 @@
         <ResultsPanel ImagePreviewUrl="@imagePreviewUrl"
                       RightLabel="Generated clip"
                       DividerIcon="bi-film"
-                      OnDownloadOriginal="DownloadVideoAsync">
+                      OnDownloadOriginal="DownloadOriginal">
             <RightSide>
                 @if (!string.IsNullOrEmpty(_videoUrl))
                 {
@@ -54,15 +52,14 @@
                            class="video-result__player"></video>
                 }
             </RightSide>
+            @* "Download Original" used to be wired to the clip download here, so the button
+               labelled Original saved the video and nothing saved the photo. *@
             <PrimaryAction>
-                <button class="flap-btn" @onclick="StartOver">Try another</button>
+                <button class="flap-btn flap-btn--primary flap-btn--sm" @onclick="DownloadVideoAsync" disabled="@string.IsNullOrEmpty(_videoUrl)">
+                    <i class="bi bi-download me-1"></i>Download
+                </button>
+                <button class="flap-btn flap-btn--sm" @onclick="StartOver">Try another</button>
             </PrimaryAction>
         </ResultsPanel>
     }
-
-    </ChildContent>
 </FeatureShell>
-
-@code {
-    private int descriptionLength;
-}

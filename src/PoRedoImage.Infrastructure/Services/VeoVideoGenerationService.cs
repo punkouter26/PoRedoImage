@@ -68,6 +68,13 @@ public sealed class VeoVideoGenerationService : IVideoGenerationService
         _http = httpClientFactory.CreateClient("Veo");
         _http.BaseAddress ??= new Uri(BaseUrl);
 
+        // On the client, not per request: the start call, every poll AND the clip download all
+        // need it. 066dac7 dropped the three per-request copies and Google answered every render
+        // with "Method doesn't allow unregistered callers". CreateClient returns a fresh instance,
+        // so these default headers are this service's alone.
+        if (!string.IsNullOrWhiteSpace(_apiKey))
+            _http.DefaultRequestHeaders.Add("x-goog-api-key", _apiKey);
+
         if (string.IsNullOrWhiteSpace(_apiKey))
         {
             _logger.LogInformation("Google:ApiKey not configured; video generation is disabled.");

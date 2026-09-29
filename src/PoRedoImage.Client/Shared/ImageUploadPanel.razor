@@ -12,59 +12,11 @@
    of them did nothing visible. The shortcut it bought was undiscoverable (nothing said "press
    Enter") and every caller either renders this panel's own submit button or supplies one
    directly beneath it. *@
-<div class="upload-panel" role="region" aria-label="Image upload">
+<div class="upload-panel @(IsSplit ? "upload-panel--split" : null)" role="region" aria-label="Image upload">
 
-    @* ── Description Length Presets (Image Regeneration only) ─────── *@
-    @* Placed above the drop zone so the user can choose detail level   *@
-    @* before uploading — it is a prerequisite choice, not a follow-up. *@
-    @if (ShowDescriptionLength)
-    {
-        <div class="preset-section mb-4">
-            @* The sub-labels used to read "~200 / ~350 / ~500 words". They no longer do, because the
-       enhancement step no longer produces paragraphs — it produces a comma-separated visual
-       specification for an image generator, which is what those models actually read. The preset
-       now buys more distinct visual clauses, not more prose. See
-       AzureOpenAiService.EnhanceDescriptionAsync. *@
-    <span class="preset-section__label"><i class="bi bi-sliders me-1"></i>Prompt detail</span>
-            @* One RadzenSelectBar in place of three hand-rolled buttons that each recomputed
-               their own aria-checked and active class from an overlapping range test. The
-               ranges stay in DetailPresetFor so a value arriving from a saved session still
-               lands on the right segment; the Template keeps the two-line stacked face. *@
-            @* role/aria-checked are explicit for the same reason as the Gallery filter:
-               RadzenSelectBar emits bare divs with no role or checked state, so the group would
-               otherwise be invisible to assistive tech. Radzen splats them onto the item. *@
-            <RadzenSelectBar TValue="int"
-                             Value="@DetailPresetFor(DescriptionLength)"
-                             ValueChanged="@(v => OnDescriptionLengthChanged.InvokeAsync(v))"
-                             Size="ButtonSize.Small"
-                             role="radiogroup"
-                             aria-label="Prompt detail">
-                <Items>
-                    <RadzenSelectBarItem Value="200" role="radio"
-                                         aria-checked="@((DetailPresetFor(DescriptionLength) == 200).ToString().ToLowerInvariant())">
-                        <Template>
-                            <span class="detail-preset__name">Quick</span>
-                            <span class="detail-preset__meta">Fewest clauses</span>
-                        </Template>
-                    </RadzenSelectBarItem>
-                    <RadzenSelectBarItem Value="350" role="radio"
-                                         aria-checked="@((DetailPresetFor(DescriptionLength) == 350).ToString().ToLowerInvariant())">
-                        <Template>
-                            <span class="detail-preset__name">Standard</span>
-                            <span class="detail-preset__meta">Balanced &middot; recommended</span>
-                        </Template>
-                    </RadzenSelectBarItem>
-                    <RadzenSelectBarItem Value="500" role="radio"
-                                         aria-checked="@((DetailPresetFor(DescriptionLength) == 500).ToString().ToLowerInvariant())">
-                        <Template>
-                            <span class="detail-preset__name">Detailed</span>
-                            <span class="detail-preset__meta">Most clauses</span>
-                        </Template>
-                    </RadzenSelectBarItem>
-                </Items>
-            </RadzenSelectBar>
-        </div>
-    }
+    @* Two columns, so a desktop can put the photo beside the options instead of above them
+       (see .upload-panel--split). On a narrow screen they simply stack, as before. *@
+    <div class="upload-panel__source">
 
     @* ── Camera ─────────────────────────────────────────────────────── *@
     @* Replaces the drop zone rather than sitting beside it: the two are alternative ways to
@@ -106,8 +58,13 @@
     }
     else
     {
+    @* Once a photo is loaded the zone shrinks to a one-line chip (Compact): the page already
+       knows which photo it is working on, so the options and the action move up above the fold
+       instead of sitting under a 320px preview. The whole chip is still the file input, so a
+       click, a drop or a paste replaces it exactly as before. *@
+    <div class="upload-panel__intake @(IsCompact ? "upload-panel__intake--compact" : null)">
     @* ── Drop Zone ──────────────────────────────────────────────────── *@
-    <div class="drop-zone @(_isDragging ? "drop-zone--active" : "") @(ImagePreviewUrl != null ? "drop-zone--has-image" : "")"
+    <div class="drop-zone @(_isDragging ? "drop-zone--active" : "") @(ImagePreviewUrl != null ? "drop-zone--has-image" : "") @(IsCompact ? "drop-zone--compact" : null)"
          @ondragover:preventDefault
          @ondragover="@(() => _isDragging = true)"
          @ondragleave="@(() => _isDragging = false)"
@@ -153,10 +110,12 @@
        inside it would be unclickable. *@
     @if (OnImageIntake.HasDelegate && _cameraSupported)
     {
-        <button type="button" class="upload-panel__camera-btn" @onclick="OpenCameraAsync" disabled="@_cameraBusy">
-            <i class="bi bi-camera me-2" aria-hidden="true"></i>Take a photo with your camera
+        <button type="button" class="upload-panel__camera-btn" @onclick="OpenCameraAsync" disabled="@_cameraBusy"
+                aria-label="Take a photo with your camera">
+            <i class="bi bi-camera" aria-hidden="true"></i><span class="upload-panel__camera-text">Camera</span>
         </button>
     }
+    </div>
     }
 
     @* ── Error ─────────────────────────────────────────────────────── *@
@@ -175,49 +134,73 @@
             <span>@ErrorMessage</span>
         </div>
     }
+    </div>
+
+    @if (ChildContent is not null || ShowProcessButton)
+    {
+    <div class="upload-panel__settings">
+
+    @* The page's own options (style, caption mode, prompt…) sit between the photo and the
+       action that consumes them, so you configure before you are asked to submit. *@
+    @ChildContent
 
     @* ── Process Button ────────────────────────────────────────────── *@
+    @* The one primary action. Below md it pins to the bottom of the viewport (.cta-bar) while
+       the panel is on screen — this replaced a second, fixed copy of the same button that every
+       page used to render for mobile. *@
     @if (ShowProcessButton)
     {
-        <button class="flap-btn flap-btn--primary flap-btn--block mt-4" @onclick="OnProcessClicked" disabled="@(!CanProcess)">
-            <i class="bi @ButtonIcon me-2"></i>@ButtonLabel
-        </button>
+        <div class="cta-bar">
+            <button class="flap-btn flap-btn--primary flap-btn--block" @onclick="OnProcessClicked" disabled="@(!CanProcess)">
+                <i class="bi @ButtonIcon me-2"></i>@ButtonLabel
+            </button>
+            @if (!CanProcess && !string.IsNullOrEmpty(DisabledHint))
+            {
+                <p class="cta-bar__hint" role="status">@DisabledHint</p>
+            }
+        </div>
+    }
+    </div>
     }
 
 </div>
 
 @code {
-    [Parameter] public bool ShowDescriptionLength { get; set; }
     [Parameter] public bool ShowProcessButton { get; set; } = true;
     [Parameter] public string ButtonLabel { get; set; } = "Process Image";
     [Parameter] public string ButtonIcon { get; set; } = "bi-cpu";
-    [Parameter] public int DescriptionLength { get; set; }
     [Parameter] public string? ImagePreviewUrl { get; set; }
     [Parameter] public EventCallback<string?> ImagePreviewUrlChanged { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public bool CanProcess { get; set; }
     [Parameter] public EventCallback<InputFileChangeEventArgs> OnFileChange { get; set; }
     [Parameter] public EventCallback OnProcessClicked { get; set; }
-    [Parameter] public EventCallback<int> OnDescriptionLengthChanged { get; set; }
+
+    /// <summary>Page options rendered between the photo and the process button.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Says why the process button is disabled. Shown only while it is.</summary>
+    [Parameter] public string? DisabledHint { get; set; } = "Add a photo to enable this.";
+
+    /// <summary>
+    /// Shrink a loaded photo to a one-line chip. Off only on Studio, where choosing the photo is
+    /// the whole screen's job and a large preview is the confirmation.
+    /// </summary>
+    [Parameter] public bool Compact { get; set; } = true;
+
+    private bool IsCompact => Compact && ImagePreviewUrl != null;
+
+    /// <summary>
+    /// A feature page's panel: options and an action to lay out beside the photo. Studio and
+    /// Bulk pass neither (their actions live elsewhere), so they keep the single column.
+    /// </summary>
+    private bool IsSplit => ChildContent is not null && ShowProcessButton;
 
     /// <summary>
     /// Raised when an image arrives by clipboard paste or a drop outside the drop zone.
     /// Leave unset to opt the hosting page out of paste/drop intake entirely.
     /// </summary>
     [Parameter] public EventCallback<IntakeImage> OnImageIntake { get; set; }
-
-    /// <summary>
-    /// Snaps an arbitrary length onto the preset that owns it. The three buttons this replaced
-    /// each carried their own half of the range test (<c>&lt;= 220</c>, <c>&gt; 220 &amp;&amp; &lt;= 420</c>,
-    /// <c>&gt; 420</c>); folding them into one function is what stops the segments from ever
-    /// disagreeing about which of them is active.
-    /// </summary>
-    private static int DetailPresetFor(int length) => length switch
-    {
-        <= 220 => 200,
-        <= 420 => 350,
-        _ => 500,
-    };
 
     private bool _isDragging;
     private DotNetObjectReference<ImageUploadPanel>? _selfRef;

@@ -84,7 +84,7 @@ public partial class RapRoast : FeaturePageBase
         (RoastIntensity.Nuclear, "Nuclear", "Written to end you. Nothing held back"),
     ];
 
-    protected override void OnGalleryImageSelected() => _result = null;
+    protected override void OnImageChanged() => _result = null;
 
     /// <summary>Studio "Surprise me" hand-off — the default beat style is enough to run.</summary>
     protected override Task? AutoStartAsync() => RoastAsync();

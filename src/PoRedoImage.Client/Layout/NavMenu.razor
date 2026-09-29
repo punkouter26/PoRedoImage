@@ -10,22 +10,23 @@
     many destinations — so the rail names the destinations.
 *@
 <nav class="app-nav__links" aria-label="Features">
-    @foreach (var (href, label) in Features)
+    @foreach (var (href, label, icon) in Features)
     {
-        <NavLink class="app-nav__link" href="@href" Match="NavLinkMatch.All">@label</NavLink>
+        @* The icon is only painted in the phone tab bar, where six labels share 390px. *@
+        <NavLink class="app-nav__link" href="@href" Match="NavLinkMatch.All"><i class="bi @icon app-nav__link-icon" aria-hidden="true"></i>@label</NavLink>
     }
 </nav>
 
 @code {
     // Order matches the Studio board's rows, so the rail and the home page cannot disagree
-    // about what this app does or what order it does it in.
-    private static readonly (string Href, string Label)[] Features =
+    // about what this app does or what order it does it in. Icons are the Studio rows' own.
+    private static readonly (string Href, string Label, string Icon)[] Features =
     [
-        ("/image-regeneration", "Regenerate"),
-        ("/meme-generation",    "Meme"),
-        ("/bulk-generate",      "Bulk"),
-        ("/rap-roast",          "Roast"),
-        ("/video",              "Video"),
-        ("/gallery",            "Gallery"),
+        ("/image-regeneration", "Regenerate", "bi-palette2"),
+        ("/meme-generation",    "Meme",       "bi-chat-square-text"),
+        ("/bulk-generate",      "Bulk",       "bi-grid-3x3"),
+        ("/rap-roast",          "Roast",      "bi-mic"),
+        ("/video",              "Video",      "bi-film"),
+        ("/gallery",            "Gallery",    "bi-images"),
     ];
 }

@@ -71,6 +71,19 @@
     @DirectionContract
     <Routes @rendermode="WasmMode" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    @* Radzen.Blazor.js calls document.fonts.load('16px Material Symbols') the moment it loads,
+       which fetched the full 3.1MB icon font on every page whether or not a Radzen icon was on
+       it. The icons render from a 96KB subset under its own family name (css/foundation.css),
+       so aim that one preload at the subset. Must run before Radzen.Blazor.js. *@
+    <script>
+        (function (fonts) {
+            if (!fonts) return;
+            var load = fonts.load.bind(fonts);
+            fonts.load = function (font, text) {
+                return load(String(font).replace('Material Symbols', '"PoRedo Radzen Icons"'), text);
+            };
+        })(document.fonts);
+    </script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/fx.js"></script>

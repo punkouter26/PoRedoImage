@@ -55,6 +55,7 @@ dotnet test tests/PoRedoImage.Tests.Unit --filter "FullyQualifiedName~AuthTests"
 pwsh ./SCRIPTS/run-e2e.ps1     # builds, launches the app on :4000, waits for /alive, runs E2E, tears down
 pwsh ./SCRIPTS/setup.ps1       # one-time machine setup (SDK, Docker, Playwright browsers)
 pwsh ./SCRIPTS/cleanup-testcontainers.ps1   # reap leaked Azurite containers after an aborted run
+python SCRIPTS/subset-radzen-icons.py      # rebuild the 96KB Radzen icon font after a Radzen upgrade or new Icon="…"
 ```
 
 README.md's test commands now name the real projects (`Tests.E2E.ApiSmoke` / `Tests.E2E.UI`); its
@@ -306,7 +307,7 @@ per-tier ceiling tests recompute them every CI run, so refresh this table when t
 
 | Tier | Methods | Ceiling |
 |---|---|---|
-| Unit | 90 | 100 |
+| Unit | 91 | 100 |
 | Integration | 45 | 50 |
 | E2E.ApiSmoke | 15 | 25 |
 | E2E.UI | 11 | 25 |

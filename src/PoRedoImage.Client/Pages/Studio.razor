@@ -20,11 +20,10 @@
             <AiServicePicker />
 
             <ImageUploadPanel
-                ShowDescriptionLength="false"
                 ShowProcessButton="false"
+                Compact="false"
                 ImagePreviewUrl="@_previewUrl"
                 ErrorMessage="@_error"
-                CanProcess="false"
                 OnFileChange="LoadFile"
                 OnImageIntake="HandleImageIntake" />
         </div>

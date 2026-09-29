@@ -15,9 +15,10 @@ using System.Security.Claims;
 namespace PoRedoImage.Client.Pages;
 
 /// <summary>
-/// Shared base component for feature pages (ImageRegeneration, MemeGeneration).
-/// Centralises upload, gallery selection, auto-save, and progress state that is
-/// identical across both pages, eliminating ~70 lines of duplication.
+/// Shared base component for every feature page (Regeneration, Meme, Bulk, Rap Roast, Video).
+/// Centralises upload, paste/drop intake, gallery selection, auto-save and run state, so the
+/// intake paths cannot drift between pages — Bulk used to carry its own copies, and they had
+/// already diverged (a pasted image skipped the downscale every other page applies).
 /// </summary>
 public abstract class FeaturePageBase : ComponentBase
 {
@@ -190,7 +191,6 @@ public abstract class FeaturePageBase : ComponentBase
         errorMessage = null;
         isComplete = false;
         AdoptImage(shrunk.PreviewUrl, bytes, contentType, fileName);
-        OnGalleryImageSelected(); // clears derived result state on the concrete page
 
         NotificationService.Notify(NotificationSeverity.Success,
             payload.Source == "drop" ? "Image dropped" : "Image pasted",
@@ -206,6 +206,7 @@ public abstract class FeaturePageBase : ComponentBase
     {
         imagePreviewUrl = previewUrl;
         SessionService.SetImage(previewUrl, contentType, fileName, bytes);
+        OnImageChanged(); // a new photo invalidates whatever the page derived from the old one
         // Fire-and-forget has bitten us before: a transient 5xx silently produced a gallery
         // with no entry. Delegate to UserImageSaveService which sends an Idempotency-Key and
         // surfaces a Retry-button Radzen toast on failure. The _ = drop is intentional here
@@ -220,12 +221,34 @@ public abstract class FeaturePageBase : ComponentBase
         imagePreviewUrl = SessionService.PreviewUrl;
         isComplete = false;
         errorMessage = null;
-        OnGalleryImageSelected();
+        OnImageChanged();
         StateHasChanged();
     }
 
-    /// <summary>Called by HandleGalleryImage so derived pages can clear their own result state.</summary>
-    protected virtual void OnGalleryImageSelected() { }
+    /// <summary>Downloads the page's input photo. Shared by every results toolbar's "Original" button.</summary>
+    protected async Task DownloadOriginal()
+    {
+        if (imagePreviewUrl == null) return;
+        var ok = await Js.InvokeAsync<bool>("downloadImage", imagePreviewUrl,
+            selectedFile?.Name ?? SessionService.FileName ?? "original.jpg");
+        if (!ok) errorMessage = "There was a problem downloading the image.";
+    }
+
+    /// <summary>
+    /// Called whenever the page's photo changes — upload, paste, drop, camera or gallery pick —
+    /// so derived pages can clear result state computed from the previous photo.
+    /// </summary>
+    protected virtual void OnImageChanged() { }
+
+    /// <summary>
+    /// The active photo's bytes and content type, or null when there is none. The session holds
+    /// the bytes for every intake path; the preview URL is the fallback for a restored session.
+    /// </summary>
+    protected (byte[] Bytes, string ContentType)? ActiveImage() =>
+        imagePreviewUrl is null
+            ? null
+            : (SessionService.Bytes ?? Convert.FromBase64String(ExtractBase64(imagePreviewUrl)),
+               SessionService.ContentType ?? selectedFile?.ContentType ?? "image/jpeg");
 
     /// <summary>
     /// Saves the just-uploaded original into the user's gallery via <see cref="UserImageSaveService"/>.

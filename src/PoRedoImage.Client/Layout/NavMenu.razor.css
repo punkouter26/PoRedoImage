@@ -1,37 +1,66 @@
 /* Individual link styling is global (app.css .app-nav__link) because these anchors are
-   rendered by NavLink inside this component and MainLayout's scoped sheet cannot reach
-   them. Only the rail's own layout belongs here. */
+   rendered by NavLink inside this component and this scoped sheet cannot reach them without
+   ::deep. Only the rail's own layout, and the phone tab bar, belong here. */
 
 .app-nav__links {
     display: flex;
     align-items: center;
     gap: 0.125rem;
-    flex: 1 1 auto;
     min-width: 0;
     justify-content: center;
 }
 
-/* Below md the five labels cannot share the rail with the wordmark. They wrap to a
-   second row when the wordmark and account controls leave room, and only scroll inline
-   when even two rows cannot fit — a hidden nav is the bug this component was written
-   to fix. The horizontal scrollbar is left visible (thin) so the overflow is
-   discoverable on touch, with an edge fade so it does not look broken. */
-@media (max-width: 991.98px) {
+.app-nav__links ::deep .app-nav__link-icon { display: none; }
+
+/* md–lg: six labels plus the status cell can outrun a 768px rail. Scroll inline rather than
+   wrap, with an edge fade so the overflow reads as deliberate. */
+@media (max-width: 1023.98px) {
     .app-nav__links {
-        justify-content: flex-end;
-        flex-wrap: wrap;
+        justify-content: flex-start;
         overflow-x: auto;
-        scrollbar-width: thin;
-        -webkit-overflow-scrolling: touch;
-        mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+        scrollbar-width: none;
+        mask-image: linear-gradient(to right, transparent 0, black 8px, black calc(100% - 8px), transparent 100%);
+    }
+}
+
+/* ── Phone: bottom tab bar ────────────────────────────────────────────────
+   On a phone the rail has room for the brand and the session status, not six destinations.
+   The wrap/scroll fallback that lived here left ONE label visible at 390px (the rest scrolled
+   off behind the wordmark), and none once the cost chip appeared. A fixed bar under the thumb
+   shows all six. --tabbar-h (app.css) is what the sticky CTA and body padding clear. */
+@media (max-width: 767.98px) {
+    .app-nav__links {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1040;
+        height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0;
+        overflow: visible;
+        mask-image: none;
+        background: var(--steel-face);
+        border-top: 1px solid rgba(0,0,0,0.65);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.6);
     }
 
-    /* On really narrow viewports, fall back to a single scrollable row to keep the
-       rail height constant and the wordmark from reflowing into two lines. */
-    @media (max-width: 479.98px) {
-        .app-nav__links {
-            flex-wrap: nowrap;
-            justify-content: flex-start;
-        }
+    .app-nav__links ::deep .app-nav__link {
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.25rem;
+        height: 100%;
+        padding: 0 0.1rem;
+        font-size: var(--text-3xs);
+        letter-spacing: 0.06em;
+        border-bottom: 0;
+        border-top: 2px solid transparent;
+        overflow: hidden;
     }
+
+    .app-nav__links ::deep .app-nav__link.active { border-top-color: var(--amber); }
+
+    .app-nav__links ::deep .app-nav__link-icon { display: block; font-size: 1.15rem; line-height: 1; }
 }
