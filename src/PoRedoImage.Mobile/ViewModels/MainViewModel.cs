@@ -54,6 +54,17 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveActionTitle));
     }
 
+    // A result landing is a tap, a failure a long press — felt even with the phone on silent.
+    partial void OnHasResultChanged(bool value) { if (value) Buzz(HapticFeedbackType.Click); }
+
+    partial void OnHasErrorChanged(bool value) { if (value) Buzz(HapticFeedbackType.LongPress); }
+
+    private static void Buzz(HapticFeedbackType type)
+    {
+        try { HapticFeedback.Default.Perform(type); }
+        catch (FeatureNotSupportedException) { /* emulators and tablets without a motor */ }
+    }
+
     public string ActiveActionTitle => ActiveAction switch
     {
         ResultMode.Meme => "Make Meme",

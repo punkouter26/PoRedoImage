@@ -316,6 +316,9 @@
     color: var(--amber);
     border-left-color: var(--amber);
     font-weight: 600;
+    /* --roast-beat is the track's live kick (0–1), published per frame by roastStage.js. */
+    transform: translateX(calc(var(--roast-beat, 0) * 6px));
+    text-shadow: 0 0 calc(var(--roast-beat, 0) * 16px) rgba(255, 180, 0, 0.75);
 }
 
 .roast-script__section {

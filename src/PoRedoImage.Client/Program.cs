@@ -71,6 +71,10 @@ builder.Services.AddScoped<PromptHistoryService>();
 // the tally resets with the app instance — it describes this visit, not the account.
 builder.Services.AddScoped<SessionCostService>();
 
+// Header tray for long-running jobs (Veo renders, bulk batches). Scoped == app-lifetime in WASM,
+// which is the point: a job outlives the page that started it.
+builder.Services.AddScoped<JobTrayService>();
+
 // BFF auth (§2): the server serializes the authenticated principal (claims only, no tokens);
 // the client deserializes it into an AuthenticationStateProvider.
 builder.Services.AddAuthorizationCore();

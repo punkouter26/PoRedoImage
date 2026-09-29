@@ -3,16 +3,15 @@ using Microsoft.JSInterop;
 namespace PoRedoImage.Client.Shared;
 
 /// <summary>
-/// Thin wrapper over the procedurally-synthesized audio cues in <c>wwwroot/js/audio.js</c>.
-/// Zero asset bytes: every cue is an <c>OscillatorNode</c> + lowpass-filtered noise burst.
+/// The one C# door to the app's feedback layer: the synthesized cues in <c>wwwroot/js/audio.js</c>
+/// plus the ticker-tape burst and haptics in <c>wwwroot/js/fx.js</c>.
+/// Zero asset bytes: every cue is an <c>OscillatorNode</c> + filtered noise burst.
 ///
 /// Honours <c>prefers-reduced-motion</c>, <c>prefers-reduced-data</c>, and a
 /// <c>localStorage['poredoimage.audio.enabled']</c> kill switch — every call is a
 /// safe no-op when the user has opted out.
 ///
-/// Inject as scoped. Resolves the <c>window.PoRedoImageAudio</c> global lazily on
-/// first use; the JS module is loaded eagerly via <c>Program.cs</c> script registration
-/// so the global is always present.
+/// Inject as scoped. Both scripts are loaded eagerly by the host page, so the globals exist.
 /// </summary>
 public sealed class AudioFeedbackService : IAsyncDisposable
 {
@@ -25,23 +24,23 @@ public sealed class AudioFeedbackService : IAsyncDisposable
         _logger = logger;
     }
 
-    /// <summary>Two-note success arpeggio (A5 → E6) — call on generation-complete.</summary>
-    public ValueTask SuccessAsync() => SafeInvoke("success");
+    /// <summary>
+    /// Station chime, "Now arriving: <paramref name="label"/>", ticker-tape and a double tap —
+    /// call on generation-complete. A null label skips the spoken line.
+    /// </summary>
+    public ValueTask SuccessAsync(string? label) => SafeInvoke("poFx.done", label);
 
-    /// <summary>Low-passed noise burst — call on generation-failed / 4xx / 5xx.</summary>
-    public ValueTask FailureAsync() => SafeInvoke("failure");
-
-    /// <summary>Single soft tick — call on micro-state changes (button press, etc.).</summary>
-    public ValueTask TickAsync() => SafeInvoke("tick");
+    /// <summary>Low-passed noise burst and one long buzz — call on generation-failed / 4xx / 5xx.</summary>
+    public ValueTask FailureAsync() => SafeInvoke("poFx.fail");
 
     /// <summary>Persist the user's audio opt-in/opt-out choice.</summary>
-    public ValueTask SetEnabledAsync(bool enabled) => SafeInvoke("setEnabled", enabled);
+    public ValueTask SetEnabledAsync(bool enabled) => SafeInvoke("PoRedoImageAudio.setEnabled", enabled);
 
     private async ValueTask SafeInvoke(string method, params object?[] args)
     {
         try
         {
-            await _js.InvokeVoidAsync($"PoRedoImageAudio.{method}", args);
+            await _js.InvokeVoidAsync(method, args);
         }
         catch (Exception ex)
         {

@@ -32,6 +32,7 @@ public abstract class FeaturePageBase : ComponentBase
     [Inject] protected UserImageSaveService UserImageSave { get; set; } = default!;
     [Inject] protected SessionCostService Cost { get; set; } = default!;
     [Inject] protected IJSRuntime Js { get; set; } = default!;
+    [Inject] protected AudioFeedbackService Feedback { get; set; } = default!;
 
     private ILogger? _logger;
     protected ILogger Logger => _logger ??= LoggerFactory.CreateLogger(GetType());
@@ -94,6 +95,8 @@ public abstract class FeaturePageBase : ComponentBase
         var route = NavigationManager.Uri;
         var path = new Uri(route).AbsolutePath;
         SessionService.RecordFeatureVisit(path);
+        _featureTitle = FeatureCatalog.All
+            .FirstOrDefault(f => path.StartsWith(f.Route, StringComparison.OrdinalIgnoreCase))?.Title;
     }
 
     /// <summary>
@@ -105,6 +108,8 @@ public abstract class FeaturePageBase : ComponentBase
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SignalRunOutcomeAsync();
+
         if (!firstRender || _autoStarted) return;
         _autoStarted = true;
 
@@ -119,6 +124,30 @@ public abstract class FeaturePageBase : ComponentBase
     }
 
     private bool _autoStarted;
+
+    private string? _featureTitle;
+    private BoardStatus _seenStatus;
+    private string? _seenError;
+    private bool _outcomePrimed;
+
+    /// <summary>
+    /// Rings the arrival chime when this render shows a run that was Working now Done, and the
+    /// failure cue when a new error appeared. Diffed after render rather than hooked into
+    /// <see cref="FeatureRunState"/> because pages reach Failed by writing <c>errorMessage</c>
+    /// directly, and this sees both paths. The first render only records a baseline: a job
+    /// restored from before this page opened (Video's tray job) is not news.
+    /// </summary>
+    private async Task SignalRunOutcomeAsync()
+    {
+        var finished = _seenStatus == BoardStatus.Working && Run.IsComplete;
+        var newError = errorMessage is not null && errorMessage != _seenError;
+        var primed = _outcomePrimed;
+        (_seenStatus, _seenError, _outcomePrimed) = (Run.Status, errorMessage, true);
+
+        if (!primed) return;
+        if (finished) await Feedback.SuccessAsync(_featureTitle);
+        else if (newError) await Feedback.FailureAsync();
+    }
 
     protected async Task LoadFile(InputFileChangeEventArgs e)
     {

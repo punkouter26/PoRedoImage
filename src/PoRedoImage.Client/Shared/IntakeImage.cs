@@ -19,7 +19,7 @@ public sealed record IntakeImage
 
     public string? FileName { get; init; }
 
-    /// <summary><c>"paste"</c> or <c>"drop"</c> — used only to word the confirmation toast.</summary>
+    /// <summary><c>"paste"</c>, <c>"drop"</c>, <c>"camera"</c> or <c>"share"</c> — used only to word the confirmation toast.</summary>
     public string? Source { get; init; }
 
     /// <summary>User-facing rejection reason (wrong type, too large, unreadable), or null on success.</summary>

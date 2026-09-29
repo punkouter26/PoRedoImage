@@ -1,5 +1,8 @@
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using PoRedoImage.Client.Services;
+using PoRedoImage.Client.Shared;
 using PoRedoImage.Shared.DTOs;
 using PoRedoImage.Shared.Json;
 using Radzen;
@@ -10,26 +13,56 @@ namespace PoRedoImage.Client.Pages;
 /// Code-behind for <c>VideoGenerate.razor</c> — the image-to-video feature.
 /// </summary>
 /// <remarks>
-/// The server starts a Veo job and hands back the provider's operation handle; this page then
-/// polls <c>GET /api/video/status</c> until the clip is ready. It is not a blocking call because
-/// a Veo render takes 1–5 minutes and Azure App Service drops an idle HTTP request at ~230
-/// seconds — a single long request would pass locally and fail in production.
+/// The server starts a Veo job and hands back the provider's operation handle. Polling it is
+/// <see cref="JobTrayService"/>'s job, not this page's: a Veo render takes 1–5 minutes, and when
+/// the loop lived here, leaving the page cancelled it and threw the render away. The page now
+/// only mirrors the tray's job, and re-attaches to it when the user comes back.
 /// </remarks>
 public partial class VideoGenerate : IDisposable
 {
-    /// <summary>How often to ask the server whether the clip is done.</summary>
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(6);
-
-    /// <summary>
-    /// Give up after this long. Veo's own guidance is 1–5 minutes; eight is generous enough that
-    /// a slow-but-healthy render still lands, while still ending rather than polling forever.
-    /// </summary>
-    private static readonly TimeSpan PollTimeout = TimeSpan.FromMinutes(8);
+    [Inject] private JobTrayService Jobs { get; set; } = default!;
 
     private string _prompt = string.Empty;
     private string? _videoUrl;
-    private CancellationTokenSource? _pollCts;
-    private bool _disposed;
+    private TrayJob? _job;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        Jobs.OnChange += OnJobsChanged;
+        _job = Jobs.LatestVideo;
+        SyncFromJob();
+    }
+
+    private void OnJobsChanged() => InvokeAsync(() =>
+    {
+        // A reload lands here before the tray has restored persisted jobs, so adopt one that
+        // appears while this page is idle.
+        if (_job is null && !isProcessing && !isComplete) _job = Jobs.LatestVideo;
+        SyncFromJob();
+        StateHasChanged();
+    });
+
+    private void SyncFromJob()
+    {
+        if (_job is null) return;
+        switch (_job.Status)
+        {
+            case BoardStatus.Working:
+                if (!isProcessing) isProcessing = true;
+                progressMessage = _job.Detail ?? "Veo is rendering…";
+                break;
+            case BoardStatus.Done when !isComplete:
+                _videoUrl = _job.ResultUrl;
+                isComplete = true;
+                Jobs.MarkSeen(_job);
+                break;
+            case BoardStatus.Failed:
+                errorMessage = _job.Detail;
+                isProcessing = false;
+                break;
+        }
+    }
 
     private async Task CreateVideo()
     {
@@ -41,11 +74,6 @@ public partial class VideoGenerate : IDisposable
         progressMessage = "Sending your photo to Veo…";
         StateHasChanged();
 
-        _pollCts?.Cancel();
-        _pollCts?.Dispose();
-        _pollCts = new CancellationTokenSource(PollTimeout);
-        var ct = _pollCts.Token;
-
         try
         {
             var request = new VideoGenerateRequest(
@@ -54,7 +82,7 @@ public partial class VideoGenerate : IDisposable
                 Prompt: _prompt.Trim());
 
             using var startResponse = await Http.PostAsJsonAsync(
-                "/api/video/generate", request, SharedJsonOptions.Default, ct);
+                "/api/video/generate", request, SharedJsonOptions.Default);
 
             if (!startResponse.IsSuccessStatusCode)
             {
@@ -64,7 +92,7 @@ public partial class VideoGenerate : IDisposable
             }
 
             var start = await startResponse.Content.ReadFromJsonAsync<VideoGenerateStartResponse>(
-                SharedJsonOptions.Default, ct);
+                SharedJsonOptions.Default);
 
             if (start is null || string.IsNullOrWhiteSpace(start.OperationName))
             {
@@ -74,74 +102,22 @@ public partial class VideoGenerate : IDisposable
             }
 
             Cost.RecordVideo(1);
-            await PollUntilDoneAsync(start.OperationName, ct);
-        }
-        catch (OperationCanceledException)
-        {
-            // Distinguish the two cancellations that reach here: the page going away (nothing to
-            // say) versus the render outliving its budget (the user needs to know it stopped).
-            if (_pollCts?.IsCancellationRequested == true && !_disposed)
-            {
-                errorMessage =
-                    $"The video did not finish within {PollTimeout.TotalMinutes:0} minutes. "
-                    + "Veo may still be busy — try again with a simpler prompt.";
-            }
-            isProcessing = false;
+            _job = Jobs.TrackVideo(start.OperationName);
+            SyncFromJob();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Video generation failed");
+            Logger.LogError(ex, "Video generation failed to start");
             errorMessage = "Video generation failed. Please try again.";
             isProcessing = false;
-        }
-        finally
-        {
-            if (!_disposed) StateHasChanged();
-        }
-    }
-
-    /// <summary>
-    /// Polls the server until the render finishes, fails, or the budget runs out.
-    /// </summary>
-    private async Task PollUntilDoneAsync(string operationName, CancellationToken ct)
-    {
-        var started = DateTimeOffset.UtcNow;
-
-        while (!ct.IsCancellationRequested)
-        {
-            await Task.Delay(PollInterval, ct);
-
-            var waited = DateTimeOffset.UtcNow - started;
-            progressMessage = $"Veo is rendering your clip… ({waited.TotalSeconds:0}s)";
-            if (!_disposed) StateHasChanged();
-
-            var status = await Http.GetFromJsonAsync<VideoGenerateStatusResponse>(
-                $"/api/video/status?op={Uri.EscapeDataString(operationName)}", SharedJsonOptions.Default, ct);
-
-            if (status is null || !status.Done) continue;
-
-            if (!string.IsNullOrWhiteSpace(status.ErrorMessage) || string.IsNullOrWhiteSpace(status.VideoData))
-            {
-                // Always name the reason. A video that just fails to appear reads as the app being
-                // broken — the same silent-degradation trap the AI fallbacks guard against.
-                errorMessage = status?.ErrorMessage ?? "The video service returned no clip.";
-                isProcessing = false;
-                return;
-            }
-
-            _videoUrl = $"data:{status.VideoContentType ?? "video/mp4"};base64,{status.VideoData}";
-            isProcessing = false;
-            isComplete = true;
-
-            NotificationService.Notify(
-                NotificationSeverity.Success, "Video ready", "Your 8-second clip is below.", duration: 4000);
-            return;
         }
     }
 
     private void StartOver()
     {
-        _pollCts?.Cancel();
+        // "Try another" is done with this clip, so it leaves the tray too.
+        if (_job is { Status: not BoardStatus.Working }) Jobs.Dismiss(_job);
+        _job = null;
         _videoUrl = null;
         _prompt = string.Empty;
         errorMessage = null;
@@ -167,11 +143,5 @@ public partial class VideoGenerate : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _disposed = true;
-        _pollCts?.Cancel();
-        _pollCts?.Dispose();
-        _pollCts = null;
-    }
+    public void Dispose() => Jobs.OnChange -= OnJobsChanged;
 }

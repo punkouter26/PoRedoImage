@@ -35,6 +35,10 @@
     @if (isProcessing)
     {
         <ProcessingProgressBar Message="@progressMessage" />
+        <div class="video-prompt-help">
+            <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+            <span>Feel free to leave this page — the render keeps going and the Jobs tray up top lights up when it's done.</span>
+        </div>
     }
 
     @if (isComplete)

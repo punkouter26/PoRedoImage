@@ -269,6 +269,8 @@ else
     /// </remarks>
     private async Task OpenLightboxAsync(GalleryItem item)
     {
+        // Snapshot the thumbnail first so the dialog's image morphs out of it (fx.js).
+        await JSRuntime.InvokeVoidAsync("poFx.heroFrom", item.ImageUrl);
         var choice = await DialogService.OpenAsync<GalleryLightbox>(
             item.FileName,
             new Dictionary<string, object> { ["Item"] = item, ["IconClass"] = KindIcon(item.Kind) },

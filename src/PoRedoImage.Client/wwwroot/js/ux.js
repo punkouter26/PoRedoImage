@@ -7,6 +7,8 @@
 //   * Zip           : STORE-method (no deflate) ZIP writer. PNG/JPEG are already compressed,
 //                     so storing costs nothing and keeps this file dependency-free.
 //   * Prompt store  : localStorage-backed recent/pinned prompt list.
+//   * Job tray      : browser notifications for jobs that finish while the tab is hidden.
+//   * Share target  : picks up a photo shared into the installed app (see sw.js).
 window.poUx = (function () {
     'use strict';
 
@@ -145,6 +147,7 @@ window.poUx = (function () {
             window.addEventListener('dragleave', onDragLeave);
             window.addEventListener('drop', onDrop);
             intake = { ref: ref, onPaste: onPaste, onDragOver: onDragOver, onDragLeave: onDragLeave, onDrop: onDrop };
+            consumeSharedImage();
         },
 
         unregisterIntake: function () {
@@ -321,7 +324,42 @@ window.poUx = (function () {
                 return 'failed';
             }
         },
+
+        // ── Job tray notifications ───────────────────────────────────────────
+        // Asked when a long job starts, never on page load: a permission prompt with no job
+        // behind it reads as spam and is the prompt users block forever.
+        requestNotifications: async function () {
+            if (!('Notification' in window) || Notification.permission !== 'default') return;
+            try { await Notification.requestPermission(); } catch { /* old callback-style API */ }
+        },
+
+        // Only when the tab is hidden: a visible tab already shows the tray and a toast.
+        notifyIfHidden: function (title, body) {
+            if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
+            try {
+                const n = new Notification(title, { body: body, icon: '/icons/icon-192.png' });
+                n.onclick = function () { window.focus(); n.close(); };
+            } catch { /* Android Chrome only allows notifications via a service worker */ }
+        },
     };
+
+    // ── Web Share Target ────────────────────────────────────────────────────
+    // sw.js stashes a photo shared from another app into Cache Storage and redirects to
+    // /?shared=1. The first upload panel to register picks it up through the same push() path
+    // as paste and drop, so it gets the same type/size validation.
+    async function consumeSharedImage() {
+        if (!('caches' in window) || new URLSearchParams(location.search).get('shared') !== '1') return;
+        history.replaceState(history.state, '', location.pathname);
+        try {
+            const cache = await caches.open('po-share');
+            const res = await cache.match('/shared-image');
+            if (!res) return;
+            await cache.delete('/shared-image');
+            const blob = await res.blob();
+            const name = decodeURIComponent(res.headers.get('X-File-Name') || '') || ('shared-image.' + extensionFor(blob.type));
+            push(new File([blob], name, { type: blob.type }), 'share');
+        } catch { /* Cache Storage unavailable — the user can still upload normally */ }
+    }
 
     // ── Internals ───────────────────────────────────────────────────────────
 

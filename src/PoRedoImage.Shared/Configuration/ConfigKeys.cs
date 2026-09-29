@@ -27,6 +27,7 @@ public static class ConfigKeys
     public const string ApplicationInsightsConnectionString = "ApplicationInsights:ConnectionString";
     public const string ApplicationInsightsStagingConnectionString = "ApplicationInsights:StagingConnectionString";
     public const string ApplicationInsightsSamplingRatio = "ApplicationInsights:SamplingRatio";
+    public const string ApplicationInsightsEnableAspNetCoreMeters = "ApplicationInsights:EnableAspNetCoreMeters";
 
     /// <summary>Platform-injected connection string (App Service sets this automatically).</summary>
     public const string AppInsightsConnectionStringEnv = "APPLICATIONINSIGHTS_CONNECTION_STRING";

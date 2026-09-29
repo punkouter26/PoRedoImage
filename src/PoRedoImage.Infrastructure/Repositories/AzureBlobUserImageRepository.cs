@@ -15,7 +15,7 @@ namespace PoRedoImage.Infrastructure.Repositories;
 /// User image repository backed by Azure Blob Storage (bytes) and Azure Table Storage (metadata).
 /// Both services share the same Storage connection string as BulkPromptRepository.
 /// Blob container: "user-images" — blobs named "{userId}/{imageId}".
-/// Table: "UserImages" — PartitionKey = userId, RowKey = imageId.
+/// Table: "UserImages" — PartitionKey = userId, RowKey = imageId, tags in a Tags column.
 /// </summary>
 public sealed class AzureBlobUserImageRepository : IUserImageRepository
 {
@@ -64,7 +64,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         }
     }
 
-    public async Task<string> SaveBlobAsync(string userId, UserImageId imageId, byte[] bytes, string contentType, IReadOnlyList<string>? tags, CancellationToken ct = default)
+    public async Task<string> SaveBlobAsync(string userId, UserImageId imageId, byte[] bytes, string contentType, CancellationToken ct = default)
     {
         if (_blobContainer is null) return string.Empty;
         await EnsureInitializedAsync(ct);
@@ -73,31 +73,28 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         var blobClient = _blobContainer.GetBlobClient(blobName);
         using var stream = new MemoryStream(bytes, writable: false);
         var headers = new BlobHttpHeaders { ContentType = contentType };
+        await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = headers }, cancellationToken: ct);
 
-        // Tags ride as blob metadata (key=Tags, value=comma-joined). Cheaper than widening the
-        // UserImages table schema and naturally scoped to the bytes themselves — they survive
-        // when the blob is read back out without a metadata round-trip.
-        var metadata = BuildTagsMetadata(tags);
-        await blobClient.UploadAsync(
-            stream,
-            new BlobUploadOptions { HttpHeaders = headers, Metadata = metadata },
-            cancellationToken: ct);
-
-        _logger.LogInformation("Saved user image blob {BlobName} ({Bytes} bytes, tags={TagCount})", blobName, bytes.Length, metadata is null ? 0 : 1);
+        _logger.LogInformation("Saved user image blob {BlobName} ({Bytes} bytes)", blobName, bytes.Length);
         return blobClient.Uri.ToString();
     }
 
-    private static IDictionary<string, string>? BuildTagsMetadata(IReadOnlyList<string>? tags)
-    {
-        if (tags is null || tags.Count == 0) return null;
-        // Metadata values must be ASCII / valid HTTP header values. Vision tags come from a
-        // controlled vocabulary from Azure Computer Vision so this is safe in practice; we still
-        // defensively strip anything that would violate the header grammar.
-        var joined = string.Join(',', tags
+    /// <summary>
+    /// Tags are stored comma-joined in one table column. Commas inside a tag become ';' so the
+    /// join stays reversible — the same encoding the older blob-metadata rows used.
+    /// </summary>
+    private static string JoinTags(IReadOnlyList<string>? tags) =>
+        tags is null ? string.Empty : string.Join(',', tags
             .Where(t => !string.IsNullOrWhiteSpace(t))
             .Select(t => t.Replace(',', ';').Trim()));
-        return string.IsNullOrEmpty(joined) ? null : new Dictionary<string, string> { ["Tags"] = joined };
-    }
+
+    private static IReadOnlyList<string> ParseTags(string? raw) =>
+        string.IsNullOrWhiteSpace(raw)
+            ? []
+            : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                 .Select(t => t.Replace(';', ','))
+                 .ToList()
+                 .AsReadOnly();
 
     public async Task SaveMetadataAsync(UserImage image, CancellationToken ct = default)
     {
@@ -112,33 +109,69 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
             ContentType = image.ContentType,
             Kind = image.Kind.ToString(),
             CreatedAt = image.CreatedAt,
-            SizeBytes = image.SizeBytes
+            SizeBytes = image.SizeBytes,
+            Tags = JoinTags(image.Tags)
         };
 
         await _tableClient.UpsertEntityAsync(entity, cancellationToken: ct);
         _logger.LogInformation("Saved user image metadata {Id} kind={Kind}", image.Id, image.Kind);
     }
 
+    /// <remarks>
+    /// Storage failures propagate: the endpoint turns them into a 503 the gallery shows with a
+    /// Retry. Returning an empty list here made a storage outage read as "all your images are gone".
+    /// </remarks>
     public async Task<IReadOnlyList<UserImage>> GetByUserAsync(string userId, CancellationToken ct = default)
     {
         if (_tableClient is null) return [];
+        await EnsureInitializedAsync(ct);
+
+        // ponytail: whole partition in memory (metadata only, ~200 bytes/row); page server-side
+        // with a reverse-ticks RowKey if a user ever holds tens of thousands of images.
+        var entities = new List<UserImageTableEntity>();
+        await foreach (var entity in _tableClient.QueryAsync<UserImageTableEntity>(
+            filter: TableClient.CreateQueryFilter($"PartitionKey eq {userId}"), cancellationToken: ct))
+        {
+            entities.Add(entity);
+        }
+
+        // Rows written before tags moved into the table carry Tags == null. Read those once from
+        // the blob's metadata and write them back, so each legacy row costs one HEAD ever rather
+        // than one HEAD per gallery load.
+        await Parallel.ForEachAsync(
+            entities.Where(e => e.Tags is null),
+            new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = ct },
+            async (entity, token) => await BackfillLegacyTagsAsync(entity, token));
+
+        return entities.Select(MapToDomain).OrderByDescending(i => i.CreatedAt).ToList().AsReadOnly();
+    }
+
+    private async Task BackfillLegacyTagsAsync(UserImageTableEntity entity, CancellationToken ct)
+    {
+        if (_blobContainer is null || _tableClient is null) return;
         try
         {
-            await EnsureInitializedAsync(ct);
-
-            var results = new List<UserImage>();
-            await foreach (var entity in _tableClient.QueryAsync<UserImageTableEntity>(
-                filter: $"PartitionKey eq '{userId}'", cancellationToken: ct))
+            var blobClient = _blobContainer.GetBlobClient($"{entity.PartitionKey}/{entity.RowKey}");
+            string tags;
+            try
             {
-                results.Add(MapToDomain(entity));
+                var props = await blobClient.GetPropertiesAsync(cancellationToken: ct);
+                tags = props.Value.Metadata.TryGetValue("Tags", out var raw) ? raw : string.Empty;
+            }
+            catch (RequestFailedException ex) when (ex.Status == 404)
+            {
+                tags = string.Empty;
             }
 
-            return results.OrderByDescending(i => i.CreatedAt).ToList().AsReadOnly();
+            entity.Tags = tags;
+            await _tableClient.UpdateEntityAsync(
+                new TableEntity(entity.PartitionKey, entity.RowKey) { [nameof(UserImageTableEntity.Tags)] = tags },
+                ETag.All, TableUpdateMode.Merge, ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to retrieve user images for user {UserId}", userId);
-            return [];
+            // Tags are decoration; a failed backfill shows the image untagged and retries next load.
+            _logger.LogWarning(ex, "Tag backfill failed for {UserId}/{ImageId}", entity.PartitionKey, entity.RowKey);
         }
     }
 
@@ -162,42 +195,6 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
             _logger.LogWarning(ex, "Failed to retrieve user image blob {UserId}/{ImageId}", userId, imageId);
             return null;
         }
-    }
-
-    /// <summary>
-    /// Reads just the Tags metadata (one HEAD request) so the gallery can display content
-    /// filters without doing a full DownloadContent on every row. Cheap, idempotent.
-    /// </summary>
-    public async Task<IReadOnlyList<string>?> GetTagsAsync(string userId, UserImageId imageId, CancellationToken ct = default)
-    {
-        if (_blobContainer is null) return null;
-        try
-        {
-            await EnsureInitializedAsync(ct);
-            var blobClient = _blobContainer.GetBlobClient($"{userId}/{imageId}");
-            var props = await blobClient.GetPropertiesAsync(cancellationToken: ct);
-            return ParseTagsMetadata(props.Value.Metadata);
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to retrieve tags metadata for {UserId}/{ImageId}", userId, imageId);
-            return null;
-        }
-    }
-
-    private static IReadOnlyList<string>? ParseTagsMetadata(IDictionary<string, string>? metadata)
-    {
-        if (metadata is null) return null;
-        if (!metadata.TryGetValue("Tags", out var raw) || string.IsNullOrWhiteSpace(raw))
-            return null;
-        return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                  .Select(t => t.Replace(';', ','))
-                  .ToList()
-                  .AsReadOnly();
     }
 
     public async Task<UserImage?> GetMetadataAsync(string userId, UserImageId imageId, CancellationToken ct = default)
@@ -250,7 +247,7 @@ public sealed class AzureBlobUserImageRepository : IUserImageRepository
         Kind = Enum.TryParse<UserImageKind>(entity.Kind, out var k) ? k : UserImageKind.Original,
         CreatedAt = entity.CreatedAt,
         SizeBytes = entity.SizeBytes,
-        Tags = []
+        Tags = ParseTags(entity.Tags)
     };
 }
 
@@ -265,4 +262,7 @@ internal sealed class UserImageTableEntity : ITableEntity
     public string Kind { get; set; } = "Original";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public long SizeBytes { get; set; }
+
+    /// <summary>Comma-joined tags; null only on rows written before this column existed.</summary>
+    public string? Tags { get; set; }
 }

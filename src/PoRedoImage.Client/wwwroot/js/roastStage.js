@@ -21,6 +21,47 @@ window.poRoast = (function () {
     // after a single export.
     const audioGraphs = new WeakMap();
 
+    /**
+     * The element's Web Audio graph — speakers, recorder tap and beat analyser — built once.
+     * Resolves null when the context will not start: routing the element through a context that
+     * never runs would mute the track for good, so nothing is committed until it is running.
+     */
+    async function graphFor(audio) {
+        let graph = audioGraphs.get(audio);
+        if (graph) {
+            if (graph.ctx.state === 'suspended') await graph.ctx.resume();
+            return graph;
+        }
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return null;
+        const ctxA = new Ctor();
+        // Safari can leave resume() pending forever without a gesture; don't wait on it.
+        await Promise.race([ctxA.resume().catch(function () { }), new Promise(function (r) { setTimeout(r, 300); })]);
+        if (ctxA.state !== 'running') { ctxA.close(); return null; }
+
+        const source = ctxA.createMediaElementSource(audio);
+        const dest = ctxA.createMediaStreamDestination();
+        const analyser = ctxA.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.5;
+        source.connect(ctxA.destination);
+        source.connect(dest);
+        source.connect(analyser);
+        graph = { ctx: ctxA, dest: dest, analyser: analyser, bins: new Uint8Array(analyser.frequencyBinCount), avg: 0 };
+        audioGraphs.set(audio, graph);
+        return graph;
+    }
+
+    /** 0–1 kick strength: bass energy (bins 1–4, ~90–380Hz) above its own running average. */
+    function beatLevel(graph) {
+        graph.analyser.getByteFrequencyData(graph.bins);
+        let e = 0;
+        for (let i = 1; i <= 4; i++) e += graph.bins[i];
+        e /= 4 * 255;
+        graph.avg = graph.avg * 0.93 + e * 0.07;
+        return Math.max(0, Math.min(1, (e - graph.avg) * 6));
+    }
+
     function prefersReducedMotion() {
         return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     }
@@ -100,18 +141,25 @@ window.poRoast = (function () {
     function tick() {
         if (!session) return;
         paint();
+        if (session.graph) session.container.style.setProperty('--roast-beat', beatLevel(session.graph).toFixed(3));
         session.raf = requestAnimationFrame(tick);
     }
 
     function startLoop() {
         if (!session || session.raf) return;
         session.raf = requestAnimationFrame(tick);
+        // Built on play, not attach: play is the user's gesture, so the context is allowed to run.
+        if (!session.graph && !prefersReducedMotion()) {
+            const s = session;
+            graphFor(s.audio).then(function (g) { s.graph = g; });
+        }
     }
 
     function stopLoop() {
         if (!session || !session.raf) return;
         cancelAnimationFrame(session.raf);
         session.raf = 0;
+        session.container.style.setProperty('--roast-beat', '0');
         paint(); // one final settle so a pause leaves the correct bar lit
     }
 
@@ -212,12 +260,12 @@ window.poRoast = (function () {
         ctx.textAlign = 'left';
     }
 
-    function drawMemeRoastFrame(ctx, img, lines, idx, progress, meta, t) {
+    function drawMemeRoastFrame(ctx, img, lines, idx, progress, meta, t, kick) {
         ctx.save();
         t = t || 0;
 
-        // Beat pulse (~120 BPM)
-        const beat = Math.sin(t * 7.5);
+        // The track's measured kick; a ~120 BPM sine only when there is no analyser to ask.
+        const beat = kick != null ? kick : Math.sin(t * 7.5);
         const isPunchline = idx >= 0 && (idx % 2 === 1 || idx === lines.length - 1);
 
         // Shake effect on punchlines
@@ -514,18 +562,8 @@ window.poRoast = (function () {
                 });
 
                 // Route the element's audio into a recordable stream, keeping the speaker path live.
-                let graph = audioGraphs.get(audio);
-                if (!graph) {
-                    const Ctor = window.AudioContext || window.webkitAudioContext;
-                    const ctxA = new Ctor();
-                    const source = ctxA.createMediaElementSource(audio);
-                    const dest = ctxA.createMediaStreamDestination();
-                    source.connect(ctxA.destination);
-                    source.connect(dest);
-                    graph = { ctx: ctxA, dest: dest };
-                    audioGraphs.set(audio, graph);
-                }
-                if (graph.ctx.state === 'suspended') await graph.ctx.resume();
+                const graph = await graphFor(audio);
+                if (!graph) return 'failed';
 
                 const stream = new MediaStream([
                     ...canvas.captureStream(30).getVideoTracks(),
@@ -549,7 +587,7 @@ window.poRoast = (function () {
                         if (t >= l.end) idx = i;
                     }
                     if (mode === 'memeRoast') {
-                        drawMemeRoastFrame(ctx, img, timed, idx, t / duration, meta, t);
+                        drawMemeRoastFrame(ctx, img, timed, idx, t / duration, meta, t, beatLevel(graph));
                     } else {
                         drawFrame(ctx, img, timed, idx, t / duration, meta);
                     }

@@ -5,12 +5,16 @@ This file provides guidance to AI coding agents (Claude Code, Antigravity, etc.)
 ## Core Agent Rules
 
 1. **Master Branch Only**: Only use the `master` branch for all work and only use other branches if specifically asked to.
-2. **Never Push Without Asking**: Never push code to remote without me specifically asking.
-3. **Restart and Verify**: Always restart app and verify it restart successfully after making code change.
-4. **Project Documentation**: This file is the project summary. There is no `DOCS` folder — it was removed deliberately; do not re-add references to one.
-5. **No dotnet secrets**: Do not use dotnet secrets to store data locally / Put it in appSettings or Azure Key Vault (if one exists).
-6. **Git Commits in American Slang**: When git sync happen create a git commit that is short and uses american slang so it seems a human wrote it.
-7. **Response TLDR**: At the end of any prompt that has an answer longer than 100 words, at a TLDR 20 word summary.
+2. **Restart and Verify**: Always restart app and verify it restarts successfully after making code change.
+3. **Project Documentation**: Check for a `DOCS` folder in the root to get an overall summary of the project. None exists today (it was removed deliberately), so this file is the project summary.
+4. **No dotnet secrets**: Do not use dotnet secrets to store data locally / Put it in appSettings or Azure Key Vault (if one exists).
+5. **Git Sync = Commit + Push**: When git sync happens, create a git commit that is short and uses american slang and not technical so it seems a human wrote it, and also push code. Outside a git sync, never push without being asked.
+6. **Response TLDR**: At the end of any prompt that has an answer longer than 100 words, add a TLDR 20 word summary.
+7. **Targeted Tests Only**: Do not run all tests after code changes. Only run the tests related to the code change, or run no tests at all if the change is simple.
+8. **Automate, Don't Delegate**: Avoid making me manually type in commands to the CLI or manually click through a web GUI if you can do it for me automatically.
+9. **Warnings Are Errors**: Treat compile warnings as errors and make sure they are fixed (`TreatWarningsAsErrors` already enforces this in the build).
+10. **Report Big Deletions**: If more than 100 lines of code are removed overall from a prompt, mention it.
+11. **UI Change Screenshots**: When a change to the UI is made, take an annotated screenshot showing the new and old UI and annotate the changes. Place the image in the `SCREENSHOTS` folder and give its valid full path.
 
 ## Source of truth
 
@@ -297,13 +301,13 @@ its whole ruleset costs two methods against the ceiling however many rules it gr
 
 Approximate headroom, so you know which tier can absorb a new test.
 Test **methods**, not test cases — a `[Theory]` counts once however many `InlineData` rows it has,
-which is why these numbers are far below what a `dotnet test` run reports. Counted 2026-09-07; the
+which is why these numbers are far below what a `dotnet test` run reports. Counted 2026-09-28; the
 per-tier ceiling tests recompute them every CI run, so refresh this table when they drift.
 
 | Tier | Methods | Ceiling |
 |---|---|---|
-| Unit | 89 | 100 |
-| Integration | 44 | 50 |
+| Unit | 90 | 100 |
+| Integration | 45 | 50 |
 | E2E.ApiSmoke | 15 | 25 |
 | E2E.UI | 11 | 25 |
 | Architecture | 2 | 10 |
@@ -328,19 +332,20 @@ target (default `http://localhost:4000`).
 ## Branching & Git Sync — master only
 
 - **Master branch only**: Only use the master branch for all work and only use other branches if specifically asked to. Do **not** create feature, fix, or release branches, and do not open pull requests. No other branch may exist locally or on `origin`; if one appears, merge it into `master` and delete it on both sides. This overrides the usual "branch before committing" default — here, committing straight to `master` is the intended workflow, not an accident.
-- **Never push without asking**: Never push code to remote without me specifically asking.
-- **Commit style**: When git sync happen create a git commit that is short and uses american slang so it seems a human wrote it.
+- **Git sync = commit + push**: When git sync happens, create a short, non-technical commit in american slang so it seems a human wrote it, then push. Outside a git sync, never push without being asked.
 
 ## Will fail review
 
 | Anti-pattern | Why |
 |---|---|
 | Creating any branch other than `master` without being asked | Master branch only for all work unless specifically asked |
-| Pushing code to remote without explicit request | Never push code to remote without me specifically asking |
+| Pushing code to remote outside a git sync without explicit request | Only push on git sync or when specifically asked |
 | Skipping app restart & verification | Always restart app and verify it restart successfully after making code change |
 | `<UserSecretsId>` / `dotnet user-secrets` | Do not use dotnet secrets to store data locally / Put it in appSettings or Azure Key Vault |
-| Long or robotic commit messages during git sync | When git sync happen create a git commit that is short and uses american slang so it seems a human wrote it |
-| Response >100 words missing 20-word TLDR | At the end of any prompt that has an answer longer than 100 words, at a TLDR 20 word summary |
+| Long, technical or robotic commit messages during git sync | Git sync commits are short, non-technical american slang |
+| Response >100 words missing 20-word TLDR | At the end of any prompt that has an answer longer than 100 words, add a TLDR 20 word summary |
+| Running the whole test suite for a small change | Only run tests related to the change, or none if it's simple |
+| UI change with no annotated old/new screenshot in `SCREENSHOTS/` | Annotated before/after screenshot, full path given |
 | Interactive component in `.Web` | All UI lives in `.Client` |
 | `RenderMode.InteractiveServer`, or prerendering on a page | Breaks the no-prerender contract |
 | `AddOidcAuthentication()` on `.Client` | Puts tokens in the browser |

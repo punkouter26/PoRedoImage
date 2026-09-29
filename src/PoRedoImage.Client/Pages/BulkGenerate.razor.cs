@@ -198,6 +198,11 @@ public partial class BulkGenerate
 
         StateHasChanged();
 
+        // The batch keeps streaming if the user navigates away (this page is not disposable), so
+        // the header tray is where they watch it from elsewhere.
+        var trayJob = Jobs.Start($"Bulk · {activePrompts.Count} styles", "/bulk-generate");
+        string? trayFailure = null;
+
         try
         {
             // Use GPT-4o vision via API to get a detailed physical description of the person
@@ -297,12 +302,12 @@ public partial class BulkGenerate
                     slot.ImageUrl = $"data:{item.ContentType};base64,{item.ImageData}";
                     _completedCount++;
                     Cost.RecordImages();
-                    _ = Audio.TickAsync();
                     if (_userId is not null)
                         _ = AutoSaveVariationAsync(item.ImageData, item.ContentType);
                 }
 
                 StateHasChanged();
+                Jobs.Update(trayJob, $"{_results.Count(r => r.Status != BulkGenerateStatus.Processing)} of {_results.Count} finished");
                 // Persist results to localStorage so they survive circuit disconnection
                 _ = JSRuntime.InvokeVoidAsync("bulkStateManager.save",
                     System.Text.Json.JsonSerializer.Serialize(new BulkSavedState(_results.ToArray()), RestoreJsonOpts)).AsTask();
@@ -322,21 +327,26 @@ public partial class BulkGenerate
                 else
                     NotificationService.Notify(NotificationSeverity.Error, "All Failed", "All generations failed. Check each card for details.", duration: 7000);
 
-                // Audio cue: success arpeggio when at least one variation completed, otherwise failure.
-                _ = _completedCount > 0 ? Audio.SuccessAsync() : Audio.FailureAsync();
+                // Arrival chime when at least one variation completed, otherwise the failure cue.
+                _ = _completedCount > 0 ? Audio.SuccessAsync("Bulk Generate") : Audio.FailureAsync();
             }
         }
         catch (OperationCanceledException)
         {
+            trayFailure = "Cancelled.";
             NotificationService.Notify(NotificationSeverity.Warning, "Cancelled", "Generation was cancelled.", duration: 4000);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Error during generation: {ex.Message}", duration: 7000);
+            trayFailure = $"Error during generation: {ex.Message}";
+            NotificationService.Notify(NotificationSeverity.Error, "Error", trayFailure, duration: 7000);
             Logger.LogError(ex, "Bulk Generate failed");
         }
         finally
         {
+            Jobs.Complete(trayJob,
+                success: trayFailure is null && _completedCount > 0,
+                trayFailure ?? $"{_completedCount} of {activePrompts.Count} variations done — saved to your gallery.");
             _isGenerating = false;
             _cts?.Dispose();
             _cts = null;

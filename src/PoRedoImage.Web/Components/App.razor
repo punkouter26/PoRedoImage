@@ -57,6 +57,10 @@
     <link rel="stylesheet" href="@Assets["PoRedoImage.Client.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
+    @* Installable app (PWA) + share target. See wwwroot/sw.js for why it caches nothing. *@
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <meta name="theme-color" content="#0D0D0F" />
     <HeadOutlet @rendermode="WasmMode" />
     <title>PoRedoImage</title>
 </head>
@@ -69,6 +73,7 @@
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="js/audio.js"></script>
+    <script src="js/fx.js"></script>
     <script src="js/imageProcessing.js"></script>
     <script src="js/sessionState.js"></script>
     <script src="js/guestStorage.js"></script>
@@ -77,6 +82,9 @@
     <!-- Local AI interop. The workers themselves are ES modules loaded on demand by this script,
          so nothing model-related is fetched unless the user actually selects a browser model. -->
     <script src="js/local-ai/local-ai-interop.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () { });
+    </script>
 </body>
 
 </html>

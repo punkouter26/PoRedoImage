@@ -1059,8 +1059,25 @@ body.po-drop-active::after {
 
 .split-compare__img.loaded { opacity: 1; }
 
+/* fx.js overlays. The develop canvas sits exactly over the result and shares its crop, so the
+   halftone resolves onto the same pixels the <img> shows underneath. */
+.fx-develop {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover;
+    pointer-events: none;
+}
+
+.fx-burst { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2000; }
+
+/* Gallery thumbnail → lightbox morph (poFx.heroFrom). */
+::view-transition-group(po-hero) {
+    animation-duration: 380ms;
+    animation-timing-function: var(--motion-ease-in-out);
+}
+
 .split-compare__label {
     position: absolute;
+    z-index: 1; /* above fx.js's develop canvas, which is appended after it */
     top: 8px;
     left: 8px;
     margin: 0;

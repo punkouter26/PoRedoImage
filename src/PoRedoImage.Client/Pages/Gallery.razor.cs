@@ -32,6 +32,11 @@ public partial class Gallery
     private string? _deletingId;
     private bool _batchWorking;
 
+    // Every card carries a Radzen button row, so rendering a few hundred at once stalls the WASM
+    // renderer. Search, kind counts and select-all still work over the full list; only the DOM pages.
+    private const int PageSize = 48;
+    private int _visibleCount = PageSize;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadGalleryAsync();
@@ -46,11 +51,12 @@ public partial class Gallery
             var res = await Http.GetFromJsonAsync<List<UserImageDto>>("/api/user-images");
             _images = res?.OrderByDescending(x => x.CreatedAt).ToList() ?? new List<UserImageDto>();
             _selectedIds.Clear();
+            _visibleCount = PageSize;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load gallery");
-            _loadError = "Could not connect to the storage service. Ensure backend services are running.";
+            _loadError = "Your gallery couldn't be loaded right now. Your images are not lost.";
         }
         finally
         {
@@ -77,6 +83,10 @@ public partial class Gallery
             return q.ToList();
         }
     }
+
+    private List<UserImageDto> VisibleImages => FilteredImages.Take(_visibleCount).ToList();
+
+    private void ResetPaging() => _visibleCount = PageSize;
 
     private int CountFor(UserImageKind kind) => _images.Count(x => x.Kind == kind);
 
@@ -111,6 +121,8 @@ public partial class Gallery
             item.ImageUrl,
             item.Tags ?? Array.Empty<string>());
 
+        // Snapshot the card first so the dialog's image morphs out of it (fx.js).
+        await JS.InvokeVoidAsync("poFx.heroFrom", item.ImageUrl);
         var choice = await DialogService.OpenAsync<GalleryLightbox>(
             item.FileName,
             new Dictionary<string, object>

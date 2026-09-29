@@ -49,13 +49,25 @@ public static class UserImageEndpoints
     private static async Task<IResult> ListImagesAsync(
         HttpContext context,
         IUserImageService service,
+        ILogger<IUserImageService> logger,
         CancellationToken ct)
     {
         var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null) return Results.Unauthorized();
 
-        var images = await service.GetGalleryAsync(userId, ct);
-        return Results.Ok(images);
+        try
+        {
+            return Results.Ok(await service.GetGalleryAsync(userId, ct));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A storage failure must not read as an empty gallery — the client shows this with a Retry.
+            logger.LogWarning(ex, "Gallery list failed for {UserId}", userId);
+            return Results.Problem(
+                title: "Storage Service Unavailable",
+                detail: "Your gallery could not be loaded right now. Your images are not lost — try again shortly.",
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     private static async Task<IResult> SaveOriginalAsync(

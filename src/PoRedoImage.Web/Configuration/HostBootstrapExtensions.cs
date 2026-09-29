@@ -191,12 +191,15 @@ public static class HostBootstrapExtensions
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();
 
-                // Cost cap: drop the noisy ASP.NET HTTP client/hosting pre-aggregated meters
-                // (~60% of this app's Log Analytics ingestion). Reversible via config.
-                if (!builder.Configuration.GetValue("ApplicationInsights:EnableAspNetCoreMeters", false))
+                // Cost cap: drop the noisy ASP.NET hosting / HttpClient pre-aggregated meters
+                // (~60% of this app's Log Analytics ingestion). Reversible via config. A View, not
+                // a skipped AddMeter: the Azure Monitor distro registers these meters on its own.
+                if (!ConfigValue.Bool(builder.Configuration, ConfigKeys.ApplicationInsightsEnableAspNetCoreMeters))
                 {
-                    metrics.RemoveMeter("Microsoft.AspNetCore.Hosting");
-                    metrics.RemoveMeter("Microsoft.AspNetCore.HttpClient");
+                    metrics.AddView(instrument =>
+                        instrument.Meter.Name is "Microsoft.AspNetCore.Hosting" or "System.Net.Http"
+                            ? MetricStreamConfiguration.Drop
+                            : null);
                 }
             });
 

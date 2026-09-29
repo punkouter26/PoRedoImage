@@ -12,7 +12,7 @@ public sealed class UserImageService(
     public async Task<SaveImageResponse> SaveOriginalAsync(string userId, byte[] bytes, string contentType, string fileName, IReadOnlyList<string>? tags = null, CancellationToken ct = default)
     {
         var image = UserImage.Create(userId, fileName, contentType, UserImageKind.Original, bytes.Length, tags);
-        await repository.SaveBlobAsync(userId, image.Id, bytes, contentType, image.Tags, ct);
+        await repository.SaveBlobAsync(userId, image.Id, bytes, contentType, ct);
         await repository.SaveMetadataAsync(image, ct);
         logger.LogInformation("Saved original image {Id} for user {UserId}", image.Id, userId);
         return new SaveImageResponse(image.Id.Value, $"/api/user-images/{image.Id}");
@@ -28,7 +28,7 @@ public sealed class UserImageService(
             _ => "result.png"
         };
         var image = UserImage.Create(userId, fileName, contentType, kind, bytes.Length, tags);
-        await repository.SaveBlobAsync(userId, image.Id, bytes, contentType, image.Tags, ct);
+        await repository.SaveBlobAsync(userId, image.Id, bytes, contentType, ct);
         await repository.SaveMetadataAsync(image, ct);
         logger.LogInformation("Saved {Kind} result image {Id} for user {UserId}", kind, image.Id, userId);
         return new SaveImageResponse(image.Id.Value, $"/api/user-images/{image.Id}");
@@ -37,15 +37,7 @@ public sealed class UserImageService(
     public async Task<IReadOnlyList<UserImageDto>> GetGalleryAsync(string userId, CancellationToken ct = default)
     {
         var images = await repository.GetByUserAsync(userId, ct);
-        var list = new List<UserImageDto>(images.Count);
-        foreach (var i in images)
-        {
-            // Tags live on the blob, not in the table — pull them per-row so the gallery can
-            // filter by content later. The metadata call is a HEAD-equivalent (no body download),
-            // and we degrade gracefully on storage errors so a single broken blob can't blank the
-            // whole gallery.
-            var tags = await repository.GetTagsAsync(userId, i.Id, ct) ?? [];
-            list.Add(new UserImageDto(
+        return images.Select(i => new UserImageDto(
                 i.Id.Value,
                 i.FileName,
                 i.ContentType,
@@ -53,9 +45,9 @@ public sealed class UserImageService(
                 i.CreatedAt,
                 i.SizeBytes,
                 $"/api/user-images/{i.Id}",
-                tags));
-        }
-        return list.AsReadOnly();
+                i.Tags))
+            .ToList()
+            .AsReadOnly();
     }
 
     public Task<(byte[] Bytes, string ContentType)?> GetImageAsync(string userId, UserImageId imageId, CancellationToken ct = default) =>

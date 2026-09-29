@@ -1,0 +1,78 @@
+@* Header tray for long-running jobs. Hidden until the first job starts, so a visitor who never
+   renders a video never sees an empty control. *@
+@implements IDisposable
+@inject PoRedoImage.Client.Services.JobTrayService Jobs
+@inject NavigationManager Nav
+
+@if (Jobs.Jobs.Count > 0)
+{
+    <div class="job-tray">
+        <button type="button" class="job-tray__toggle" @onclick="Toggle"
+                aria-expanded="@_open" aria-label="@($"Jobs: {Running} running, {Jobs.Jobs.Count} total")">
+            <i class="bi @(Running > 0 ? "bi-hourglass-split" : "bi-check2-square")" aria-hidden="true"></i>
+            <span class="job-tray__label">Jobs</span>
+            @if (Jobs.AttentionCount > 0)
+            {
+                <span class="job-tray__badge @(Running > 0 ? "job-tray__badge--working" : "")">@Jobs.AttentionCount</span>
+            }
+        </button>
+
+        @if (_open)
+        {
+            <div class="job-tray__panel" role="dialog" aria-label="Running and finished jobs">
+                <ul class="job-tray__list">
+                    @foreach (var job in Jobs.Jobs.Reverse())
+                    {
+                        <li class="job-tray__row">
+                            <div class="job-tray__main">
+                                <span class="job-tray__name">@job.Label</span>
+                                <StatusCell Status="job.Status" ShowLamp="true" />
+                            </div>
+                            @if (!string.IsNullOrEmpty(job.Detail))
+                            {
+                                <div class="job-tray__detail">@job.Detail</div>
+                            }
+                            <div class="job-tray__actions">
+                                <button type="button" class="flap-btn flap-btn--sm" @onclick="() => Open(job)">Open</button>
+                                @if (job.Status != BoardStatus.Working)
+                                {
+                                    <button type="button" class="flap-btn flap-btn--sm" aria-label="@($"Dismiss {job.Label}")"
+                                            @onclick="() => Jobs.Dismiss(job)">Dismiss</button>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _open;
+
+    private int Running => Jobs.Jobs.Count(j => j.Status == BoardStatus.Working);
+
+    protected override void OnInitialized() => Jobs.OnChange += OnJobsChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Jobs.RestoreAsync();
+    }
+
+    private void OnJobsChanged() => InvokeAsync(StateHasChanged);
+
+    private void Toggle()
+    {
+        _open = !_open;
+        if (_open) Jobs.MarkAllSeen();
+    }
+
+    private void Open(PoRedoImage.Client.Services.TrayJob job)
+    {
+        _open = false;
+        Nav.NavigateTo(job.Href);
+    }
+
+    public void Dispose() => Jobs.OnChange -= OnJobsChanged;
+}

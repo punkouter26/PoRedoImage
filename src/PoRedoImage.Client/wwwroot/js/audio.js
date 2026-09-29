@@ -32,30 +32,17 @@ const AudioCue = (() => {
         return false;
     }
 
-    function tone({ freq = 880, durMs = 60, type = 'sine', attack = 4, release = 24 } = {}) {
-        if (!enabled || prefersReduced()) return;
+    function ready() {
+        if (!isOn()) return false;
         const c = ensureContext();
-        if (!c) return;
+        if (!c) return false;
         if (c.state === 'suspended') c.resume();
-        const osc = c.createOscillator();
-        const gain = c.createGain();
-        osc.type = type;
-        osc.frequency.value = freq;
-        const now = c.currentTime;
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(1, now + attack / 1000);
-        gain.gain.linearRampToValueAtTime(0, now + durMs / 1000);
-        osc.connect(gain);
-        gain.connect(master);
-        osc.start(now);
-        osc.stop(now + (durMs + release) / 1000);
+        return true;
     }
 
     function noise({ durMs = 120, lowpass = 1200 } = {}) {
-        if (!enabled || prefersReduced()) return;
-        const c = ensureContext();
-        if (!c) return;
-        if (c.state === 'suspended') c.resume();
+        if (!ready()) return;
+        const c = ctx;
         // Fill a tiny buffer with white noise + lowpass for a soft thud.
         const buf = c.createBuffer(1, c.sampleRate * (durMs / 1000), c.sampleRate);
         const data = buf.getChannelData(0);
@@ -72,10 +59,40 @@ const AudioCue = (() => {
         src.stop(c.currentTime + durMs / 1000);
     }
 
-    // Two-note success arpeggio: A5 → E6, 70ms each.
-    function success() {
-        tone({ freq: 880, durMs: 70, type: 'sine' });
-        setTimeout(() => tone({ freq: 1318.51, durMs: 110, type: 'sine' }), 70);
+    // Station PA chime — three struck bells, G5 → E5 → C5, each with a long exponential tail.
+    function bell(freq, at, peak) {
+        const c = ensureContext();
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, at);
+        gain.gain.linearRampToValueAtTime(peak, at + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + 1.1);
+        osc.connect(gain).connect(master);
+        osc.start(at);
+        osc.stop(at + 1.15);
+    }
+
+    function success(label) {
+        if (!ready()) return;
+        const now = ctx.currentTime;
+        bell(783.99, now, 0.9);
+        bell(659.25, now + 0.28, 0.8);
+        bell(523.25, now + 0.56, 0.9);
+        announce(label, 900);
+    }
+
+    // "Now arriving: Meme." Spoken through the platform voice, after the chime has rung out.
+    function announce(label, delayMs) {
+        if (!label || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+        setTimeout(function () {
+            const u = new SpeechSynthesisUtterance('Now arriving: ' + label + '.');
+            u.rate = 0.95;
+            u.volume = 0.8;
+            speechSynthesis.cancel();
+            speechSynthesis.speak(u);
+        }, delayMs);
     }
 
     // Low-passed noise burst for failures.
@@ -83,9 +100,35 @@ const AudioCue = (() => {
         noise({ durMs: 140, lowpass: 800 });
     }
 
-    // Single soft tick for in-progress events.
-    function tick() {
-        tone({ freq: 1320, durMs: 22, type: 'sine' });
+    // One split-flap leaf hitting its stop: a 10ms band-passed click with a little pitch scatter,
+    // so a cascade of them sounds mechanical rather than like one sample on repeat.
+    // Skipped until the page has had a gesture — an AudioContext created earlier starts suspended
+    // and Chrome logs a warning for every resume attempt.
+    let clackBuf = null;
+    function clack(level) {
+        if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+        if (!ready()) return;
+        if (!clackBuf) {
+            clackBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.012), ctx.sampleRate);
+            const d = clackBuf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = clackBuf;
+        src.playbackRate.value = 0.85 + Math.random() * 0.3;
+        const band = ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.value = 2400 + Math.random() * 1600;
+        band.Q.value = 1.2;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.55 * (level || 1);
+        src.connect(band).connect(gain).connect(master);
+        src.start();
+    }
+
+    /** True when cues are allowed to fire — the same gate every sound uses. */
+    function isOn() {
+        return enabled && !prefersReduced();
     }
 
     function setEnabled(value) {
@@ -94,7 +137,7 @@ const AudioCue = (() => {
     }
 
     readPref();
-    return { success, failure, tick, setEnabled };
+    return { success, failure, clack, isOn, setEnabled };
 })();
 
 window.PoRedoImageAudio = AudioCue;
