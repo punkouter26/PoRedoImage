@@ -242,8 +242,17 @@ dotnet build src/PoRedoImage.Mobile -f net10.0-android -r android-x64   -t:Insta
 
 `.vscode/settings.json` points C# Dev Kit at `PoRedoImage.slnx`, not the Mobile one: loading
 `PoRedoImage.Mobile.slnx` on a machine without the Android SDK fails every design-time build with
-`XA5300` (and `NU1012`), which surfaces as a red Problems panel unrelated to the web app. Open the
-Mobile solution explicitly once the SDK is installed.
+`XA5300` (and `NU1012`), which surfaces as a red C# Doctor / Problems panel unrelated to the web app.
+Installing Android Studio does NOT install the SDK (that happens in its first-run wizard). One command
+installs it where both .NET and Android Studio look by default, and needs a JDK on `JAVA_HOME`:
+
+```powershell
+dotnet build src/PoRedoImage.Mobile -t:InstallAndroidDependencies -f net10.0-android "-p:AndroidSdkDirectory=$env:LOCALAPPDATA\Android\Sdk" -p:AcceptAndroidSdkLicenses=True
+```
+
+Nothing in CI builds the MAUI head, so it can rot silently: in 2026-09 it had not compiled since
+`aba465c` (a lost `[ObservableProperty]` field) until the SDK was installed. Build
+`PoRedoImage.Mobile.slnx` after touching `Shared` DTOs.
 
 Pick the RID to match the device: physical phones are `arm64-v8a`, the emulator images here are
 `x86_64`. Installing the wrong one fails with Android's misleading *"not enough storage space"*.

@@ -33,6 +33,12 @@ public partial class MainViewModel : ObservableObject
     private readonly ISharedImageInbox _sharedInbox;
     private readonly IAudioPlayerService _audioPlayer;
 
+    // Restored: aba465c overwrote this line while adding _activeAction below, which deleted the
+    // generated CapturedImage property that twenty call sites still use. Nothing noticed, because
+    // this machine had no Android SDK and nothing else builds the MAUI head.
+    [ObservableProperty]
+    private ImageCaptureResult? _capturedImage;
+
     [ObservableProperty]
     private ResultMode _activeAction = ResultMode.None;
 

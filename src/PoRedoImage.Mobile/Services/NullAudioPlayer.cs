@@ -7,9 +7,11 @@ public class NullAudioPlayer : IAudioPlayerService
 {
     public bool IsPlaying => false;
 
-    public event EventHandler? PlaybackStarted;
+    // Never raised — nothing plays — so the handlers are simply not kept. Plain field-like events
+    // here tripped CS0067 ("never used"), which TreatWarningsAsErrors turns into a build break.
+    public event EventHandler? PlaybackStarted { add { } remove { } }
     public event EventHandler? PlaybackEnded;
-    public event EventHandler<string>? PlaybackError;
+    public event EventHandler<string>? PlaybackError { add { } remove { } }
 
     public Task PlayAsync(byte[] audioBytes, string contentType = "audio/mpeg")
     {
